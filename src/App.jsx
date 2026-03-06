@@ -9,6 +9,9 @@ import NotesWidget from './components/NotesWidget'
 import WeatherWidget from './components/WeatherWidget'
 import PomodoroTimer from './components/PomodoroTimer'
 import { LogOut, GraduationCap, Menu, X } from 'lucide-react'
+import SpotifyWidget from './components/SpotifyWidget'
+import ThemeSettings from './components/ThemeSettings'
+import { Settings, Sun, Moon } from 'lucide-react'
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -20,6 +23,10 @@ export default function App() {
   const [selectedTask, setSelectedTask] = useState(null)
   const [defaultTime, setDefaultTime] = useState('09:00')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [darkMode, setDarkMode] = useState(true)
+  const [showThemeSettings, setShowThemeSettings] = useState(false)
+  const [theme, setTheme] = useState({ accent: '#00FFD1', bg1: '#0a0a1a', bg2: '#0d1117' })
+  const [pomodoroActive, setPomodoroActive] = useState(false)
 
   // Auth listener
   useEffect(() => {
@@ -36,6 +43,16 @@ export default function App() {
   useEffect(() => {
     if (session) { fetchTasks(); fetchSubjects() }
   }, [session])
+
+  // Effect voor dark/light mode:
+  useEffect(() => {
+    document.body.classList.toggle('light-mode', !darkMode)
+  }, [darkMode])
+
+  // Effect voor accent kleur:
+  useEffect(() => {
+    document.documentElement.style.setProperty('--accent', theme.accent)
+  }, [theme.accent])
 
   const fetchTasks = async () => {
     const { data } = await supabase.from('tasks').select('*').order('time', { ascending: true })
@@ -147,6 +164,7 @@ export default function App() {
               </div>
             </div>
           )}
+          
 
           <div className="flex items-center gap-2">
             <span className="text-xs hidden sm:block" style={{ color: 'rgba(255,255,255,0.3)' }}>
@@ -162,6 +180,27 @@ export default function App() {
             <button className="md:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.6)' }}>
               {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+            {/* Light/Dark toggle */}
+            <button
+              onClick={() => setDarkMode(!darkMode)}
+              title={darkMode ? 'Light mode' : 'Dark mode'}
+              style={{
+                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '12px', padding: '8px', cursor: 'pointer',
+                color: darkMode ? 'rgba(255,255,255,0.6)' : 'var(--accent)'
+              }}>
+              {darkMode ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+
+            {/* Instellingen */}
+            <button
+              onClick={() => setShowThemeSettings(true)}
+              style={{
+                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '12px', padding: '8px', cursor: 'pointer', color: 'rgba(255,255,255,0.6)'
+              }}>
+              <Settings size={16} />
             </button>
           </div>
         </nav>
@@ -193,6 +232,7 @@ export default function App() {
           {/* RIGHT COLUMN */}
           <div className="space-y-4 sticky top-6">
             <WeatherWidget />
+            <SpotifyWidget />
             <PomodoroTimer onModeChange={setIsBreak} />
             {/* Upcoming tasks summary */}
             <div className="glass-card p-4">
@@ -260,13 +300,22 @@ export default function App() {
           {mobileMenuOpen && (
             <div className="space-y-4" style={{ animation: 'slideUp 0.3s ease' }}>
               <WeatherWidget />
-              <PomodoroTimer onModeChange={setIsBreak} />
+              <PomodoroTimer onModeChange={setIsBreak} onPomodoroActive={setPomodoroActive} />
               <SubjectsWidget subjects={subjects} onAdd={handleAddSubject} onDelete={handleDeleteSubject} />
               <NotesWidget />
             </div>
           )}
         </div>
       </div>
+
+      // ThemeSettings modal:
+      {showThemeSettings && (
+        <ThemeSettings
+          onClose={() => setShowThemeSettings(false)}
+          theme={theme} setTheme={setTheme}
+          darkMode={darkMode} setDarkMode={setDarkMode}
+        />
+      )}
 
       {/* Task Modal */}
       {modalOpen && (
