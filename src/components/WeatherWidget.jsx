@@ -19,7 +19,7 @@ const WMO_CODES = {
 
 export default function WeatherWidget() {
   const [weather, setWeather] = useState(null)
-  const [city, setCity] = useState('Amsterdam')
+  const [city, setCity] = useState('Dronten') // ← standaard Dronten
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -50,7 +50,8 @@ export default function WeatherWidget() {
           <Cloud size={16} style={{ color: '#00FFD1' }} />
           <h3 className="text-sm font-semibold text-white">Weer</h3>
         </div>
-        <button onClick={fetchWeather} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}>
+        <button onClick={fetchWeather}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}>
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
         </button>
       </div>
@@ -65,6 +66,9 @@ export default function WeatherWidget() {
           style={{ fontSize: '12px', padding: '6px 10px' }}
           placeholder="Stad..."
         />
+        <button onClick={fetchWeather} className="btn-neon" style={{ padding: '6px 12px', fontSize: '12px' }}>
+          Zoek
+        </button>
       </div>
 
       {error && <p className="text-xs" style={{ color: '#ff6b6b' }}>{error}</p>}
