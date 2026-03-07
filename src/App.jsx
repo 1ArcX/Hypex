@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { supabase } from './supabaseClient'
 import AuthPage from './components/AuthPage'
 import Clock from './components/Clock'
@@ -17,6 +17,8 @@ import AdminPanel from './components/AdminPanel'
 import TasksWidget from './components/TasksWidget'
 import { Shield } from 'lucide-react'
 
+const ADMIN_EMAIL = 'zhafirfachri@gmail.com'
+
 export default function App() {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -32,65 +34,77 @@ export default function App() {
   const [theme, setTheme] = useState({ accent: '#00FFD1', bg1: '#0a0a1a', bg2: '#0d1117' })
   const [pomodoroActive, setPomodoroActive] = useState(false)
   const [profiles, setProfiles] = useState([])
-
-  const ADMIN_EMAIL = 'zhafirfachri@gmail.com'
-
   const [showAdmin, setShowAdmin] = useState(false)
-  const [profileReady, setProfileReady] = useState(false)
+
+  // ✅ FIX: user vroeg beschikbaar via useMemo (geen undefined bij vakken/kalender)
+  const user = useMemo(() => session?.user || null, [session])
+  const isAdmin = user?.email === ADMIN_EMAIL
 
   const fetchProfiles = async () => {
-    const { data, error } = await supabase.from('profiles').select('*');
-    if (error) console.error('Error fetching profiles:', error);
-    else setProfiles(data || []);
-  };
+    const { data, error } = await supabase.from('profiles').select('*')
+    if (error) console.error('Error fetching profiles:', error)
+    else setProfiles(data || [])
+  }
 
-  // Auth listener
+  // ✅ FIX: mounted flag voorkomt state-update na unmount
   useEffect(() => {
+    let mounted = true
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session); setLoading(false)
+      if (!mounted) return
+      setSession(session)
+      setLoading(false)
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
     })
-    return () => subscription.unsubscribe()
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   // Load data
-useEffect(() => {
-  if (session) {
-    fetchTasks(); fetchSubjects(); fetchProfiles()
-  }
-}, [session])
+  useEffect(() => {
+    if (session) {
+      fetchTasks(); fetchSubjects(); fetchProfiles()
+    }
+  }, [session])
 
-useEffect(() => {
-  if (profiles.length > 0) {
-    const p = profiles.find(pr => pr.id === session?.user?.id)
-    setProfileReady(!!(p?.klas && p?.vakken?.length > 0))
-  }
-}, [profiles])
+  // ✅ FIX: useMemo voor userProfile (geen stale closure)
+  const userProfile = useMemo(() => {
+    if (!user?.id) return null
+    return profiles.find(p => p.id === user.id) || null
+  }, [profiles, user?.id])
 
-  // Effect voor accent kleur:
+  // ✅ FIX: profileReady als computed value, niet als aparte state
+  const profileReady = !!(userProfile?.klas && (userProfile?.vakken?.length || 0) > 0)
+
+  // Effect voor accent kleur
   useEffect(() => {
     document.documentElement.style.setProperty('--accent', theme.accent)
   }, [theme.accent])
 
   useEffect(() => {
-  const handler = () => fetchTasks()
-  window.addEventListener('refreshTasks', handler)
-  return () => window.removeEventListener('refreshTasks', handler)
-}, [])
+    const handler = () => fetchTasks()
+    window.addEventListener('refreshTasks', handler)
+    return () => window.removeEventListener('refreshTasks', handler)
+  }, [])
 
   const fetchTasks = async () => {
-    const { data } = await supabase.from('tasks').select('*').order('time', { ascending: true })
-    if (data) setTasks(data)
+    const { data, error } = await supabase.from('tasks').select('*').order('time', { ascending: true })
+    if (error) console.error(error)
+    setTasks(data || [])
   }
 
   const fetchSubjects = async () => {
-    const { data } = await supabase.from('subjects').select('*').order('created_at', { ascending: true })
-    if (data) setSubjects(data)
+    const { data, error } = await supabase.from('subjects').select('*').order('created_at', { ascending: true })
+    if (error) console.error(error)
+    setSubjects(data || [])
   }
 
+  // ✅ FIX: handleSaveTask gebruikt user?.id (nooit undefined)
   const handleSaveTask = async (taskData) => {
+    if (!user?.id) return
     if (taskData.id) {
       await supabase.from('tasks').update({
         title: taskData.title,
@@ -106,16 +120,18 @@ useEffect(() => {
         time: taskData.time,
         subject_id: taskData.subject_id,
         completed: false,
-        user_id: session.user.id
+        user_id: user.id
       })
     }
-    setModalOpen(false); setSelectedTask(null)
+    setShowTaskModal(false)
+    setSelectedTask(null)
     fetchTasks()
   }
 
   const handleDeleteTask = async (id) => {
     await supabase.from('tasks').delete().eq('id', id)
-    setModalOpen(false); setSelectedTask(null)
+    setShowTaskModal(false)
+    setSelectedTask(null)
     fetchTasks()
   }
 
@@ -125,7 +141,8 @@ useEffect(() => {
   }
 
   const handleAddSubject = async (subjectData) => {
-    await supabase.from('subjects').insert({ ...subjectData, user_id: session.user.id })
+    if (!user?.id) return
+    await supabase.from('subjects').insert({ ...subjectData, user_id: user.id })
     fetchSubjects()
   }
 
@@ -135,17 +152,21 @@ useEffect(() => {
   }
 
   const openNewTask = (time) => {
-    setSelectedTask(null); setDefaultTime(time); setModalOpen(true)
+    setSelectedTask(null)
+    setDefaultTime(time || '09:00')
+    setShowTaskModal(true)
   }
 
   const openEditTask = (task) => {
-    setSelectedTask(task); setModalOpen(true)
+    setSelectedTask(task)
+    setShowTaskModal(true)
   }
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="mesh-bg"><div className="mesh-blob" /></div>
-      <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#00FFD1', borderTopColor: 'transparent' }} />
+      <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin"
+        style={{ borderColor: '#00FFD1', borderTopColor: 'transparent' }} />
     </div>
   )
 
@@ -156,26 +177,19 @@ useEffect(() => {
     </>
   )
 
-  // user wordt HIER gedeclareerd, NADAT session gecontroleerd is
-  const user = session.user
-  const isAdmin = user?.email === ADMIN_EMAIL
-  const userProfile = profiles.find(p => p.id === user?.id)
   const displayName = userProfile?.full_name || user?.email?.split('@')[0] || 'Student'
-
   const completedToday = tasks.filter(t => t.completed).length
   const totalToday = tasks.length
 
+  // ✅ FIX: profiles.length > 0 check + profileReady als computed value
   if (!profileReady && profiles.length > 0) return (
     <>
       <div className="mesh-bg"><div className="mesh-blob" /></div>
-      <ProfileSetup 
-        userId={session.user.id} 
+      <ProfileSetup
+        userId={user.id}
         onComplete={async () => {
-          // 1. Haal direct de nieuwste data op uit Supabase
-          await fetchProfiles(); 
-          // 2. Zet de state handmatig op true voor de zekerheid
-          setProfileReady(true); 
-        }} 
+          await fetchProfiles()
+        }}
       />
     </>
   )
@@ -188,9 +202,14 @@ useEffect(() => {
       {/* Main content */}
       <div className="relative z-10 min-h-screen flex flex-col">
 
-        {/* Top navbar */}
+        {/* Top navbar — sticky zodat hij nooit wegscrollt */}
         <nav className="flex items-center justify-between px-6 py-4"
-          style={{ borderBottom: '1px solid rgba(0,255,209,0.08)', background: 'rgba(5,10,20,0.6)', backdropFilter: 'blur(20px)' }}>
+          style={{
+            position: 'sticky', top: 0, zIndex: 50,
+            borderBottom: '1px solid rgba(0,255,209,0.08)',
+            background: 'rgba(5,10,20,0.85)',
+            backdropFilter: 'blur(20px)'
+          }}>
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl flex items-center justify-center"
               style={{ background: 'rgba(0,255,209,0.15)', border: '1px solid rgba(0,255,209,0.3)' }}>
@@ -199,9 +218,9 @@ useEffect(() => {
             <span className="font-semibold text-white text-sm hidden sm:block">Student Dashboard</span>
           </div>
 
-        <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
-          Hoi, {displayName} 👋
-        </span>
+          <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
+            Hoi, {displayName} 👋
+          </span>
 
           {/* Progress bar */}
           {totalToday > 0 && (
@@ -211,14 +230,18 @@ useEffect(() => {
               </span>
               <div className="w-32 h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
                 <div className="h-full rounded-full transition-all duration-500"
-                  style={{ width: `${(completedToday / totalToday) * 100}%`, background: 'linear-gradient(90deg, #00FFD1, #818CF8)', boxShadow: '0 0 8px rgba(0,255,209,0.5)' }} />
+                  style={{
+                    width: `${(completedToday / totalToday) * 100}%`,
+                    background: 'linear-gradient(90deg, #00FFD1, #818CF8)',
+                    boxShadow: '0 0 8px rgba(0,255,209,0.5)'
+                  }} />
               </div>
             </div>
           )}
 
           <div className="flex items-center gap-2">
             <span className="text-xs hidden sm:block" style={{ color: 'rgba(255,255,255,0.3)' }}>
-              {session.user.email}
+              {user?.email}
             </span>
             <button onClick={() => supabase.auth.signOut()}
               className="btn-neon flex items-center gap-1.5"
@@ -226,6 +249,7 @@ useEffect(() => {
               <LogOut size={13} />
               <span className="hidden sm:inline">Uitloggen</span>
             </button>
+
             {/* Mobile menu toggle */}
             <button className="md:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.6)' }}>
@@ -233,38 +257,46 @@ useEffect(() => {
             </button>
 
             {/* Instellingen knop */}
-            <button
-              onClick={() => setShowThemeSettings(true)}
+            <button onClick={() => setShowThemeSettings(true)}
               style={{
                 background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
                 borderRadius: '12px', padding: '8px', cursor: 'pointer', color: 'rgba(255,255,255,0.6)'
               }}>
               <Settings size={16} />
             </button>
+
             {isAdmin && (
-            <button onClick={() => setShowAdmin(true)}
-              title="Admin Paneel"
-              style={{ background: 'rgba(255,180,0,0.1)', border: '1px solid rgba(255,180,0,0.3)', borderRadius: '12px', padding: '8px', cursor: 'pointer', color: '#FFB400' }}>
-              <Shield size={16} />
-            </button>
-          )}
+              <button onClick={() => setShowAdmin(true)} title="Admin Paneel"
+                style={{ background: 'rgba(255,180,0,0.1)', border: '1px solid rgba(255,180,0,0.3)', borderRadius: '12px', padding: '8px', cursor: 'pointer', color: '#FFB400' }}>
+                <Shield size={16} />
+              </button>
+            )}
           </div>
         </nav>
 
         {/* Desktop: 3-column grid */}
-        <div className="hidden md:grid flex-1 gap-4 p-6" style={{ gridTemplateColumns: '280px 1fr 300px', alignItems: 'start' }}>
+        <div className="hidden md:grid flex-1 gap-4 p-6"
+          style={{ gridTemplateColumns: '280px 1fr 300px', alignItems: 'start' }}>
 
           {/* LEFT COLUMN */}
-          <div className="space-y-4 sticky top-6">
-            <SubjectsWidget subjects={subjects} onAdd={handleAddSubject} onDelete={handleDeleteSubject} />
-            <NotesWidget />
+          <div className="space-y-4 sticky top-20">
+            <SubjectsWidget
+              subjects={subjects}
+              userId={user.id}
+              onAdd={handleAddSubject}
+              onDelete={handleDeleteSubject}
+              isAdmin={isAdmin}
+            />
+            <NotesWidget userId={user.id} />
             <TasksWidget
               tasks={tasks}
               subjects={subjects}
               onAdd={async (data) => {
-                await supabase.from('tasks').insert({ ...data, completed: false, user_id: session.user.id })
+                if (!user?.id) return
+                await supabase.from('tasks').insert({ ...data, completed: false, user_id: user.id })
                 fetchTasks()
               }}
+              onEdit={openEditTask}
               onDelete={handleDeleteTask}
               onToggle={handleToggleTask}
             />
@@ -274,22 +306,23 @@ useEffect(() => {
           <div className="space-y-4">
             <div className="glass-card p-6">
               <Clock isBreak={isBreak} />
-              <div className="mt-1 mb-4" style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(0,255,209,0.2), transparent)' }} />
+              <div className="mt-1 mb-4"
+                style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(0,255,209,0.2), transparent)' }} />
               <div className="overflow-y-auto" style={{ maxHeight: '40vh' }}>
-              <Timeline
-                userId={session?.user?.id}
-                tasks={tasks}
-                subjects={subjects}
-                onToggleTask={handleToggleTask}
-                onEditTask={(task) => { setSelectedTask(task); setShowTaskModal(true) }}
-                isAdmin={isAdmin}
-              />
+                <Timeline
+                  userId={user.id}
+                  tasks={tasks}
+                  subjects={subjects}
+                  onToggleTask={handleToggleTask}
+                  onEditTask={openEditTask}
+                  isAdmin={isAdmin}
+                />
               </div>
             </div>
           </div>
 
           {/* RIGHT COLUMN */}
-          <div className="space-y-4 sticky top-6">
+          <div className="space-y-4 sticky top-20">
             <WeatherWidget />
             {isAdmin && <SpotifyWidget />}
             <PomodoroTimer onModeChange={setIsBreak} />
@@ -304,22 +337,28 @@ useEffect(() => {
           <div className="glass-card p-4">
             <h3 className="text-sm font-semibold text-white mb-3">Dag Tijdlijn</h3>
             <div className="overflow-y-auto" style={{ maxHeight: '50vh' }}>
-            <Timeline
-              userId={session?.user?.id}
-              tasks={tasks}
-              subjects={subjects}
-              onToggleTask={handleToggleTask}
-              onEditTask={(task) => { setSelectedTask(task); setShowTaskModal(true) }}
-              isAdmin={isAdmin}
-            />
+              <Timeline
+                userId={user.id}
+                tasks={tasks}
+                subjects={subjects}
+                onToggleTask={handleToggleTask}
+                onEditTask={openEditTask}
+                isAdmin={isAdmin}
+              />
             </div>
           </div>
           {mobileMenuOpen && (
             <div className="space-y-4" style={{ animation: 'slideUp 0.3s ease' }}>
               <WeatherWidget />
               <PomodoroTimer onModeChange={setIsBreak} onPomodoroActive={setPomodoroActive} />
-              <SubjectsWidget userId={session?.user?.id} />
-              <NotesWidget />
+              <SubjectsWidget
+                subjects={subjects}
+                userId={user.id}
+                onAdd={handleAddSubject}
+                onDelete={handleDeleteSubject}
+                isAdmin={isAdmin}
+              />
+              <NotesWidget userId={user.id} />
             </div>
           )}
         </div>
@@ -327,7 +366,6 @@ useEffect(() => {
 
       {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
 
-      {/* ThemeSettings modal */}
       {showThemeSettings && (
         <ThemeSettings
           onClose={() => setShowThemeSettings(false)}
@@ -336,16 +374,15 @@ useEffect(() => {
         />
       )}
 
-      
-
-      {/* Task Modal */}
       {showTaskModal && (
         <TaskModal
           task={selectedTask}
+          defaultTime={defaultTime}
           subjects={subjects}
-          userId={session?.user?.id}
+          userId={user.id}
           onClose={() => { setShowTaskModal(false); setSelectedTask(null) }}
-          onSave={() => { fetchTasks(); setShowTaskModal(false); setSelectedTask(null) }}
+          onSave={handleSaveTask}
+          onDelete={handleDeleteTask}
         />
       )}
     </div>
