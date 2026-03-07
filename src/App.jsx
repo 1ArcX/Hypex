@@ -149,10 +149,6 @@ export default function App() {
       {/* Main content */}
       <div className="relative z-10 min-h-screen flex flex-col">
 
-        <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
-          Hoi, {displayName} 👋
-        </span>
-
         {/* Top navbar */}
         <nav className="flex items-center justify-between px-6 py-4"
           style={{ borderBottom: '1px solid rgba(0,255,209,0.08)', background: 'rgba(5,10,20,0.6)', backdropFilter: 'blur(20px)' }}>
@@ -163,6 +159,10 @@ export default function App() {
             </div>
             <span className="font-semibold text-white text-sm hidden sm:block">Student Dashboard</span>
           </div>
+
+        <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
+          Hoi, {displayName} 👋
+        </span>
 
           {/* Progress bar */}
           {totalToday > 0 && (
