@@ -275,12 +275,14 @@ useEffect(() => {
               <Clock isBreak={isBreak} />
               <div className="mt-1 mb-4" style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(0,255,209,0.2), transparent)' }} />
               <div className="overflow-y-auto" style={{ maxHeight: '40vh' }}>
-                <Timeline
-                  userId={session.user.id}
-                  tasks={tasks}
-                  subjects={subjects}
-                  onToggleTask={handleToggleTask}
-                />
+              <Timeline
+                userId={session?.user?.id}
+                tasks={tasks}
+                subjects={subjects}
+                onToggleTask={handleToggleTask}
+                onEditTask={(task) => { setSelectedTask(task); setShowTaskModal(true) }}
+                isAdmin={isAdmin}
+              />
               </div>
             </div>
           </div>
@@ -301,13 +303,14 @@ useEffect(() => {
           <div className="glass-card p-4">
             <h3 className="text-sm font-semibold text-white mb-3">Dag Tijdlijn</h3>
             <div className="overflow-y-auto" style={{ maxHeight: '50vh' }}>
-              <Timeline
-                tasks={tasks}
-                subjects={subjects}
-                onSlotClick={openNewTask}
-                onTaskClick={openEditTask}
-                onToggleTask={handleToggleTask}
-              />
+            <Timeline
+              userId={session?.user?.id}
+              tasks={tasks}
+              subjects={subjects}
+              onToggleTask={handleToggleTask}
+              onEditTask={(task) => { setSelectedTask(task); setShowTaskModal(true) }}
+              isAdmin={isAdmin}
+            />
             </div>
           </div>
           {mobileMenuOpen && (

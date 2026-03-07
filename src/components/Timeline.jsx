@@ -1,53 +1,48 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabaseClient'
-import { Plus, ChevronLeft, ChevronRight, Repeat, X, Save } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight, X, Save, Trash2, Clock, AlignLeft, Repeat, Check } from 'lucide-react'
+import { openBookLink } from '../utils/openBook'
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i)
 const MONTHS = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec']
-const DAYS_NL = ['Zondag','Maandag','Dinsdag','Woensdag','Donderdag','Vrijdag','Zaterdag']
+const DAYS_NL = ['Zo','Ma','Di','Wo','Do','Vr','Za']
+const DAYS_FULL = ['Zondag','Maandag','Dinsdag','Woensdag','Donderdag','Vrijdag','Zaterdag']
 const EVENT_COLORS = ['#00FFD1','#818CF8','#FF8C42','#FF6B6B','#4ADE80','#FACC15','#38BDF8']
 
-function formatTime(h, m = 0) {
-  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`
-}
-
+function pad(n) { return String(n).padStart(2,'0') }
+function formatTime(h, m = 0) { return `${pad(h)}:${pad(m)}` }
+function toDateStr(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}` }
 function isSameDay(a, b) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+  return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate()
 }
-
 function getWeekDays(date) {
   const start = new Date(date)
-  start.setDate(date.getDate() - date.getDay() + 1) // start op maandag
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(start)
-    d.setDate(start.getDate() + i)
-    return d
-  })
+  const day = date.getDay()
+  start.setDate(date.getDate() - (day === 0 ? 6 : day - 1))
+  return Array.from({length:7},(_,i)=>{ const d=new Date(start); d.setDate(start.getDate()+i); return d })
 }
 
-export default function Timeline({ userId, tasks, subjects, onToggleTask }) {
+const emptyForm = (date, hour) => ({
+  title: '', description: '', date: toDateStr(date || new Date()),
+  startTime: hour !== undefined ? formatTime(hour) : '09:00',
+  endTime: hour !== undefined ? formatTime(Math.min(hour+1,23)) : '10:00',
+  color: '#818CF8', recurrence: '', recurrence_days: [], completed: false
+})
+
+export default function Timeline({ userId, tasks, subjects, onToggleTask, onEditTask, isAdmin }) {
   const [view, setView] = useState('day')
   const [current, setCurrent] = useState(new Date())
   const [events, setEvents] = useState([])
-  const [showModal, setShowModal] = useState(false)
-  const [editEvent, setEditEvent] = useState(null)
-  const [dragOverHour, setDragOverHour] = useState(null)
-  const [form, setForm] = useState({
-    title: '', description: '', date: '', startTime: '09:00', endTime: '10:00',
-    color: '#818CF8', type: 'event', recurrence: '', recurrence_days: []
-  })
+  const [modal, setModal] = useState(null) // null | { mode: 'new'|'edit', data: {} }
+  const [form, setForm] = useState(emptyForm(new Date()))
+  const [saving, setSaving] = useState(false)
   const scrollRef = useRef(null)
   const now = new Date()
 
+  useEffect(() => { fetchEvents() }, [])
   useEffect(() => {
-    fetchEvents()
-  }, [])
-
-  useEffect(() => {
-    // Scroll naar huidige tijd bij laden
     if (scrollRef.current) {
-      const hour = now.getHours()
-      scrollRef.current.scrollTop = Math.max(0, (hour - 2) * 60)
+      scrollRef.current.scrollTop = Math.max(0, (now.getHours() - 2) * 60)
     }
   }, [view])
 
@@ -56,104 +51,83 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask }) {
     if (data) setEvents(data)
   }
 
-  const getEventsForDay = (date) => {
-    return events.filter(ev => {
-      const start = new Date(ev.start_time)
-      if (isSameDay(start, date)) return true
-      if (ev.recurrence === 'daily' && start <= date) return true
-      if (ev.recurrence === 'weekly' && ev.recurrence_days?.includes(date.getDay()) && start <= date) return true
-      if (ev.recurrence === 'monthly' && start.getDate() === date.getDate() && start <= date) return true
-      return false
-    })
-  }
+  const getEventsForDay = (date) => events.filter(ev => {
+    const start = new Date(ev.start_time)
+    if (isSameDay(start, date)) return true
+    if (ev.recurrence === 'daily') return start <= date
+    if (ev.recurrence === 'weekly' && ev.recurrence_days?.includes(date.getDay())) return start <= date
+    if (ev.recurrence === 'monthly' && start.getDate() === date.getDate()) return start <= date
+    return false
+  })
 
-  const getTasksForDay = (date) => {
-    return tasks.filter(t => {
-      if (!t.time) return false
-      // Toon taken op de huidige dag als ze geen specifieke datum hebben
-      if (!t.date) return isSameDay(date, now)
-      return isSameDay(new Date(t.date), date)
-    })
-  }
+  const getTasksForDay = (date) => (tasks || []).filter(t => {
+    if (!t.start_time && !t.time) return false
+    const taskDate = t.date ? new Date(t.date) : now
+    return isSameDay(taskDate, date)
+  })
 
   const openNew = (date, hour) => {
-    const d = date || current
-    setEditEvent(null)
-    setForm({
-      title: '', description: '',
-      date: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`,
-      startTime: hour !== undefined ? formatTime(hour) : '09:00',
-      endTime: hour !== undefined ? formatTime(Math.min(hour + 1, 23)) : '10:00',
-      color: '#818CF8', type: 'event', recurrence: '', recurrence_days: []
-    })
-    setShowModal(true)
+    setForm(emptyForm(date || current, hour))
+    setModal({ mode: 'new' })
   }
 
-  const openEdit = (ev) => {
+  const openEditEvent = (ev, e) => {
+    e?.stopPropagation()
     const start = new Date(ev.start_time)
     const end = new Date(ev.end_time)
-    setEditEvent(ev)
     setForm({
       title: ev.title, description: ev.description || '',
-      date: `${start.getFullYear()}-${String(start.getMonth()+1).padStart(2,'0')}-${String(start.getDate()).padStart(2,'0')}`,
+      date: toDateStr(start),
       startTime: formatTime(start.getHours(), start.getMinutes()),
       endTime: formatTime(end.getHours(), end.getMinutes()),
-      color: ev.color || '#818CF8', type: ev.type || 'event',
-      recurrence: ev.recurrence || '', recurrence_days: ev.recurrence_days || []
+      color: ev.color || '#818CF8',
+      recurrence: ev.recurrence || '', recurrence_days: ev.recurrence_days || [],
+      completed: false
     })
-    setShowModal(true)
+    setModal({ mode: 'edit', event: ev })
   }
 
   const handleSave = async () => {
     if (!form.title.trim()) return
+    setSaving(true)
     const start = new Date(`${form.date}T${form.startTime}`)
     const end = new Date(`${form.date}T${form.endTime}`)
     const payload = {
       user_id: userId, title: form.title, description: form.description,
       start_time: start.toISOString(), end_time: end.toISOString(),
-      color: form.color, type: form.type,
+      color: form.color,
       recurrence: form.recurrence || null,
-      recurrence_days: form.recurrence_days.length ? form.recurrence_days : null
+      recurrence_days: form.recurrence_days?.length ? form.recurrence_days : null
     }
-    if (editEvent) {
-      await supabase.from('calendar_events').update(payload).eq('id', editEvent.id)
+    if (modal?.mode === 'edit' && modal.event) {
+      await supabase.from('calendar_events').update(payload).eq('id', modal.event.id)
     } else {
-      await supabase.from('calendar_events').insert(payload)
+      const { error } = await supabase.from('calendar_events').insert(payload)
+      if (error) { console.error(error); setSaving(false); return }
     }
-    setShowModal(false)
+    setSaving(false)
+    setModal(null)
     fetchEvents()
   }
 
   const handleDelete = async () => {
-    if (!editEvent) return
-    await supabase.from('calendar_events').delete().eq('id', editEvent.id)
-    setShowModal(false)
+    if (!modal?.event) return
+    await supabase.from('calendar_events').delete().eq('id', modal.event.id)
+    setModal(null)
     fetchEvents()
-  }
-
-  // Drag & drop taak naar tijdlijn
-  const handleDrop = async (e, date, hour) => {
-    e.preventDefault()
-    setDragOverHour(null)
-    const taskId = e.dataTransfer.getData('taskId')
-    if (!taskId) return
-    const dateStr = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`
-    await supabase.from('tasks').update({ time: formatTime(hour), date: dateStr }).eq('id', taskId)
-    // Refresh tasks via parent — trigger een custom event
-    window.dispatchEvent(new Event('refreshTasks'))
   }
 
   const navigate = (dir) => {
     const d = new Date(current)
-    if (view === 'day') d.setDate(d.getDate() + dir)
-    else if (view === 'week') d.setDate(d.getDate() + dir * 7)
-    else d.setMonth(d.getMonth() + dir)
+    if (view==='day') d.setDate(d.getDate()+dir)
+    else if (view==='week') d.setDate(d.getDate()+dir*7)
+    else d.setMonth(d.getMonth()+dir)
     setCurrent(d)
   }
 
   const headerLabel = () => {
-    if (view === 'day') return `${DAYS_NL[current.getDay()]} ${current.getDate()} ${MONTHS[current.getMonth()]}`
-    if (view === 'week') {
+    if (view==='day') return `${DAYS_FULL[current.getDay()]} ${current.getDate()} ${MONTHS[current.getMonth()]}`
+    if (view==='week') {
       const days = getWeekDays(current)
       return `${days[0].getDate()} – ${days[6].getDate()} ${MONTHS[current.getMonth()]} ${current.getFullYear()}`
     }
@@ -163,44 +137,36 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask }) {
   // ---- MONTH VIEW ----
   const MonthView = () => {
     const firstDay = new Date(current.getFullYear(), current.getMonth(), 1)
-    const lastDay = new Date(current.getFullYear(), current.getMonth() + 1, 0)
-    const startPad = (firstDay.getDay() + 6) % 7 // maandag = 0
-    const cells = []
-    for (let i = 0; i < startPad; i++) cells.push(null)
-    for (let d = 1; d <= lastDay.getDate(); d++) cells.push(new Date(current.getFullYear(), current.getMonth(), d))
-    const dayLabels = ['Ma','Di','Wo','Do','Vr','Za','Zo']
+    const lastDay = new Date(current.getFullYear(), current.getMonth()+1, 0)
+    const startPad = (firstDay.getDay()+6)%7
+    const cells = [...Array(startPad).fill(null)]
+    for (let d=1; d<=lastDay.getDate(); d++) cells.push(new Date(current.getFullYear(), current.getMonth(), d))
 
     return (
-      <div style={{ flex: 1, overflow: 'auto' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          {dayLabels.map(d => (
-            <div key={d} style={{ padding: '6px', textAlign: 'center', fontSize: '11px', color: 'rgba(255,255,255,0.3)', fontWeight: 600 }}>{d}</div>
+      <div style={{flex:1, overflow:'auto', minHeight:0}}>
+        <div style={{display:'grid', gridTemplateColumns:'repeat(7,1fr)', borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
+          {['Ma','Di','Wo','Do','Vr','Za','Zo'].map(d=>(
+            <div key={d} style={{padding:'6px', textAlign:'center', fontSize:'10px', color:'rgba(255,255,255,0.25)', fontWeight:600}}>{d}</div>
           ))}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
-          {cells.map((date, i) => {
-            const dayEvents = date ? [...getEventsForDay(date), ...getTasksForDay(date)] : []
+        <div style={{display:'grid', gridTemplateColumns:'repeat(7,1fr)'}}>
+          {cells.map((date,i)=>{
+            const dayItems = date ? [...getEventsForDay(date), ...getTasksForDay(date)] : []
             const isToday = date && isSameDay(date, now)
             return (
-              <div key={i}
-                onClick={() => { if (date) { setCurrent(date); setView('day') } }}
-                style={{ minHeight: '70px', padding: '4px', borderRight: '1px solid rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: date ? 'pointer' : 'default', background: isToday ? 'rgba(0,255,209,0.04)' : 'transparent', transition: 'background 0.15s' }}
-                onMouseEnter={e => { if (date) e.currentTarget.style.background = 'rgba(255,255,255,0.03)' }}
-                onMouseLeave={e => { e.currentTarget.style.background = isToday ? 'rgba(0,255,209,0.04)' : 'transparent' }}>
-                {date && (
-                  <>
-                    <div style={{ width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: isToday ? '#00FFD1' : 'transparent', color: isToday ? '#000' : 'rgba(255,255,255,0.7)', fontSize: '11px', fontWeight: isToday ? 700 : 400, marginBottom: '3px' }}>
-                      {date.getDate()}
+              <div key={i} onClick={()=>{ if(date){setCurrent(date);setView('day')} }}
+                style={{minHeight:'60px', padding:'3px', borderRight:'1px solid rgba(255,255,255,0.04)', borderBottom:'1px solid rgba(255,255,255,0.04)', cursor:date?'pointer':'default', background:isToday?'rgba(0,255,209,0.04)':'transparent'}}>
+                {date && <>
+                  <div style={{width:'20px',height:'20px',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',background:isToday?'#00FFD1':'transparent',color:isToday?'#000':'rgba(255,255,255,0.6)',fontSize:'10px',fontWeight:isToday?700:400,marginBottom:'2px'}}>
+                    {date.getDate()}
+                  </div>
+                  {dayItems.slice(0,2).map((ev,idx)=>(
+                    <div key={ev.id||idx} style={{background:(ev.color||'#818CF8')+'22',borderRadius:'3px',padding:'1px 3px',fontSize:'9px',color:ev.color||'#818CF8',marginBottom:'1px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                      {ev.title}
                     </div>
-                    {dayEvents.slice(0, 2).map((ev, idx) => (
-                      <div key={ev.id || idx}
-                        style={{ background: (ev.color || '#818CF8') + '33', border: `1px solid ${ev.color || '#818CF8'}66`, borderRadius: '3px', padding: '1px 4px', fontSize: '9px', color: ev.color || '#818CF8', marginBottom: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {ev.title}
-                      </div>
-                    ))}
-                    {dayEvents.length > 2 && <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.3)' }}>+{dayEvents.length - 2}</div>}
-                  </>
-                )}
+                  ))}
+                  {dayItems.length>2 && <div style={{fontSize:'9px',color:'rgba(255,255,255,0.25)'}}>+{dayItems.length-2}</div>}
+                </>}
               </div>
             )
           })}
@@ -209,24 +175,23 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask }) {
     )
   }
 
-  // ---- TIME GRID (dag + week) ----
+  // ---- TIME GRID ----
   const TimeGridView = ({ days }) => {
-    const nowMinutes = now.getHours() * 60 + now.getMinutes()
-    const todayIndex = days.findIndex(d => isSameDay(d, now))
-    const dayLabels = ['Ma','Di','Wo','Do','Vr','Za','Zo']
+    const nowMins = now.getHours()*60+now.getMinutes()
+    const todayIdx = days.findIndex(d=>isSameDay(d,now))
 
     return (
-      <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }} ref={scrollRef}>
-        {/* Dag headers (alleen bij week view) */}
-        {days.length > 1 && (
-          <div style={{ display: 'grid', gridTemplateColumns: `48px repeat(${days.length}, 1fr)`, borderBottom: '1px solid rgba(255,255,255,0.08)', position: 'sticky', top: 0, background: 'rgba(10,10,26,0.97)', zIndex: 10 }}>
-            <div />
-            {days.map((d, i) => {
-              const isToday = isSameDay(d, now)
+      <div style={{flex:1, overflow:'hidden', display:'flex', flexDirection:'column', minHeight:0}}>
+        {/* Day headers for week view */}
+        {days.length>1 && (
+          <div style={{display:'grid', gridTemplateColumns:`48px repeat(${days.length},1fr)`, borderBottom:'1px solid rgba(255,255,255,0.08)', flexShrink:0}}>
+            <div/>
+            {days.map((d,i)=>{
+              const isToday=isSameDay(d,now)
               return (
-                <div key={i} style={{ padding: '6px 4px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)' }}>{dayLabels[(d.getDay() + 6) % 7]}</div>
-                  <div style={{ width: '26px', height: '26px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '2px auto 0', background: isToday ? '#00FFD1' : 'transparent', color: isToday ? '#000' : 'rgba(255,255,255,0.8)', fontSize: '12px', fontWeight: isToday ? 700 : 400 }}>
+                <div key={i} style={{padding:'4px',textAlign:'center'}}>
+                  <div style={{fontSize:'9px',color:'rgba(255,255,255,0.3)'}}>{DAYS_NL[(d.getDay()+6)%7]}</div>
+                  <div style={{width:'24px',height:'24px',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',margin:'1px auto 0',background:isToday?'#00FFD1':'transparent',color:isToday?'#000':'rgba(255,255,255,0.7)',fontSize:'11px',fontWeight:isToday?700:400}}>
                     {d.getDate()}
                   </div>
                 </div>
@@ -235,76 +200,87 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask }) {
           </div>
         )}
 
-        {/* Time grid */}
-        <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: `48px repeat(${days.length}, 1fr)` }}>
-          {HOURS.map(h => (
-            <React.Fragment key={h}>
-              {/* Uur label */}
-              <div style={{ height: '60px', display: 'flex', alignItems: 'flex-start', paddingTop: '4px', paddingRight: '8px', justifyContent: 'flex-end' }}>
-                <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.2)' }}>{formatTime(h)}</span>
+        {/* Scrollable grid */}
+        <div ref={scrollRef} style={{flex:1, overflowY:'auto', overflowX:'hidden', position:'relative'}}>
+          <div style={{display:'grid', gridTemplateColumns:`48px repeat(${days.length},1fr)`, position:'relative', width:'100%'}}>
+            {HOURS.map(h=>(
+              <React.Fragment key={h}>
+                <div style={{height:'60px',display:'flex',alignItems:'flex-start',paddingTop:'4px',paddingRight:'8px',justifyContent:'flex-end',flexShrink:0}}>
+                  <span style={{fontSize:'9px',color:'rgba(255,255,255,0.18)'}}>{formatTime(h)}</span>
+                </div>
+                {days.map((d,di)=>{
+                  const dayEvs = getEventsForDay(d).filter(ev=>new Date(ev.start_time).getHours()===h)
+                  const dayTasks = getTasksForDay(d).filter(t=>{
+                    const timeStr = t.start_time || t.time
+                    return timeStr && parseInt(timeStr.split(':')[0])===h
+                  })
+                  return (
+                    <div key={di} onClick={()=>openNew(d,h)}
+                      onDragOver={e=>e.preventDefault()}
+                      onDrop={async e=>{
+                        e.preventDefault()
+                        const taskId=e.dataTransfer.getData('taskId')
+                        if(!taskId) return
+                        await supabase.from('tasks').update({time:formatTime(h),date:toDateStr(d)}).eq('id',taskId)
+                        window.dispatchEvent(new Event('refreshTasks'))
+                      }}
+                      style={{height:'60px',borderLeft:'1px solid rgba(255,255,255,0.04)',borderBottom:'1px solid rgba(255,255,255,0.04)',position:'relative',cursor:'pointer',boxSizing:'border-box'}}>
+
+                      {/* Events */}
+                      {dayEvs.map(ev=>{
+                        const s=new Date(ev.start_time), en=new Date(ev.end_time)
+                        const dur=Math.max(20,(en-s)/60000)
+                        const top=(s.getMinutes()/60)*60
+                        const height=Math.min((dur/60)*60, 60-top)
+                        return (
+                          <div key={ev.id} onClick={e=>openEditEvent(ev,e)}
+                            style={{position:'absolute',left:'2px',right:'2px',top:`${top}px`,height:`${height}px`,background:ev.color+'25',border:`1px solid ${ev.color}66`,borderRadius:'5px',padding:'2px 4px',overflow:'hidden',cursor:'pointer',zIndex:2}}>
+                            <p style={{fontSize:'9px',color:ev.color,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',margin:0}}>{ev.title}</p>
+                          </div>
+                        )
+                      })}
+
+                      {/* Tasks */}
+                      {dayTasks.map((task,ti)=>{
+                        const timeStr = task.start_time || task.time || '00:00'
+                        const mins=parseInt(timeStr.split(':')[1]||0)
+                        const top=(mins/60)*60
+                        const subject=subjects?.find(s=>s.id===task.subject_id)
+                        return (
+                          <div key={task.id}
+                            draggable
+                            onDragStart={e=>e.dataTransfer.setData('taskId',task.id)}
+                            onClick={e=>{e.stopPropagation(); onEditTask?.(task)}}
+                            style={{position:'absolute',left:'2px',right:'2px',top:`${top+ti*17}px`,height:'15px',background:task.completed?'rgba(0,255,100,0.08)':'rgba(255,255,255,0.05)',border:`1px solid ${task.completed?'rgba(0,255,100,0.25)':'rgba(255,255,255,0.1)'}`,borderRadius:'4px',padding:'0 4px',overflow:'hidden',cursor:'pointer',zIndex:3,display:'flex',alignItems:'center',gap:'3px'}}>
+                            <div style={{width:'4px',height:'4px',borderRadius:'50%',background:task.completed?'#00ff88':'#00FFD1',flexShrink:0}}/>
+                            <p style={{fontSize:'9px',color:task.completed?'rgba(255,255,255,0.25)':'rgba(255,255,255,0.65)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',textDecoration:task.completed?'line-through':'none',margin:0}}>
+                              {task.title}{subject?` · ${subject.name}`:''}
+                            </p>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })}
+              </React.Fragment>
+            ))}
+
+            {/* Huidige tijd lijn — volledig van links naar rechts */}
+            {todayIdx>=0 && (
+              <div style={{
+                position:'absolute',
+                top:`${nowMins}px`,
+                left:'48px',
+                right:'0',
+                height:'2px',
+                background:'#FF6B6B',
+                zIndex:5,
+                pointerEvents:'none'
+              }}>
+                <div style={{width:'7px',height:'7px',borderRadius:'50%',background:'#FF6B6B',position:'absolute',left:'-3px',top:'-2.5px'}}/>
               </div>
-
-              {/* Kolommen per dag */}
-              {days.map((d, di) => {
-                const dayEvs = getEventsForDay(d).filter(ev => new Date(ev.start_time).getHours() === h)
-                const dayTasks = getTasksForDay(d).filter(t => t.time && parseInt(t.time.split(':')[0]) === h)
-                const isDropTarget = dragOverHour?.hour === h && dragOverHour?.dayIndex === di
-
-                return (
-                  <div key={di}
-                    onClick={() => openNew(d, h)}
-                    onDragOver={e => { e.preventDefault(); setDragOverHour({ hour: h, dayIndex: di }) }}
-                    onDragLeave={() => setDragOverHour(null)}
-                    onDrop={e => handleDrop(e, d, h)}
-                    style={{ height: '60px', borderLeft: '1px solid rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)', position: 'relative', cursor: 'pointer', background: isDropTarget ? 'rgba(0,255,209,0.08)' : 'transparent', transition: 'background 0.1s' }}
-                    onMouseEnter={e => { if (!isDropTarget) e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}
-                    onMouseLeave={e => { if (!isDropTarget) e.currentTarget.style.background = 'transparent' }}>
-
-                    {/* Calendar events */}
-                    {dayEvs.map(ev => {
-                      const start = new Date(ev.start_time)
-                      const end = new Date(ev.end_time)
-                      const duration = Math.max(30, (end - start) / 60000)
-                      const topOffset = (start.getMinutes() / 60) * 60
-                      const height = Math.min((duration / 60) * 60, 60 - topOffset)
-                      return (
-                        <div key={ev.id}
-                          onClick={e => { e.stopPropagation(); openEdit(ev) }}
-                          style={{ position: 'absolute', left: '2px', right: '2px', top: `${topOffset}px`, height: `${height}px`, background: ev.color + '33', border: `1px solid ${ev.color}88`, borderRadius: '6px', padding: '2px 5px', overflow: 'hidden', cursor: 'pointer', zIndex: 2 }}>
-                          <p style={{ fontSize: '10px', color: ev.color, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.title}</p>
-                          {ev.recurrence && <Repeat size={8} style={{ color: ev.color, opacity: 0.7 }} />}
-                        </div>
-                      )
-                    })}
-
-                    {/* Taken */}
-                    {dayTasks.map((task, ti) => {
-                      const mins = parseInt(task.time?.split(':')[1] || 0)
-                      const topOffset = (mins / 60) * 60
-                      const subject = subjects?.find(s => s.id === task.subject_id)
-                      return (
-                        <div key={task.id}
-                          onClick={e => { e.stopPropagation(); onToggleTask?.(task) }}
-                          style={{ position: 'absolute', left: '2px', right: '2px', top: `${topOffset + ti * 18}px`, height: '16px', background: task.completed ? 'rgba(0,255,100,0.1)' : 'rgba(255,255,255,0.06)', border: `1px solid ${task.completed ? 'rgba(0,255,100,0.3)' : 'rgba(255,255,255,0.12)'}`, borderRadius: '4px', padding: '0 5px', overflow: 'hidden', cursor: 'pointer', zIndex: 3, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: task.completed ? '#00ff88' : '#00FFD1', flexShrink: 0 }} />
-                          <p style={{ fontSize: '9px', color: task.completed ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: task.completed ? 'line-through' : 'none' }}>
-                            {task.title}{subject ? ` · ${subject.name}` : ''}
-                          </p>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )
-              })}
-            </React.Fragment>
-          ))}
-
-          {/* Huidige tijd lijn */}
-          {todayIndex >= 0 && (
-            <div style={{ position: 'absolute', top: `${nowMinutes}px`, left: `${48 + todayIndex * (100 / days.length)}%`, right: 0, height: '2px', background: '#FF6B6B', zIndex: 5, pointerEvents: 'none', width: days.length === 1 ? 'calc(100% - 48px)' : `${100 / days.length}%` }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#FF6B6B', position: 'absolute', left: '-4px', top: '-3px' }} />
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     )
@@ -313,104 +289,132 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask }) {
   const weekDays = getWeekDays(current)
 
   return (
-    <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      {/* Toolbar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <button onClick={() => setCurrent(new Date())}
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '3px 8px', cursor: 'pointer', color: 'rgba(255,255,255,0.6)', fontSize: '11px' }}>
+    <div className="glass-card" style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
+      {/* Sticky toolbar */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 12px',borderBottom:'1px solid rgba(255,255,255,0.06)',flexShrink:0,flexWrap:'wrap',gap:'6px'}}>
+        <div style={{display:'flex',alignItems:'center',gap:'4px'}}>
+          <button onClick={()=>setCurrent(new Date())}
+            style={{background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'6px',padding:'3px 7px',cursor:'pointer',color:'rgba(255,255,255,0.5)',fontSize:'10px'}}>
             Vandaag
           </button>
-          <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', padding: '2px' }}><ChevronLeft size={16} /></button>
-          <button onClick={() => navigate(1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', padding: '2px' }}><ChevronRight size={16} /></button>
-          <span style={{ color: 'white', fontWeight: 600, fontSize: '13px' }}>{headerLabel()}</span>
+          <button onClick={()=>navigate(-1)} style={{background:'none',border:'none',cursor:'pointer',color:'rgba(255,255,255,0.35)',padding:'2px'}}><ChevronLeft size={14}/></button>
+          <button onClick={()=>navigate(1)} style={{background:'none',border:'none',cursor:'pointer',color:'rgba(255,255,255,0.35)',padding:'2px'}}><ChevronRight size={14}/></button>
+          <span style={{color:'white',fontWeight:600,fontSize:'12px',whiteSpace:'nowrap'}}>{headerLabel()}</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          {['day','week','month'].map(v => (
-            <button key={v} onClick={() => setView(v)}
-              style={{ padding: '3px 10px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', border: '1px solid', borderColor: view === v ? 'rgba(0,255,209,0.5)' : 'rgba(255,255,255,0.1)', background: view === v ? 'rgba(0,255,209,0.15)' : 'rgba(255,255,255,0.04)', color: view === v ? '#00FFD1' : 'rgba(255,255,255,0.4)' }}>
-              {v === 'day' ? 'Dag' : v === 'week' ? 'Week' : 'Maand'}
+        <div style={{display:'flex',alignItems:'center',gap:'3px'}}>
+          {['day','week','month'].map(v=>(
+            <button key={v} onClick={()=>setView(v)}
+              style={{padding:'3px 8px',borderRadius:'6px',fontSize:'10px',cursor:'pointer',border:'1px solid',borderColor:view===v?'rgba(0,255,209,0.5)':'rgba(255,255,255,0.08)',background:view===v?'rgba(0,255,209,0.12)':'transparent',color:view===v?'#00FFD1':'rgba(255,255,255,0.35)'}}>
+              {v==='day'?'Dag':v==='week'?'Week':'Maand'}
             </button>
           ))}
-          <button onClick={() => openNew(current)}
-            style={{ background: 'rgba(0,255,209,0.1)', border: '1px solid rgba(0,255,209,0.3)', borderRadius: '6px', padding: '3px 8px', cursor: 'pointer', color: '#00FFD1', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px' }}>
-            <Plus size={12} /> Nieuw
+          <button onClick={()=>openNew(current)}
+            style={{background:'rgba(0,255,209,0.1)',border:'1px solid rgba(0,255,209,0.25)',borderRadius:'6px',padding:'3px 8px',cursor:'pointer',color:'#00FFD1',display:'flex',alignItems:'center',gap:'3px',fontSize:'10px',marginLeft:'4px'}}>
+            <Plus size={11}/> Nieuw
           </button>
         </div>
       </div>
 
       {/* Views */}
-      {view === 'month' && <MonthView />}
-      {view === 'week' && <TimeGridView days={weekDays} />}
-      {view === 'day' && <TimeGridView days={[current]} />}
+      <div style={{flex:1,overflow:'hidden',display:'flex',flexDirection:'column',minHeight:0}}>
+        {view==='month' && <MonthView/>}
+        {view==='week' && <TimeGridView days={weekDays}/>}
+        {view==='day' && <TimeGridView days={[current]}/>}
+      </div>
 
-      {/* Event Modal */}
-      {showModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}>
-          <div className="glass-card p-6" style={{ width: '100%', maxWidth: '400px', margin: '0 16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <h3 style={{ color: 'white', fontWeight: 600, fontSize: '15px' }}>{editEvent ? 'Bewerk event' : 'Nieuw event'}</h3>
-              <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}><X size={18} /></button>
+      {/* Modal — fixed over hele scherm */}
+      {modal && (
+        <div style={{position:'fixed',inset:0,zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.7)',backdropFilter:'blur(10px)',padding:'16px'}}
+          onClick={()=>setModal(null)}>
+          <div className="glass-card" style={{width:'100%',maxWidth:'440px',padding:'24px',maxHeight:'90vh',overflowY:'auto'}}
+            onClick={e=>e.stopPropagation()}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px'}}>
+              <h2 style={{color:'white',fontWeight:700,fontSize:'16px',margin:0}}>
+                {modal.mode==='edit'?'✏️ Bewerk event':'📅 Nieuw event'}
+              </h2>
+              <button onClick={()=>setModal(null)} style={{background:'none',border:'none',cursor:'pointer',color:'rgba(255,255,255,0.4)'}}><X size={18}/></button>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <input className="glass-input" placeholder="Titel *" value={form.title} onChange={e => setForm(p => ({...p, title: e.target.value}))} autoFocus />
-              <input className="glass-input" placeholder="Beschrijving" value={form.description} onChange={e => setForm(p => ({...p, description: e.target.value}))} />
-              <input type="date" className="glass-input" value={form.date} onChange={e => setForm(p => ({...p, date: e.target.value}))} />
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input type="time" className="glass-input" value={form.startTime} onChange={e => setForm(p => ({...p, startTime: e.target.value}))} />
-                <input type="time" className="glass-input" value={form.endTime} onChange={e => setForm(p => ({...p, endTime: e.target.value}))} />
+
+            <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+              <input className="glass-input" placeholder="Titel *" value={form.title}
+                onChange={e=>setForm(p=>({...p,title:e.target.value}))} autoFocus/>
+              <textarea className="glass-input" placeholder="Beschrijving (optioneel)" value={form.description}
+                onChange={e=>setForm(p=>({...p,description:e.target.value}))}
+                style={{resize:'vertical',minHeight:'60px'}}/>
+              <div>
+                <label style={{color:'rgba(255,255,255,0.35)',fontSize:'11px',display:'block',marginBottom:'4px'}}>Datum</label>
+                <input type="date" className="glass-input" value={form.date}
+                  onChange={e=>setForm(p=>({...p,date:e.target.value}))}/>
               </div>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                {['event','recurring'].map(t => (
-                  <button key={t} onClick={() => setForm(p => ({...p, type: t}))}
-                    style={{ flex: 1, padding: '6px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer', border: '1px solid', borderColor: form.type === t ? 'rgba(0,255,209,0.5)' : 'rgba(255,255,255,0.1)', background: form.type === t ? 'rgba(0,255,209,0.15)' : 'transparent', color: form.type === t ? '#00FFD1' : 'rgba(255,255,255,0.4)' }}>
-                    {t === 'event' ? '📅 Eenmalig' : '🔁 Terugkerend'}
-                  </button>
-                ))}
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
+                <div>
+                  <label style={{color:'rgba(255,255,255,0.35)',fontSize:'11px',display:'block',marginBottom:'4px'}}>Starttijd</label>
+                  <input type="time" className="glass-input" value={form.startTime}
+                    onChange={e=>setForm(p=>({...p,startTime:e.target.value}))}/>
+                </div>
+                <div>
+                  <label style={{color:'rgba(255,255,255,0.35)',fontSize:'11px',display:'block',marginBottom:'4px'}}>Eindtijd</label>
+                  <input type="time" className="glass-input" value={form.endTime}
+                    onChange={e=>setForm(p=>({...p,endTime:e.target.value}))}/>
+                </div>
               </div>
-              {form.type === 'recurring' && (
-                <select className="glass-input" value={form.recurrence} onChange={e => setForm(p => ({...p, recurrence: e.target.value}))}>
-                  <option value="">Selecteer herhaling...</option>
+
+              {/* Herhaling */}
+              <div>
+                <label style={{color:'rgba(255,255,255,0.35)',fontSize:'11px',display:'block',marginBottom:'4px'}}>Herhaling</label>
+                <select className="glass-input" value={form.recurrence}
+                  onChange={e=>setForm(p=>({...p,recurrence:e.target.value}))}>
+                  <option value="">Geen herhaling</option>
                   <option value="daily">Dagelijks</option>
                   <option value="weekly">Wekelijks</option>
                   <option value="monthly">Maandelijks</option>
                 </select>
-              )}
-              {form.type === 'recurring' && form.recurrence === 'weekly' && (
-                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                  {['Ma','Di','Wo','Do','Vr','Za','Zo'].map((d, i) => {
-                    const dayNum = (i + 1) % 7
-                    return (
-                      <button key={i} onClick={() => setForm(p => ({ ...p, recurrence_days: p.recurrence_days.includes(dayNum) ? p.recurrence_days.filter(x => x !== dayNum) : [...p.recurrence_days, dayNum] }))}
-                        style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', border: '1px solid', borderColor: form.recurrence_days.includes(dayNum) ? 'rgba(0,255,209,0.5)' : 'rgba(255,255,255,0.1)', background: form.recurrence_days.includes(dayNum) ? 'rgba(0,255,209,0.15)' : 'transparent', color: form.recurrence_days.includes(dayNum) ? '#00FFD1' : 'rgba(255,255,255,0.4)' }}>
-                        {d}
-                      </button>
-                    )
-                  })}
+              </div>
+
+              {form.recurrence==='weekly' && (
+                <div>
+                  <label style={{color:'rgba(255,255,255,0.35)',fontSize:'11px',display:'block',marginBottom:'6px'}}>Dagen</label>
+                  <div style={{display:'flex',gap:'4px',flexWrap:'wrap'}}>
+                    {['Ma','Di','Wo','Do','Vr','Za','Zo'].map((d,i)=>{
+                      const dayNum=(i+1)%7
+                      const sel=form.recurrence_days.includes(dayNum)
+                      return (
+                        <button key={i} type="button" onClick={()=>setForm(p=>({...p,recurrence_days:sel?p.recurrence_days.filter(x=>x!==dayNum):[...p.recurrence_days,dayNum]}))}
+                          style={{padding:'4px 8px',borderRadius:'6px',fontSize:'11px',cursor:'pointer',border:'1px solid',borderColor:sel?'rgba(0,255,209,0.5)':'rgba(255,255,255,0.1)',background:sel?'rgba(0,255,209,0.15)':'transparent',color:sel?'#00FFD1':'rgba(255,255,255,0.4)'}}>
+                          {d}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>Kleur:</span>
-                {EVENT_COLORS.map(c => (
-                  <button key={c} onClick={() => setForm(p => ({...p, color: c}))}
-                    style={{ width: '18px', height: '18px', borderRadius: '50%', background: c, border: form.color === c ? '2px solid white' : '2px solid transparent', cursor: 'pointer', flexShrink: 0 }} />
-                ))}
+
+              {/* Kleur */}
+              <div>
+                <label style={{color:'rgba(255,255,255,0.35)',fontSize:'11px',display:'block',marginBottom:'6px'}}>Kleur</label>
+                <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                  {EVENT_COLORS.map(c=>(
+                    <button key={c} type="button" onClick={()=>setForm(p=>({...p,color:c}))}
+                      style={{width:'24px',height:'24px',borderRadius:'50%',background:c,border:form.color===c?'3px solid white':'2px solid transparent',cursor:'pointer',flexShrink:0,transition:'transform 0.1s',transform:form.color===c?'scale(1.2)':'scale(1)'}}/>
+                  ))}
+                </div>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-              {editEvent && (
-                <button onClick={handleDelete} className="btn-neon"
-                  style={{ borderColor: 'rgba(255,80,80,0.4)', color: '#ff6b6b', background: 'rgba(255,80,80,0.1)', fontSize: '12px' }}>
-                  Verwijder
+
+            <div style={{display:'flex',gap:'8px',marginTop:'20px'}}>
+              {modal.mode==='edit' && (
+                <button onClick={handleDelete}
+                  style={{padding:'9px 14px',borderRadius:'10px',border:'1px solid rgba(255,80,80,0.3)',background:'rgba(255,80,80,0.08)',color:'#ff6b6b',cursor:'pointer',fontSize:'12px',display:'flex',alignItems:'center',gap:'4px'}}>
+                  <Trash2 size={13}/> Verwijder
                 </button>
               )}
-              <button onClick={() => setShowModal(false)} className="btn-neon"
-                style={{ flex: 1, borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.4)', background: 'transparent', fontSize: '12px' }}>
+              <button onClick={()=>setModal(null)}
+                style={{flex:1,padding:'9px',borderRadius:'10px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'rgba(255,255,255,0.35)',cursor:'pointer',fontSize:'12px'}}>
                 Annuleer
               </button>
-              <button onClick={handleSave} disabled={!form.title.trim()} className="btn-neon"
-                style={{ flex: 1, fontSize: '12px' }}>
-                <Save size={12} /> Opslaan
+              <button onClick={handleSave} disabled={!form.title.trim()||saving}
+                style={{flex:2,padding:'9px',borderRadius:'10px',border:'1px solid rgba(0,255,209,0.4)',background:'rgba(0,255,209,0.12)',color:'#00FFD1',cursor:'pointer',fontSize:'12px',fontWeight:600,display:'flex',alignItems:'center',justifyContent:'center',gap:'4px'}}>
+                <Save size={13}/> {saving?'Opslaan...':'Opslaan'}
               </button>
             </div>
           </div>

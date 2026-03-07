@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { X, Trash2, Save, Clock, BookOpen, AlignLeft, ExternalLink } from 'lucide-react'
+import { X, Trash2, Save, Clock, AlignLeft, ExternalLink } from 'lucide-react'
+import { openBookLink } from '../utils/openBook'
 
 export default function TaskModal({ task, defaultTime, subjects, onSave, onDelete, onClose }) {
   const [title, setTitle] = useState('')
@@ -92,7 +93,7 @@ export default function TaskModal({ task, defaultTime, subjects, onSave, onDelet
           {/* Subject */}
           <div>
             <label className="text-xs font-medium mb-1.5 flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.5)' }}>
-              <BookOpen size={12} /> Vak
+              <button onClick={() => openBookLink(link)}>Vak</button>
             </label>
             <select
               value={subjectId}

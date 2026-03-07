@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
-import { BookOpen, ExternalLink, Edit3, X, Check, ChevronDown, ChevronUp } from 'lucide-react'
+import { openBookLink } from '../utils/openBook'
+import { saveProfile } from '../utils/supabaseProfiles'
 
 const ALLE_VAKKEN = [
   'Aardrijkskunde', 'Bedrijfseconomie', 'Bewegen, sport en maatschappij (BSM)',
@@ -62,35 +63,50 @@ const fetchProfile = async () => {
 
   console.log("userId:", userId)
 
+// const handleSave = async () => {
+//   if (!userId) {
+//     alert('Geen gebruiker gevonden. Probeer opnieuw in te loggen.')
+//     return
+//   }
+//   setSaving(true)
+
+//   const { error } = await supabase
+//     .from('profiles')
+//     .upsert({
+//       id: userId,          // Dit MOET een geldige UUID zijn
+//       vakken: selectedVakken,
+//       klas: selectedKlas,
+//       updated_at: new Date().toISOString()
+//     }, {
+//       onConflict: 'id',
+//       ignoreDuplicates: false
+//     })
+
+//   if (error) {
+//     console.error('Fout:', error)
+//     alert('Opslaan mislukt: ' + error.message)
+//     setSaving(false)
+//     return
+//   }
+
+//   await saveProfile(userId, { vakken: selectedVakken, klas: selectedKlas })
+
+//   await fetchProfile()
+//   setSaving(false)
+//   setEditing(false)
+// }
+
 const handleSave = async () => {
-  if (!userId) {
-    alert('Geen gebruiker gevonden. Probeer opnieuw in te loggen.')
-    return
-  }
+  if (!userId) { alert('Geen gebruiker gevonden'); return }
   setSaving(true)
-
-  const { error } = await supabase
-    .from('profiles')
-    .upsert({
-      id: userId,          // Dit MOET een geldige UUID zijn
-      vakken: selectedVakken,
-      klas: selectedKlas,
-      updated_at: new Date().toISOString()
-    }, {
-      onConflict: 'id',
-      ignoreDuplicates: false
-    })
-
-  if (error) {
-    console.error('Fout:', error)
-    alert('Opslaan mislukt: ' + error.message)
-    setSaving(false)
-    return
+  try {
+    await saveProfile(userId, { vakken: selectedVakken, klas: selectedKlas })
+    await fetchProfile()
+    setEditing(false)
+  } catch (err) {
+    alert('Opslaan mislukt: ' + err.message)
   }
-
-  await fetchProfile()
   setSaving(false)
-  setEditing(false)
 }
 
   const vakken = profile?.vakken || []
@@ -101,7 +117,7 @@ const handleSave = async () => {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: expanded ? '12px' : '0' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <BookOpen size={14} color="#00FFD1" />
+          <button onClick={() => openBookLink(link)}>Boek</button>
           <span style={{ color: 'white', fontWeight: 600, fontSize: '13px' }}>Mijn Vakken</span>
           {klas && (
             <span style={{ background: 'rgba(0,255,209,0.1)', border: '1px solid rgba(0,255,209,0.25)', borderRadius: '20px', padding: '1px 8px', fontSize: '10px', color: '#00FFD1' }}>
