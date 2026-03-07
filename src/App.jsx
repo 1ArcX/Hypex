@@ -11,7 +11,7 @@ import PomodoroTimer from './components/PomodoroTimer'
 import { LogOut, GraduationCap, Menu, X } from 'lucide-react'
 import SpotifyWidget from './components/SpotifyWidget'
 import ThemeSettings from './components/ThemeSettings'
-import { Settings, Sun, Moon } from 'lucide-react'
+import { Settings } from 'lucide-react'
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -23,10 +23,17 @@ export default function App() {
   const [selectedTask, setSelectedTask] = useState(null)
   const [defaultTime, setDefaultTime] = useState('09:00')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [darkMode, setDarkMode] = useState(true)
   const [showThemeSettings, setShowThemeSettings] = useState(false)
   const [theme, setTheme] = useState({ accent: '#00FFD1', bg1: '#0a0a1a', bg2: '#0d1117' })
   const [pomodoroActive, setPomodoroActive] = useState(false)
+  const [profiles, setProfiles] = useState([])
+
+  const ADMIN_EMAIL = 'zhafirfachri@gmail.com'
+
+  const fetchProfiles = async () => {
+    const { data } = await supabase.from('profiles').select('id, full_name')
+    if (data) setProfiles(data)
+  }
 
   // Auth listener
   useEffect(() => {
@@ -41,13 +48,8 @@ export default function App() {
 
   // Load data
   useEffect(() => {
-    if (session) { fetchTasks(); fetchSubjects() }
+    if (session) { fetchTasks(); fetchSubjects(); fetchProfiles() }
   }, [session])
-
-  // Effect voor dark/light mode:
-  useEffect(() => {
-    document.body.classList.toggle('light-mode', !darkMode)
-  }, [darkMode])
 
   // Effect voor accent kleur:
   useEffect(() => {
@@ -121,7 +123,7 @@ export default function App() {
       <div className="mesh-bg"><div className="mesh-blob" /></div>
       <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#00FFD1', borderTopColor: 'transparent' }} />
     </div>
-    )
+  )
 
   if (!session) return (
     <>
@@ -129,6 +131,12 @@ export default function App() {
       <AuthPage />
     </>
   )
+
+  // user wordt HIER gedeclareerd, NADAT session gecontroleerd is
+  const user = session.user
+  const isAdmin = user?.email === ADMIN_EMAIL
+  const userProfile = profiles.find(p => p.id === user?.id)
+  const displayName = userProfile?.full_name || user?.email?.split('@')[0] || 'Student'
 
   const completedToday = tasks.filter(t => t.completed).length
   const totalToday = tasks.length
@@ -140,6 +148,10 @@ export default function App() {
 
       {/* Main content */}
       <div className="relative z-10 min-h-screen flex flex-col">
+
+        <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
+          Hoi, {displayName} 👋
+        </span>
 
         {/* Top navbar */}
         <nav className="flex items-center justify-between px-6 py-4"
@@ -164,7 +176,6 @@ export default function App() {
               </div>
             </div>
           )}
-          
 
           <div className="flex items-center gap-2">
             <span className="text-xs hidden sm:block" style={{ color: 'rgba(255,255,255,0.3)' }}>
@@ -181,19 +192,8 @@ export default function App() {
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.6)' }}>
               {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
-            {/* Light/Dark toggle */}
-            <button
-              onClick={() => setDarkMode(!darkMode)}
-              title={darkMode ? 'Light mode' : 'Dark mode'}
-              style={{
-                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '12px', padding: '8px', cursor: 'pointer',
-                color: darkMode ? 'rgba(255,255,255,0.6)' : 'var(--accent)'
-              }}>
-              {darkMode ? <Sun size={16} /> : <Moon size={16} />}
-            </button>
 
-            {/* Instellingen */}
+            {/* Instellingen knop */}
             <button
               onClick={() => setShowThemeSettings(true)}
               style={{
@@ -232,7 +232,7 @@ export default function App() {
           {/* RIGHT COLUMN */}
           <div className="space-y-4 sticky top-6">
             <WeatherWidget />
-            <SpotifyWidget />
+            {isAdmin && <SpotifyWidget />}
             <PomodoroTimer onModeChange={setIsBreak} />
             {/* Upcoming tasks summary */}
             <div className="glass-card p-4">
@@ -277,12 +277,9 @@ export default function App() {
 
         {/* MOBILE LAYOUT */}
         <div className="md:hidden flex-1 p-4 space-y-4">
-          {/* Clock */}
           <div className="glass-card p-4">
             <Clock isBreak={isBreak} />
           </div>
-
-          {/* Timeline */}
           <div className="glass-card p-4">
             <h3 className="text-sm font-semibold text-white mb-3">Dag Tijdlijn</h3>
             <div className="overflow-y-auto" style={{ maxHeight: '50vh' }}>
@@ -295,8 +292,6 @@ export default function App() {
               />
             </div>
           </div>
-
-          {/* Mobile expandable panels */}
           {mobileMenuOpen && (
             <div className="space-y-4" style={{ animation: 'slideUp 0.3s ease' }}>
               <WeatherWidget />
@@ -308,12 +303,12 @@ export default function App() {
         </div>
       </div>
 
-      // ThemeSettings modal:
+      {/* ThemeSettings modal */}
       {showThemeSettings && (
         <ThemeSettings
           onClose={() => setShowThemeSettings(false)}
-          theme={theme} setTheme={setTheme}
-          darkMode={darkMode} setDarkMode={setDarkMode}
+          theme={theme}
+          setTheme={setTheme}
         />
       )}
 

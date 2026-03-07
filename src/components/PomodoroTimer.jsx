@@ -18,14 +18,17 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive }) {
   const progress = 1 - seconds / totalSeconds
   const radius = 54
   const circumference = 2 * Math.PI * radius
-  const accent = isBreak ? '#FF8C42' : 'var(--accent)'
 
   useEffect(() => {
     if (!dragging) setSeconds(isBreak ? breakMins * 60 : workMins * 60)
   }, [workMins, breakMins, isBreak])
 
+  // ✅ Fix: onPomodoroActive in eigen useEffect, niet samen met timer logic
   useEffect(() => {
-    onPomodoroActive?.(running)
+    setTimeout(() => onPomodoroActive?.(running), 0)
+  }, [running])
+
+  useEffect(() => {
     if (running) {
       intervalRef.current = setInterval(() => {
         setSeconds(s => {
@@ -35,7 +38,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive }) {
             if (!isBreak) setSessions(n => n + 1)
             const next = !isBreak
             setIsBreak(next)
-            onModeChange?.(next)
+            setTimeout(() => onModeChange?.(next), 0)
             return next ? breakMins * 60 : workMins * 60
           }
           return s - 1
@@ -50,9 +53,10 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive }) {
   const reset = () => { setRunning(false); setSeconds(isBreak ? breakMins * 60 : workMins * 60) }
 
   const switchMode = (toBreak) => {
-    setRunning(false); setIsBreak(toBreak)
+    setRunning(false)
+    setIsBreak(toBreak)
     setSeconds(toBreak ? breakMins * 60 : workMins * 60)
-    onModeChange?.(toBreak)
+    setTimeout(() => onModeChange?.(toBreak), 0)
   }
 
   const handleRingInteraction = (e) => {
@@ -78,9 +82,10 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive }) {
 
   const mins = String(Math.floor(seconds / 60)).padStart(2, '0')
   const secs = String(seconds % 60).padStart(2, '0')
+  const accentColor = isBreak ? '#FF8C42' : 'var(--accent)'
 
   return (
-    <div className={`glass-card p-4 transition-all duration-700 ${running ? 'pomodoro-active' : ''}`}
+    <div className="glass-card p-4 transition-all duration-700"
       style={running ? {
         boxShadow: isBreak
           ? '0 0 40px rgba(255,140,66,0.25), inset 0 0 40px rgba(255,140,66,0.05)'
@@ -93,12 +98,11 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive }) {
           {isBreak ? <Coffee size={16} style={{ color: '#FF8C42' }} /> : <Brain size={16} style={{ color: 'var(--accent)' }} />}
           <h3 className="text-sm font-semibold text-white">Pomodoro</h3>
           {running && (
-            <span className="text-xs px-2 py-0.5 rounded-full animate-pulse"
-              style={{
-                background: isBreak ? 'rgba(255,140,66,0.2)' : 'rgba(0,255,209,0.2)',
-                color: isBreak ? '#FF8C42' : 'var(--accent)',
-                border: `1px solid ${isBreak ? 'rgba(255,140,66,0.4)' : 'rgba(0,255,209,0.4)'}`
-              }}>
+            <span className="text-xs px-2 py-0.5 rounded-full animate-pulse" style={{
+              background: isBreak ? 'rgba(255,140,66,0.2)' : 'rgba(0,255,209,0.2)',
+              color: accentColor,
+              border: `1px solid ${isBreak ? 'rgba(255,140,66,0.4)' : 'rgba(0,255,209,0.4)'}`
+            }}>
               {isBreak ? 'Pauze' : 'Focus'}
             </span>
           )}
@@ -145,7 +149,8 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive }) {
           style={{
             background: !isBreak ? 'rgba(0,255,209,0.15)' : 'transparent',
             color: !isBreak ? 'var(--accent)' : 'rgba(255,255,255,0.4)',
-            border: !isBreak ? '1px solid rgba(0,255,209,0.3)' : '1px solid transparent'
+            border: !isBreak ? '1px solid rgba(0,255,209,0.3)' : '1px solid transparent',
+            cursor: 'pointer'
           }}>
           Werken ({workMins}m)
         </button>
@@ -154,30 +159,29 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive }) {
           style={{
             background: isBreak ? 'rgba(255,140,66,0.15)' : 'transparent',
             color: isBreak ? '#FF8C42' : 'rgba(255,255,255,0.4)',
-            border: isBreak ? '1px solid rgba(255,140,66,0.3)' : '1px solid transparent'
+            border: isBreak ? '1px solid rgba(255,140,66,0.3)' : '1px solid transparent',
+            cursor: 'pointer'
           }}>
           Pauze ({breakMins}m)
         </button>
       </div>
 
-      {/* Ring met tooltip */}
       <div className="flex flex-col items-center mb-4">
         <div className="relative" style={{ width: '130px', height: '130px' }}>
-          {/* Tooltip */}
           {showTooltip && !running && (
             <div style={{
-              position: 'absolute', top: '-36px', left: '50%', transform: 'translateX(-50%)',
-              background: 'rgba(0,0,0,0.8)', color: 'rgba(255,255,255,0.8)',
-              fontSize: '11px', padding: '4px 10px', borderRadius: '8px',
+              position: 'absolute', top: '-38px', left: '50%', transform: 'translateX(-50%)',
+              background: 'rgba(0,0,0,0.85)', color: 'rgba(255,255,255,0.85)',
+              fontSize: '11px', padding: '5px 10px', borderRadius: '8px',
               whiteSpace: 'nowrap', pointerEvents: 'none', zIndex: 20,
-              border: '1px solid rgba(255,255,255,0.1)'
+              border: '1px solid rgba(255,255,255,0.12)'
             }}>
-              Sleep om tijd aan te passen
+              Sleep ring om tijd aan te passen
               <div style={{
                 position: 'absolute', bottom: '-5px', left: '50%', transform: 'translateX(-50%)',
                 width: 0, height: 0,
                 borderLeft: '5px solid transparent', borderRight: '5px solid transparent',
-                borderTop: '5px solid rgba(0,0,0,0.8)'
+                borderTop: '5px solid rgba(0,0,0,0.85)'
               }} />
             </div>
           )}
@@ -206,7 +210,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive }) {
 
           <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ pointerEvents: 'none' }}>
             <span className="text-2xl font-bold font-mono"
-              style={{ color: isBreak ? '#FF8C42' : 'var(--accent)', textShadow: `0 0 10px ${isBreak ? '#FF8C42' : 'var(--accent)'}` }}>
+              style={{ color: accentColor, textShadow: `0 0 10px ${accentColor}` }}>
               {mins}:{secs}
             </span>
             <span className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>
@@ -225,7 +229,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive }) {
           className="btn-neon flex-1 flex items-center justify-center gap-2"
           style={{
             borderColor: isBreak ? 'rgba(255,140,66,0.5)' : 'rgba(0,255,209,0.5)',
-            color: isBreak ? '#FF8C42' : 'var(--accent)',
+            color: accentColor,
             background: isBreak ? 'rgba(255,140,66,0.1)' : 'rgba(0,255,209,0.1)'
           }}>
           {running ? <><Pause size={16} /> Pauzeer</> : <><Play size={16} /> {seconds === totalSeconds ? 'Start' : 'Hervat'}</>}

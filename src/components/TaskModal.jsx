@@ -27,8 +27,15 @@ export default function TaskModal({ task, defaultTime, subjects, onSave, onDelet
     onSave({ id: task?.id, title, description, time, subject_id: subjectId || null, completed })
   }
 
+  const normalizeUrl = (url) => {
+  if (!url) return ''
+  if (url.startsWith('http://') || url.startsWith('https://')) return url
+  return 'https://' + url
+  }
+
   return (
     <div className="modal-overlay" onClick={onClose}>
+    
       <div className="modal-content glass-card p-6 w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -99,10 +106,14 @@ export default function TaskModal({ task, defaultTime, subjects, onSave, onDelet
               ))}
             </select>
             {selectedSubject?.url && (
-              <a href={selectedSubject.url} target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-1 mt-1.5 text-xs"
-                style={{ color: '#00FFD1' }}>
-                <ExternalLink size={12} /> Open online boek
+              <a
+                href={normalizeUrl(selectedSubject.url)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={e => e.stopPropagation()}
+                style={{ color: 'var(--accent)', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}
+              >
+                <ExternalLink size={12} /> Online boek openen
               </a>
             )}
           </div>

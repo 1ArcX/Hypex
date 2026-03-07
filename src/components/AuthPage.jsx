@@ -1,11 +1,12 @@
 import React, { useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { BookOpen, Mail, Lock, LogIn, UserPlus, Eye, EyeOff } from 'lucide-react'
+import { BookOpen, Mail, Lock, User, LogIn, UserPlus, Eye, EyeOff } from 'lucide-react'
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [name, setName] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -13,14 +14,17 @@ export default function AuthPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setLoading(true)
-    setError('')
-    setMessage('')
+    setLoading(true); setError(''); setMessage('')
+
     if (isLogin) {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) setError(error.message)
     } else {
-      const { error } = await supabase.auth.signUp({ email, password })
+      if (!name.trim()) { setError('Vul je naam in'); setLoading(false); return }
+      const { error } = await supabase.auth.signUp({
+        email, password,
+        options: { data: { full_name: name.trim() } }
+      })
       if (error) setError(error.message)
       else setMessage('Check je e-mail voor een bevestigingslink!')
     }
@@ -46,23 +50,33 @@ export default function AuthPage() {
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Email veld — label boven input, geen overlap */}
+          {/* Naam — alleen bij registratie */}
+          {!isLogin && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium flex items-center gap-1.5"
+                style={{ color: 'rgba(0,255,209,0.8)' }}>
+                <User size={13} /> Volledige naam
+              </label>
+              <input
+                type="text" placeholder="Jan de Vries"
+                value={name} onChange={e => setName(e.target.value)}
+                className="glass-input" required={!isLogin}
+              />
+            </div>
+          )}
+
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium flex items-center gap-1.5"
               style={{ color: 'rgba(0,255,209,0.8)' }}>
               <Mail size={13} /> E-mailadres
             </label>
             <input
-              type="email"
-              placeholder="jouw@email.nl"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              className="glass-input"
-              required
+              type="email" placeholder="jouw@email.nl"
+              value={email} onChange={e => setEmail(e.target.value)}
+              className="glass-input" required
             />
           </div>
 
-          {/* Wachtwoord veld — label boven input, geen overlap */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium flex items-center gap-1.5"
               style={{ color: 'rgba(0,255,209,0.8)' }}>
@@ -72,14 +86,11 @@ export default function AuthPage() {
               <input
                 type={showPass ? 'text' : 'password'}
                 placeholder="Minimaal 6 tekens"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                className="glass-input pr-10"
-                required
+                value={password} onChange={e => setPassword(e.target.value)}
+                className="glass-input pr-10" required
               />
               <button type="button" onClick={() => setShowPass(!showPass)}
-                className="absolute right-3 top-1/2 -translate-y-1/2"
-                style={{ color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}>
                 {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
@@ -112,8 +123,7 @@ export default function AuthPage() {
         <p className="text-center mt-6 text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>
           {isLogin ? 'Nog geen account?' : 'Al een account?'}{' '}
           <button onClick={() => { setIsLogin(!isLogin); setError(''); setMessage('') }}
-            className="font-medium"
-            style={{ color: '#00FFD1', background: 'none', border: 'none', cursor: 'pointer' }}>
+            style={{ color: '#00FFD1', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '500' }}>
             {isLogin ? 'Registreer hier' : 'Log in'}
           </button>
         </p>
