@@ -12,6 +12,11 @@ import { LogOut, GraduationCap, Menu, X } from 'lucide-react'
 import SpotifyWidget from './components/SpotifyWidget'
 import ThemeSettings from './components/ThemeSettings'
 import { Settings } from 'lucide-react'
+import ProfileSetup from './components/ProfileSetup'
+import AdminPanel from './components/AdminPanel'
+import TasksWidget from './components/TasksWidget'
+import Calendar from './components/Calendar'
+import { Shield } from 'lucide-react'
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -30,6 +35,9 @@ export default function App() {
 
   const ADMIN_EMAIL = 'zhafirfachri@gmail.com'
 
+  const [showAdmin, setShowAdmin] = useState(false)
+  const [profileReady, setProfileReady] = useState(false)
+
   const fetchProfiles = async () => {
     const { data } = await supabase.from('profiles').select('id, full_name')
     if (data) setProfiles(data)
@@ -47,9 +55,18 @@ export default function App() {
   }, [])
 
   // Load data
-  useEffect(() => {
-    if (session) { fetchTasks(); fetchSubjects(); fetchProfiles() }
-  }, [session])
+useEffect(() => {
+  if (session) {
+    fetchTasks(); fetchSubjects(); fetchProfiles()
+  }
+}, [session])
+
+useEffect(() => {
+  if (profiles.length > 0) {
+    const p = profiles.find(pr => pr.id === session?.user?.id)
+    setProfileReady(!!(p?.klas && p?.vakken?.length > 0))
+  }
+}, [profiles])
 
   // Effect voor accent kleur:
   useEffect(() => {
@@ -141,6 +158,14 @@ export default function App() {
   const completedToday = tasks.filter(t => t.completed).length
   const totalToday = tasks.length
 
+    // Toon profiel setup als klas/vakken nog niet ingesteld zijn
+  if (!profileReady && profiles.length > 0) return (
+    <>
+      <div className="mesh-bg"><div className="mesh-blob" /></div>
+      <ProfileSetup userId={user.id} onComplete={() => { fetchProfiles(); setProfileReady(true) }} />
+    </>
+  )
+
   return (
     <div className="min-h-screen relative">
       {/* Animated background */}
@@ -202,6 +227,13 @@ export default function App() {
               }}>
               <Settings size={16} />
             </button>
+            {isAdmin && (
+            <button onClick={() => setShowAdmin(true)}
+              title="Admin Paneel"
+              style={{ background: 'rgba(255,180,0,0.1)', border: '1px solid rgba(255,180,0,0.3)', borderRadius: '12px', padding: '8px', cursor: 'pointer', color: '#FFB400' }}>
+              <Shield size={16} />
+            </button>
+          )}
           </div>
         </nav>
 
@@ -215,18 +247,15 @@ export default function App() {
           </div>
 
           {/* MIDDLE COLUMN */}
-          <div className="glass-card p-6">
-            <Clock isBreak={isBreak} />
-            <div className="mt-1 mb-4" style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(0,255,209,0.2), transparent)' }} />
-            <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 260px)' }}>
-              <Timeline
-                tasks={tasks}
-                subjects={subjects}
-                onSlotClick={openNewTask}
-                onTaskClick={openEditTask}
-                onToggleTask={handleToggleTask}
-              />
+          <div className="space-y-4">
+            <div className="glass-card p-6">
+              <Clock isBreak={isBreak} />
+              <div className="mt-1 mb-4" style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(0,255,209,0.2), transparent)' }} />
+              <div className="overflow-y-auto" style={{ maxHeight: '40vh' }}>
+                <Timeline tasks={tasks} subjects={subjects} onSlotClick={openNewTask} onTaskClick={openEditTask} onToggleTask={handleToggleTask} />
+              </div>
             </div>
+            <Calendar userId={session.user.id} />
           </div>
 
           {/* RIGHT COLUMN */}
@@ -234,44 +263,16 @@ export default function App() {
             <WeatherWidget />
             {isAdmin && <SpotifyWidget />}
             <PomodoroTimer onModeChange={setIsBreak} />
-            {/* Upcoming tasks summary */}
-            <div className="glass-card p-4">
-              <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-                <span style={{ color: '#00FFD1' }}>📋</span> Schoolopdrachten
-              </h3>
-              {tasks.filter(t => !t.completed).length === 0 ? (
-                <p className="text-xs text-center py-3" style={{ color: 'rgba(255,255,255,0.25)' }}>
-                  Alle taken afgerond! 🎉
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {tasks.filter(t => !t.completed).slice(0, 5).map(task => {
-                    const subject = subjects.find(s => s.id === task.subject_id)
-                    return (
-                      <div key={task.id}
-                        onClick={() => openEditTask(task)}
-                        className="flex items-start gap-2 px-2 py-2 rounded-xl cursor-pointer transition-all duration-200"
-                        style={{ border: '1px solid rgba(255,255,255,0.06)' }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,255,209,0.04)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: subject?.color || '#00FFD1', marginTop: '5px', flexShrink: 0 }} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium truncate" style={{ color: 'rgba(255,255,255,0.75)' }}>{task.title}</p>
-                          <p className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                            {task.time}{subject ? ` · ${subject.name}` : ''}
-                          </p>
-                        </div>
-                      </div>
-                    )
-                  })}
-                  {tasks.filter(t => !t.completed).length > 5 && (
-                    <p className="text-xs text-center" style={{ color: 'rgba(255,255,255,0.25)' }}>
-                      +{tasks.filter(t => !t.completed).length - 5} meer in de tijdlijn
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
+            <TasksWidget
+              tasks={tasks}
+              subjects={subjects}
+              onAdd={async (data) => {
+                await supabase.from('tasks').insert({ ...data, completed: false, user_id: session.user.id })
+                fetchTasks()
+              }}
+              onDelete={handleDeleteTask}
+              onToggle={handleToggleTask}
+            />
           </div>
         </div>
 
@@ -302,6 +303,8 @@ export default function App() {
           )}
         </div>
       </div>
+
+      {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
 
       {/* ThemeSettings modal */}
       {showThemeSettings && (
