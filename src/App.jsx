@@ -15,7 +15,6 @@ import { Settings } from 'lucide-react'
 import ProfileSetup from './components/ProfileSetup'
 import AdminPanel from './components/AdminPanel'
 import TasksWidget from './components/TasksWidget'
-import Calendar from './components/Calendar'
 import { Shield } from 'lucide-react'
 
 export default function App() {
@@ -39,9 +38,10 @@ export default function App() {
   const [profileReady, setProfileReady] = useState(false)
 
   const fetchProfiles = async () => {
-    const { data } = await supabase.from('profiles').select('id, full_name')
-    if (data) setProfiles(data)
-  }
+    const { data, error } = await supabase.from('profiles').select('*');
+    if (error) console.error('Error fetching profiles:', error);
+    else setProfiles(data || []);
+  };
 
   // Auth listener
   useEffect(() => {
@@ -72,6 +72,12 @@ useEffect(() => {
   useEffect(() => {
     document.documentElement.style.setProperty('--accent', theme.accent)
   }, [theme.accent])
+
+  useEffect(() => {
+  const handler = () => fetchTasks()
+  window.addEventListener('refreshTasks', handler)
+  return () => window.removeEventListener('refreshTasks', handler)
+}, [])
 
   const fetchTasks = async () => {
     const { data } = await supabase.from('tasks').select('*').order('time', { ascending: true })
@@ -158,11 +164,18 @@ useEffect(() => {
   const completedToday = tasks.filter(t => t.completed).length
   const totalToday = tasks.length
 
-    // Toon profiel setup als klas/vakken nog niet ingesteld zijn
   if (!profileReady && profiles.length > 0) return (
     <>
       <div className="mesh-bg"><div className="mesh-blob" /></div>
-      <ProfileSetup userId={user.id} onComplete={() => { fetchProfiles(); setProfileReady(true) }} />
+      <ProfileSetup 
+        userId={session.user.id} 
+        onComplete={async () => {
+          // 1. Haal direct de nieuwste data op uit Supabase
+          await fetchProfiles(); 
+          // 2. Zet de state handmatig op true voor de zekerheid
+          setProfileReady(true); 
+        }} 
+      />
     </>
   )
 
@@ -244,25 +257,6 @@ useEffect(() => {
           <div className="space-y-4 sticky top-6">
             <SubjectsWidget subjects={subjects} onAdd={handleAddSubject} onDelete={handleDeleteSubject} />
             <NotesWidget />
-          </div>
-
-          {/* MIDDLE COLUMN */}
-          <div className="space-y-4">
-            <div className="glass-card p-6">
-              <Clock isBreak={isBreak} />
-              <div className="mt-1 mb-4" style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(0,255,209,0.2), transparent)' }} />
-              <div className="overflow-y-auto" style={{ maxHeight: '40vh' }}>
-                <Timeline tasks={tasks} subjects={subjects} onSlotClick={openNewTask} onTaskClick={openEditTask} onToggleTask={handleToggleTask} />
-              </div>
-            </div>
-            <Calendar userId={session.user.id} />
-          </div>
-
-          {/* RIGHT COLUMN */}
-          <div className="space-y-4 sticky top-6">
-            <WeatherWidget />
-            {isAdmin && <SpotifyWidget />}
-            <PomodoroTimer onModeChange={setIsBreak} />
             <TasksWidget
               tasks={tasks}
               subjects={subjects}
@@ -273,6 +267,29 @@ useEffect(() => {
               onDelete={handleDeleteTask}
               onToggle={handleToggleTask}
             />
+          </div>
+
+          {/* MIDDLE COLUMN */}
+          <div className="space-y-4">
+            <div className="glass-card p-6">
+              <Clock isBreak={isBreak} />
+              <div className="mt-1 mb-4" style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(0,255,209,0.2), transparent)' }} />
+              <div className="overflow-y-auto" style={{ maxHeight: '40vh' }}>
+                <Timeline
+                  userId={session.user.id}
+                  tasks={tasks}
+                  subjects={subjects}
+                  onToggleTask={handleToggleTask}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN */}
+          <div className="space-y-4 sticky top-6">
+            <WeatherWidget />
+            {isAdmin && <SpotifyWidget />}
+            <PomodoroTimer onModeChange={setIsBreak} />
           </div>
         </div>
 
@@ -297,7 +314,7 @@ useEffect(() => {
             <div className="space-y-4" style={{ animation: 'slideUp 0.3s ease' }}>
               <WeatherWidget />
               <PomodoroTimer onModeChange={setIsBreak} onPomodoroActive={setPomodoroActive} />
-              <SubjectsWidget subjects={subjects} onAdd={handleAddSubject} onDelete={handleDeleteSubject} />
+              <SubjectsWidget userId={session.user.id} />
               <NotesWidget />
             </div>
           )}

@@ -25,18 +25,35 @@ export default function ProfileSetup({ userId, onComplete }) {
     )
   }
 
-  const handleSave = async () => {
-    if (!klas || selectedVakken.length === 0 || !naam.trim()) return
-    setSaving(true)
-    await supabase.from('profiles').upsert({
+const handleSave = async () => {
+  if (!klas || selectedVakken.length === 0 || !naam.trim()) return
+  setSaving(true)
+
+  const { error } = await supabase
+    .from('profiles')
+    .upsert({
       id: userId,
       full_name: naam.trim(),
-      klas,
-      vakken: selectedVakken
+      klas: klas,
+      vakken: selectedVakken,
+      updated_at: new Date().toISOString()
+    }, { 
+      onConflict: 'id',        // update als id al bestaat
+      ignoreDuplicates: false  // altijd overschrijven
     })
+
+  if (error) {
+    console.error('Fout:', error)
+    alert('Opslaan mislukt: ' + error.message)
+    setSaving(false)
+    return
+  }
+
+  setTimeout(() => {
     setSaving(false)
     onComplete()
-  }
+  }, 200)
+}
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)' }}>
