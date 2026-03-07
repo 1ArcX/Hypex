@@ -314,7 +314,7 @@ useEffect(() => {
             <div className="space-y-4" style={{ animation: 'slideUp 0.3s ease' }}>
               <WeatherWidget />
               <PomodoroTimer onModeChange={setIsBreak} onPomodoroActive={setPomodoroActive} />
-              <SubjectsWidget userId={session.user.id} />
+              <SubjectsWidget userId={session?.user?.id} />
               <NotesWidget />
             </div>
           )}

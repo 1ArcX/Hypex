@@ -22,27 +22,28 @@ export default function SubjectsWidget({ userId }) {
   const [saving, setSaving] = useState(false)
   const [expanded, setExpanded] = useState(true)
 
-  useEffect(() => {
-    fetchProfile()
-    fetchLinks()
-  }, [userId])
+useEffect(() => {
+    if (userId) {
+      fetchProfile();
+      fetchLinks();
+    }
+  }, [userId]); // Voeg userId toe aan de dependency array
 
 const fetchProfile = async () => {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single()
+    if (!userId) return; // Extra check
     
-  if (data) {
-    setProfile(data)
-    // Zorg dat we een array hebben, ook als het null is in de database
-    const userVakken = data.vakken || []
-    setSelectedVakken(userVakken)
-    setSelectedKlas(data.klas || '')
-    console.log("Geladen vakken:", userVakken) // Debugging
-  }
-};
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+      
+    if (data) {
+      setProfile(data);
+      setSelectedVakken(data.vakken || []);
+      setSelectedKlas(data.klas || '');
+    }
+  };
 
   const fetchLinks = async () => {
     const { data } = await supabase.from('subject_links').select('*')
@@ -59,13 +60,19 @@ const fetchProfile = async () => {
     )
   }
 
+  console.log("userId:", userId)
+
 const handleSave = async () => {
+  if (!userId) {
+    alert('Geen gebruiker gevonden. Probeer opnieuw in te loggen.')
+    return
+  }
   setSaving(true)
 
   const { error } = await supabase
     .from('profiles')
     .upsert({
-      id: userId,
+      id: userId,          // Dit MOET een geldige UUID zijn
       vakken: selectedVakken,
       klas: selectedKlas,
       updated_at: new Date().toISOString()
