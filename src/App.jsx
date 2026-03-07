@@ -24,6 +24,7 @@ export default function App() {
   const [subjects, setSubjects] = useState([])
   const [isBreak, setIsBreak] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
+  const [showTaskModal, setShowTaskModal] = useState(false)
   const [selectedTask, setSelectedTask] = useState(null)
   const [defaultTime, setDefaultTime] = useState('09:00')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -335,15 +336,16 @@ useEffect(() => {
         />
       )}
 
+      
+
       {/* Task Modal */}
-      {modalOpen && (
+      {showTaskModal && (
         <TaskModal
           task={selectedTask}
-          defaultTime={defaultTime}
           subjects={subjects}
-          onSave={handleSaveTask}
-          onDelete={handleDeleteTask}
-          onClose={() => { setModalOpen(false); setSelectedTask(null) }}
+          userId={session?.user?.id}
+          onClose={() => { setShowTaskModal(false); setSelectedTask(null) }}
+          onSave={() => { fetchTasks(); setShowTaskModal(false); setSelectedTask(null) }}
         />
       )}
     </div>

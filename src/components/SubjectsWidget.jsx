@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import { openBookLink } from '../utils/openBook'
+import { BookOpen, ExternalLink, Pencil, X, Check, ChevronDown, ChevronUp } from 'lucide-react'
 import { saveProfile } from '../utils/supabaseProfiles'
 
 const ALLE_VAKKEN = [
@@ -128,7 +129,7 @@ const handleSave = async () => {
         <div style={{ display: 'flex', gap: '6px' }}>
           <button onClick={() => setEditing(!editing)}
             style={{ background: editing ? 'rgba(0,255,209,0.15)' : 'rgba(255,255,255,0.05)', border: `1px solid ${editing ? 'rgba(0,255,209,0.4)' : 'rgba(255,255,255,0.1)'}`, borderRadius: '8px', padding: '4px 8px', cursor: 'pointer', color: editing ? '#00FFD1' : 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px' }}>
-            <Edit3 size={11} /> {editing ? 'Annuleer' : 'Bewerk'}
+            <Pencil size={11} /> {editing ? 'Annuleer' : 'Bewerk'}
           </button>
           <button onClick={() => setExpanded(!expanded)}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '2px' }}>
