@@ -1,17 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import { openBookLink } from '../utils/openBook'
-import { BookOpen, ExternalLink, Pencil, X, Check, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'
+import { ExternalLink, Pencil, Check, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'
 import { saveProfile } from '../utils/supabaseProfiles'
-
-const ALLE_VAKKEN = [
-  'Aardrijkskunde', 'Bedrijfseconomie', 'Bewegen, sport en maatschappij (BSM)',
-  'Biologie', 'Culturele & kunstzinnige vorming (CKV)', 'Duits', 'Economie',
-  'Engels', 'Frans', 'Geschiedenis', 'Kunst Beeldend', 'Levensbeschouwelijke vorming',
-  'Lichamelijke oefening', 'Loopbaanoriëntatie/begeleiding (LOB)', 'Maatschappijleer',
-  'Natuurkunde', 'Nederlands', 'Profielwerkstuk (PWS)', 'Rekenen 3F',
-  'Scheikunde', 'Wiskunde A', 'Wiskunde B'
-]
+import { ALLE_VAKKEN, matchVak } from '../utils/alleVakken'
 
 const KLASSEN = ['Havo 3', 'Havo 4', 'Havo 5', 'VWO 4', 'VWO 5', 'VWO 6']
 
@@ -127,7 +119,7 @@ const syncFromMagister = async () => {
     if (!res.ok) throw new Error('Magister fout')
     const vakken = await res.json()
     if (!vakken?.length) { setSyncMsg('Geen vakken gevonden'); setTimeout(() => setSyncMsg(''), 3000); setSaving(false); return }
-    const namen = vakken.map(v => v.naam).filter(Boolean)
+    const namen = vakken.map(v => matchVak(v.naam) || matchVak(v.afkorting)).filter(Boolean).filter((v, i, a) => a.indexOf(v) === i)
     await saveProfile(userId, { vakken: namen })
     await fetchProfile()
     setSyncMsg(`${namen.length} vakken gesynchroniseerd ✓`)

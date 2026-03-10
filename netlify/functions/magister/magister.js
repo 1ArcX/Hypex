@@ -202,19 +202,30 @@ exports.handler = async (event) => {
 
     if (action === 'opdrachten') {
       const count = body.count || 50
-      const assignments = await m.assignments({ count })
-      return ok(assignments.map(a => ({
-        naam: a.name || '',
-        omschrijving: a.description || '',
-        vak: a.class?.description || a.class?.abbreviation || a.class?.Omschrijving || a.class?.Afkorting || '',
-        deadline: dateStr(a.deadline),
-        ingeleverdOp: dateStr(a.handedInOn),
-        beoordeling: a.grade || null,
-        beoordeeldOp: dateStr(a.markedOn),
-        afgesloten: a.finished || false,
-        magInleveren: a.canHandIn || false,
-        opnieuwInleveren: a.handInAgain || false
-      })))
+      // Use raw HTTP to avoid magister.js Assignment constructor crash on null Bijlagen
+      const listResp = await m.http.get(`${m._personUrl}/opdrachten?top=${count}&skip=0&status=alle`)
+      const listData = await listResp.json()
+      const ids = (listData.Items || []).map(i => i.Id)
+      const results = []
+      for (const id of ids) {
+        try {
+          const resp = await m.http.get(`${m._personUrl}/opdrachten/${id}`)
+          const raw = await resp.json()
+          results.push({
+            naam: raw.Titel || '',
+            omschrijving: raw.Omschrijving || '',
+            vak: raw.Vak?.Omschrijving || raw.Vak?.Afkorting || '',
+            deadline: dateStr(raw.InleverenVoor),
+            ingeleverdOp: dateStr(raw.IngeleverdOp),
+            beoordeling: raw.Beoordeling || null,
+            beoordeeldOp: dateStr(raw.BeoordeeldOp),
+            afgesloten: raw.Afgesloten || false,
+            magInleveren: raw.MagInleveren || false,
+            opnieuwInleveren: raw.OpnieuwInleveren || false
+          })
+        } catch (_) {}
+      }
+      return ok(results)
     }
 
     if (action === 'schedule') {

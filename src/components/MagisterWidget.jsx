@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { BookOpen, ClipboardList, RefreshCw, Settings, ChevronDown, ChevronUp, AlertCircle, FileText } from 'lucide-react'
 import { supabase } from '../supabaseClient'
+import { ALLE_VAKKEN, matchVak } from '../utils/alleVakken'
 
 const API = '/.netlify/functions/magister'
 const STORAGE_KEY = 'magister_credentials'
@@ -39,7 +40,12 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
     try {
       const vakken = await callMagister(credsToUse, 'vakken')
       if (!vakken?.length) return
-      const namen = vakken.map(v => v.naam).filter(Boolean)
+      // Only keep vakken that match entries in the predefined ALLE_VAKKEN list
+      const namen = vakken
+        .map(v => matchVak(v.naam) || matchVak(v.afkorting))
+        .filter(Boolean)
+        .filter((v, i, a) => a.indexOf(v) === i) // deduplicate
+      if (!namen.length) return
       const { data: existing } = await supabase.from('subjects').select('name').eq('user_id', userId)
       const existingNames = new Set((existing || []).map(s => s.name))
       const missing = namen.filter(n => !existingNames.has(n))
@@ -57,16 +63,19 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
     try {
       const materials = await callMagister(credsToUse, 'lesmateriaal')
       if (!materials?.length) return
-      // Upsert each material with a url into subject_links (keyed on vak_naam)
-      for (const m of materials) {
-        if (!m.url || !m.vak) continue
-        const { data: existing } = await supabase.from('subject_links').select('id').eq('vak_naam', m.vak).maybeSingle()
+      for (const mat of materials) {
+        if (!mat.url) continue
+        // Match vak name to ALLE_VAKKEN canonical name
+        const vakNaam = matchVak(mat.vak)
+        if (!vakNaam) continue
+        const { data: existing } = await supabase.from('subject_links').select('id').eq('vak_naam', vakNaam).maybeSingle()
         if (existing) {
-          await supabase.from('subject_links').update({ url: m.url }).eq('vak_naam', m.vak)
+          await supabase.from('subject_links').update({ url: mat.url }).eq('vak_naam', vakNaam)
         } else {
-          await supabase.from('subject_links').insert({ vak_naam: m.vak, url: m.url })
+          await supabase.from('subject_links').insert({ vak_naam: vakNaam, url: mat.url })
         }
       }
+      onSubjectsSync?.()
     } catch (e) {
       console.warn('Lesmateriaal sync mislukt:', e.message)
     }
