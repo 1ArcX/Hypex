@@ -155,11 +155,11 @@ export default function MagisterWidget() {
               </p>
               <input className="glass-input" placeholder="Leerlingnummer" value={formCreds.username}
                 onChange={e => setFormCreds(p => ({ ...p, username: e.target.value }))}
-                style={{ fontSize: '12px' }} />
+                autoComplete="off" style={{ fontSize: '12px' }} />
               <input className="glass-input" type="password" placeholder="Wachtwoord" value={formCreds.password}
                 onChange={e => setFormCreds(p => ({ ...p, password: e.target.value }))}
                 onKeyDown={e => e.key === 'Enter' && saveCreds()}
-                style={{ fontSize: '12px' }} />
+                autoComplete="new-password" style={{ fontSize: '12px' }} />
               {error && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ff6b6b', fontSize: '11px' }}>
                   <AlertCircle size={12} /> {error}
