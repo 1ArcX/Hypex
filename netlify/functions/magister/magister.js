@@ -1,4 +1,4 @@
-const { magister } = require('magister.js')
+const magister = require('magister.js').default
 
 const HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -31,16 +31,20 @@ exports.handler = async (event) => {
 
   if (!action || !username || !password) return err('action, username en password zijn verplicht')
 
+  // Current authCode extracted from accounts.magister.net login JS
+  const authCode = 'd8594abbed31'
+
   let m
   try {
     m = await magister({
       school: { url: `https://${school}.magister.net` },
       username,
-      password
+      password,
+      authCode
     })
   } catch (e) {
     const msg = e.message || ''
-    if (msg.includes('401') || msg.includes('Unauthorized') || msg.includes('credentials') || msg.includes('password')) {
+    if (msg.includes('401') || msg.includes('Unauthorized') || msg.includes('credentials') || msg.includes('password') || msg.includes('AuthCodeValidation') || msg.includes('auth')) {
       return err('Inloggen mislukt. Controleer je leerlingnummer en wachtwoord.', 401)
     }
     return err(`Inlogfout: ${msg}`, 500)
@@ -53,12 +57,17 @@ exports.handler = async (event) => {
 
     if (action === 'grades') {
       const top = body.top || 15
-      const grades = await m.grades(undefined, undefined, undefined, top)
-      const result = grades.map(g => ({
-        vak: g.course?.description || g.subject?.description || '',
+      // Get current course enrollment and fetch latest grades
+      const courses = await m.courses()
+      const current = courses.find(c => c.isCurrent) || courses[courses.length - 1]
+      if (!current) return ok([])
+      const grades = await current.grades({ latest: true, fillGrades: true })
+      const sorted = grades.slice().sort((a, b) => new Date(b.dateFilledIn) - new Date(a.dateFilledIn)).slice(0, top)
+      const result = sorted.map(g => ({
+        vak: g.class?.description || g.class?.abbreviation || '',
         cijfer: g.grade,
-        omschrijving: g.description || '',
-        datum: dateStr(g.date),
+        omschrijving: g.description || g.type?.description || '',
+        datum: dateStr(g.dateFilledIn || g.testDate),
         weging: g.weight,
         klaar: g.passed
       }))
@@ -70,10 +79,10 @@ exports.handler = async (event) => {
       const to = new Date(body.end || (() => { const d = new Date(); d.setDate(d.getDate() + 7); return d })())
       const appointments = await m.appointments(from, to)
       const result = appointments.map(a => ({
-        vak: a.courses?.map(c => c.description).join(', ') || a.description || '',
+        vak: a.classes?.join(', ') || a.description || '',
         start: dateStr(a.start),
         einde: dateStr(a.end),
-        lokaal: a.location || a.classroom || '',
+        lokaal: a.location || '',
         docent: a.teachers?.map(t => t.fullName || t.name).join(', ') || '',
         uitgevallen: a.isCancelled || false,
         huiswerk: a.content || ''
@@ -87,7 +96,7 @@ exports.handler = async (event) => {
       const appointments = await m.appointments(from, to)
       const hw = appointments.filter(a => a.content && a.content.trim())
       const result = hw.map(a => ({
-        vak: a.courses?.map(c => c.description).join(', ') || a.description || '',
+        vak: a.classes?.join(', ') || a.description || '',
         omschrijving: a.content || '',
         datum: dateStr(a.start),
         klaar: a.finished || false
