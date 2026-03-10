@@ -22,7 +22,7 @@ export default function MagisterWidget() {
   const [creds, setCreds]       = useState(() => {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || null } catch { return null }
   })
-  const [formCreds, setFormCreds] = useState({ school: '', username: '', password: '' })
+  const [formCreds, setFormCreds] = useState({ school: 'ichthus', username: '', password: '' })
   const [showSettings, setShowSettings]   = useState(!creds)
   const [tab, setTab]           = useState('rooster')
   const [loading, setLoading]   = useState(false)
@@ -153,10 +153,7 @@ export default function MagisterWidget() {
               <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', margin: 0 }}>
                 Log in met je Magister-account
               </p>
-              <input className="glass-input" placeholder="Schoolnaam (bijv. metis)" value={formCreds.school}
-                onChange={e => setFormCreds(p => ({ ...p, school: e.target.value }))}
-                style={{ fontSize: '12px' }} />
-              <input className="glass-input" placeholder="Gebruikersnaam" value={formCreds.username}
+              <input className="glass-input" placeholder="Leerlingnummer" value={formCreds.username}
                 onChange={e => setFormCreds(p => ({ ...p, username: e.target.value }))}
                 style={{ fontSize: '12px' }} />
               <input className="glass-input" type="password" placeholder="Wachtwoord" value={formCreds.password}
