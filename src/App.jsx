@@ -4,7 +4,6 @@ import AuthPage from './components/AuthPage'
 import Clock from './components/Clock'
 import Timeline from './components/Timeline'
 import TaskModal from './components/TaskModal'
-import SubjectsWidget from './components/SubjectsWidget'
 import NotesWidget from './components/NotesWidget'
 import WeatherWidget from './components/WeatherWidget'
 import PomodoroTimer from './components/PomodoroTimer'
@@ -82,21 +81,6 @@ export default function App() {
 
   // ✅ FIX: profileReady als computed value, niet als aparte state
   const profileReady = !!(userProfile?.klas && (userProfile?.vakken?.length || 0) > 0)
-
-  // Auto-sync profiel vakken naar subjects tabel zodat FK werkt
-  useEffect(() => {
-    if (!userProfile?.vakken?.length || !user?.id) return
-    const sync = async () => {
-      const { data: existing } = await supabase.from('subjects').select('name').eq('user_id', user.id)
-      const existingNames = new Set((existing || []).map(s => s.name))
-      const missing = userProfile.vakken.filter(v => !existingNames.has(v))
-      if (missing.length > 0) {
-        await supabase.from('subjects').insert(missing.map(name => ({ name, user_id: user.id })))
-      }
-      fetchSubjects()
-    }
-    sync()
-  }, [userProfile?.vakken, user?.id])
 
   // Effect voor accent kleur
   useEffect(() => {
@@ -289,10 +273,6 @@ export default function App() {
 
           {/* LEFT COLUMN */}
           <div className="space-y-4 sticky top-20">
-            <SubjectsWidget
-              userId={user.id}
-              onSyncComplete={() => { fetchSubjects(); fetchProfiles() }}
-            />
             <NotesWidget userId={user.id} />
             <TasksWidget
               tasks={tasks}
@@ -369,10 +349,6 @@ export default function App() {
             onEdit={openEditTask}
             onDelete={handleDeleteTask}
             onToggle={handleToggleTask}
-          />
-          <SubjectsWidget
-            userId={user.id}
-            onSyncComplete={() => { fetchSubjects(); fetchProfiles() }}
           />
           <NotesWidget userId={user.id} />
         </div>

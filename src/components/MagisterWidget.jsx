@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { BookOpen, ClipboardList, RefreshCw, Settings, ChevronDown, ChevronUp, AlertCircle, FileText } from 'lucide-react'
+import { BookOpen, ClipboardList, RefreshCw, Settings, ChevronDown, ChevronUp, AlertCircle, FileText, ExternalLink, BookMarked } from 'lucide-react'
 import { supabase } from '../supabaseClient'
-import { ALLE_VAKKEN, matchVak } from '../utils/alleVakken'
+import { matchVak } from '../utils/alleVakken'
 
 const API = '/.netlify/functions/magister'
 const STORAGE_KEY = 'magister_credentials'
@@ -19,40 +19,71 @@ async function callMagister(creds, action, extra = {}) {
 
 function inDays(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10) }
 
+// Converts a Magister lesmateriaal URL to the Noordhoff deeplink via EAN
+function toBookUrl(url) {
+  if (!url) return null
+  const m = url.match(/\/Ean\/(\d+)/i)
+  return m ? `https://apps.noordhoff.nl/se/deeplink?targetEAN=${m[1]}` : url
+}
+
 export default function MagisterWidget({ userId, onSubjectsSync }) {
   const [creds, setCreds] = useState(() => {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || null } catch { return null }
   })
   const [formCreds, setFormCreds] = useState({ school: 'ichthus', username: '', password: '' })
   const [showSettings, setShowSettings] = useState(!creds)
-  const [tab, setTab] = useState('cijfers')
+  const [tab, setTab] = useState('vakken')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [data, setData] = useState({ grades: null, homework: null, assignments: null })
   const [expanded, setExpanded] = useState(true)
+  const [profile, setProfile] = useState(null)
+  const [subjectLinks, setSubjectLinks] = useState({})
+  const [syncing, setSyncing] = useState(false)
+  const [syncMsg, setSyncMsg] = useState('')
 
   useEffect(() => {
-    if (creds) fetchTab(tab)
+    if (creds) fetchTab(tab === 'vakken' ? 'cijfers' : tab)
   }, [creds])
+
+  useEffect(() => {
+    if (userId) { fetchProfile(); fetchLinks() }
+  }, [userId])
+
+  const fetchProfile = async () => {
+    if (!userId) return
+    const { data } = await supabase.from('profiles').select('vakken, klas').eq('id', userId).single()
+    if (data) setProfile(data)
+  }
+
+  const fetchLinks = async () => {
+    const { data } = await supabase.from('subject_links').select('*')
+    if (data) {
+      const map = {}
+      data.forEach(row => { map[row.vak_naam] = row.url })
+      setSubjectLinks(map)
+    }
+  }
 
   const syncVakken = async (credsToUse) => {
     if (!userId) return
     try {
       const vakken = await callMagister(credsToUse, 'vakken')
       if (!vakken?.length) return
-      // Only keep vakken that match entries in the predefined ALLE_VAKKEN list
       const namen = vakken
         .map(v => matchVak(v.naam) || matchVak(v.afkorting))
         .filter(Boolean)
-        .filter((v, i, a) => a.indexOf(v) === i) // deduplicate
+        .filter((v, i, a) => a.indexOf(v) === i)
       if (!namen.length) return
-      const { data: existing } = await supabase.from('subjects').select('name').eq('user_id', userId)
-      const existingNames = new Set((existing || []).map(s => s.name))
-      const missing = namen.filter(n => !existingNames.has(n))
-      if (missing.length > 0) {
-        await supabase.from('subjects').insert(missing.map(name => ({ name, user_id: userId })))
-      }
+      // Full replace: remove old subjects, insert new ones
+      const { data: existing } = await supabase.from('subjects').select('id, name').eq('user_id', userId)
+      const existingMap = Object.fromEntries((existing || []).map(s => [s.name, s.id]))
+      const toDelete = (existing || []).filter(s => !namen.includes(s.name))
+      const toInsert = namen.filter(n => !existingMap[n])
+      if (toDelete.length) await supabase.from('subjects').delete().in('id', toDelete.map(s => s.id))
+      if (toInsert.length) await supabase.from('subjects').insert(toInsert.map(name => ({ name, user_id: userId })))
       await supabase.from('profiles').update({ vakken: namen }).eq('id', userId)
+      await fetchProfile()
       onSubjectsSync?.()
     } catch (e) {
       console.warn('Vakken sync mislukt:', e.message)
@@ -65,20 +96,40 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
       if (!materials?.length) return
       for (const mat of materials) {
         if (!mat.url) continue
-        // Match vak name to ALLE_VAKKEN canonical name
         const vakNaam = matchVak(mat.vak)
         if (!vakNaam) continue
+        const bookUrl = toBookUrl(mat.url)
         const { data: existing } = await supabase.from('subject_links').select('id').eq('vak_naam', vakNaam).maybeSingle()
         if (existing) {
-          await supabase.from('subject_links').update({ url: mat.url }).eq('vak_naam', vakNaam)
+          await supabase.from('subject_links').update({ url: bookUrl }).eq('vak_naam', vakNaam)
         } else {
-          await supabase.from('subject_links').insert({ vak_naam: vakNaam, url: mat.url })
+          await supabase.from('subject_links').insert({ vak_naam: vakNaam, url: bookUrl })
         }
       }
-      onSubjectsSync?.()
+      await fetchLinks()
     } catch (e) {
       console.warn('Lesmateriaal sync mislukt:', e.message)
     }
+  }
+
+  const syncAll = async () => {
+    if (!creds) {
+      setSyncMsg('Niet ingelogd bij Magister')
+      setTimeout(() => setSyncMsg(''), 3000)
+      return
+    }
+    setSyncing(true)
+    try {
+      await syncVakken(creds)
+      await syncLesmateriaal(creds)
+      const count = profile?.vakken?.length || 0
+      setSyncMsg(`Gesynchroniseerd ✓`)
+      setTimeout(() => setSyncMsg(''), 3000)
+    } catch {
+      setSyncMsg('Sync mislukt')
+      setTimeout(() => setSyncMsg(''), 3000)
+    }
+    setSyncing(false)
   }
 
   const saveCreds = async () => {
@@ -89,7 +140,6 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(formCreds))
       setCreds(formCreds)
       setShowSettings(false)
-      // Run syncs in background
       syncVakken(formCreds)
       syncLesmateriaal(formCreds)
     } catch (e) {
@@ -126,11 +176,14 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
     setLoading(false)
   }
 
-  const switchTab = (t) => { setTab(t); fetchTab(t) }
+  const switchTab = (t) => {
+    setTab(t)
+    if (t !== 'vakken') fetchTab(t)
+  }
 
   const refresh = () => {
     setData({ grades: null, homework: null, assignments: null })
-    setTimeout(() => fetchTab(tab), 50)
+    if (tab !== 'vakken') setTimeout(() => fetchTab(tab), 50)
   }
 
   const formatDate = (str) => {
@@ -146,6 +199,9 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
     if (!deadline) return false
     return new Date(deadline) < new Date()
   }
+
+  const vakken = profile?.vakken || []
+  const klas = profile?.klas || ''
 
   return (
     <div className="glass-card p-4">
@@ -215,15 +271,17 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
             </div>
           )}
 
-          {/* Inhoud (alleen als ingelogd) */}
-          {creds && !showSettings && (
+          {!showSettings && (
             <>
               {/* Tabs */}
               <div style={{ display: 'flex', gap: '4px', marginBottom: '10px' }}>
                 {[
-                  { id: 'cijfers', label: 'Cijfers', icon: <BookOpen size={11} /> },
-                  { id: 'huiswerk', label: 'Huiswerk', icon: <ClipboardList size={11} /> },
-                  { id: 'opdrachten', label: 'Opdrachten', icon: <FileText size={11} /> },
+                  { id: 'vakken', label: 'Vakken', icon: <BookMarked size={11} /> },
+                  ...(creds ? [
+                    { id: 'cijfers', label: 'Cijfers', icon: <BookOpen size={11} /> },
+                    { id: 'huiswerk', label: 'Huiswerk', icon: <ClipboardList size={11} /> },
+                    { id: 'opdrachten', label: 'Opdrachten', icon: <FileText size={11} /> },
+                  ] : [])
                 ].map(t => (
                   <button key={t.id} onClick={() => switchTab(t.id)}
                     style={{ flex: 1, padding: '5px 4px', borderRadius: '8px', fontSize: '10px', cursor: 'pointer', border: '1px solid', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', borderColor: tab === t.id ? 'rgba(0,255,209,0.5)' : 'rgba(255,255,255,0.08)', background: tab === t.id ? 'rgba(0,255,209,0.12)' : 'transparent', color: tab === t.id ? '#00FFD1' : 'rgba(255,255,255,0.4)' }}>
@@ -232,8 +290,62 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
                 ))}
               </div>
 
+              {/* Vakken tab */}
+              {tab === 'vakken' && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {klas && (
+                        <span style={{ background: 'rgba(0,255,209,0.1)', border: '1px solid rgba(0,255,209,0.25)', borderRadius: '20px', padding: '1px 8px', fontSize: '10px', color: '#00FFD1' }}>
+                          {klas}
+                        </span>
+                      )}
+                    </div>
+                    {creds && (
+                      <button onClick={syncAll} disabled={syncing}
+                        style={{ background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.25)', borderRadius: '8px', padding: '3px 8px', cursor: 'pointer', color: '#FACC15', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', opacity: syncing ? 0.5 : 1 }}>
+                        <RefreshCw size={11} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} /> Sync
+                      </button>
+                    )}
+                  </div>
+
+                  {syncMsg && (
+                    <div style={{ fontSize: '11px', color: syncMsg.includes('✓') ? '#4ADE80' : '#FACC15', marginBottom: '8px', padding: '4px 8px', background: 'rgba(255,255,255,0.04)', borderRadius: '6px' }}>
+                      {syncMsg}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {vakken.length === 0 ? (
+                      <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>
+                        {creds ? 'Klik op "Sync" om vakken te laden' : 'Log in bij Magister om vakken te laden'}
+                      </p>
+                    ) : vakken.map(vak => {
+                      const link = subjectLinks[vak]
+                      return (
+                        <div key={vak}
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}>
+                          <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.75)', fontWeight: 500 }}>{vak}</span>
+                          {link ? (
+                            <a href={link} target="_blank" rel="noopener noreferrer"
+                              onClick={e => e.stopPropagation()}
+                              style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#00FFD1', textDecoration: 'none', background: 'rgba(0,255,209,0.08)', border: '1px solid rgba(0,255,209,0.2)', borderRadius: '6px', padding: '2px 7px' }}>
+                              <ExternalLink size={10} /> Boek
+                            </a>
+                          ) : (
+                            <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.12)' }}>–</span>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Loading */}
-              {loading && (
+              {loading && tab !== 'vakken' && (
                 <div style={{ textAlign: 'center', padding: '20px', color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>
                   <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite', display: 'block', margin: '0 auto 6px' }} />
                   Laden...
@@ -241,7 +353,7 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
               )}
 
               {/* Error */}
-              {error && !loading && (
+              {error && !loading && tab !== 'vakken' && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ff6b6b', fontSize: '12px', padding: '8px', borderRadius: '8px', background: 'rgba(255,80,80,0.08)' }}>
                   <AlertCircle size={13} /> {error}
                 </div>
@@ -326,14 +438,14 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
                   })}
                 </div>
               )}
-            </>
-          )}
 
-          {/* Niet ingelogd */}
-          {!creds && !showSettings && (
-            <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>
-              Klik op "Inloggen" om te beginnen
-            </p>
+              {/* Niet ingelogd prompt (alleen bij niet-vakken tabs) */}
+              {!creds && tab !== 'vakken' && (
+                <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>
+                  Klik op "Inloggen" om te beginnen
+                </p>
+              )}
+            </>
           )}
         </>
       )}
