@@ -1,0 +1,7 @@
+{
+  "name": "magister-function",
+  "version": "1.0.0",
+  "dependencies": {
+    "magister.js": "^2.2.0"
+  }
+}
