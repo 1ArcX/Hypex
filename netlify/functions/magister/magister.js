@@ -44,9 +44,18 @@ exports.handler = async (event) => {
     })
   } catch (e) {
     const msg = e.message || ''
-    if (msg.includes('401') || msg.includes('Unauthorized') || msg.includes('credentials') || msg.includes('password') || msg.includes('AuthCodeValidation') || msg.includes('auth')) {
+    // Any auth failure ends up here - wrong credentials, session issues, or library errors
+    // from failed login attempts all map to the same "invalid credentials" response
+    if (
+      msg.includes('401') || msg.includes('Unauthorized') ||
+      msg.includes('credentials') || msg.includes('password') ||
+      msg.includes('AuthCodeValidation') || msg.includes('auth') ||
+      msg.includes('split') || msg.includes('Cannot read') ||
+      msg.includes('session') || msg.includes('login')
+    ) {
       return err('Inloggen mislukt. Controleer je leerlingnummer en wachtwoord.', 401)
     }
+    console.error('Magister login error:', msg)
     return err(`Inlogfout: ${msg}`, 500)
   }
 
