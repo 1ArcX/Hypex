@@ -351,7 +351,7 @@ export default function App() {
           {/* RIGHT COLUMN */}
           <div className="space-y-4 sticky top-20">
             <WeatherWidget />
-            {isAdmin && <SpotifyWidget />}
+            <SpotifyWidget />
             <PomodoroTimer onModeChange={setIsBreak} />
             <MagisterWidget />
           </div>
