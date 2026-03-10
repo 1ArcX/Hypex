@@ -47,7 +47,14 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
   }, [creds])
 
   useEffect(() => {
-    if (userId) { fetchProfile(); fetchLinks() }
+    if (!userId) return
+    fetchProfile()
+    fetchLinks()
+    // Auto-sync vakken once per session to apply latest matchVak logic
+    if (creds && !sessionStorage.getItem('magister_synced')) {
+      sessionStorage.setItem('magister_synced', '1')
+      syncVakken(creds).then(() => syncLesmateriaal(creds))
+    }
   }, [userId])
 
   const fetchProfile = async () => {

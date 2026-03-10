@@ -104,7 +104,21 @@ export default function App() {
     if (!user?.id) return
     const { data, error } = await supabase.from('subjects').select('*').eq('user_id', user.id).order('name', { ascending: true })
     if (error) console.error(error)
-    setSubjects(data || [])
+    const rows = data || []
+    // Dedup: keep first row per name, delete the rest
+    const seen = new Set()
+    const toDelete = []
+    for (const s of rows) {
+      if (seen.has(s.name)) toDelete.push(s.id)
+      else seen.add(s.name)
+    }
+    if (toDelete.length > 0) {
+      await supabase.from('subjects').delete().in('id', toDelete)
+      const { data: clean } = await supabase.from('subjects').select('*').eq('user_id', user.id).order('name', { ascending: true })
+      setSubjects(clean || [])
+    } else {
+      setSubjects(rows)
+    }
   }
 
   const handleSaveTask = async (taskData) => {
