@@ -8,7 +8,7 @@ import SubjectsWidget from './components/SubjectsWidget'
 import NotesWidget from './components/NotesWidget'
 import WeatherWidget from './components/WeatherWidget'
 import PomodoroTimer from './components/PomodoroTimer'
-import { LogOut, GraduationCap, Menu, X } from 'lucide-react'
+import { LogOut, GraduationCap } from 'lucide-react'
 import SpotifyWidget from './components/SpotifyWidget'
 import ThemeSettings from './components/ThemeSettings'
 import { Settings } from 'lucide-react'
@@ -33,7 +33,6 @@ export default function App() {
   const [selectedTask, setSelectedTask] = useState(null)
   const [defaultTime, setDefaultTime] = useState('09:00')
   const [defaultDate, setDefaultDate] = useState('')
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showThemeSettings, setShowThemeSettings] = useState(false)
   const [theme, setTheme] = useState({ accent: '#00FFD1', bg1: '#0a0a1a', bg2: '#0d1117' })
   const [pomodoroActive, setPomodoroActive] = useState(false)
@@ -277,12 +276,6 @@ export default function App() {
               <span className="hidden sm:inline">Uitloggen</span>
             </button>
 
-            {/* Mobile menu toggle */}
-            <button className="md:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.6)' }}>
-              {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-            </button>
-
             {/* Instellingen knop */}
             <button onClick={() => setShowThemeSettings(true)}
               style={{
@@ -346,6 +339,7 @@ export default function App() {
                 />
               </div>
             </div>
+            <MagisterWidget />
           </div>
 
           {/* RIGHT COLUMN */}
@@ -353,7 +347,6 @@ export default function App() {
             <WeatherWidget />
             <SpotifyWidget />
             <PomodoroTimer onModeChange={setIsBreak} />
-            <MagisterWidget />
           </div>
         </div>
 
@@ -375,20 +368,30 @@ export default function App() {
               />
             </div>
           </div>
-          {mobileMenuOpen && (
-            <div className="space-y-4" style={{ animation: 'slideUp 0.3s ease' }}>
-              <WeatherWidget />
-              <PomodoroTimer onModeChange={setIsBreak} onPomodoroActive={setPomodoroActive} />
-              <SubjectsWidget
-                subjects={subjects}
-                userId={user.id}
-                onAdd={handleAddSubject}
-                onDelete={handleDeleteSubject}
-                isAdmin={isAdmin}
-              />
-              <NotesWidget userId={user.id} />
-            </div>
-          )}
+          <MagisterWidget />
+          <WeatherWidget />
+          <SpotifyWidget />
+          <PomodoroTimer onModeChange={setIsBreak} onPomodoroActive={setPomodoroActive} />
+          <TasksWidget
+            tasks={tasks}
+            subjects={subjects}
+            onAdd={async (data) => {
+              if (!user?.id) return
+              await supabase.from('tasks').insert({ ...data, completed: false, user_id: user.id })
+              fetchTasks()
+            }}
+            onEdit={openEditTask}
+            onDelete={handleDeleteTask}
+            onToggle={handleToggleTask}
+          />
+          <SubjectsWidget
+            subjects={subjects}
+            userId={user.id}
+            onAdd={handleAddSubject}
+            onDelete={handleDeleteSubject}
+            isAdmin={isAdmin}
+          />
+          <NotesWidget userId={user.id} />
         </div>
       </div>
 
