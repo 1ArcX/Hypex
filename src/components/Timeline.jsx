@@ -4,6 +4,7 @@ import { Plus, ChevronLeft, ChevronRight, X, Save, Trash2 } from 'lucide-react'
 
 const HOUR_H = 56       // px per hour in the time grid
 const TIME_COL = 48     // px for the time label column
+const MAGISTER_KEY = 'magister_credentials'
 
 const MONTHS_FULL = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December']
 const MONTHS_SHORT = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec']
@@ -43,6 +44,7 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask, onEdit
   const [modal, setModal] = useState(null)
   const [form, setForm] = useState(emptyForm(new Date()))
   const [saving, setSaving] = useState(false)
+  const [magisterLessons, setMagisterLessons] = useState([])
   const scrollRef = useRef(null)
   const now = new Date()
 
@@ -50,16 +52,42 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask, onEdit
 
   useEffect(() => {
     if (scrollRef.current) {
-      // Scroll to 1 hour before current time (or 7am)
       const targetHour = Math.max(0, now.getHours() - 1)
       scrollRef.current.scrollTop = targetHour * HOUR_H
     }
   }, [view])
 
+  // Fetch Magister schedule for the visible range, cached per date-range in sessionStorage
+  useEffect(() => {
+    const days = view === 'week' ? getWeekDays(current) : [current]
+    const start = toDateStr(days[0])
+    const end = toDateStr(days[days.length - 1])
+    const cacheKey = `magister_sched_${start}_${end}`
+    const cached = sessionStorage.getItem(cacheKey)
+    if (cached) { try { setMagisterLessons(JSON.parse(cached)) } catch {} ; return }
+    const creds = (() => { try { return JSON.parse(localStorage.getItem(MAGISTER_KEY)) } catch { return null } })()
+    if (!creds) return
+    fetch('/.netlify/functions/magister', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...creds, action: 'schedule', start, end })
+    }).then(r => r.ok ? r.json() : null).then(data => {
+      if (Array.isArray(data)) {
+        sessionStorage.setItem(cacheKey, JSON.stringify(data))
+        setMagisterLessons(data)
+      }
+    }).catch(() => {})
+  }, [view, toDateStr(current)])
+
   const fetchEvents = async () => {
     const { data } = await supabase.from('calendar_events').select('*').eq('user_id', userId)
     if (data) setEvents(data)
   }
+
+  const getMagisterLessonsForDay = (date) => magisterLessons.filter(les => {
+    if (!les.start) return false
+    return isSameDay(new Date(les.start), date)
+  })
 
   const getEventsForDay = (date) => events.filter(ev => {
     const start = new Date(ev.start_time)
@@ -264,6 +292,7 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask, onEdit
             {days.map((d, di) => {
               const colEvents = getEventsForDay(d)
               const colTasks = getTasksForDay(d)
+              const colLessons = getMagisterLessonsForDay(d)
               const colLeft = `calc(${TIME_COL}px + ${di / days.length * 100}%)`
               const colWidth = `calc(${100 / days.length}% - 4px)`
 
@@ -301,6 +330,46 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask, onEdit
                         {showTime && (
                           <div style={{ fontSize: '10px', color: ev.color + 'bb', lineHeight: 1.2, marginTop: '1px' }}>
                             {pad(s.getHours())}:{pad(s.getMinutes())} – {pad(en.getHours())}:{pad(en.getMinutes())}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+
+                  {colLessons.map((les, li) => {
+                    const s = new Date(les.start), en = new Date(les.einde || les.start)
+                    const startMins = s.getHours()*60 + s.getMinutes()
+                    const endMins = Math.max(startMins + 30, en.getHours()*60 + en.getMinutes())
+                    const top = (startMins / 60) * HOUR_H
+                    const height = Math.max(22, ((endMins - startMins) / 60) * HOUR_H - 2)
+                    const showDetail = height >= 36
+                    const cancelled = les.uitgevallen
+                    const color = cancelled ? '#FF6B6B' : '#FACC15'
+                    return (
+                      <div key={`les-${li}`}
+                        style={{
+                          position: 'absolute',
+                          top: `${top}px`,
+                          height: `${height}px`,
+                          left: colLeft,
+                          width: colWidth,
+                          background: color + '18',
+                          borderLeft: `3px solid ${cancelled ? '#FF6B6B99' : '#FACC1599'}`,
+                          borderRadius: '5px',
+                          padding: '3px 7px',
+                          overflow: 'hidden',
+                          cursor: 'default',
+                          zIndex: 1,
+                          boxSizing: 'border-box',
+                          marginLeft: '2px',
+                          opacity: cancelled ? 0.5 : 0.85
+                        }}>
+                        <div style={{ fontSize: '11px', fontWeight: 600, color, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: cancelled ? 'line-through' : 'none' }}>
+                          🎓 {les.vak || 'Les'}
+                        </div>
+                        {showDetail && (
+                          <div style={{ fontSize: '10px', color: color + 'aa', lineHeight: 1.3, marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {les.lokaal ? les.lokaal : ''}{les.docent ? ` · ${les.docent}` : ''}
                           </div>
                         )}
                       </div>

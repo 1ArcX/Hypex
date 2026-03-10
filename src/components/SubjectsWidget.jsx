@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import { openBookLink } from '../utils/openBook'
-import { BookOpen, ExternalLink, Pencil, X, Check, ChevronDown, ChevronUp } from 'lucide-react'
+import { BookOpen, ExternalLink, Pencil, X, Check, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'
 import { saveProfile } from '../utils/supabaseProfiles'
 
 const ALLE_VAKKEN = [
@@ -23,6 +23,7 @@ export default function SubjectsWidget({ userId }) {
   const [selectedKlas, setSelectedKlas] = useState('')
   const [saving, setSaving] = useState(false)
   const [expanded, setExpanded] = useState(true)
+  const [syncMsg, setSyncMsg] = useState('')
 
 useEffect(() => {
     if (userId) {
@@ -109,6 +110,35 @@ const handleSave = async () => {
   setSaving(false)
 }
 
+const syncFromMagister = async () => {
+  const creds = (() => { try { return JSON.parse(localStorage.getItem('magister_credentials')) } catch { return null } })()
+  if (!creds) {
+    setSyncMsg('Niet ingelogd bij Magister')
+    setTimeout(() => setSyncMsg(''), 3000)
+    return
+  }
+  setSaving(true)
+  try {
+    const res = await fetch('/.netlify/functions/magister', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...creds, action: 'vakken' })
+    })
+    if (!res.ok) throw new Error('Magister fout')
+    const vakken = await res.json()
+    if (!vakken?.length) { setSyncMsg('Geen vakken gevonden'); setTimeout(() => setSyncMsg(''), 3000); setSaving(false); return }
+    const namen = vakken.map(v => v.naam).filter(Boolean)
+    await saveProfile(userId, { vakken: namen })
+    await fetchProfile()
+    setSyncMsg(`${namen.length} vakken gesynchroniseerd ✓`)
+    setTimeout(() => setSyncMsg(''), 3000)
+  } catch {
+    setSyncMsg('Sync mislukt')
+    setTimeout(() => setSyncMsg(''), 3000)
+  }
+  setSaving(false)
+}
+
   const vakken = profile?.vakken || []
   const klas = profile?.klas || ''
 
@@ -125,7 +155,11 @@ const handleSave = async () => {
             </span>
           )}
         </div>
-        <div style={{ display: 'flex', gap: '6px' }}>
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <button onClick={syncFromMagister} disabled={saving} title="Vakken synchroniseren vanuit Magister"
+            style={{ background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.25)', borderRadius: '8px', padding: '4px 8px', cursor: 'pointer', color: '#FACC15', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', opacity: saving ? 0.5 : 1 }}>
+            <RefreshCw size={11} /> Magister
+          </button>
           <button onClick={() => setEditing(!editing)}
             style={{ background: editing ? 'rgba(0,255,209,0.15)' : 'rgba(255,255,255,0.05)', border: `1px solid ${editing ? 'rgba(0,255,209,0.4)' : 'rgba(255,255,255,0.1)'}`, borderRadius: '8px', padding: '4px 8px', cursor: 'pointer', color: editing ? '#00FFD1' : 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px' }}>
             <Pencil size={11} /> {editing ? 'Annuleer' : 'Bewerk'}
@@ -136,6 +170,11 @@ const handleSave = async () => {
           </button>
         </div>
       </div>
+      {syncMsg && (
+        <div style={{ fontSize: '11px', color: syncMsg.includes('✓') ? '#4ADE80' : '#FACC15', marginBottom: '8px', padding: '4px 8px', background: 'rgba(255,255,255,0.04)', borderRadius: '6px' }}>
+          {syncMsg}
+        </div>
+      )}
 
       {expanded && (
         <>
