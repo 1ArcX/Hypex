@@ -339,7 +339,7 @@ export default function App() {
                 />
               </div>
             </div>
-            <MagisterWidget />
+            <MagisterWidget userId={user.id} onSubjectsSync={() => { fetchSubjects(); fetchProfiles() }} />
           </div>
 
           {/* RIGHT COLUMN */}
@@ -368,7 +368,7 @@ export default function App() {
               />
             </div>
           </div>
-          <MagisterWidget />
+          <MagisterWidget userId={user.id} onSubjectsSync={() => { fetchSubjects(); fetchProfiles() }} />
           <WeatherWidget />
           <SpotifyWidget />
           <PomodoroTimer onModeChange={setIsBreak} onPomodoroActive={setPomodoroActive} />

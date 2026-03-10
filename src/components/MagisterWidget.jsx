@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { LogIn, BookOpen, Calendar, ClipboardList, RefreshCw, Settings, X, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react'
+import { supabase } from '../supabaseClient'
 
 const API = '/.netlify/functions/magister'
 const STORAGE_KEY = 'magister_credentials'
@@ -18,7 +19,7 @@ async function callMagister(creds, action, extra = {}) {
 function today() { return new Date().toISOString().slice(0, 10) }
 function inDays(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10) }
 
-export default function MagisterWidget() {
+export default function MagisterWidget({ userId, onSubjectsSync }) {
   const [creds, setCreds]       = useState(() => {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || null } catch { return null }
   })
@@ -34,6 +35,27 @@ export default function MagisterWidget() {
     if (creds) fetchTab(tab)
   }, [creds])
 
+  const syncVakken = async (credsToUse) => {
+    if (!userId) return
+    try {
+      const vakken = await callMagister(credsToUse, 'vakken')
+      if (!vakken?.length) return
+      const namen = vakken.map(v => v.naam).filter(Boolean)
+      // Sync to subjects table
+      const { data: existing } = await supabase.from('subjects').select('name').eq('user_id', userId)
+      const existingNames = new Set((existing || []).map(s => s.name))
+      const missing = namen.filter(n => !existingNames.has(n))
+      if (missing.length > 0) {
+        await supabase.from('subjects').insert(missing.map(name => ({ name, user_id: userId })))
+      }
+      // Sync to profile vakken
+      await supabase.from('profiles').update({ vakken: namen }).eq('id', userId)
+      onSubjectsSync?.()
+    } catch (e) {
+      console.warn('Vakken sync mislukt:', e.message)
+    }
+  }
+
   const saveCreds = async () => {
     if (!formCreds.school || !formCreds.username || !formCreds.password) return
     setLoading(true); setError(null)
@@ -42,6 +64,7 @@ export default function MagisterWidget() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(formCreds))
       setCreds(formCreds)
       setShowSettings(false)
+      syncVakken(formCreds)
     } catch (e) {
       setError(e.message)
     }

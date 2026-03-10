@@ -158,12 +158,17 @@ exports.handler = async (event) => {
     }
 
     if (action === 'grades') {
-      const top = body.top || 15
+      const top = body.top || 30
       const courses = await m.courses()
       const current = courses.find(c => c.isCurrent) || courses[courses.length - 1]
       if (!current) return ok([])
-      const grades = await current.grades({ latest: true, fillGrades: true })
-      const sorted = grades.slice().sort((a, b) => new Date(b.dateFilledIn) - new Date(a.dateFilledIn)).slice(0, top)
+      // Try without latest:true first so we get all grades, not just one per subject
+      let grades = []
+      try { grades = await current.grades({ fillGrades: true }) } catch (_) {}
+      if (!grades.length) {
+        try { grades = await current.grades({ latest: true, fillGrades: true }) } catch (_) {}
+      }
+      const sorted = grades.slice().sort((a, b) => new Date(b.dateFilledIn || b.testDate) - new Date(a.dateFilledIn || a.testDate)).slice(0, top)
       return ok(sorted.map(g => ({
         vak: g.class?.description || g.class?.abbreviation || '',
         cijfer: g.grade,
@@ -171,6 +176,17 @@ exports.handler = async (event) => {
         datum: dateStr(g.dateFilledIn || g.testDate),
         weging: g.weight,
         klaar: g.passed
+      })))
+    }
+
+    if (action === 'vakken') {
+      const courses = await m.courses()
+      const current = courses.find(c => c.isCurrent) || courses[courses.length - 1]
+      if (!current) return ok([])
+      const subjects = await current.subjects()
+      return ok(subjects.map(s => ({
+        naam: s.description || s.abbreviation || s.code || '',
+        afkorting: s.abbreviation || s.code || ''
       })))
     }
 
