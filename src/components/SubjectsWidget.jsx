@@ -1,44 +1,45 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
-import { openBookLink } from '../utils/openBook'
-import { ExternalLink, Pencil, Check, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'
-import { saveProfile } from '../utils/supabaseProfiles'
-import { ALLE_VAKKEN, matchVak } from '../utils/alleVakken'
+import { ExternalLink, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react'
+import { matchVak } from '../utils/alleVakken'
 
-const KLASSEN = ['Havo 3', 'Havo 4', 'Havo 5', 'VWO 4', 'VWO 5', 'VWO 6']
+const MAGISTER_KEY = 'magister_credentials'
 
-export default function SubjectsWidget({ userId }) {
+function getCreds() {
+  try { return JSON.parse(localStorage.getItem(MAGISTER_KEY)) || null } catch { return null }
+}
+
+async function magisterCall(creds, action, extra = {}) {
+  const res = await fetch('/.netlify/functions/magister', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...creds, action, ...extra })
+  })
+  if (!res.ok) throw new Error('Magister fout')
+  return res.json()
+}
+
+export default function SubjectsWidget({ userId, onSyncComplete }) {
   const [profile, setProfile] = useState(null)
   const [subjectLinks, setSubjectLinks] = useState({})
-  const [editing, setEditing] = useState(false)
-  const [selectedVakken, setSelectedVakken] = useState([])
-  const [selectedKlas, setSelectedKlas] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [expanded, setExpanded] = useState(true)
+  const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState('')
+  const [expanded, setExpanded] = useState(true)
 
-useEffect(() => {
-    if (userId) {
-      fetchProfile();
-      fetchLinks();
-    }
-  }, [userId]); // Voeg userId toe aan de dependency array
+  useEffect(() => {
+    if (!userId) return
+    fetchProfile()
+    fetchLinks().then(() => {
+      // Auto-sync book links on mount if logged in to Magister
+      const creds = getCreds()
+      if (creds) syncLinks(creds)
+    })
+  }, [userId])
 
-const fetchProfile = async () => {
-    if (!userId) return; // Extra check
-    
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-      
-    if (data) {
-      setProfile(data);
-      setSelectedVakken(data.vakken || []);
-      setSelectedKlas(data.klas || '');
-    }
-  };
+  const fetchProfile = async () => {
+    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
+    if (data) setProfile(data)
+  }
 
   const fetchLinks = async () => {
     const { data } = await supabase.from('subject_links').select('*')
@@ -49,97 +50,74 @@ const fetchProfile = async () => {
     }
   }
 
-  const toggleVak = (vak) => {
-    setSelectedVakken(prev =>
-      prev.includes(vak) ? prev.filter(v => v !== vak) : [...prev, vak]
-    )
+  // Sync lesmateriaal → subject_links (book URLs per vak)
+  const syncLinks = async (creds) => {
+    try {
+      const materials = await magisterCall(creds, 'lesmateriaal')
+      if (!materials?.length) return
+      for (const mat of materials) {
+        if (!mat.url) continue
+        const vakNaam = matchVak(mat.vak)
+        if (!vakNaam) continue
+        const { data: existing } = await supabase.from('subject_links').select('id').eq('vak_naam', vakNaam).maybeSingle()
+        if (existing) {
+          await supabase.from('subject_links').update({ url: mat.url }).eq('vak_naam', vakNaam)
+        } else {
+          await supabase.from('subject_links').insert({ vak_naam: vakNaam, url: mat.url })
+        }
+      }
+      await fetchLinks()
+    } catch {}
   }
 
+  const syncFromMagister = async () => {
+    const creds = getCreds()
+    if (!creds) {
+      setSyncMsg('Niet ingelogd bij Magister')
+      setTimeout(() => setSyncMsg(''), 3000)
+      return
+    }
+    setSyncing(true)
+    try {
+      // 1. Fetch vakken from Magister
+      const vakkenRaw = await magisterCall(creds, 'vakken')
+      const namen = (vakkenRaw || [])
+        .map(v => matchVak(v.naam) || matchVak(v.afkorting))
+        .filter(Boolean)
+        .filter((v, i, a) => a.indexOf(v) === i)
 
-// const handleSave = async () => {
-//   if (!userId) {
-//     alert('Geen gebruiker gevonden. Probeer opnieuw in te loggen.')
-//     return
-//   }
-//   setSaving(true)
+      if (namen.length) {
+        // Full replace: remove subjects not in new list, add missing ones
+        const { data: existing } = await supabase.from('subjects').select('id, name').eq('user_id', userId)
+        const existingMap = Object.fromEntries((existing || []).map(s => [s.name, s.id]))
+        const toDelete = (existing || []).filter(s => !namen.includes(s.name))
+        const toInsert = namen.filter(n => !existingMap[n])
+        if (toDelete.length) await supabase.from('subjects').delete().in('id', toDelete.map(s => s.id))
+        if (toInsert.length) await supabase.from('subjects').insert(toInsert.map(name => ({ name, user_id: userId })))
+        await supabase.from('profiles').update({ vakken: namen }).eq('id', userId)
+        await fetchProfile()
+        onSyncComplete?.()
+      }
 
-//   const { error } = await supabase
-//     .from('profiles')
-//     .upsert({
-//       id: userId,          // Dit MOET een geldige UUID zijn
-//       vakken: selectedVakken,
-//       klas: selectedKlas,
-//       updated_at: new Date().toISOString()
-//     }, {
-//       onConflict: 'id',
-//       ignoreDuplicates: false
-//     })
+      // 2. Sync book links
+      await syncLinks(creds)
 
-//   if (error) {
-//     console.error('Fout:', error)
-//     alert('Opslaan mislukt: ' + error.message)
-//     setSaving(false)
-//     return
-//   }
-
-//   await saveProfile(userId, { vakken: selectedVakken, klas: selectedKlas })
-
-//   await fetchProfile()
-//   setSaving(false)
-//   setEditing(false)
-// }
-
-const handleSave = async () => {
-  if (!userId) { alert('Geen gebruiker gevonden'); return }
-  setSaving(true)
-  try {
-    await saveProfile(userId, { vakken: selectedVakken, klas: selectedKlas })
-    await fetchProfile()
-    setEditing(false)
-  } catch (err) {
-    alert('Opslaan mislukt: ' + err.message)
+      setSyncMsg(`${namen.length} vakken gesynchroniseerd ✓`)
+      setTimeout(() => setSyncMsg(''), 3000)
+    } catch {
+      setSyncMsg('Sync mislukt')
+      setTimeout(() => setSyncMsg(''), 3000)
+    }
+    setSyncing(false)
   }
-  setSaving(false)
-}
-
-const syncFromMagister = async () => {
-  const creds = (() => { try { return JSON.parse(localStorage.getItem('magister_credentials')) } catch { return null } })()
-  if (!creds) {
-    setSyncMsg('Niet ingelogd bij Magister')
-    setTimeout(() => setSyncMsg(''), 3000)
-    return
-  }
-  setSaving(true)
-  try {
-    const res = await fetch('/.netlify/functions/magister', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...creds, action: 'vakken' })
-    })
-    if (!res.ok) throw new Error('Magister fout')
-    const vakken = await res.json()
-    if (!vakken?.length) { setSyncMsg('Geen vakken gevonden'); setTimeout(() => setSyncMsg(''), 3000); setSaving(false); return }
-    const namen = vakken.map(v => matchVak(v.naam) || matchVak(v.afkorting)).filter(Boolean).filter((v, i, a) => a.indexOf(v) === i)
-    await saveProfile(userId, { vakken: namen })
-    await fetchProfile()
-    setSyncMsg(`${namen.length} vakken gesynchroniseerd ✓`)
-    setTimeout(() => setSyncMsg(''), 3000)
-  } catch {
-    setSyncMsg('Sync mislukt')
-    setTimeout(() => setSyncMsg(''), 3000)
-  }
-  setSaving(false)
-}
 
   const vakken = profile?.vakken || []
   const klas = profile?.klas || ''
 
   return (
     <div className="glass-card p-4">
-      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: expanded ? '12px' : '0' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button onClick={() => openBookLink(link)}>Boek</button>
           <span style={{ color: 'white', fontWeight: 600, fontSize: '13px' }}>Mijn Vakken</span>
           {klas && (
             <span style={{ background: 'rgba(0,255,209,0.1)', border: '1px solid rgba(0,255,209,0.25)', borderRadius: '20px', padding: '1px 8px', fontSize: '10px', color: '#00FFD1' }}>
@@ -148,13 +126,9 @@ const syncFromMagister = async () => {
           )}
         </div>
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-          <button onClick={syncFromMagister} disabled={saving} title="Vakken synchroniseren vanuit Magister"
-            style={{ background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.25)', borderRadius: '8px', padding: '4px 8px', cursor: 'pointer', color: '#FACC15', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', opacity: saving ? 0.5 : 1 }}>
-            <RefreshCw size={11} /> Magister
-          </button>
-          <button onClick={() => setEditing(!editing)}
-            style={{ background: editing ? 'rgba(0,255,209,0.15)' : 'rgba(255,255,255,0.05)', border: `1px solid ${editing ? 'rgba(0,255,209,0.4)' : 'rgba(255,255,255,0.1)'}`, borderRadius: '8px', padding: '4px 8px', cursor: 'pointer', color: editing ? '#00FFD1' : 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px' }}>
-            <Pencil size={11} /> {editing ? 'Annuleer' : 'Bewerk'}
+          <button onClick={syncFromMagister} disabled={syncing} title="Vakken en boeklinks synchroniseren vanuit Magister"
+            style={{ background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.25)', borderRadius: '8px', padding: '4px 8px', cursor: 'pointer', color: '#FACC15', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', opacity: syncing ? 0.5 : 1 }}>
+            <RefreshCw size={11} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} /> Magister
           </button>
           <button onClick={() => setExpanded(!expanded)}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '2px' }}>
@@ -162,6 +136,7 @@ const syncFromMagister = async () => {
           </button>
         </div>
       </div>
+
       {syncMsg && (
         <div style={{ fontSize: '11px', color: syncMsg.includes('✓') ? '#4ADE80' : '#FACC15', marginBottom: '8px', padding: '4px 8px', background: 'rgba(255,255,255,0.04)', borderRadius: '6px' }}>
           {syncMsg}
@@ -169,96 +144,34 @@ const syncFromMagister = async () => {
       )}
 
       {expanded && (
-        <>
-          {/* Edit mode */}
-          {editing ? (
-            <div>
-              {/* Klas selector */}
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>Klas</label>
-                <select className="glass-input" value={selectedKlas} onChange={e => setSelectedKlas(e.target.value)}
-                  style={{ fontSize: '12px' }}>
-                  <option value="">Selecteer klas...</option>
-                  {KLASSEN.map(k => <option key={k} value={k}>{k}</option>)}
-                </select>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          {vakken.length === 0 ? (
+            <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>
+              Klik op "Magister" om je vakken te laden
+            </p>
+          ) : vakken.map(vak => {
+            const link = subjectLinks[vak]
+            return (
+              <div key={vak}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}>
+                <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.75)', fontWeight: 500 }}>{vak}</span>
+                {link ? (
+                  <a href={link} target="_blank" rel="noopener noreferrer"
+                    onClick={e => e.stopPropagation()}
+                    style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#00FFD1', textDecoration: 'none', background: 'rgba(0,255,209,0.08)', border: '1px solid rgba(0,255,209,0.2)', borderRadius: '6px', padding: '2px 7px' }}>
+                    <ExternalLink size={10} /> Boek
+                  </a>
+                ) : (
+                  <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.12)' }}>–</span>
+                )}
               </div>
-
-            {/* Vakken selector */}
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
-                Vakken ({selectedVakken.length} geselecteerd)
-              </label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', maxHeight: '200px', overflowY: 'auto', padding: '4px' }}>
-                {ALLE_VAKKEN.map(vak => {
-                  // Gebruik .includes() om te kijken of het vak in de array zit
-                  const isSelected = selectedVakken.includes(vak);
-                  
-                  return (
-                    <button 
-                      key={vak} 
-                      type="button"
-                      onClick={() => toggleVak(vak)}
-                      style={{ 
-                        padding: '4px 10px', 
-                        borderRadius: '20px', 
-                        fontSize: '11px', 
-                        cursor: 'pointer', 
-                        border: '1px solid',
-                        borderColor: isSelected ? 'rgba(0,255,209,0.6)' : 'rgba(255,255,255,0.1)', 
-                        background: isSelected ? 'rgba(0,255,209,0.15)' : 'rgba(255,255,255,0.03)', 
-                        color: isSelected ? '#00FFD1' : 'rgba(255,255,255,0.5)', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '4px', 
-                        transition: 'all 0.15s' 
-                      }}
-                    >
-                      {isSelected && <Check size={10} />}
-                      {vak}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-              <button onClick={handleSave} disabled={saving || selectedVakken.length === 0}
-                className="btn-neon w-full" style={{ fontSize: '12px', padding: '8px' }}>
-                {saving ? 'Opslaan...' : '✓ Opslaan'}
-              </button>
-            </div>
-          ) : (
-            /* Weergave mode */
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {vakken.length === 0 ? (
-                <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>
-                  Geen vakken — klik op Bewerk
-                </p>
-              ) : (
-                vakken.map(vak => {
-                  const link = subjectLinks[vak]
-                  return (
-                    <div key={vak}
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', transition: 'all 0.15s' }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}>
-                      <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.75)', fontWeight: 500 }}>{vak}</span>
-                      {link ? (
-                        <a href={link} target="_blank" rel="noopener noreferrer"
-                          onClick={e => e.stopPropagation()}
-                          style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#00FFD1', textDecoration: 'none', background: 'rgba(0,255,209,0.08)', border: '1px solid rgba(0,255,209,0.2)', borderRadius: '6px', padding: '2px 7px' }}>
-                          <ExternalLink size={10} /> Boek
-                        </a>
-                      ) : (
-                        <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.15)' }}>Geen link</span>
-                      )}
-                    </div>
-                  )
-                })
-              )}
-            </div>
-          )}
-        </>
+            )
+          })}
+        </div>
       )}
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )
 }

@@ -159,17 +159,6 @@ export default function App() {
     fetchTasks()
   }
 
-  const handleAddSubject = async (subjectData) => {
-    if (!user?.id) return
-    await supabase.from('subjects').insert({ ...subjectData, user_id: user.id })
-    fetchSubjects()
-  }
-
-  const handleDeleteSubject = async (id) => {
-    await supabase.from('subjects').delete().eq('id', id)
-    fetchSubjects()
-  }
-
   const openNewTask = (time) => {
     setSelectedTask(null)
     setDefaultTime(time || '09:00')
@@ -301,11 +290,8 @@ export default function App() {
           {/* LEFT COLUMN */}
           <div className="space-y-4 sticky top-20">
             <SubjectsWidget
-              subjects={subjects}
               userId={user.id}
-              onAdd={handleAddSubject}
-              onDelete={handleDeleteSubject}
-              isAdmin={isAdmin}
+              onSyncComplete={() => { fetchSubjects(); fetchProfiles() }}
             />
             <NotesWidget userId={user.id} />
             <TasksWidget
@@ -385,11 +371,8 @@ export default function App() {
             onToggle={handleToggleTask}
           />
           <SubjectsWidget
-            subjects={subjects}
             userId={user.id}
-            onAdd={handleAddSubject}
-            onDelete={handleDeleteSubject}
-            isAdmin={isAdmin}
+            onSyncComplete={() => { fetchSubjects(); fetchProfiles() }}
           />
           <NotesWidget userId={user.id} />
         </div>
