@@ -183,10 +183,37 @@ exports.handler = async (event) => {
       const courses = await m.courses()
       const current = courses.find(c => c.isCurrent) || courses[courses.length - 1]
       if (!current) return ok([])
-      const subjects = await current.subjects()
-      return ok(subjects.map(s => ({
-        naam: s.description || s.abbreviation || s.code || '',
-        afkorting: s.abbreviation || s.code || ''
+      const classes = await current.classes()
+      return ok(classes.map(c => ({
+        naam: c.description || c.abbreviation || '',
+        afkorting: c.abbreviation || ''
+      })))
+    }
+
+    if (action === 'lesmateriaal') {
+      const materials = await m.schoolUtilities()
+      return ok(materials.map(u => ({
+        naam: u.name || '',
+        uitgeverij: u.publisher || '',
+        url: u.url || null,
+        vak: u.class?.description || u.class?.abbreviation || ''
+      })))
+    }
+
+    if (action === 'opdrachten') {
+      const count = body.count || 50
+      const assignments = await m.assignments({ count })
+      return ok(assignments.map(a => ({
+        naam: a.name || '',
+        omschrijving: a.description || '',
+        vak: a.class?.description || a.class?.abbreviation || a.class?.Omschrijving || a.class?.Afkorting || '',
+        deadline: dateStr(a.deadline),
+        ingeleverdOp: dateStr(a.handedInOn),
+        beoordeling: a.grade || null,
+        beoordeeldOp: dateStr(a.markedOn),
+        afgesloten: a.finished || false,
+        magInleveren: a.canHandIn || false,
+        opnieuwInleveren: a.handInAgain || false
       })))
     }
 

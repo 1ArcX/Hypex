@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { LogIn, BookOpen, Calendar, ClipboardList, RefreshCw, Settings, X, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react'
+import { BookOpen, ClipboardList, RefreshCw, Settings, ChevronDown, ChevronUp, AlertCircle, FileText } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 
 const API = '/.netlify/functions/magister'
@@ -16,19 +16,18 @@ async function callMagister(creds, action, extra = {}) {
   return data
 }
 
-function today() { return new Date().toISOString().slice(0, 10) }
 function inDays(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10) }
 
 export default function MagisterWidget({ userId, onSubjectsSync }) {
-  const [creds, setCreds]       = useState(() => {
+  const [creds, setCreds] = useState(() => {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || null } catch { return null }
   })
   const [formCreds, setFormCreds] = useState({ school: 'ichthus', username: '', password: '' })
-  const [showSettings, setShowSettings]   = useState(!creds)
-  const [tab, setTab]           = useState('rooster')
-  const [loading, setLoading]   = useState(false)
-  const [error, setError]       = useState(null)
-  const [data, setData]         = useState({ grades: null, schedule: null, homework: null })
+  const [showSettings, setShowSettings] = useState(!creds)
+  const [tab, setTab] = useState('cijfers')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [data, setData] = useState({ grades: null, homework: null, assignments: null })
   const [expanded, setExpanded] = useState(true)
 
   useEffect(() => {
@@ -41,18 +40,35 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
       const vakken = await callMagister(credsToUse, 'vakken')
       if (!vakken?.length) return
       const namen = vakken.map(v => v.naam).filter(Boolean)
-      // Sync to subjects table
       const { data: existing } = await supabase.from('subjects').select('name').eq('user_id', userId)
       const existingNames = new Set((existing || []).map(s => s.name))
       const missing = namen.filter(n => !existingNames.has(n))
       if (missing.length > 0) {
         await supabase.from('subjects').insert(missing.map(name => ({ name, user_id: userId })))
       }
-      // Sync to profile vakken
       await supabase.from('profiles').update({ vakken: namen }).eq('id', userId)
       onSubjectsSync?.()
     } catch (e) {
       console.warn('Vakken sync mislukt:', e.message)
+    }
+  }
+
+  const syncLesmateriaal = async (credsToUse) => {
+    try {
+      const materials = await callMagister(credsToUse, 'lesmateriaal')
+      if (!materials?.length) return
+      // Upsert each material with a url into subject_links (keyed on vak_naam)
+      for (const m of materials) {
+        if (!m.url || !m.vak) continue
+        const { data: existing } = await supabase.from('subject_links').select('id').eq('vak_naam', m.vak).maybeSingle()
+        if (existing) {
+          await supabase.from('subject_links').update({ url: m.url }).eq('vak_naam', m.vak)
+        } else {
+          await supabase.from('subject_links').insert({ vak_naam: m.vak, url: m.url })
+        }
+      }
+    } catch (e) {
+      console.warn('Lesmateriaal sync mislukt:', e.message)
     }
   }
 
@@ -64,7 +80,9 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(formCreds))
       setCreds(formCreds)
       setShowSettings(false)
+      // Run syncs in background
       syncVakken(formCreds)
+      syncLesmateriaal(formCreds)
     } catch (e) {
       setError(e.message)
     }
@@ -74,7 +92,7 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
   const logout = () => {
     localStorage.removeItem(STORAGE_KEY)
     setCreds(null)
-    setData({ grades: null, schedule: null, homework: null })
+    setData({ grades: null, homework: null, assignments: null })
     setShowSettings(true)
     setFormCreds({ school: '', username: '', password: '' })
   }
@@ -84,14 +102,14 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
     setLoading(true); setError(null)
     try {
       if (t === 'cijfers' && !data.grades) {
-        const grades = await callMagister(creds, 'grades', { top: 15 })
+        const grades = await callMagister(creds, 'grades', { top: 30 })
         setData(p => ({ ...p, grades }))
-      } else if (t === 'rooster' && !data.schedule) {
-        const schedule = await callMagister(creds, 'schedule', { start: today(), end: inDays(7) })
-        setData(p => ({ ...p, schedule }))
       } else if (t === 'huiswerk' && !data.homework) {
-        const homework = await callMagister(creds, 'homework', { start: today(), end: inDays(14) })
+        const homework = await callMagister(creds, 'homework', { start: new Date().toISOString().slice(0, 10), end: inDays(14) })
         setData(p => ({ ...p, homework }))
+      } else if (t === 'opdrachten' && !data.assignments) {
+        const assignments = await callMagister(creds, 'opdrachten', { count: 50 })
+        setData(p => ({ ...p, assignments }))
       }
     } catch (e) {
       setError(e.message)
@@ -102,26 +120,8 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
   const switchTab = (t) => { setTab(t); fetchTab(t) }
 
   const refresh = () => {
-    setData({ grades: null, schedule: null, homework: null })
+    setData({ grades: null, homework: null, assignments: null })
     setTimeout(() => fetchTab(tab), 50)
-  }
-
-  const formatDateTime = (str) => {
-    if (!str) return ''
-    try {
-      const d = new Date(str)
-      if (isNaN(d)) return str
-      return d.toLocaleString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-    } catch { return str }
-  }
-
-  const formatTime = (str) => {
-    if (!str) return ''
-    try {
-      const d = new Date(str)
-      if (isNaN(d)) return str
-      return d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
-    } catch { return str }
   }
 
   const formatDate = (str) => {
@@ -131,6 +131,11 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
       if (isNaN(d)) return str
       return d.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })
     } catch { return str }
+  }
+
+  const isOverdue = (deadline) => {
+    if (!deadline) return false
+    return new Date(deadline) < new Date()
   }
 
   return (
@@ -166,15 +171,13 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
         </div>
       </div>
 
-      {!expanded && null}
-
       {expanded && (
         <>
           {/* Login/instellingen form */}
           {showSettings && (
             <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '14px', marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', margin: 0 }}>
-                Log in met je Magister-account
+                Log in met je Magister-account. Vakken en digitaal lesmateriaal worden automatisch gesynchroniseerd.
               </p>
               <input className="glass-input" placeholder="Leerlingnummer" value={formCreds.username}
                 onChange={e => setFormCreds(p => ({ ...p, username: e.target.value }))}
@@ -195,8 +198,8 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
                     Uitloggen
                   </button>
                 )}
-                <button onClick={saveCreds} disabled={loading || !formCreds.school || !formCreds.username || !formCreds.password}
-                  style={{ flex: 2, padding: '7px', borderRadius: '8px', border: '1px solid rgba(0,255,209,0.4)', background: 'rgba(0,255,209,0.12)', color: '#00FFD1', cursor: 'pointer', fontSize: '12px', fontWeight: 600, opacity: (!formCreds.school || !formCreds.username || !formCreds.password) ? 0.4 : 1 }}>
+                <button onClick={saveCreds} disabled={loading || !formCreds.username || !formCreds.password}
+                  style={{ flex: 2, padding: '7px', borderRadius: '8px', border: '1px solid rgba(0,255,209,0.4)', background: 'rgba(0,255,209,0.12)', color: '#00FFD1', cursor: 'pointer', fontSize: '12px', fontWeight: 600, opacity: (!formCreds.username || !formCreds.password) ? 0.4 : 1 }}>
                   {loading ? 'Bezig...' : 'Inloggen & opslaan'}
                 </button>
               </div>
@@ -209,9 +212,9 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
               {/* Tabs */}
               <div style={{ display: 'flex', gap: '4px', marginBottom: '10px' }}>
                 {[
-                  { id: 'rooster', label: 'Rooster', icon: <Calendar size={11} /> },
                   { id: 'cijfers', label: 'Cijfers', icon: <BookOpen size={11} /> },
                   { id: 'huiswerk', label: 'Huiswerk', icon: <ClipboardList size={11} /> },
+                  { id: 'opdrachten', label: 'Opdrachten', icon: <FileText size={11} /> },
                 ].map(t => (
                   <button key={t.id} onClick={() => switchTab(t.id)}
                     style={{ flex: 1, padding: '5px 4px', borderRadius: '8px', fontSize: '10px', cursor: 'pointer', border: '1px solid', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', borderColor: tab === t.id ? 'rgba(0,255,209,0.5)' : 'rgba(255,255,255,0.08)', background: tab === t.id ? 'rgba(0,255,209,0.12)' : 'transparent', color: tab === t.id ? '#00FFD1' : 'rgba(255,255,255,0.4)' }}>
@@ -223,8 +226,8 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
               {/* Loading */}
               {loading && (
                 <div style={{ textAlign: 'center', padding: '20px', color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>
-                  <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite', marginBottom: '6px' }} />
-                  <p style={{ margin: 0 }}>Laden...</p>
+                  <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite', display: 'block', margin: '0 auto 6px' }} />
+                  Laden...
                 </div>
               )}
 
@@ -232,34 +235,6 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
               {error && !loading && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ff6b6b', fontSize: '12px', padding: '8px', borderRadius: '8px', background: 'rgba(255,80,80,0.08)' }}>
                   <AlertCircle size={13} /> {error}
-                </div>
-              )}
-
-              {/* Rooster */}
-              {tab === 'rooster' && !loading && data.schedule && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  {data.schedule.length === 0 && (
-                    <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>Geen lessen gevonden</p>
-                  )}
-                  {data.schedule.map((les, i) => (
-                    <div key={i} style={{ padding: '8px 10px', borderRadius: '10px', background: les.uitgevallen ? 'rgba(255,80,80,0.06)' : 'rgba(255,255,255,0.03)', border: `1px solid ${les.uitgevallen ? 'rgba(255,80,80,0.2)' : 'rgba(255,255,255,0.06)'}` }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <span style={{ fontSize: '12px', color: les.uitgevallen ? '#ff6b6b' : 'rgba(255,255,255,0.85)', fontWeight: 500, textDecoration: les.uitgevallen ? 'line-through' : 'none' }}>
-                          {les.vak || 'Onbekend vak'}
-                        </span>
-                        {les.uitgevallen && <span style={{ fontSize: '10px', color: '#ff6b6b', background: 'rgba(255,80,80,0.1)', padding: '1px 5px', borderRadius: '4px' }}>Uitgevallen</span>}
-                      </div>
-                      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: '2px 0 0' }}>
-                        {formatTime(les.start)}{les.einde ? ` – ${formatTime(les.einde)}` : ''}{les.lokaal ? ` · ${les.lokaal}` : ''}{les.docent ? ` · ${les.docent}` : ''}
-                      </p>
-                      {les.start && <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.2)', margin: '1px 0 0' }}>{formatDate(les.start)}</p>}
-                      {les.huiswerk && (
-                        <p style={{ fontSize: '11px', color: '#FACC15', margin: '4px 0 0', padding: '4px 6px', background: 'rgba(250,204,21,0.06)', borderRadius: '6px' }}>
-                          📚 {les.huiswerk}
-                        </p>
-                      )}
-                    </div>
-                  ))}
                 </div>
               )}
 
@@ -305,6 +280,41 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
                       {hw.datum && <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', margin: '3px 0 0' }}>{formatDate(hw.datum)}</p>}
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* Opdrachten */}
+              {tab === 'opdrachten' && !loading && data.assignments && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {data.assignments.length === 0 && (
+                    <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>Geen opdrachten gevonden</p>
+                  )}
+                  {data.assignments.map((a, i) => {
+                    const overdue = !a.afgesloten && !a.ingeleverdOp && isOverdue(a.deadline)
+                    const statusColor = a.afgesloten ? '#4ADE80' : a.ingeleverdOp ? '#00FFD1' : overdue ? '#FF6B6B' : a.magInleveren ? '#FACC15' : 'rgba(255,255,255,0.3)'
+                    const statusLabel = a.afgesloten ? 'Afgesloten' : a.opnieuwInleveren ? 'Opnieuw inleveren' : a.ingeleverdOp ? 'Ingeleverd' : overdue ? 'Te laat' : a.magInleveren ? 'Open' : ''
+                    return (
+                      <div key={i} style={{ padding: '8px 10px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${overdue ? 'rgba(255,80,80,0.2)' : 'rgba(255,255,255,0.06)'}` }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.85)', fontWeight: 500, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.naam || 'Onbekend'}</p>
+                            {a.vak && <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', margin: '2px 0 0' }}>{a.vak}</p>}
+                          </div>
+                          {statusLabel && (
+                            <span style={{ fontSize: '10px', color: statusColor, background: statusColor + '18', border: `1px solid ${statusColor}44`, borderRadius: '6px', padding: '1px 6px', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                              {statusLabel}
+                            </span>
+                          )}
+                        </div>
+                        {a.omschrijving && <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)', margin: '4px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.omschrijving}</p>}
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
+                          {a.deadline && <span style={{ fontSize: '10px', color: overdue ? '#FF6B6B' : 'rgba(255,255,255,0.25)' }}>Deadline: {formatDate(a.deadline)}</span>}
+                          {a.ingeleverdOp && <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)' }}>Ingeleverd: {formatDate(a.ingeleverdOp)}</span>}
+                          {a.beoordeling && <span style={{ fontSize: '10px', color: '#818CF8' }}>Beoordeling: {a.beoordeling}</span>}
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </>
