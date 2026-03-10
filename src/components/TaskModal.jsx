@@ -1,161 +1,122 @@
 import React, { useState, useEffect } from 'react'
-import { X, Trash2, Save, Clock, AlignLeft, ExternalLink } from 'lucide-react'
-import { openBookLink } from '../utils/openBook'
+import { X, Trash2, Save } from 'lucide-react'
 
-export default function TaskModal({ task, defaultTime, subjects, onSave, onDelete, onClose }) {
+const EVENT_COLORS = ['#00FFD1','#818CF8','#FF8C42','#FF6B6B','#4ADE80','#FACC15','#38BDF8']
+
+export default function TaskModal({ task, defaultTime, defaultDate, subjects, onSave, onDelete, onClose }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [time, setTime] = useState('09:00')
+  const [date, setDate] = useState('')
+  const [startTime, setStartTime] = useState('09:00')
+  const [endTime, setEndTime] = useState('10:00')
   const [subjectId, setSubjectId] = useState('')
+  const [color, setColor] = useState(EVENT_COLORS[0])
   const [completed, setCompleted] = useState(false)
 
   useEffect(() => {
     if (task) {
       setTitle(task.title || '')
       setDescription(task.description || '')
-      setTime(task.time || '09:00')
+      setDate(task.date || '')
+      setStartTime(task.start_time || task.time || '09:00')
+      setEndTime(task.end_time || '10:00')
       setSubjectId(task.subject_id || '')
+      setColor(task.color || EVENT_COLORS[0])
       setCompleted(task.completed || false)
     } else {
-      setTime(defaultTime || '09:00')
+      setDate(defaultDate || new Date().toISOString().slice(0,10))
+      setStartTime(defaultTime || '09:00')
+      setEndTime(defaultTime ? (defaultTime.slice(0,2) < '23' ? `${String(parseInt(defaultTime)+1).padStart(2,'0')}:00` : '23:59') : '10:00')
     }
-  }, [task, defaultTime])
-
-  const selectedSubject = subjects.find(s => s.id === subjectId)
+  }, [task, defaultTime, defaultDate])
 
   const handleSave = () => {
     if (!title.trim()) return
-    onSave({ id: task?.id, title, description, time, subject_id: subjectId || null, completed })
-  }
-
-  const normalizeUrl = (url) => {
-  if (!url) return ''
-  if (url.startsWith('http://') || url.startsWith('https://')) return url
-  return 'https://' + url
+    onSave({ id: task?.id, title, description, date, start_time: startTime, end_time: endTime, time: startTime, subject_id: subjectId || null, color, completed })
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-    
-      <div className="modal-content glass-card p-6 w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-white">
-            {task ? 'Taak bewerken' : 'Nieuwe taak'}
-          </h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}>
-            <X size={20} />
-          </button>
+    <div style={{position:'fixed',inset:0,zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.7)',backdropFilter:'blur(10px)',padding:'16px'}}
+      onClick={onClose}>
+      <div className="glass-card" style={{width:'100%',maxWidth:'440px',padding:'24px',maxHeight:'90vh',overflowY:'auto'}}
+        onClick={e=>e.stopPropagation()}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px'}}>
+          <h2 style={{color:'white',fontWeight:700,fontSize:'16px',margin:0}}>
+            {task ? '✏️ Taak bewerken' : '📝 Nieuwe taak'}
+          </h2>
+          <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:'rgba(255,255,255,0.4)'}}><X size={18}/></button>
         </div>
 
-        <div className="space-y-4">
-          {/* Title */}
+        <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+          <input className="glass-input" placeholder="Titel *" value={title}
+            onChange={e=>setTitle(e.target.value)} autoFocus/>
+          <textarea className="glass-input" placeholder="Beschrijving (optioneel)" value={description}
+            onChange={e=>setDescription(e.target.value)}
+            style={{resize:'vertical',minHeight:'60px'}}/>
           <div>
-            <label className="text-xs font-medium mb-1.5 block" style={{ color: 'rgba(255,255,255,0.5)' }}>Titel *</label>
-            <input
-              type="text"
-              placeholder="Wat moet je doen?"
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              className="glass-input"
-              autoFocus
-            />
+            <label style={{color:'rgba(255,255,255,0.35)',fontSize:'11px',display:'block',marginBottom:'4px'}}>Datum</label>
+            <input type="date" className="glass-input" value={date} style={{colorScheme:'dark'}}
+              onChange={e=>setDate(e.target.value)}/>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
+            <div>
+              <label style={{color:'rgba(255,255,255,0.35)',fontSize:'11px',display:'block',marginBottom:'4px'}}>Starttijd</label>
+              <input type="time" className="glass-input" value={startTime} style={{colorScheme:'dark'}}
+                onChange={e=>setStartTime(e.target.value)}/>
+            </div>
+            <div>
+              <label style={{color:'rgba(255,255,255,0.35)',fontSize:'11px',display:'block',marginBottom:'4px'}}>Eindtijd</label>
+              <input type="time" className="glass-input" value={endTime} style={{colorScheme:'dark'}}
+                onChange={e=>setEndTime(e.target.value)}/>
+            </div>
           </div>
 
-          {/* Description */}
           <div>
-            <label className="text-xs font-medium mb-1.5 flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.5)' }}>
-              <AlignLeft size={12} /> Beschrijving
-            </label>
-            <textarea
-              placeholder="Optionele details..."
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              className="glass-input resize-none"
-              rows={3}
-            />
-          </div>
-
-          {/* Time */}
-          <div>
-            <label className="text-xs font-medium mb-1.5 flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.5)' }}>
-              <Clock size={12} /> Tijdstip
-            </label>
-            <input
-              type="time"
-              value={time}
-              onChange={e => setTime(e.target.value)}
-              className="glass-input"
-              style={{ colorScheme: 'dark' }}
-            />
-          </div>
-
-          {/* Subject */}
-          <div>
-            <label className="text-xs font-medium mb-1.5 flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.5)' }}>
-              <button onClick={() => openBookLink(link)}>Vak</button>
-            </label>
-            <select
-              value={subjectId}
-              onChange={e => setSubjectId(e.target.value)}
-              className="glass-input"
-              style={{ colorScheme: 'dark' }}
-            >
+            <label style={{color:'rgba(255,255,255,0.35)',fontSize:'11px',display:'block',marginBottom:'4px'}}>Vak</label>
+            <select className="glass-input" value={subjectId} style={{colorScheme:'dark'}}
+              onChange={e=>setSubjectId(e.target.value)}>
               <option value="">Geen vak</option>
               {subjects.map(s => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
-            {selectedSubject?.url && (
-              <a
-                href={normalizeUrl(selectedSubject.url)}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={e => e.stopPropagation()}
-                style={{ color: 'var(--accent)', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}
-              >
-                <ExternalLink size={12} /> Online boek openen
-              </a>
-            )}
           </div>
 
-          {/* Completed toggle */}
-          {task && (
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setCompleted(!completed)}
-                className="flex items-center gap-2 text-sm"
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: completed ? '#00FFD1' : 'rgba(255,255,255,0.4)' }}
-              >
-                <div style={{
-                  width: '20px', height: '20px', borderRadius: '6px',
-                  background: completed ? 'rgba(0,255,209,0.2)' : 'rgba(255,255,255,0.05)',
-                  border: `1px solid ${completed ? 'rgba(0,255,209,0.5)' : 'rgba(255,255,255,0.2)'}`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  transition: 'all 0.2s'
-                }}>
-                  {completed && <span style={{ fontSize: '12px' }}>✓</span>}
-                </div>
-                Afgerond
-              </button>
+          <div>
+            <label style={{color:'rgba(255,255,255,0.35)',fontSize:'11px',display:'block',marginBottom:'6px'}}>Kleur</label>
+            <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+              {EVENT_COLORS.map(c=>(
+                <button key={c} type="button" onClick={()=>setColor(c)}
+                  style={{width:'24px',height:'24px',borderRadius:'50%',background:c,border:color===c?'3px solid white':'2px solid transparent',cursor:'pointer',flexShrink:0,transition:'transform 0.1s',transform:color===c?'scale(1.2)':'scale(1)'}}/>
+              ))}
             </div>
+          </div>
+
+          {task && (
+            <button onClick={()=>setCompleted(!completed)}
+              style={{display:'flex',alignItems:'center',gap:'8px',background:'none',border:'none',cursor:'pointer',color:completed?'#00FFD1':'rgba(255,255,255,0.4)',fontSize:'13px',padding:0}}>
+              <div style={{width:'20px',height:'20px',borderRadius:'6px',background:completed?'rgba(0,255,209,0.2)':'rgba(255,255,255,0.05)',border:`1px solid ${completed?'rgba(0,255,209,0.5)':'rgba(255,255,255,0.2)'}`,display:'flex',alignItems:'center',justifyContent:'center',transition:'all 0.2s'}}>
+                {completed && <span style={{fontSize:'12px'}}>✓</span>}
+              </div>
+              Afgerond
+            </button>
           )}
         </div>
 
-        {/* Actions */}
-        <div className="flex gap-2 mt-6">
+        <div style={{display:'flex',gap:'8px',marginTop:'20px'}}>
           {task && (
-            <button onClick={() => onDelete(task.id)} className="btn-neon flex items-center gap-1.5"
-              style={{ borderColor: 'rgba(255,80,80,0.4)', color: '#ff6b6b', background: 'rgba(255,80,80,0.1)' }}>
-              <Trash2 size={14} /> Verwijder
+            <button onClick={()=>onDelete(task.id)}
+              style={{padding:'9px 14px',borderRadius:'10px',border:'1px solid rgba(255,80,80,0.3)',background:'rgba(255,80,80,0.08)',color:'#ff6b6b',cursor:'pointer',fontSize:'12px',display:'flex',alignItems:'center',gap:'4px'}}>
+              <Trash2 size={13}/> Verwijder
             </button>
           )}
-          <button onClick={onClose} className="btn-neon flex-1"
-            style={{ borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.03)' }}>
+          <button onClick={onClose}
+            style={{flex:1,padding:'9px',borderRadius:'10px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'rgba(255,255,255,0.35)',cursor:'pointer',fontSize:'12px'}}>
             Annuleer
           </button>
-          <button onClick={handleSave} disabled={!title.trim()} className="btn-neon flex-1 flex items-center justify-center gap-1.5">
-            <Save size={14} /> Opslaan
+          <button onClick={handleSave} disabled={!title.trim()}
+            style={{flex:2,padding:'9px',borderRadius:'10px',border:'1px solid rgba(0,255,209,0.4)',background:'rgba(0,255,209,0.12)',color:'#00FFD1',cursor:'pointer',fontSize:'12px',fontWeight:600,display:'flex',alignItems:'center',justifyContent:'center',gap:'4px'}}>
+            <Save size={13}/> Opslaan
           </button>
         </div>
       </div>

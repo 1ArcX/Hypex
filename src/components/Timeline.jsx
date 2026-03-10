@@ -33,18 +33,12 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask, onEdit
   const [view, setView] = useState('day')
   const [current, setCurrent] = useState(new Date())
   const [events, setEvents] = useState([])
-  const [modal, setModal] = useState(null) // null | { mode: 'new'|'edit', data: {} }
+  const [modal, setModal] = useState(null)
   const [form, setForm] = useState(emptyForm(new Date()))
   const [saving, setSaving] = useState(false)
-  const scrollRef = useRef(null)
   const now = new Date()
 
   useEffect(() => { fetchEvents() }, [])
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = Math.max(0, (now.getHours() - 2) * 60)
-    }
-  }, [view])
 
   const fetchEvents = async () => {
     const { data } = await supabase.from('calendar_events').select('*').eq('user_id', userId)
@@ -179,19 +173,20 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask, onEdit
   const TimeGridView = ({ days }) => {
     const nowMins = now.getHours()*60+now.getMinutes()
     const todayIdx = days.findIndex(d=>isSameDay(d,now))
+    const nowPct = (nowMins / (24*60)) * 100
 
     return (
       <div style={{flex:1, overflow:'hidden', display:'flex', flexDirection:'column', minHeight:0}}>
-        {/* Day headers for week view */}
+        {/* Day headers for week view — always visible, never scrolls away */}
         {days.length>1 && (
-          <div style={{display:'grid', gridTemplateColumns:`48px repeat(${days.length},1fr)`, borderBottom:'1px solid rgba(255,255,255,0.08)', flexShrink:0}}>
+          <div style={{display:'grid', gridTemplateColumns:`40px repeat(${days.length},1fr)`, borderBottom:'1px solid rgba(255,255,255,0.08)', flexShrink:0}}>
             <div/>
             {days.map((d,i)=>{
               const isToday=isSameDay(d,now)
               return (
-                <div key={i} style={{padding:'4px',textAlign:'center'}}>
+                <div key={i} style={{padding:'3px',textAlign:'center'}}>
                   <div style={{fontSize:'9px',color:'rgba(255,255,255,0.3)'}}>{DAYS_NL[(d.getDay()+6)%7]}</div>
-                  <div style={{width:'24px',height:'24px',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',margin:'1px auto 0',background:isToday?'#00FFD1':'transparent',color:isToday?'#000':'rgba(255,255,255,0.7)',fontSize:'11px',fontWeight:isToday?700:400}}>
+                  <div style={{width:'22px',height:'22px',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',margin:'1px auto 0',background:isToday?'#00FFD1':'transparent',color:isToday?'#000':'rgba(255,255,255,0.7)',fontSize:'10px',fontWeight:isToday?700:400}}>
                     {d.getDate()}
                   </div>
                 </div>
@@ -200,13 +195,20 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask, onEdit
           </div>
         )}
 
-        {/* Scrollable grid */}
-        <div ref={scrollRef} style={{flex:1, overflowY:'auto', overflowX:'hidden', position:'relative'}}>
-          <div style={{display:'grid', gridTemplateColumns:`48px repeat(${days.length},1fr)`, position:'relative', width:'100%'}}>
+        {/* Full-height grid — no scroll, all 24h visible */}
+        <div style={{flex:1, overflow:'hidden', position:'relative', minHeight:0}}>
+          <div style={{
+            display:'grid',
+            gridTemplateColumns:`40px repeat(${days.length},1fr)`,
+            gridTemplateRows:`repeat(24, calc(100% / 24))`,
+            height:'100%',
+            width:'100%',
+            position:'relative'
+          }}>
             {HOURS.map(h=>(
               <React.Fragment key={h}>
-                <div style={{height:'60px',display:'flex',alignItems:'flex-start',paddingTop:'4px',paddingRight:'8px',justifyContent:'flex-end',flexShrink:0}}>
-                  <span style={{fontSize:'9px',color:'rgba(255,255,255,0.18)'}}>{formatTime(h)}</span>
+                <div style={{display:'flex',alignItems:'flex-start',paddingTop:'2px',paddingRight:'5px',justifyContent:'flex-end',overflow:'hidden',borderBottom:'1px solid rgba(255,255,255,0.03)'}}>
+                  <span style={{fontSize:'7px',color:'rgba(255,255,255,0.2)',lineHeight:1}}>{formatTime(h)}</span>
                 </div>
                 {days.map((d,di)=>{
                   const dayEvs = getEventsForDay(d).filter(ev=>new Date(ev.start_time).getHours()===h)
@@ -224,37 +226,35 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask, onEdit
                         await supabase.from('tasks').update({time:formatTime(h),date:toDateStr(d)}).eq('id',taskId)
                         window.dispatchEvent(new Event('refreshTasks'))
                       }}
-                      style={{height:'60px',borderLeft:'1px solid rgba(255,255,255,0.04)',borderBottom:'1px solid rgba(255,255,255,0.04)',position:'relative',cursor:'pointer',boxSizing:'border-box'}}>
+                      style={{borderLeft:'1px solid rgba(255,255,255,0.04)',borderBottom:'1px solid rgba(255,255,255,0.04)',position:'relative',cursor:'pointer',boxSizing:'border-box',overflow:'hidden'}}>
 
-                      {/* Events */}
                       {dayEvs.map(ev=>{
                         const s=new Date(ev.start_time), en=new Date(ev.end_time)
-                        const dur=Math.max(20,(en-s)/60000)
-                        const top=(s.getMinutes()/60)*60
-                        const height=Math.min((dur/60)*60, 60-top)
+                        const dur=Math.max(10,(en-s)/60000)
+                        const topPct=(s.getMinutes()/60)*100
+                        const hPct=Math.min((dur/60)*100, 100-topPct)
                         return (
                           <div key={ev.id} onClick={e=>openEditEvent(ev,e)}
-                            style={{position:'absolute',left:'2px',right:'2px',top:`${top}px`,height:`${height}px`,background:ev.color+'25',border:`1px solid ${ev.color}66`,borderRadius:'5px',padding:'2px 4px',overflow:'hidden',cursor:'pointer',zIndex:2}}>
-                            <p style={{fontSize:'9px',color:ev.color,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',margin:0}}>{ev.title}</p>
+                            style={{position:'absolute',left:'1px',right:'1px',top:`${topPct}%`,height:`${Math.max(hPct,10)}%`,background:ev.color+'25',border:`1px solid ${ev.color}55`,borderRadius:'3px',padding:'1px 2px',overflow:'hidden',cursor:'pointer',zIndex:2}}>
+                            <p style={{fontSize:'7px',color:ev.color,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',margin:0,lineHeight:1.2}}>{ev.title}</p>
                           </div>
                         )
                       })}
 
-                      {/* Tasks */}
                       {dayTasks.map((task,ti)=>{
                         const timeStr = task.start_time || task.time || '00:00'
                         const mins=parseInt(timeStr.split(':')[1]||0)
-                        const top=(mins/60)*60
+                        const topPct=(mins/60)*100
                         const subject=subjects?.find(s=>s.id===task.subject_id)
+                        const color=task.completed?'#4ADE80':(subject?.color||'#00FFD1')
                         return (
                           <div key={task.id}
                             draggable
                             onDragStart={e=>e.dataTransfer.setData('taskId',task.id)}
                             onClick={e=>{e.stopPropagation(); onEditTask?.(task)}}
-                            style={{position:'absolute',left:'2px',right:'2px',top:`${top+ti*17}px`,height:'15px',background:task.completed?'rgba(0,255,100,0.08)':'rgba(255,255,255,0.05)',border:`1px solid ${task.completed?'rgba(0,255,100,0.25)':'rgba(255,255,255,0.1)'}`,borderRadius:'4px',padding:'0 4px',overflow:'hidden',cursor:'pointer',zIndex:3,display:'flex',alignItems:'center',gap:'3px'}}>
-                            <div style={{width:'4px',height:'4px',borderRadius:'50%',background:task.completed?'#00ff88':'#00FFD1',flexShrink:0}}/>
-                            <p style={{fontSize:'9px',color:task.completed?'rgba(255,255,255,0.25)':'rgba(255,255,255,0.65)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',textDecoration:task.completed?'line-through':'none',margin:0}}>
-                              {task.title}{subject?` · ${subject.name}`:''}
+                            style={{position:'absolute',left:'1px',right:'1px',top:`calc(${topPct}% + ${ti*12}px)`,height:'45%',background:color+'25',border:`1px solid ${color}55`,borderRadius:'3px',padding:'1px 2px',overflow:'hidden',cursor:'pointer',zIndex:3}}>
+                            <p style={{fontSize:'7px',color:task.completed?color+'99':color,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',margin:0,lineHeight:1.2,textDecoration:task.completed?'line-through':'none'}}>
+                              {task.completed?'✓ ':''}{task.title}{subject?` · ${subject.name}`:''}
                             </p>
                           </div>
                         )
@@ -265,19 +265,19 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask, onEdit
               </React.Fragment>
             ))}
 
-            {/* Huidige tijd lijn — volledig van links naar rechts */}
+            {/* Huidige tijd lijn */}
             {todayIdx>=0 && (
               <div style={{
                 position:'absolute',
-                top:`${nowMins}px`,
-                left:'48px',
+                top:`${nowPct}%`,
+                left:'40px',
                 right:'0',
-                height:'2px',
+                height:'1px',
                 background:'#FF6B6B',
                 zIndex:5,
                 pointerEvents:'none'
               }}>
-                <div style={{width:'7px',height:'7px',borderRadius:'50%',background:'#FF6B6B',position:'absolute',left:'-3px',top:'-2.5px'}}/>
+                <div style={{width:'5px',height:'5px',borderRadius:'50%',background:'#FF6B6B',position:'absolute',left:'-2px',top:'-2px'}}/>
               </div>
             )}
           </div>
@@ -322,7 +322,7 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask, onEdit
         {view==='day' && <TimeGridView days={[current]}/>}
       </div>
 
-      {/* Modal — fixed over hele scherm */}
+      {/* Modal */}
       {modal && (
         <div style={{position:'fixed',inset:0,zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.7)',backdropFilter:'blur(10px)',padding:'16px'}}
           onClick={()=>setModal(null)}>
@@ -359,7 +359,6 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask, onEdit
                 </div>
               </div>
 
-              {/* Herhaling */}
               <div>
                 <label style={{color:'rgba(255,255,255,0.35)',fontSize:'11px',display:'block',marginBottom:'4px'}}>Herhaling</label>
                 <select className="glass-input" value={form.recurrence}
@@ -389,7 +388,6 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask, onEdit
                 </div>
               )}
 
-              {/* Kleur */}
               <div>
                 <label style={{color:'rgba(255,255,255,0.35)',fontSize:'11px',display:'block',marginBottom:'6px'}}>Kleur</label>
                 <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>

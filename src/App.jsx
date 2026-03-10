@@ -15,6 +15,8 @@ import { Settings } from 'lucide-react'
 import ProfileSetup from './components/ProfileSetup'
 import AdminPanel from './components/AdminPanel'
 import TasksWidget from './components/TasksWidget'
+import MagisterWidget from './components/MagisterWidget'
+import PasswordResetPage from './components/PasswordResetPage'
 import { Shield } from 'lucide-react'
 
 const ADMIN_EMAIL = 'zhafirfachri@gmail.com'
@@ -22,6 +24,7 @@ const ADMIN_EMAIL = 'zhafirfachri@gmail.com'
 export default function App() {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [passwordRecovery, setPasswordRecovery] = useState(false)
   const [tasks, setTasks] = useState([])
   const [subjects, setSubjects] = useState([])
   const [isBreak, setIsBreak] = useState(false)
@@ -29,6 +32,7 @@ export default function App() {
   const [showTaskModal, setShowTaskModal] = useState(false)
   const [selectedTask, setSelectedTask] = useState(null)
   const [defaultTime, setDefaultTime] = useState('09:00')
+  const [defaultDate, setDefaultDate] = useState('')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showThemeSettings, setShowThemeSettings] = useState(false)
   const [theme, setTheme] = useState({ accent: '#00FFD1', bg1: '#0a0a1a', bg2: '#0d1117' })
@@ -54,7 +58,8 @@ export default function App() {
       setSession(session)
       setLoading(false)
     })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true)
       setSession(session)
     })
     return () => {
@@ -65,10 +70,10 @@ export default function App() {
 
   // Load data
   useEffect(() => {
-    if (session) {
+    if (session && user?.id) {
       fetchTasks(); fetchSubjects(); fetchProfiles()
     }
-  }, [session])
+  }, [session, user?.id])
 
   // ✅ FIX: useMemo voor userProfile (geen stale closure)
   const userProfile = useMemo(() => {
@@ -79,50 +84,65 @@ export default function App() {
   // ✅ FIX: profileReady als computed value, niet als aparte state
   const profileReady = !!(userProfile?.klas && (userProfile?.vakken?.length || 0) > 0)
 
+  // Auto-sync profiel vakken naar subjects tabel zodat FK werkt
+  useEffect(() => {
+    if (!userProfile?.vakken?.length || !user?.id) return
+    const sync = async () => {
+      const { data: existing } = await supabase.from('subjects').select('name').eq('user_id', user.id)
+      const existingNames = new Set((existing || []).map(s => s.name))
+      const missing = userProfile.vakken.filter(v => !existingNames.has(v))
+      if (missing.length > 0) {
+        await supabase.from('subjects').insert(missing.map(name => ({ name, user_id: user.id })))
+      }
+      fetchSubjects()
+    }
+    sync()
+  }, [userProfile?.vakken, user?.id])
+
   // Effect voor accent kleur
   useEffect(() => {
     document.documentElement.style.setProperty('--accent', theme.accent)
   }, [theme.accent])
 
   useEffect(() => {
-    const handler = () => fetchTasks()
+    const handler = () => { if (user?.id) fetchTasks() }
     window.addEventListener('refreshTasks', handler)
     return () => window.removeEventListener('refreshTasks', handler)
-  }, [])
+  }, [user?.id])
 
   const fetchTasks = async () => {
-    const { data, error } = await supabase.from('tasks').select('*').order('time', { ascending: true })
+    if (!user?.id) return
+    const { data, error } = await supabase.from('tasks').select('*').eq('user_id', user.id).order('date', { ascending: true })
     if (error) console.error(error)
     setTasks(data || [])
   }
 
   const fetchSubjects = async () => {
-    const { data, error } = await supabase.from('subjects').select('*').order('created_at', { ascending: true })
+    if (!user?.id) return
+    const { data, error } = await supabase.from('subjects').select('*').eq('user_id', user.id).order('name', { ascending: true })
     if (error) console.error(error)
     setSubjects(data || [])
   }
 
-  // ✅ FIX: handleSaveTask gebruikt user?.id (nooit undefined)
   const handleSaveTask = async (taskData) => {
     if (!user?.id) return
-    if (taskData.id) {
-      await supabase.from('tasks').update({
-        title: taskData.title,
-        description: taskData.description,
-        time: taskData.time,
-        subject_id: taskData.subject_id,
-        completed: taskData.completed
-      }).eq('id', taskData.id)
-    } else {
-      await supabase.from('tasks').insert({
-        title: taskData.title,
-        description: taskData.description,
-        time: taskData.time,
-        subject_id: taskData.subject_id,
-        completed: false,
-        user_id: user.id
-      })
+    const fields = {
+      title: taskData.title,
+      description: taskData.description || null,
+      time: taskData.time || taskData.start_time,
+      date: taskData.date || null,
+      start_time: taskData.start_time || null,
+      end_time: taskData.end_time || null,
+      subject_id: taskData.subject_id || null,
+      completed: taskData.completed ?? false
     }
+    let error
+    if (taskData.id) {
+      ({ error } = await supabase.from('tasks').update(fields).eq('id', taskData.id).eq('user_id', user.id))
+    } else {
+      ({ error } = await supabase.from('tasks').insert({ ...fields, completed: false, user_id: user.id }))
+    }
+    if (error) { console.error('Taak opslaan mislukt:', error); return }
     setShowTaskModal(false)
     setSelectedTask(null)
     fetchTasks()
@@ -168,6 +188,13 @@ export default function App() {
       <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin"
         style={{ borderColor: '#00FFD1', borderTopColor: 'transparent' }} />
     </div>
+  )
+
+  if (passwordRecovery) return (
+    <>
+      <div className="mesh-bg"><div className="mesh-blob" /></div>
+      <PasswordResetPage onDone={() => setPasswordRecovery(false)} />
+    </>
   )
 
   if (!session) return (
@@ -308,7 +335,7 @@ export default function App() {
               <Clock isBreak={isBreak} />
               <div className="mt-1 mb-4"
                 style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(0,255,209,0.2), transparent)' }} />
-              <div className="overflow-y-auto" style={{ maxHeight: '40vh' }}>
+              <div style={{ height: '60vh' }}>
                 <Timeline
                   userId={user.id}
                   tasks={tasks}
@@ -326,6 +353,7 @@ export default function App() {
             <WeatherWidget />
             {isAdmin && <SpotifyWidget />}
             <PomodoroTimer onModeChange={setIsBreak} />
+            <MagisterWidget />
           </div>
         </div>
 
@@ -336,7 +364,7 @@ export default function App() {
           </div>
           <div className="glass-card p-4">
             <h3 className="text-sm font-semibold text-white mb-3">Dag Tijdlijn</h3>
-            <div className="overflow-y-auto" style={{ maxHeight: '50vh' }}>
+            <div style={{ height: '50vh' }}>
               <Timeline
                 userId={user.id}
                 tasks={tasks}
@@ -378,6 +406,7 @@ export default function App() {
         <TaskModal
           task={selectedTask}
           defaultTime={defaultTime}
+          defaultDate={defaultDate}
           subjects={subjects}
           userId={user.id}
           onClose={() => { setShowTaskModal(false); setSelectedTask(null) }}

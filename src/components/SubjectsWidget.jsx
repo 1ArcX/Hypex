@@ -62,7 +62,6 @@ const fetchProfile = async () => {
     )
   }
 
-  console.log("userId:", userId)
 
 // const handleSave = async () => {
 //   if (!userId) {
