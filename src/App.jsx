@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from './supabaseClient'
 import AuthPage from './components/AuthPage'
 import Clock from './components/Clock'
@@ -7,7 +7,7 @@ import TaskModal from './components/TaskModal'
 import NotesWidget from './components/NotesWidget'
 import WeatherWidget from './components/WeatherWidget'
 import PomodoroTimer from './components/PomodoroTimer'
-import { LogOut, GraduationCap, Home, CalendarDays, CheckSquare, Layers, FileText, Flame } from 'lucide-react'
+import { LogOut, GraduationCap, Home, CalendarDays, CheckSquare, Layers, FileText, Flame, GripVertical } from 'lucide-react'
 import SpotifyWidget from './components/SpotifyWidget'
 import ThemeSettings from './components/ThemeSettings'
 import { Settings } from 'lucide-react'
@@ -19,6 +19,59 @@ import PasswordResetPage from './components/PasswordResetPage'
 import { Shield } from 'lucide-react'
 
 const ADMIN_EMAIL = 'zhafirfachri@gmail.com'
+
+function DraggableWidget({ id, col, index, onDragStart, onDragEnd, children }) {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <div
+      style={{ position: 'relative' }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {children}
+      <div
+        draggable
+        onDragStart={(e) => onDragStart(e, col, index, id)}
+        onDragEnd={onDragEnd}
+        style={{
+          position: 'absolute', top: 10, right: 10,
+          opacity: hovered ? 1 : 0,
+          transition: 'opacity 0.15s',
+          cursor: 'grab',
+          color: 'rgba(255,255,255,0.4)',
+          padding: '2px',
+          borderRadius: '4px',
+          background: 'rgba(0,0,0,0.3)',
+          zIndex: 20,
+          lineHeight: 0,
+        }}
+        title="Versleep widget"
+      >
+        <GripVertical size={16} />
+      </div>
+    </div>
+  )
+}
+
+function DropZone({ col, index, dropTarget, onDragOver, onDragLeave, onDrop }) {
+  const key = `${col}:${index}`
+  const active = dropTarget === key
+  return (
+    <div
+      onDragOver={(e) => onDragOver(e, col, index)}
+      onDragLeave={onDragLeave}
+      onDrop={(e) => onDrop(e, col, index)}
+      style={{
+        height: active ? 56 : 16,
+        transition: 'height 0.15s ease',
+        borderRadius: 8,
+        border: active ? '2px dashed var(--accent)' : '2px solid transparent',
+        background: active ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'transparent',
+        flexShrink: 0,
+      }}
+    />
+  )
+}
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -40,6 +93,19 @@ export default function App() {
   const [mobileTab, setMobileTab] = useState('home')
   const [toolTab, setToolTab]     = useState('weer')
   const [takenTab, setTakenTab]   = useState('taken')
+
+  // Drag-and-drop widget order
+  const DEFAULT_LEFT  = ['habits', 'notes', 'tasks']
+  const DEFAULT_RIGHT = ['weather', 'spotify', 'pomodoro']
+  const [widgetOrder, setWidgetOrder] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('widget_order'))
+      if (saved?.left?.length && saved?.right?.length) return saved
+    } catch {}
+    return { left: DEFAULT_LEFT, right: DEFAULT_RIGHT }
+  })
+  const dragState = useRef({ sourceColumn: null, sourceIndex: null, widgetId: null })
+  const [dropTarget, setDropTarget] = useState(null)
 
   // ✅ FIX: user vroeg beschikbaar via useMemo (geen undefined bij vakken/kalender)
   const user = useMemo(() => session?.user || null, [session])
@@ -177,6 +243,49 @@ export default function App() {
     setShowTaskModal(true)
   }
 
+  // ── Drag handlers ──────────────────────────────────────────────────────────
+  const handleDragStart = (e, column, index, widgetId) => {
+    dragState.current = { sourceColumn: column, sourceIndex: index, widgetId }
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handleDragOver = (e, column, index) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    const key = `${column}:${index}`
+    setDropTarget(prev => prev === key ? prev : key)
+  }
+
+  const handleDragLeave = (e) => {
+    if (e.currentTarget.contains(e.relatedTarget)) return
+    setDropTarget(null)
+  }
+
+  const handleDrop = (e, targetColumn, insertIndex) => {
+    e.preventDefault()
+    const { sourceColumn, sourceIndex, widgetId } = dragState.current
+    if (!widgetId) return
+    // No-op: dropped back on same position
+    if (sourceColumn === targetColumn && (sourceIndex === insertIndex || sourceIndex + 1 === insertIndex)) {
+      setDropTarget(null)
+      return
+    }
+    const next = { left: [...widgetOrder.left], right: [...widgetOrder.right] }
+    next[sourceColumn].splice(sourceIndex, 1)
+    let idx = insertIndex
+    if (sourceColumn === targetColumn && sourceIndex < insertIndex) idx--
+    idx = Math.max(0, Math.min(next[targetColumn].length, idx))
+    next[targetColumn].splice(idx, 0, widgetId)
+    setWidgetOrder(next)
+    localStorage.setItem('widget_order', JSON.stringify(next))
+    setDropTarget(null)
+  }
+
+  const handleDragEnd = () => {
+    dragState.current = { sourceColumn: null, sourceIndex: null, widgetId: null }
+    setDropTarget(null)
+  }
+
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="mesh-bg"><div className="mesh-blob" /></div>
@@ -198,6 +307,38 @@ export default function App() {
       <AuthPage />
     </>
   )
+
+  function getWidgetElement(id) {
+    return {
+      habits:   <HabitsWidget userId={user.id} />,
+      notes:    <NotesWidget userId={user.id} />,
+      tasks:    <TasksWidget tasks={tasks} subjects={subjects}
+                  onAdd={async (data) => { if (!user?.id) return; await supabase.from('tasks').insert({ ...data, completed: false, user_id: user.id }); fetchTasks() }}
+                  onEdit={openEditTask} onDelete={handleDeleteTask} onToggle={handleToggleTask} />,
+      weather:  <WeatherWidget />,
+      spotify:  <SpotifyWidget />,
+      pomodoro: <PomodoroTimer onModeChange={setIsBreak} />,
+    }[id] ?? null
+  }
+
+  function renderColumn(col) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <DropZone col={col} index={0} dropTarget={dropTarget}
+          onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} />
+        {widgetOrder[col].map((id, i) => (
+          <React.Fragment key={id}>
+            <DraggableWidget id={id} col={col} index={i}
+              onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+              {getWidgetElement(id)}
+            </DraggableWidget>
+            <DropZone col={col} index={i + 1} dropTarget={dropTarget}
+              onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} />
+          </React.Fragment>
+        ))}
+      </div>
+    )
+  }
 
   const displayName = userProfile?.full_name || user?.email?.split('@')[0] || 'Student'
   const completedToday = tasks.filter(t => t.completed).length
@@ -283,22 +424,7 @@ export default function App() {
           style={{ gridTemplateColumns: '280px 1fr 300px', alignItems: 'start' }}>
 
           {/* LEFT COLUMN */}
-          <div className="space-y-4 sticky top-20">
-            <HabitsWidget userId={user.id} />
-            <NotesWidget userId={user.id} />
-            <TasksWidget
-              tasks={tasks}
-              subjects={subjects}
-              onAdd={async (data) => {
-                if (!user?.id) return
-                await supabase.from('tasks').insert({ ...data, completed: false, user_id: user.id })
-                fetchTasks()
-              }}
-              onEdit={openEditTask}
-              onDelete={handleDeleteTask}
-              onToggle={handleToggleTask}
-            />
-          </div>
+          <div style={{ position: 'sticky', top: '80px' }}>{renderColumn('left')}</div>
 
           {/* MIDDLE COLUMN */}
           <div className="space-y-4">
@@ -321,11 +447,7 @@ export default function App() {
           </div>
 
           {/* RIGHT COLUMN */}
-          <div className="space-y-4 sticky top-20">
-            <WeatherWidget />
-            <SpotifyWidget />
-            <PomodoroTimer onModeChange={setIsBreak} />
-          </div>
+          <div style={{ position: 'sticky', top: '80px' }}>{renderColumn('right')}</div>
         </div>
         </div>
 
