@@ -106,6 +106,14 @@ body {
 .text-secondary { color: var(--text-secondary) !important; }
 .text-muted { color: var(--text-muted) !important; }
 
+/* ===== MOBILE: geen pagina-scroll ===== */
+@media (max-width: 767px) {
+  html, body, #root {
+    height: 100%;
+    overflow: hidden;
+  }
+}
+
 /* ===== SCROLLBAR ===== */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }

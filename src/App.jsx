@@ -7,7 +7,7 @@ import TaskModal from './components/TaskModal'
 import NotesWidget from './components/NotesWidget'
 import WeatherWidget from './components/WeatherWidget'
 import PomodoroTimer from './components/PomodoroTimer'
-import { LogOut, GraduationCap } from 'lucide-react'
+import { LogOut, GraduationCap, Home, CalendarDays, CheckSquare, Layers, FileText } from 'lucide-react'
 import SpotifyWidget from './components/SpotifyWidget'
 import ThemeSettings from './components/ThemeSettings'
 import { Settings } from 'lucide-react'
@@ -36,6 +36,9 @@ export default function App() {
   const [pomodoroActive, setPomodoroActive] = useState(false)
   const [profiles, setProfiles] = useState([])
   const [showAdmin, setShowAdmin] = useState(false)
+  const [mobileTab, setMobileTab] = useState('home')
+  const [toolTab, setToolTab]     = useState('weer')
+  const [takenTab, setTakenTab]   = useState('taken')
 
   // ✅ FIX: user vroeg beschikbaar via useMemo (geen undefined bij vakken/kalender)
   const user = useMemo(() => session?.user || null, [session])
@@ -322,42 +325,149 @@ export default function App() {
           </div>
         </div>
 
-        {/* MOBILE LAYOUT */}
-        <div className="md:hidden flex-1 p-4 space-y-4">
-          <div className="glass-card p-4">
-            <Clock isBreak={isBreak} />
-          </div>
-          <div className="glass-card p-4">
-            <h3 className="text-sm font-semibold text-white mb-3">Dag Tijdlijn</h3>
-            <div style={{ height: '50vh' }}>
-              <Timeline
-                userId={user.id}
-                tasks={tasks}
-                subjects={subjects}
-                onToggleTask={handleToggleTask}
-                onEditTask={openEditTask}
-                isAdmin={isAdmin}
-              />
+        {/* ═══ MOBILE LAYOUT — tab-based, geen pagina-scroll ═══ */}
+        {(() => {
+          const hour = new Date().getHours()
+          const greeting = hour < 12 ? 'Goedemorgen' : hour < 18 ? 'Goedemiddag' : 'Goedenavond'
+          const nextTask = tasks.filter(t => !t.completed)[0] || null
+
+          const subTabStyle = (active) => ({
+            fontSize: 12, padding: '6px 14px', borderRadius: 20, border: 'none', cursor: 'pointer',
+            background: active ? 'var(--accent)' : 'rgba(255,255,255,0.07)',
+            color: active ? '#000' : 'rgba(255,255,255,0.5)',
+            fontWeight: active ? 600 : 400, whiteSpace: 'nowrap', flexShrink: 0,
+          })
+
+          const TABS = [
+            { id: 'home',   Icon: Home,         label: 'Home'   },
+            { id: 'agenda', Icon: CalendarDays,  label: 'Agenda' },
+            { id: 'taken',  Icon: CheckSquare,   label: 'Taken'  },
+            { id: 'tools',  Icon: Layers,        label: 'Tools'  },
+          ]
+
+          return (
+            <div className="md:hidden flex-1 flex flex-col" style={{ overflow: 'hidden', minHeight: 0 }}>
+
+              {/* ─── Tab content ─── */}
+              <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+
+                {/* HOME */}
+                {mobileTab === 'home' && (
+                  <div style={{ height: '100%', overflowY: 'auto', padding: '20px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>{greeting}, {displayName}</p>
+                    <div className="glass-card" style={{ padding: '20px 20px 16px' }}>
+                      <Clock isBreak={isBreak} />
+                    </div>
+
+                    {totalToday > 0 && (
+                      <div className="glass-card" style={{ padding: '14px 16px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                          <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Voortgang vandaag</span>
+                          <span style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}>{completedToday}/{totalToday} taken</span>
+                        </div>
+                        <div style={{ height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 4 }}>
+                          <div style={{ height: '100%', width: `${(completedToday / totalToday) * 100}%`, background: 'var(--accent)', borderRadius: 4, transition: 'width 0.4s', boxShadow: '0 0 8px color-mix(in srgb, var(--accent) 50%, transparent)' }} />
+                        </div>
+                      </div>
+                    )}
+
+                    {nextTask && (
+                      <div className="glass-card" style={{ padding: '14px 16px', cursor: 'pointer' }} onClick={() => openEditTask(nextTask)}>
+                        <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: '0 0 4px' }}>Volgende taak</p>
+                        <p style={{ fontSize: 14, color: 'white', fontWeight: 500, margin: '0 0 4px' }}>{nextTask.title}</p>
+                        {nextTask.time && <p style={{ fontSize: 12, color: 'var(--accent)', margin: 0 }}>{nextTask.time}</p>}
+                      </div>
+                    )}
+
+                    <button className="btn-neon" onClick={() => { setMobileTab('taken'); openNewTask() }}
+                      style={{ padding: '13px', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%' }}>
+                      + Taak toevoegen
+                    </button>
+                  </div>
+                )}
+
+                {/* AGENDA */}
+                {mobileTab === 'agenda' && (
+                  <div style={{ height: '100%', display: 'flex', flexDirection: 'column', padding: '12px 16px 16px' }}>
+                    <div className="glass-card" style={{ flex: 1, padding: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                      <Timeline
+                        userId={user.id} tasks={tasks} subjects={subjects}
+                        onToggleTask={handleToggleTask} onEditTask={openEditTask} isAdmin={isAdmin}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* TAKEN / NOTITIES */}
+                {mobileTab === 'taken' && (
+                  <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ display: 'flex', gap: 8, padding: '12px 16px 0', flexShrink: 0 }}>
+                      <button style={subTabStyle(takenTab === 'taken')}   onClick={() => setTakenTab('taken')}>Taken</button>
+                      <button style={subTabStyle(takenTab === 'notities')} onClick={() => setTakenTab('notities')}>Notities</button>
+                    </div>
+                    <div style={{ flex: 1, overflow: 'hidden', padding: '12px 16px 16px' }}>
+                      {takenTab === 'taken' && (
+                        <div style={{ height: '100%', overflowY: 'auto' }}>
+                          <TasksWidget
+                            tasks={tasks} subjects={subjects}
+                            onAdd={async (data) => { if (!user?.id) return; await supabase.from('tasks').insert({ ...data, completed: false, user_id: user.id }); fetchTasks() }}
+                            onEdit={openEditTask} onDelete={handleDeleteTask} onToggle={handleToggleTask}
+                          />
+                        </div>
+                      )}
+                      {takenTab === 'notities' && (
+                        <div style={{ height: '100%', overflowY: 'auto' }}>
+                          <NotesWidget userId={user.id} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* TOOLS */}
+                {mobileTab === 'tools' && (
+                  <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ display: 'flex', gap: 8, padding: '12px 16px 0', overflowX: 'auto', flexShrink: 0 }}>
+                      {[['weer','Weer'],['pomodoro','Pomodoro'],['spotify','Spotify'],['magister','Magister']].map(([id, label]) => (
+                        <button key={id} style={subTabStyle(toolTab === id)} onClick={() => setToolTab(id)}>{label}</button>
+                      ))}
+                    </div>
+                    <div style={{ flex: 1, overflow: 'hidden', padding: '12px 16px 16px' }}>
+                      <div style={{ height: '100%', overflowY: 'auto' }}>
+                        {toolTab === 'weer'     && <WeatherWidget />}
+                        {toolTab === 'pomodoro' && <PomodoroTimer onModeChange={setIsBreak} onPomodoroActive={setPomodoroActive} />}
+                        {toolTab === 'spotify'  && <SpotifyWidget />}
+                        {toolTab === 'magister' && <MagisterWidget userId={user.id} onSubjectsSync={() => { fetchSubjects(); fetchProfiles() }} />}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ─── Bottom tab bar ─── */}
+              <nav style={{
+                display: 'flex', flexShrink: 0,
+                background: 'rgba(5,10,20,0.95)',
+                backdropFilter: 'blur(24px)',
+                borderTop: '1px solid rgba(255,255,255,0.07)',
+                paddingBottom: 'env(safe-area-inset-bottom)',
+              }}>
+                {TABS.map(({ id, Icon, label }) => (
+                  <button key={id} onClick={() => setMobileTab(id)} style={{
+                    flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+                    justifyContent: 'center', gap: 4, padding: '10px 0',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: mobileTab === id ? 'var(--accent)' : 'rgba(255,255,255,0.3)',
+                    transition: 'color 0.15s',
+                  }}>
+                    <Icon size={20} strokeWidth={mobileTab === id ? 2.2 : 1.7} />
+                    <span style={{ fontSize: 10, fontWeight: mobileTab === id ? 600 : 400 }}>{label}</span>
+                  </button>
+                ))}
+              </nav>
             </div>
-          </div>
-          <MagisterWidget userId={user.id} onSubjectsSync={() => { fetchSubjects(); fetchProfiles() }} />
-          <WeatherWidget />
-          <SpotifyWidget />
-          <PomodoroTimer onModeChange={setIsBreak} onPomodoroActive={setPomodoroActive} />
-          <TasksWidget
-            tasks={tasks}
-            subjects={subjects}
-            onAdd={async (data) => {
-              if (!user?.id) return
-              await supabase.from('tasks').insert({ ...data, completed: false, user_id: user.id })
-              fetchTasks()
-            }}
-            onEdit={openEditTask}
-            onDelete={handleDeleteTask}
-            onToggle={handleToggleTask}
-          />
-          <NotesWidget userId={user.id} />
-        </div>
+          )
+        })()}
       </div>
 
       {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
