@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { supabase } from '../supabaseClient'
 import { Plus, ChevronLeft, ChevronRight, X, Save, Trash2 } from 'lucide-react'
 
@@ -89,13 +89,10 @@ export default function Timeline({ userId, tasks, subjects, onEditTask }) {
 
   useEffect(() => { fetchEvents() }, [])
 
-  useEffect(() => {
-    const t = setTimeout(() => {
-      if (scrollRef.current) {
-        scrollRef.current.scrollTop = Math.max(0, now.getHours() - 1) * HOUR_H
-      }
-    }, 50)
-    return () => clearTimeout(t)
+  useLayoutEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = Math.max(0, now.getHours() - 1) * HOUR_H
+    }
   }, [view])
 
   // Listen for Magister login → clear cache and re-fetch schedule
@@ -510,11 +507,11 @@ export default function Timeline({ userId, tasks, subjects, onEditTask }) {
         </div>
       </div>
 
-      {/* View content */}
+      {/* View content — call as functions to prevent remount on re-render */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        {view === 'month' && <MonthView />}
-        {view === 'week'  && <TimeGrid days={weekDays} />}
-        {view === 'day'   && <TimeGrid days={[current]} />}
+        {view === 'month' && MonthView({})}
+        {view === 'week'  && TimeGrid({ days: weekDays })}
+        {view === 'day'   && TimeGrid({ days: [current] })}
       </div>
 
       {/* Lesson detail popup */}

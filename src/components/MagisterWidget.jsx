@@ -19,7 +19,6 @@ async function callMagister(creds, action, extra = {}) {
 
 function inDays(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10) }
 
-// Converts a Magister lesmateriaal URL to the Noordhoff deeplink via EAN
 function toBookUrl(url) {
   if (!url) return null
   const m = url.match(/\/Ean\/(\d+)/i)
@@ -42,15 +41,15 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState('')
 
+  // Fetch all Magister data at once on mount (no lazy loading per tab)
   useEffect(() => {
-    if (creds) fetchTab(tab === 'vakken' ? 'cijfers' : tab)
+    if (creds) fetchAllData(creds)
   }, [creds])
 
   useEffect(() => {
     if (!userId) return
     fetchProfile()
     fetchLinks()
-    // Auto-sync vakken once per session to apply latest matchVak logic
     if (creds && !sessionStorage.getItem('magister_synced')) {
       sessionStorage.setItem('magister_synced', '1')
       syncVakken(creds).then(() => syncLesmateriaal(creds))
@@ -72,6 +71,23 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
     }
   }
 
+  const fetchAllData = async (c) => {
+    if (!c) return
+    setLoading(true); setError(null)
+    try {
+      const today = new Date().toISOString().slice(0, 10)
+      const [grades, homework, assignments] = await Promise.all([
+        callMagister(c, 'grades', { top: 30 }),
+        callMagister(c, 'homework', { start: today, end: inDays(14) }),
+        callMagister(c, 'opdrachten', { count: 50 })
+      ])
+      setData({ grades, homework, assignments })
+    } catch (e) {
+      setError(e.message)
+    }
+    setLoading(false)
+  }
+
   const syncVakken = async (credsToUse) => {
     if (!userId) return
     try {
@@ -82,7 +98,6 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
         .filter(Boolean)
         .filter((v, i, a) => a.indexOf(v) === i)
       if (!namen.length) return
-      // Full replace: remove old subjects, insert new ones
       const { data: existing } = await supabase.from('subjects').select('id, name').eq('user_id', userId)
       const existingMap = Object.fromEntries((existing || []).map(s => [s.name, s.id]))
       const toDelete = (existing || []).filter(s => !namen.includes(s.name))
@@ -129,8 +144,7 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
     try {
       await syncVakken(creds)
       await syncLesmateriaal(creds)
-      const count = profile?.vakken?.length || 0
-      setSyncMsg(`Gesynchroniseerd ✓`)
+      setSyncMsg('Gesynchroniseerd ✓')
       setTimeout(() => setSyncMsg(''), 3000)
     } catch {
       setSyncMsg('Sync mislukt')
@@ -164,34 +178,9 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
     setFormCreds({ school: '', username: '', password: '' })
   }
 
-  const fetchTab = async (t) => {
-    if (!creds) return
-    setLoading(true); setError(null)
-    try {
-      if (t === 'cijfers' && !data.grades) {
-        const grades = await callMagister(creds, 'grades', { top: 30 })
-        setData(p => ({ ...p, grades }))
-      } else if (t === 'huiswerk' && !data.homework) {
-        const homework = await callMagister(creds, 'homework', { start: new Date().toISOString().slice(0, 10), end: inDays(14) })
-        setData(p => ({ ...p, homework }))
-      } else if (t === 'opdrachten' && !data.assignments) {
-        const assignments = await callMagister(creds, 'opdrachten', { count: 50 })
-        setData(p => ({ ...p, assignments }))
-      }
-    } catch (e) {
-      setError(e.message)
-    }
-    setLoading(false)
-  }
-
-  const switchTab = (t) => {
-    setTab(t)
-    if (t !== 'vakken') fetchTab(t)
-  }
-
   const refresh = () => {
     setData({ grades: null, homework: null, assignments: null })
-    if (tab !== 'vakken') setTimeout(() => fetchTab(tab), 50)
+    fetchAllData(creds)
   }
 
   const formatDate = (str) => {
@@ -211,6 +200,10 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
   const vakken = profile?.vakken || []
   const klas = profile?.klas || ''
 
+  // Accent-aware inline style helpers
+  const accentBg = (pct) => `color-mix(in srgb, var(--accent) ${pct}%, transparent)`
+  const accentBorder = (pct) => `1px solid color-mix(in srgb, var(--accent) ${pct}%, transparent)`
+
   return (
     <div className="glass-card p-4">
       {/* Header */}
@@ -219,7 +212,7 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
           <span style={{ fontSize: '16px' }}>🎓</span>
           <span style={{ color: 'white', fontWeight: 600, fontSize: '13px' }}>Magister</span>
           {creds && (
-            <span style={{ background: 'rgba(0,255,209,0.1)', border: '1px solid rgba(0,255,209,0.25)', borderRadius: '20px', padding: '1px 8px', fontSize: '10px', color: '#00FFD1' }}>
+            <span style={{ background: accentBg(10), border: accentBorder(25), borderRadius: '20px', padding: '1px 8px', fontSize: '10px', color: 'var(--accent)' }}>
               {creds.school}
             </span>
           )}
@@ -228,13 +221,13 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
           {creds && (
             <button onClick={refresh} disabled={loading}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '3px', borderRadius: '6px' }}
-              onMouseEnter={e => e.currentTarget.style.color = '#00FFD1'}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
               onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.3)'}>
               <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
             </button>
           )}
           <button onClick={() => setShowSettings(!showSettings)}
-            style={{ background: showSettings ? 'rgba(0,255,209,0.15)' : 'rgba(255,255,255,0.05)', border: `1px solid ${showSettings ? 'rgba(0,255,209,0.4)' : 'rgba(255,255,255,0.1)'}`, borderRadius: '8px', padding: '3px 7px', cursor: 'pointer', color: showSettings ? '#00FFD1' : 'rgba(255,255,255,0.4)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            style={{ background: showSettings ? accentBg(15) : 'rgba(255,255,255,0.05)', border: showSettings ? accentBorder(40) : '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '3px 7px', cursor: 'pointer', color: showSettings ? 'var(--accent)' : 'rgba(255,255,255,0.4)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
             <Settings size={11} /> {creds ? (showSettings ? 'Sluiten' : 'Instelling') : 'Inloggen'}
           </button>
           <button onClick={() => setExpanded(!expanded)}
@@ -272,7 +265,7 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
                   </button>
                 )}
                 <button onClick={saveCreds} disabled={loading || !formCreds.username || !formCreds.password}
-                  style={{ flex: 2, padding: '7px', borderRadius: '8px', border: '1px solid rgba(0,255,209,0.4)', background: 'rgba(0,255,209,0.12)', color: '#00FFD1', cursor: 'pointer', fontSize: '12px', fontWeight: 600, opacity: (!formCreds.username || !formCreds.password) ? 0.4 : 1 }}>
+                  style={{ flex: 2, padding: '7px', borderRadius: '8px', border: accentBorder(40), background: accentBg(12), color: 'var(--accent)', cursor: 'pointer', fontSize: '12px', fontWeight: 600, opacity: (!formCreds.username || !formCreds.password) ? 0.4 : 1 }}>
                   {loading ? 'Bezig...' : 'Inloggen & opslaan'}
                 </button>
               </div>
@@ -291,8 +284,8 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
                     { id: 'opdrachten', label: 'Opdrachten', icon: <FileText size={11} /> },
                   ] : [])
                 ].map(t => (
-                  <button key={t.id} onClick={() => switchTab(t.id)}
-                    style={{ flex: 1, padding: '5px 4px', borderRadius: '8px', fontSize: '10px', cursor: 'pointer', border: '1px solid', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', borderColor: tab === t.id ? 'rgba(0,255,209,0.5)' : 'rgba(255,255,255,0.08)', background: tab === t.id ? 'rgba(0,255,209,0.12)' : 'transparent', color: tab === t.id ? '#00FFD1' : 'rgba(255,255,255,0.4)' }}>
+                  <button key={t.id} onClick={() => setTab(t.id)}
+                    style={{ flex: 1, padding: '5px 4px', borderRadius: '8px', fontSize: '10px', cursor: 'pointer', border: '1px solid', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', borderColor: tab === t.id ? accentBg(50) : 'rgba(255,255,255,0.08)', background: tab === t.id ? accentBg(12) : 'transparent', color: tab === t.id ? 'var(--accent)' : 'rgba(255,255,255,0.4)' }}>
                     {t.icon} {t.label}
                   </button>
                 ))}
@@ -304,7 +297,7 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       {klas && (
-                        <span style={{ background: 'rgba(0,255,209,0.1)', border: '1px solid rgba(0,255,209,0.25)', borderRadius: '20px', padding: '1px 8px', fontSize: '10px', color: '#00FFD1' }}>
+                        <span style={{ background: accentBg(10), border: accentBorder(25), borderRadius: '20px', padding: '1px 8px', fontSize: '10px', color: 'var(--accent)' }}>
                           {klas}
                         </span>
                       )}
@@ -339,7 +332,7 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
                           {link ? (
                             <a href={link} target="_blank" rel="noopener noreferrer"
                               onClick={e => e.stopPropagation()}
-                              style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#00FFD1', textDecoration: 'none', background: 'rgba(0,255,209,0.08)', border: '1px solid rgba(0,255,209,0.2)', borderRadius: '6px', padding: '2px 7px' }}>
+                              style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--accent)', textDecoration: 'none', background: accentBg(8), border: accentBorder(20), borderRadius: '6px', padding: '2px 7px' }}>
                               <ExternalLink size={10} /> Boek
                             </a>
                           ) : (
@@ -420,7 +413,7 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
                   )}
                   {data.assignments.map((a, i) => {
                     const overdue = !a.afgesloten && !a.ingeleverdOp && isOverdue(a.deadline)
-                    const statusColor = a.afgesloten ? '#4ADE80' : a.ingeleverdOp ? '#00FFD1' : overdue ? '#FF6B6B' : a.magInleveren ? '#FACC15' : 'rgba(255,255,255,0.3)'
+                    const statusColor = a.afgesloten ? '#4ADE80' : a.ingeleverdOp ? 'var(--accent)' : overdue ? '#FF6B6B' : a.magInleveren ? '#FACC15' : 'rgba(255,255,255,0.3)'
                     const statusLabel = a.afgesloten ? 'Afgesloten' : a.opnieuwInleveren ? 'Opnieuw inleveren' : a.ingeleverdOp ? 'Ingeleverd' : overdue ? 'Te laat' : a.magInleveren ? 'Open' : ''
                     return (
                       <div key={i} style={{ padding: '8px 10px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${overdue ? 'rgba(255,80,80,0.2)' : 'rgba(255,255,255,0.06)'}` }}>
@@ -447,7 +440,6 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
                 </div>
               )}
 
-              {/* Niet ingelogd prompt (alleen bij niet-vakken tabs) */}
               {!creds && tab !== 'vakken' && (
                 <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>
                   Klik op "Inloggen" om te beginnen

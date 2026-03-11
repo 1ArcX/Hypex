@@ -217,8 +217,8 @@ export default function App() {
           }}>
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-              style={{ background: 'rgba(0,255,209,0.15)', border: '1px solid rgba(0,255,209,0.3)' }}>
-              <GraduationCap size={16} color="#00FFD1" />
+              style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)' }}>
+              <GraduationCap size={16} color="var(--accent)" />
             </div>
             <span className="font-semibold text-white text-sm hidden sm:block">Student Dashboard</span>
           </div>
@@ -237,8 +237,8 @@ export default function App() {
                 <div className="h-full rounded-full transition-all duration-500"
                   style={{
                     width: `${(completedToday / totalToday) * 100}%`,
-                    background: 'linear-gradient(90deg, #00FFD1, #818CF8)',
-                    boxShadow: '0 0 8px rgba(0,255,209,0.5)'
+                    background: 'linear-gradient(90deg, var(--accent), #818CF8)',
+                    boxShadow: '0 0 8px color-mix(in srgb, var(--accent) 50%, transparent)'
                   }} />
               </div>
             </div>

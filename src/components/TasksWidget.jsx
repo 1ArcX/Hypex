@@ -55,11 +55,11 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-          <span style={{ color: '#00FFD1' }}>✅</span> Taken
+          <span style={{ color: 'var(--accent)' }}>✅</span> Taken
         </h3>
         <button
           onClick={() => { setAdding(!adding); setNewTitle('') }}
-          style={{ background: 'rgba(0,255,209,0.1)', border: '1px solid rgba(0,255,209,0.3)', borderRadius: '8px', padding: '4px 8px', cursor: 'pointer', color: '#00FFD1', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
+          style={{ background: 'color-mix(in srgb, var(--accent) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', borderRadius: '8px', padding: '4px 8px', cursor: 'pointer', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
           {adding ? <X size={12} /> : <Plus size={12} />}
           {adding ? 'Annuleer' : 'Nieuw'}
         </button>
@@ -67,7 +67,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
 
       {/* Inline aanmaken */}
       {adding && (
-        <div style={{ background: 'rgba(0,255,209,0.05)', border: '1px solid rgba(0,255,209,0.2)', borderRadius: '12px', padding: '12px', marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ background: 'color-mix(in srgb, var(--accent) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)', borderRadius: '12px', padding: '12px', marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <input
             className="glass-input"
             placeholder="Taaknaam..."
@@ -115,7 +115,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
           <button
             onClick={handleAdd}
             disabled={!newTitle.trim()}
-            style={{ padding: '8px', borderRadius: '10px', border: '1px solid rgba(0,255,209,0.4)', background: 'rgba(0,255,209,0.12)', color: '#00FFD1', cursor: 'pointer', fontSize: '12px', fontWeight: 600, opacity: !newTitle.trim() ? 0.4 : 1 }}>
+            style={{ padding: '8px', borderRadius: '10px', border: '1px solid color-mix(in srgb, var(--accent) 40%, transparent)', background: 'color-mix(in srgb, var(--accent) 12%, transparent)', color: 'var(--accent)', cursor: 'pointer', fontSize: '12px', fontWeight: 600, opacity: !newTitle.trim() ? 0.4 : 1 }}>
             + Toevoegen
           </button>
         </div>
@@ -141,7 +141,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                 onDragStart?.(task)
               }}
               style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', cursor: 'grab', background: 'rgba(255,255,255,0.01)', transition: 'background 0.15s' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,255,209,0.04)'}
+              onMouseEnter={e => e.currentTarget.style.background = 'color-mix(in srgb, var(--accent) 4%, transparent)'}
               onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.01)'}>
               <GripVertical size={13} style={{ color: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
               <button onClick={() => onToggle(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
@@ -188,7 +188,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
           {complete.map(task => (
             <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', opacity: 0.5 }}>
               <button onClick={() => onToggle(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
-                <CheckCircle2 size={15} style={{ color: '#00FFD1' }} />
+                <CheckCircle2 size={15} style={{ color: 'var(--accent)' }} />
               </button>
               <p style={{ flex: 1, fontSize: '12px', color: 'rgba(255,255,255,0.4)', textDecoration: 'line-through', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {task.title}
