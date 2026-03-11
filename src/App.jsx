@@ -395,6 +395,7 @@ export default function App() {
                       <Timeline
                         userId={user.id} tasks={tasks} subjects={subjects}
                         onToggleTask={handleToggleTask} onEditTask={openEditTask} isAdmin={isAdmin}
+                        defaultView="day" hideWeekView
                       />
                     </div>
                   </div>

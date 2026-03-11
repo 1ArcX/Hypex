@@ -19,6 +19,15 @@ async function callMagister(creds, action, extra = {}) {
 
 function inDays(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10) }
 
+function stripHtml(html) {
+  if (!html) return ''
+  return html
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(n))
+    .replace(/\s+/g, ' ').trim()
+}
+
 function toBookUrl(url) {
   if (!url) return null
   const m = url.match(/\/Ean\/(\d+)/i)
@@ -398,7 +407,7 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
                         <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.85)', fontWeight: 500 }}>{hw.vak || 'Onbekend vak'}</span>
                         {hw.klaar && <span style={{ fontSize: '10px', color: '#4ADE80' }}>✓ Klaar</span>}
                       </div>
-                      {hw.omschrijving && <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', margin: '4px 0 0' }}>{hw.omschrijving}</p>}
+                      {hw.omschrijving && <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', margin: '4px 0 0' }}>{stripHtml(hw.omschrijving)}</p>}
                       {hw.datum && <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', margin: '3px 0 0' }}>{formatDate(hw.datum)}</p>}
                     </div>
                   ))}

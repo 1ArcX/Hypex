@@ -13,6 +13,10 @@ const DAYS_FULL = ['Zondag','Maandag','Dinsdag','Woensdag','Donderdag','Vrijdag'
 const EVENT_COLORS = ['#FF6B6B','#FF8C42','#FACC15','#4ADE80','#00FFD1','#38BDF8','#818CF8','#F472B6']
 
 function pad(n) { return String(n).padStart(2, '0') }
+function stripHtml(html) {
+  if (!html) return ''
+  return html.replace(/<[^>]*>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').replace(/&#(\d+);/g, (_, n) => String.fromCharCode(n)).replace(/\s+/g, ' ').trim()
+}
 function toDateStr(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}` }
 function isSameDay(a, b) {
   return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate()
@@ -74,8 +78,8 @@ const emptyForm = (date, hour) => ({
   color: '#818CF8', recurrence: '', recurrence_days: []
 })
 
-export default function Timeline({ userId, tasks, subjects, onEditTask }) {
-  const [view, setView] = useState('week')
+export default function Timeline({ userId, tasks, subjects, onEditTask, defaultView = 'week', hideWeekView = false }) {
+  const [view, setView] = useState(defaultView)
   const [current, setCurrent] = useState(new Date())
   const [events, setEvents] = useState([])
   const [modal, setModal] = useState(null)
@@ -493,7 +497,7 @@ export default function Timeline({ userId, tasks, subjects, onEditTask }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '2px', border: '1px solid rgba(255,255,255,0.08)' }}>
-            {[['day','Dag'], ['week','Week'], ['month','Maand']].map(([v, label]) => (
+            {[['day','Dag'], ['week','Week'], ['month','Maand']].filter(([v]) => !(v === 'week' && hideWeekView)).map(([v, label]) => (
               <button key={v} onClick={() => setView(v)}
                 style={{ padding: '3px 10px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', border: 'none', background: view === v ? 'rgba(255,255,255,0.15)' : 'transparent', color: view === v ? 'white' : 'rgba(255,255,255,0.4)', fontWeight: view === v ? 600 : 400 }}>
                 {label}
@@ -566,14 +570,14 @@ export default function Timeline({ userId, tasks, subjects, onEditTask }) {
               {lessonDetail.huiswerk && (
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                   <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', width: '60px', flexShrink: 0, paddingTop: '2px' }}>Huiswerk</span>
-                  <span style={{ fontSize: '12px', color: '#FACC15', fontWeight: 500, lineHeight: 1.4 }}>{lessonDetail.huiswerk}</span>
+                  <span style={{ fontSize: '12px', color: '#FACC15', fontWeight: 500, lineHeight: 1.4 }}>{stripHtml(lessonDetail.huiswerk)}</span>
                 </div>
               )}
               {/* Omschrijving */}
               {lessonDetail.omschrijving && (
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                   <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', width: '60px', flexShrink: 0, paddingTop: '2px' }}>Info</span>
-                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', lineHeight: 1.4 }}>{lessonDetail.omschrijving}</span>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', lineHeight: 1.4 }}>{stripHtml(lessonDetail.omschrijving)}</span>
                 </div>
               )}
             </div>
@@ -598,7 +602,8 @@ export default function Timeline({ userId, tasks, subjects, onEditTask }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <input className="glass-input" placeholder="Titel *" value={form.title}
                 onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
-                onKeyDown={e => e.key === 'Enter' && handleSave()} autoFocus />
+                onKeyDown={e => e.key === 'Enter' && handleSave()}
+                style={{ fontSize: '16px' }} />
               <textarea className="glass-input" placeholder="Beschrijving" value={form.description}
                 onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
                 style={{ resize: 'vertical', minHeight: '56px' }} />
