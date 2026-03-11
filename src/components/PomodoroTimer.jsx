@@ -1,64 +1,173 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Play, Pause, RotateCcw, Coffee, Brain, Settings, X } from 'lucide-react'
 
+const LS_KEY = 'pomodoro_state'
+
+function loadState() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY)) } catch { return null }
+}
+
+function saveState(state) {
+  localStorage.setItem(LS_KEY, JSON.stringify(state))
+}
+
 export default function PomodoroTimer({ onModeChange, onPomodoroActive }) {
-  const [isBreak, setIsBreak] = useState(false)
-  const [workMins, setWorkMins] = useState(25)
-  const [breakMins, setBreakMins] = useState(5)
-  const [seconds, setSeconds] = useState(25 * 60)
-  const [running, setRunning] = useState(false)
-  const [sessions, setSessions] = useState(0)
+  const [isBreak,      setIsBreak]      = useState(false)
+  const [workMins,     setWorkMins]     = useState(25)
+  const [breakMins,    setBreakMins]    = useState(5)
+  const [seconds,      setSeconds]      = useState(25 * 60)  // displayed remaining
+  const [running,      setRunning]      = useState(false)
+  const [sessions,     setSessions]     = useState(0)
   const [showSettings, setShowSettings] = useState(false)
-  const [dragging, setDragging] = useState(false)
-  const [showTooltip, setShowTooltip] = useState(false)
-  const intervalRef = useRef(null)
-  const svgRef = useRef(null)
+  const [dragging,     setDragging]     = useState(false)
+  const [showTooltip,  setShowTooltip]  = useState(false)
 
-  const totalSeconds = isBreak ? breakMins * 60 : workMins * 60
-  const progress = 1 - seconds / totalSeconds
-  const radius = 54
-  const circumference = 2 * Math.PI * radius
+  const endTimeRef   = useRef(null)   // absolute ms when current session ends
+  const intervalRef  = useRef(null)
+  const svgRef       = useRef(null)
 
+  // ── Restore persisted state on mount ──────────────────────────────────────
   useEffect(() => {
-    if (!dragging) setSeconds(isBreak ? breakMins * 60 : workMins * 60)
-  }, [workMins, breakMins, isBreak])
+    const s = loadState()
+    if (!s) return
+    setWorkMins(s.workMins ?? 25)
+    setBreakMins(s.breakMins ?? 5)
+    setIsBreak(s.isBreak ?? false)
+    setSessions(s.sessions ?? 0)
 
-  // ✅ Fix: onPomodoroActive in eigen useEffect, niet samen met timer logic
-  useEffect(() => {
-    setTimeout(() => onPomodoroActive?.(running), 0)
-  }, [running])
+    if (s.running && s.endTime) {
+      const remaining = Math.ceil((s.endTime - Date.now()) / 1000)
+      if (remaining > 0) {
+        endTimeRef.current = s.endTime
+        setSeconds(remaining)
+        setRunning(true)
+      } else {
+        // Timer already expired while away — count it and switch mode
+        const nextBreak = !s.isBreak
+        const newSessions = s.isBreak ? s.sessions : (s.sessions ?? 0) + 1
+        setSessions(newSessions)
+        setIsBreak(nextBreak)
+        const totalSecs = nextBreak ? (s.breakMins ?? 5) * 60 : (s.workMins ?? 25) * 60
+        setSeconds(totalSecs)
+        saveState({ running: false, isBreak: nextBreak, workMins: s.workMins, breakMins: s.breakMins, sessions: newSessions, remainingSeconds: totalSecs })
+        setTimeout(() => onModeChange?.(nextBreak), 0)
+      }
+    } else if (!s.running && s.remainingSeconds != null) {
+      setSeconds(s.remainingSeconds)
+    }
+  }, [])
 
+  // ── Tick: recompute from endTime every 500 ms ─────────────────────────────
+  const tick = useCallback(() => {
+    if (!endTimeRef.current) return
+    const remaining = Math.ceil((endTimeRef.current - Date.now()) / 1000)
+    if (remaining <= 0) {
+      clearInterval(intervalRef.current)
+      endTimeRef.current = null
+      setRunning(false)
+      setIsBreak(prev => {
+        const nextBreak = !prev
+        setSessions(n => {
+          const newN = prev ? n : n + 1
+          setWorkMins(wm => {
+            setBreakMins(bm => {
+              const totalSecs = nextBreak ? bm * 60 : wm * 60
+              setSeconds(totalSecs)
+              saveState({ running: false, isBreak: nextBreak, workMins: wm, breakMins: bm, sessions: newN, remainingSeconds: totalSecs })
+              return bm
+            })
+            return wm
+          })
+          return newN
+        })
+        setTimeout(() => {
+          onModeChange?.(nextBreak)
+          onPomodoroActive?.(false)
+        }, 0)
+        return nextBreak
+      })
+    } else {
+      setSeconds(remaining)
+    }
+  }, [onModeChange, onPomodoroActive])
+
+  // Start/stop interval
   useEffect(() => {
     if (running) {
-      intervalRef.current = setInterval(() => {
-        setSeconds(s => {
-          if (s <= 1) {
-            clearInterval(intervalRef.current)
-            setRunning(false)
-            if (!isBreak) setSessions(n => n + 1)
-            const next = !isBreak
-            setIsBreak(next)
-            setTimeout(() => onModeChange?.(next), 0)
-            return next ? breakMins * 60 : workMins * 60
-          }
-          return s - 1
-        })
-      }, 1000)
+      intervalRef.current = setInterval(tick, 500)
     } else {
       clearInterval(intervalRef.current)
     }
     return () => clearInterval(intervalRef.current)
-  }, [running, isBreak, workMins, breakMins])
+  }, [running, tick])
 
-  const reset = () => { setRunning(false); setSeconds(isBreak ? breakMins * 60 : workMins * 60) }
+  // Recalculate on tab becoming visible (iPad, background tabs)
+  useEffect(() => {
+    const onVisible = () => {
+      if (running && endTimeRef.current) tick()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+    }
+  }, [running, tick])
+
+  // Notify parent of running state
+  useEffect(() => {
+    setTimeout(() => onPomodoroActive?.(running), 0)
+  }, [running])
+
+  // ── Controls ──────────────────────────────────────────────────────────────
+  const toggleRunning = () => {
+    if (!running) {
+      // Start / resume
+      const endTime = Date.now() + seconds * 1000
+      endTimeRef.current = endTime
+      setRunning(true)
+      saveState({ running: true, endTime, isBreak, workMins, breakMins, sessions })
+    } else {
+      // Pause — snapshot remaining
+      const remaining = endTimeRef.current
+        ? Math.max(0, Math.ceil((endTimeRef.current - Date.now()) / 1000))
+        : seconds
+      endTimeRef.current = null
+      setRunning(false)
+      setSeconds(remaining)
+      saveState({ running: false, isBreak, workMins, breakMins, sessions, remainingSeconds: remaining })
+    }
+  }
+
+  const reset = () => {
+    setRunning(false)
+    endTimeRef.current = null
+    const s = isBreak ? breakMins * 60 : workMins * 60
+    setSeconds(s)
+    saveState({ running: false, isBreak, workMins, breakMins, sessions, remainingSeconds: s })
+  }
 
   const switchMode = (toBreak) => {
     setRunning(false)
+    endTimeRef.current = null
     setIsBreak(toBreak)
-    setSeconds(toBreak ? breakMins * 60 : workMins * 60)
+    const s = toBreak ? breakMins * 60 : workMins * 60
+    setSeconds(s)
+    saveState({ running: false, isBreak: toBreak, workMins, breakMins, sessions, remainingSeconds: s })
     setTimeout(() => onModeChange?.(toBreak), 0)
   }
 
+  // Settings sliders
+  const changeWorkMins = (m) => {
+    setWorkMins(m)
+    if (!isBreak && !running) { setSeconds(m * 60); saveState({ running: false, isBreak, workMins: m, breakMins, sessions, remainingSeconds: m * 60 }) }
+  }
+  const changeBreakMins = (m) => {
+    setBreakMins(m)
+    if (isBreak && !running) { setSeconds(m * 60); saveState({ running: false, isBreak, workMins, breakMins: m, sessions, remainingSeconds: m * 60 }) }
+  }
+
+  // ── Ring drag ─────────────────────────────────────────────────────────────
   const handleRingInteraction = (e) => {
     if (running) return
     const svg = svgRef.current
@@ -80,6 +189,11 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive }) {
     }
   }
 
+  // ── Display ───────────────────────────────────────────────────────────────
+  const totalSeconds = isBreak ? breakMins * 60 : workMins * 60
+  const progress = 1 - seconds / totalSeconds
+  const radius = 54
+  const circumference = 2 * Math.PI * radius
   const mins = String(Math.floor(seconds / 60)).padStart(2, '0')
   const secs = String(seconds % 60).padStart(2, '0')
   const accentColor = isBreak ? '#FF8C42' : 'var(--accent)'
@@ -129,7 +243,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive }) {
               Werktijd: <span style={{ color: 'var(--accent)' }}>{workMins} min</span>
             </label>
             <input type="range" min="1" max="60" value={workMins}
-              onChange={e => { setWorkMins(+e.target.value); if (!isBreak) { setRunning(false); setSeconds(+e.target.value * 60) } }}
+              onChange={e => changeWorkMins(+e.target.value)}
               style={{ width: '100%', accentColor: 'var(--accent)' }} />
           </div>
           <div>
@@ -137,7 +251,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive }) {
               Pauzetijd: <span style={{ color: '#FF8C42' }}>{breakMins} min</span>
             </label>
             <input type="range" min="1" max="30" value={breakMins}
-              onChange={e => { setBreakMins(+e.target.value); if (isBreak) { setRunning(false); setSeconds(+e.target.value * 60) } }}
+              onChange={e => changeBreakMins(+e.target.value)}
               style={{ width: '100%', accentColor: '#FF8C42' }} />
           </div>
         </div>
@@ -225,7 +339,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive }) {
           style={{ padding: '10px', borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.03)' }}>
           <RotateCcw size={16} />
         </button>
-        <button onClick={() => setRunning(!running)}
+        <button onClick={toggleRunning}
           className="btn-neon flex-1 flex items-center justify-center gap-2"
           style={{
             borderColor: isBreak ? 'rgba(255,140,66,0.5)' : 'rgba(0,255,209,0.5)',
