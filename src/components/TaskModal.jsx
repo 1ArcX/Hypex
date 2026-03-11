@@ -49,7 +49,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, on
 
         <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
           <input className="glass-input" placeholder="Titel *" value={title}
-            onChange={e=>setTitle(e.target.value)} autoFocus/>
+            onChange={e=>setTitle(e.target.value)} style={{ fontSize: '16px' }} />
           <textarea className="glass-input" placeholder="Beschrijving (optioneel)" value={description}
             onChange={e=>setDescription(e.target.value)}
             style={{resize:'vertical',minHeight:'60px'}}/>

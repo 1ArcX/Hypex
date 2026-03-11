@@ -203,12 +203,12 @@ export default function App() {
   const totalToday = tasks.length
 
   return (
-    <div className="min-h-screen relative">
+    <div style={{ height: '100dvh', overflow: 'hidden', position: 'relative' }}>
       {/* Animated background */}
       <div className="mesh-bg"><div className="mesh-blob" /></div>
 
       {/* Main content */}
-      <div className="relative z-10 min-h-screen flex flex-col">
+      <div className="flex flex-col" style={{ position: 'relative', zIndex: 10, height: '100%' }}>
 
         {/* Top navbar — sticky zodat hij nooit wegscrollt */}
         <nav className="flex items-center justify-between px-6 py-4"
@@ -277,7 +277,8 @@ export default function App() {
         </nav>
 
         {/* Desktop: 3-column grid */}
-        <div className="hidden md:grid flex-1 gap-4 p-6"
+        <div className="hidden md:block" style={{ flex: 1, overflowY: 'auto' }}>
+        <div className="grid gap-4 p-6"
           style={{ gridTemplateColumns: '280px 1fr 300px', alignItems: 'start' }}>
 
           {/* LEFT COLUMN */}
@@ -323,6 +324,7 @@ export default function App() {
             <SpotifyWidget />
             <PomodoroTimer onModeChange={setIsBreak} />
           </div>
+        </div>
         </div>
 
         {/* ═══ MOBILE LAYOUT — tab-based, geen pagina-scroll ═══ */}
@@ -451,6 +453,7 @@ export default function App() {
                 backdropFilter: 'blur(24px)',
                 borderTop: '1px solid rgba(255,255,255,0.07)',
                 paddingBottom: 'env(safe-area-inset-bottom)',
+                position: 'relative', zIndex: 100,
               }}>
                 {TABS.map(({ id, Icon, label }) => (
                   <button key={id} onClick={() => setMobileTab(id)} style={{
