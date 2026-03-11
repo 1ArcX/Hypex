@@ -158,7 +158,7 @@ const iconBtn = {
 }
 
 // ── Completion Popup ──────────────────────────────────────────────────────────
-function CompletionPopup({ prevMode, nextMode, onContinue }) {
+function CompletionPopup({ prevMode, nextMode, onStart, onSkip }) {
   const isWorkDone = prevMode === 'work'
   const modeColor  = MODES[nextMode].color
   const modeRgb    = MODES[nextMode].rgb
@@ -176,7 +176,6 @@ function CompletionPopup({ prevMode, nextMode, onContinue }) {
         border: `1px solid rgba(${modeRgb}, 0.25)`,
         boxShadow: `0 0 80px rgba(${modeRgb}, 0.2)`,
       }}>
-        {/* Big icon */}
         <div style={{
           width: 80, height: 80, borderRadius: '50%', margin: '0 auto 20px',
           background: `rgba(${modeRgb}, 0.15)`,
@@ -184,10 +183,7 @@ function CompletionPopup({ prevMode, nextMode, onContinue }) {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: `0 0 40px rgba(${modeRgb}, 0.3)`,
         }}>
-          {isWorkDone
-            ? <Coffee size={36} color={modeColor} />
-            : <Zap size={36} color={modeColor} />
-          }
+          {isWorkDone ? <Coffee size={36} color={modeColor} /> : <Zap size={36} color={modeColor} />}
         </div>
 
         <h2 style={{ fontSize: 22, fontWeight: 700, color: 'white', margin: '0 0 8px' }}>
@@ -198,12 +194,12 @@ function CompletionPopup({ prevMode, nextMode, onContinue }) {
             ? 'Je hebt het verdiend — neem een lange pauze.'
             : nextMode === 'break'
             ? 'Neem even een korte pauze.'
-            : 'Klaar voor de volgende focus sessie?'
-          }
+            : 'Klaar voor de volgende focus sessie?'}
         </p>
 
-        <button onClick={onContinue} style={{
-          width: '100%', padding: '14px', borderRadius: 14, border: 'none',
+        {/* Start button — dismisses AND starts timer */}
+        <button onClick={onStart} style={{
+          width: '100%', padding: '14px', borderRadius: 14,
           background: `rgba(${modeRgb}, 0.2)`,
           border: `1px solid rgba(${modeRgb}, 0.4)`,
           color: modeColor, cursor: 'pointer',
@@ -213,7 +209,9 @@ function CompletionPopup({ prevMode, nextMode, onContinue }) {
         }}>
           {nextMode === 'work' ? '▶ Start Focus' : nextMode === 'break' ? '☕ Start Pauze' : '🌙 Start Lange Pauze'}
         </button>
-        <button onClick={onContinue} style={{
+
+        {/* Skip — just dismisses, timer stays paused */}
+        <button onClick={onSkip} style={{
           marginTop: 10, background: 'none', border: 'none', cursor: 'pointer',
           color: 'rgba(255,255,255,0.3)', fontSize: 13, padding: '6px',
         }}>
@@ -458,7 +456,18 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, userId }
     dispatch({ type: 'TOGGLE_NOTIF' })
   }
 
-  const dismissPopup = () => setPopup(null)
+  const skipPopup = () => setPopup(null)
+
+  const startAfterPopup = () => {
+    setPopup(null)
+    // Start the timer for the next mode (state already advanced by COMPLETE)
+    const s = stateRef.current
+    const endTime = Date.now() + s.seconds * 1000
+    endTimeRef.current = endTime
+    dispatch({ type: 'SET_RUN', value: true })
+    onModeChange?.(s.mode !== 'work')
+    broadcastState({ ...s, running: true }, endTime)
+  }
 
   // ── Display ───────────────────────────────────────────────────────────────
   const {
@@ -488,7 +497,8 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, userId }
         <CompletionPopup
           prevMode={popup.prevMode}
           nextMode={popup.nextMode}
-          onContinue={dismissPopup}
+          onStart={startAfterPopup}
+          onSkip={skipPopup}
         />
       )}
 

@@ -268,6 +268,34 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, defaultV
         <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', position: 'relative' }}>
           <div style={{ position: 'relative', height: `${24 * HOUR_H}px` }}>
 
+            {/* Ochtend / Middag / Avond achtergrondzones */}
+            {[
+              { start: 0,  end: 6,  color: 'rgba(30,20,60,0.28)',   label: '' },           // nacht (donkerblauw)
+              { start: 6,  end: 12, color: 'rgba(255,200,80,0.045)', label: 'Ochtend' },    // ochtend (zacht geel)
+              { start: 12, end: 18, color: 'rgba(0,180,255,0.035)',  label: 'Middag' },     // middag (lichtblauw)
+              { start: 18, end: 24, color: 'rgba(120,60,200,0.055)', label: 'Avond' },      // avond (zacht paars)
+            ].map(({ start, end, color, label }) => (
+              <div key={start} style={{
+                position: 'absolute',
+                top: `${start * HOUR_H}px`,
+                left: `${TIME_COL}px`,
+                right: 0,
+                height: `${(end - start) * HOUR_H}px`,
+                background: color,
+                pointerEvents: 'none',
+                zIndex: 0,
+              }}>
+                {label && (
+                  <span style={{
+                    position: 'absolute', top: 6, right: 8,
+                    fontSize: 9, fontWeight: 600, letterSpacing: '0.08em',
+                    color: 'rgba(255,255,255,0.12)', textTransform: 'uppercase',
+                    userSelect: 'none',
+                  }}>{label}</span>
+                )}
+              </div>
+            ))}
+
             {/* Hour lines + labels */}
             {Array.from({ length: 24 }, (_, h) => (
               <React.Fragment key={h}>
