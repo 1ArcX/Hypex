@@ -23,6 +23,33 @@ function addFocusMins(mins) {
   } catch { return 0 }
 }
 
+// ── Supabase stats storage (per account) ─────────────────────────────────────
+const STATS_BUCKET = 'user-data'
+
+async function saveStatsToCloud(userId, todayMins, totalSessions) {
+  if (!userId) return
+  try {
+    const key = getTodayKey()
+    const existing = JSON.parse(localStorage.getItem(LS_STATS)) || {}
+    existing[key] = todayMins
+    const payload = JSON.stringify({ stats: existing, totalSessions })
+    await supabase.storage.from(STATS_BUCKET)
+      .upload(`${userId}/pomodoro-stats.json`, payload, {
+        upsert: true, contentType: 'application/json',
+      })
+  } catch {}
+}
+
+async function loadStatsFromCloud(userId) {
+  if (!userId) return null
+  try {
+    const { data, error } = await supabase.storage.from(STATS_BUCKET)
+      .download(`${userId}/pomodoro-stats.json`)
+    if (error || !data) return null
+    return JSON.parse(await data.text())
+  } catch { return null }
+}
+
 function loadSaved() {
   try { return JSON.parse(localStorage.getItem(LS_KEY)) } catch { return null }
 }
@@ -225,15 +252,39 @@ function CompletionPopup({ prevMode, nextMode, onStart, onSkip }) {
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function PomodoroTimer({ onModeChange, onPomodoroActive, userId }) {
   const [state, dispatch] = useReducer(reducer, INIT)
-  const stateRef    = useRef(state)
-  const endTimeRef  = useRef(null)
-  const intervalRef = useRef(null)
-  const channelRef  = useRef(null)
+  const stateRef           = useRef(state)
+  const endTimeRef         = useRef(null)
+  const intervalRef        = useRef(null)
+  const channelRef         = useRef(null)
+  const localControlUntil  = useRef(0)
+
+  // Call this whenever the user takes a local action — blocks remote sync for 30s
+  const claimLocalControl = () => { localControlUntil.current = Date.now() + 30_000 }
 
   // Popup state
   const [popup, setPopup] = useState(null)   // { prevMode, nextMode } | null
 
   useEffect(() => { stateRef.current = state }, [state])
+
+  // ── Load stats from cloud on mount ────────────────────────────────────────
+  useEffect(() => {
+    if (!userId) return
+    loadStatsFromCloud(userId).then(cloud => {
+      if (!cloud) return
+      // Merge cloud stats into localStorage (take max for each day)
+      try {
+        const local = JSON.parse(localStorage.getItem(LS_STATS)) || {}
+        let changed = false
+        for (const [day, mins] of Object.entries(cloud.stats || {})) {
+          if ((local[day] || 0) < mins) { local[day] = mins; changed = true }
+        }
+        if (changed) localStorage.setItem(LS_STATS, JSON.stringify(local))
+        const todayMins = local[getTodayKey()] || 0
+        const totalSessions = cloud.totalSessions ?? stateRef.current.totalSessions
+        dispatch({ type: 'RESTORE', payload: { ...stateRef.current, todayMins, totalSessions } })
+      } catch {}
+    })
+  }, [userId])
 
   // ── Restore saved state ──────────────────────────────────────────────────
   useEffect(() => {
@@ -296,6 +347,8 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, userId }
 
       const todayMins = s.mode === 'work' ? addFocusMins(s.workMins) : getTodayMins()
       const nextMode  = calcNextMode(s.mode, s.sessionsInCycle, s.sessionsPerLong)
+      const newTotal  = s.mode === 'work' ? s.totalSessions + 1 : s.totalSessions
+      saveStatsToCloud(userId, todayMins, newTotal)
 
       if (s.notifEnabled) {
         const title = s.mode === 'work' ? 'Focus sessie klaar! 🎯' : 'Pauze voorbij!'
@@ -367,6 +420,8 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, userId }
 
   function applyRemoteState(remote) {
     if (!remote) return
+    // User recently touched controls locally — ignore remote for 30s
+    if (Date.now() < localControlUntil.current) return
     const local = stateRef.current
     // Always accept if remote is running; accept paused state only when local is also paused
     if (!remote.running && local.running) return
@@ -424,6 +479,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, userId }
 
   // ── Controls ──────────────────────────────────────────────────────────────
   const toggleRunning = () => {
+    claimLocalControl()
     // Warm up audio context on user gesture
     try { getAudioCtx().resume() } catch {}
 
@@ -444,12 +500,14 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, userId }
   }
 
   const reset = () => {
+    claimLocalControl()
     endTimeRef.current = null
     dispatch({ type: 'RESET' })
     broadcastState({ ...state, running: false, seconds: getMins(state) * 60 }, null)
   }
 
   const skip = () => {
+    claimLocalControl()
     endTimeRef.current = null
     const next = calcNextMode(state.mode, state.sessionsInCycle, state.sessionsPerLong)
     dispatch({ type: 'SKIP' })
@@ -473,6 +531,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, userId }
   const skipPopup = () => setPopup(null)
 
   const startAfterPopup = () => {
+    claimLocalControl()
     setPopup(null)
     // Start the timer for the next mode (state already advanced by COMPLETE)
     const s = stateRef.current
