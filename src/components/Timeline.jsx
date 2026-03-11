@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabaseClient'
 import { Plus, ChevronLeft, ChevronRight, X, Save, Trash2 } from 'lucide-react'
 
-const HOUR_H = 56       // px per hour in the time grid
-const TIME_COL = 48     // px for the time label column
+const HOUR_H = 56
+const TIME_COL = 48
 const MAGISTER_KEY = 'magister_credentials'
 
 const MONTHS_FULL = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December']
@@ -28,6 +28,43 @@ function timeStrToMins(str) {
   const [h, m] = str.split(':').map(Number)
   return (h||0)*60 + (m||0)
 }
+function fmtTime(date) {
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+// Compute side-by-side layout for overlapping items (Apple Calendar style)
+function layoutOverlaps(items) {
+  if (!items.length) return []
+  const sorted = [...items].sort((a, b) =>
+    a.startMins !== b.startMins ? a.startMins - b.startMins : b.endMins - a.endMins
+  )
+  const colEnds = []
+  for (const item of sorted) {
+    let placed = false
+    for (let ci = 0; ci < colEnds.length; ci++) {
+      if (colEnds[ci] <= item.startMins) {
+        item._col = ci
+        colEnds[ci] = item.endMins
+        placed = true
+        break
+      }
+    }
+    if (!placed) {
+      item._col = colEnds.length
+      colEnds.push(item.endMins)
+    }
+  }
+  for (const item of sorted) {
+    let maxCol = item._col
+    for (const other of sorted) {
+      if (other.startMins < item.endMins && other.endMins > item.startMins) {
+        maxCol = Math.max(maxCol, other._col)
+      }
+    }
+    item._colTotal = maxCol + 1
+  }
+  return sorted
+}
 
 const emptyForm = (date, hour) => ({
   title: '', description: '',
@@ -37,7 +74,7 @@ const emptyForm = (date, hour) => ({
   color: '#818CF8', recurrence: '', recurrence_days: []
 })
 
-export default function Timeline({ userId, tasks, subjects, onToggleTask, onEditTask }) {
+export default function Timeline({ userId, tasks, subjects, onEditTask }) {
   const [view, setView] = useState('week')
   const [current, setCurrent] = useState(new Date())
   const [events, setEvents] = useState([])
@@ -45,6 +82,8 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask, onEdit
   const [form, setForm] = useState(emptyForm(new Date()))
   const [saving, setSaving] = useState(false)
   const [magisterLessons, setMagisterLessons] = useState([])
+  const [lessonDetail, setLessonDetail] = useState(null)
+  const [scheduleVersion, setScheduleVersion] = useState(0)
   const scrollRef = useRef(null)
   const now = new Date()
 
@@ -57,14 +96,29 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask, onEdit
     }
   }, [view])
 
-  // Fetch Magister schedule for the visible range, cached per date-range in sessionStorage
+  // Listen for Magister login → clear cache and re-fetch schedule
+  useEffect(() => {
+    const handler = () => {
+      Object.keys(sessionStorage)
+        .filter(k => k.startsWith('magister_sched_'))
+        .forEach(k => sessionStorage.removeItem(k))
+      setScheduleVersion(v => v + 1)
+    }
+    window.addEventListener('magisterLogin', handler)
+    return () => window.removeEventListener('magisterLogin', handler)
+  }, [])
+
+  // Fetch Magister schedule for visible range, cached per range in sessionStorage
   useEffect(() => {
     const days = view === 'week' ? getWeekDays(current) : [current]
     const start = toDateStr(days[0])
     const end = toDateStr(days[days.length - 1])
     const cacheKey = `magister_sched_${start}_${end}`
     const cached = sessionStorage.getItem(cacheKey)
-    if (cached) { try { setMagisterLessons(JSON.parse(cached)) } catch {} ; return }
+    if (cached && scheduleVersion === 0) {
+      try { setMagisterLessons(JSON.parse(cached)) } catch {}
+      return
+    }
     const creds = (() => { try { return JSON.parse(localStorage.getItem(MAGISTER_KEY)) } catch { return null } })()
     if (!creds) return
     fetch('/.netlify/functions/magister', {
@@ -77,7 +131,7 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask, onEdit
         setMagisterLessons(data)
       }
     }).catch(() => {})
-  }, [view, toDateStr(current)])
+  }, [view, toDateStr(current), scheduleVersion])
 
   const fetchEvents = async () => {
     const { data } = await supabase.from('calendar_events').select('*').eq('user_id', userId)
@@ -175,6 +229,7 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask, onEdit
     const nowTop = (nowMins / 60) * HOUR_H
     const showNowLine = days.some(d => isSameDay(d, now))
     const isDay = days.length === 1
+    const N = days.length
 
     return (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
@@ -182,37 +237,21 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask, onEdit
         {/* Day header row */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: `${TIME_COL}px repeat(${days.length}, 1fr)`,
+          gridTemplateColumns: `${TIME_COL}px repeat(${N}, 1fr)`,
           borderBottom: '1px solid rgba(255,255,255,0.07)',
           flexShrink: 0,
         }}>
-          <div /> {/* corner */}
+          <div />
           {days.map((d, i) => {
             const isToday = isSameDay(d, now)
             return (
               <div key={i} style={{ padding: '8px 6px', textAlign: 'center' }}>
-                <div style={{
-                  fontSize: '11px', fontWeight: 500, letterSpacing: '0.06em',
-                  color: isToday ? 'var(--accent, #00FFD1)' : 'rgba(255,255,255,0.35)',
-                  marginBottom: '4px', textTransform: 'uppercase'
-                }}>
+                <div style={{ fontSize: '11px', fontWeight: 500, letterSpacing: '0.06em', color: isToday ? 'var(--accent, #00FFD1)' : 'rgba(255,255,255,0.35)', marginBottom: '4px', textTransform: 'uppercase' }}>
                   {DAYS_SHORT[d.getDay()]}
                 </div>
                 <div
                   onClick={() => { if (!isDay) { setCurrent(d); setView('day') } }}
-                  style={{
-                    width: isDay ? '36px' : '28px',
-                    height: isDay ? '36px' : '28px',
-                    borderRadius: '50%',
-                    margin: '0 auto',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: isToday ? 'var(--accent, #00FFD1)' : 'transparent',
-                    color: isToday ? '#000' : 'rgba(255,255,255,0.85)',
-                    fontSize: isDay ? '18px' : '13px',
-                    fontWeight: isToday ? 700 : 400,
-                    cursor: isDay ? 'default' : 'pointer',
-                    transition: 'background 0.15s'
-                  }}>
+                  style={{ width: isDay ? '36px' : '28px', height: isDay ? '36px' : '28px', borderRadius: '50%', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', background: isToday ? 'var(--accent, #00FFD1)' : 'transparent', color: isToday ? '#000' : 'rgba(255,255,255,0.85)', fontSize: isDay ? '18px' : '13px', fontWeight: isToday ? 700 : 400, cursor: isDay ? 'default' : 'pointer', transition: 'background 0.15s' }}>
                   {d.getDate()}
                 </div>
               </div>
@@ -224,47 +263,15 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask, onEdit
         <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', position: 'relative' }}>
           <div style={{ position: 'relative', height: `${24 * HOUR_H}px` }}>
 
-            {/* Hour lines + time labels */}
+            {/* Hour lines + labels */}
             {Array.from({ length: 24 }, (_, h) => (
               <React.Fragment key={h}>
-                {/* Time label */}
-                <div style={{
-                  position: 'absolute',
-                  top: `${h * HOUR_H}px`,
-                  left: 0,
-                  width: `${TIME_COL}px`,
-                  height: `${HOUR_H}px`,
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  justifyContent: 'flex-end',
-                  paddingRight: '10px',
-                  paddingTop: h === 0 ? '0' : '-6px',
-                  boxSizing: 'border-box',
-                  pointerEvents: 'none',
-                  transform: h === 0 ? 'none' : 'translateY(-8px)'
-                }}>
-                  <span style={{
-                    fontSize: '10px',
-                    color: 'rgba(255,255,255,0.22)',
-                    fontVariantNumeric: 'tabular-nums',
-                    lineHeight: 1,
-                    userSelect: 'none'
-                  }}>
+                <div style={{ position: 'absolute', top: `${h * HOUR_H}px`, left: 0, width: `${TIME_COL}px`, height: `${HOUR_H}px`, display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end', paddingRight: '10px', boxSizing: 'border-box', pointerEvents: 'none', transform: h === 0 ? 'none' : 'translateY(-8px)' }}>
+                  <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.22)', fontVariantNumeric: 'tabular-nums', lineHeight: 1, userSelect: 'none' }}>
                     {h === 0 ? '' : `${pad(h)}:00`}
                   </span>
                 </div>
-
-                {/* Hour row (clickable per column) */}
-                <div style={{
-                  position: 'absolute',
-                  top: `${h * HOUR_H}px`,
-                  left: `${TIME_COL}px`,
-                  right: 0,
-                  height: `${HOUR_H}px`,
-                  borderTop: '1px solid rgba(255,255,255,0.05)',
-                  display: 'grid',
-                  gridTemplateColumns: `repeat(${days.length}, 1fr)`,
-                }}>
+                <div style={{ position: 'absolute', top: `${h * HOUR_H}px`, left: `${TIME_COL}px`, right: 0, height: `${HOUR_H}px`, borderTop: '1px solid rgba(255,255,255,0.05)', display: 'grid', gridTemplateColumns: `repeat(${N}, 1fr)` }}>
                   {days.map((d, di) => (
                     <div key={di}
                       onClick={() => openNew(d, h)}
@@ -276,147 +283,119 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask, onEdit
                         await supabase.from('tasks').update({ time: `${pad(h)}:00`, date: toDateStr(d) }).eq('id', taskId)
                         window.dispatchEvent(new Event('refreshTasks'))
                       }}
-                      style={{
-                        borderLeft: di > 0 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                        cursor: 'pointer',
-                        // half-hour dashed line
-                        backgroundImage: 'linear-gradient(to bottom, transparent calc(50% - 0.5px), rgba(255,255,255,0.03) calc(50% - 0.5px), rgba(255,255,255,0.03) calc(50% + 0.5px), transparent calc(50% + 0.5px))'
-                      }}
+                      style={{ borderLeft: di > 0 ? '1px solid rgba(255,255,255,0.04)' : 'none', cursor: 'pointer', backgroundImage: 'linear-gradient(to bottom, transparent calc(50% - 0.5px), rgba(255,255,255,0.03) calc(50% - 0.5px), rgba(255,255,255,0.03) calc(50% + 0.5px), transparent calc(50% + 0.5px))' }}
                     />
                   ))}
                 </div>
               </React.Fragment>
             ))}
 
-            {/* Events + Tasks per day column */}
+            {/* Events + Lessons + Tasks per day, with overlap layout */}
             {days.map((d, di) => {
               const colEvents = getEventsForDay(d)
               const colTasks = getTasksForDay(d)
               const colLessons = getMagisterLessonsForDay(d)
-              const colLeft = `calc(${TIME_COL}px + ${di / days.length * 100}%)`
-              const colWidth = `calc(${100 / days.length}% - 4px)`
+
+              // Build unified item list for overlap computation
+              const allItems = [
+                ...colLessons.map((les, li) => {
+                  const s = new Date(les.start), en = new Date(les.einde || les.start)
+                  const startMins = s.getHours()*60 + s.getMinutes()
+                  const endMins = Math.max(startMins + 30, en.getHours()*60 + en.getMinutes())
+                  return { type: 'lesson', key: `les-${di}-${li}`, startMins, endMins, data: les }
+                }),
+                ...colEvents.map(ev => {
+                  const s = new Date(ev.start_time), en = new Date(ev.end_time)
+                  const startMins = s.getHours()*60 + s.getMinutes()
+                  const endMins = Math.max(startMins + 30, en.getHours()*60 + en.getMinutes())
+                  return { type: 'event', key: `ev-${ev.id}`, startMins, endMins, data: ev }
+                }),
+                ...colTasks.map(task => {
+                  const timeStr = task.start_time || task.time || '08:00'
+                  const startMins = timeStrToMins(timeStr)
+                  const endMins = task.end_time ? timeStrToMins(task.end_time) : startMins + 60
+                  return { type: 'task', key: `task-${task.id}`, startMins, endMins, data: task }
+                }),
+              ]
+
+              const laid = layoutOverlaps(allItems)
 
               return (
                 <React.Fragment key={`col-${di}`}>
-                  {colEvents.map(ev => {
-                    const s = new Date(ev.start_time), en = new Date(ev.end_time)
-                    const startMins = s.getHours()*60 + s.getMinutes()
-                    const endMins = Math.max(startMins + 30, en.getHours()*60 + en.getMinutes())
-                    const top = (startMins / 60) * HOUR_H
-                    const height = Math.max(22, ((endMins - startMins) / 60) * HOUR_H - 2)
-                    const showTime = height >= 36
-                    return (
-                      <div key={ev.id}
-                        onClick={e => openEditEvent(ev, e)}
-                        style={{
-                          position: 'absolute',
-                          top: `${top}px`,
-                          height: `${height}px`,
-                          left: colLeft,
-                          width: colWidth,
-                          background: ev.color + '22',
-                          borderLeft: `3px solid ${ev.color}`,
-                          borderRadius: '5px',
-                          padding: '3px 7px',
-                          overflow: 'hidden',
-                          cursor: 'pointer',
-                          zIndex: 2,
-                          boxSizing: 'border-box',
-                          marginLeft: '2px'
-                        }}>
-                        <div style={{ fontSize: '11px', fontWeight: 600, color: ev.color, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {ev.title}
-                        </div>
-                        {showTime && (
-                          <div style={{ fontSize: '10px', color: ev.color + 'bb', lineHeight: 1.2, marginTop: '1px' }}>
-                            {pad(s.getHours())}:{pad(s.getMinutes())} – {pad(en.getHours())}:{pad(en.getMinutes())}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-
-                  {colLessons.map((les, li) => {
-                    const s = new Date(les.start), en = new Date(les.einde || les.start)
-                    const startMins = s.getHours()*60 + s.getMinutes()
-                    const endMins = Math.max(startMins + 30, en.getHours()*60 + en.getMinutes())
-                    const top = (startMins / 60) * HOUR_H
-                    const height = Math.max(22, ((endMins - startMins) / 60) * HOUR_H - 2)
+                  {laid.map(item => {
+                    const top = (item.startMins / 60) * HOUR_H
+                    const height = Math.max(22, ((item.endMins - item.startMins) / 60) * HOUR_H - 2)
                     const showDetail = height >= 36
-                    const cancelled = les.uitgevallen
-                    const color = cancelled ? '#FF6B6B' : '#FACC15'
-                    return (
-                      <div key={`les-${li}`}
-                        style={{
-                          position: 'absolute',
-                          top: `${top}px`,
-                          height: `${height}px`,
-                          left: colLeft,
-                          width: colWidth,
-                          background: color + '18',
-                          borderLeft: `3px solid ${cancelled ? '#FF6B6B99' : '#FACC1599'}`,
-                          borderRadius: '5px',
-                          padding: '3px 7px',
-                          overflow: 'hidden',
-                          cursor: 'default',
-                          zIndex: 1,
-                          boxSizing: 'border-box',
-                          marginLeft: '2px',
-                          opacity: cancelled ? 0.5 : 0.85
-                        }}>
-                        <div style={{ fontSize: '11px', fontWeight: 600, color, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: cancelled ? 'line-through' : 'none' }}>
-                          🎓 {les.vak || 'Les'}
-                        </div>
-                        {showDetail && (
-                          <div style={{ fontSize: '10px', color: color + 'aa', lineHeight: 1.3, marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {les.lokaal ? les.lokaal : ''}{les.docent ? ` · ${les.docent}` : ''}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
+                    // Position within this day column, with sub-column for overlaps
+                    const dayFrac = 1 / N
+                    const subFrac = dayFrac / item._colTotal
+                    const leftPct = (di + item._col / item._colTotal) * dayFrac * 100
+                    const widthPct = subFrac * 100
+                    const leftStyle = `calc(${TIME_COL}px + ${leftPct}%)`
+                    const widthStyle = `calc(${widthPct}% - 4px)`
 
-                  {colTasks.map((task) => {
-                    const timeStr = task.start_time || task.time || '08:00'
-                    const startMins = timeStrToMins(timeStr)
-                    const endMins = task.end_time ? timeStrToMins(task.end_time) : startMins + 60
-                    const top = (startMins / 60) * HOUR_H
-                    const height = Math.max(24, ((endMins - startMins) / 60) * HOUR_H - 2)
-                    const subject = subjects?.find(s => s.id === task.subject_id)
-                    const color = task.completed ? '#4ADE80' : (subject?.color || '#818CF8')
-                    const showSub = height >= 36 && subject
-                    return (
-                      <div key={task.id}
-                        draggable
-                        onDragStart={e => e.dataTransfer.setData('taskId', task.id)}
-                        onClick={e => { e.stopPropagation(); onEditTask?.(task) }}
-                        style={{
-                          position: 'absolute',
-                          top: `${top}px`,
-                          height: `${height}px`,
-                          left: colLeft,
-                          width: colWidth,
-                          background: color + '18',
-                          borderLeft: `3px solid ${color}`,
-                          borderRadius: '5px',
-                          padding: '3px 7px',
-                          overflow: 'hidden',
-                          cursor: 'pointer',
-                          zIndex: 3,
-                          boxSizing: 'border-box',
-                          marginLeft: '2px',
-                          opacity: task.completed ? 0.55 : 1
-                        }}>
-                        <div style={{ fontSize: '11px', fontWeight: 600, color, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: task.completed ? 'line-through' : 'none' }}>
-                          {task.completed ? '✓ ' : ''}{task.title}
-                        </div>
-                        {showSub && (
-                          <div style={{ fontSize: '10px', color: color + 'aa', lineHeight: 1.2, marginTop: '1px' }}>
-                            {subject.name}
+                    if (item.type === 'lesson') {
+                      const les = item.data
+                      const cancelled = les.uitgevallen
+                      const color = cancelled ? '#FF6B6B' : '#FACC15'
+                      return (
+                        <div key={item.key}
+                          onClick={e => { e.stopPropagation(); setLessonDetail(les) }}
+                          style={{ position: 'absolute', top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, background: color + '18', borderLeft: `3px solid ${cancelled ? '#FF6B6B99' : '#FACC1599'}`, borderRadius: '5px', padding: '3px 7px', overflow: 'hidden', cursor: 'pointer', zIndex: 1, boxSizing: 'border-box', marginLeft: '2px', opacity: cancelled ? 0.5 : 0.85 }}>
+                          <div style={{ fontSize: '11px', fontWeight: 600, color, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: cancelled ? 'line-through' : 'none' }}>
+                            🎓 {les.vak || 'Les'}
                           </div>
-                        )}
-                      </div>
-                    )
+                          {showDetail && (
+                            <div style={{ fontSize: '10px', color: color + 'aa', lineHeight: 1.3, marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {[les.lokaal, les.docent].filter(Boolean).join(' · ')}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    }
+
+                    if (item.type === 'event') {
+                      const ev = item.data
+                      const s = new Date(ev.start_time), en = new Date(ev.end_time)
+                      return (
+                        <div key={item.key}
+                          onClick={e => openEditEvent(ev, e)}
+                          style={{ position: 'absolute', top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, background: ev.color + '22', borderLeft: `3px solid ${ev.color}`, borderRadius: '5px', padding: '3px 7px', overflow: 'hidden', cursor: 'pointer', zIndex: 2, boxSizing: 'border-box', marginLeft: '2px' }}>
+                          <div style={{ fontSize: '11px', fontWeight: 600, color: ev.color, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {ev.title}
+                          </div>
+                          {showDetail && (
+                            <div style={{ fontSize: '10px', color: ev.color + 'bb', lineHeight: 1.2, marginTop: '1px' }}>
+                              {fmtTime(s)} – {fmtTime(en)}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    }
+
+                    if (item.type === 'task') {
+                      const task = item.data
+                      const subject = subjects?.find(s => s.id === task.subject_id)
+                      const color = task.completed ? '#4ADE80' : (subject?.color || '#818CF8')
+                      return (
+                        <div key={item.key}
+                          draggable
+                          onDragStart={e => e.dataTransfer.setData('taskId', task.id)}
+                          onClick={e => { e.stopPropagation(); onEditTask?.(task) }}
+                          style={{ position: 'absolute', top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, background: color + '18', borderLeft: `3px solid ${color}`, borderRadius: '5px', padding: '3px 7px', overflow: 'hidden', cursor: 'pointer', zIndex: 3, boxSizing: 'border-box', marginLeft: '2px', opacity: task.completed ? 0.55 : 1 }}>
+                          <div style={{ fontSize: '11px', fontWeight: 600, color, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: task.completed ? 'line-through' : 'none' }}>
+                            {task.completed ? '✓ ' : ''}{task.title}
+                          </div>
+                          {showDetail && subject && (
+                            <div style={{ fontSize: '10px', color: color + 'aa', lineHeight: 1.2, marginTop: '1px' }}>
+                              {subject.name}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    }
+
+                    return null
                   })}
                 </React.Fragment>
               )
@@ -424,21 +403,8 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask, onEdit
 
             {/* Current time line */}
             {showNowLine && (
-              <div style={{
-                position: 'absolute',
-                top: `${nowTop}px`,
-                left: `${TIME_COL - 6}px`,
-                right: 0,
-                height: '2px',
-                background: '#FF453A',
-                zIndex: 10,
-                pointerEvents: 'none'
-              }}>
-                <div style={{
-                  width: '10px', height: '10px', borderRadius: '50%',
-                  background: '#FF453A',
-                  position: 'absolute', left: '-1px', top: '-4px'
-                }} />
+              <div style={{ position: 'absolute', top: `${nowTop}px`, left: `${TIME_COL - 6}px`, right: 0, height: '2px', background: '#FF453A', zIndex: 10, pointerEvents: 'none' }}>
+                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#FF453A', position: 'absolute', left: '-1px', top: '-4px' }} />
               </div>
             )}
           </div>
@@ -459,7 +425,6 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask, onEdit
 
     return (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
-        {/* Day headers */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
           {['Ma','Di','Wo','Do','Vr','Za','Zo'].map(d => (
             <div key={d} style={{ padding: '8px 4px', textAlign: 'center', fontSize: '11px', fontWeight: 500, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
@@ -467,58 +432,35 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask, onEdit
             </div>
           ))}
         </div>
-
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', flex: 1 }}>
           {cells.map((date, i) => {
             if (!date) return <div key={i} style={{ borderRight: '1px solid rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(0,0,0,0.1)' }} />
             const evs = getEventsForDay(date)
             const tsks = getTasksForDay(date)
-            const all = [...evs, ...tsks]
+            const les = getMagisterLessonsForDay(date)
+            const all = [...evs, ...tsks, ...les]
             const isToday = isSameDay(date, now)
             const isWeekend = date.getDay() === 0 || date.getDay() === 6
             return (
-              <div key={i}
-                onClick={() => { setCurrent(date); setView('day') }}
-                style={{
-                  padding: '4px 5px',
-                  borderRight: '1px solid rgba(255,255,255,0.04)',
-                  borderBottom: '1px solid rgba(255,255,255,0.04)',
-                  cursor: 'pointer',
-                  background: isToday ? 'rgba(0,255,209,0.04)' : isWeekend ? 'rgba(255,255,255,0.01)' : 'transparent',
-                  minHeight: '72px'
-                }}>
+              <div key={i} onClick={() => { setCurrent(date); setView('day') }}
+                style={{ padding: '4px 5px', borderRight: '1px solid rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', background: isToday ? 'rgba(0,255,209,0.04)' : isWeekend ? 'rgba(255,255,255,0.01)' : 'transparent', minHeight: '72px' }}>
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '4px' }}>
-                  <div style={{
-                    width: '22px', height: '22px', borderRadius: '50%',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: isToday ? 'var(--accent, #00FFD1)' : 'transparent',
-                    color: isToday ? '#000' : isWeekend ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.75)',
-                    fontSize: '11px', fontWeight: isToday ? 700 : 400
-                  }}>
+                  <div style={{ width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: isToday ? 'var(--accent, #00FFD1)' : 'transparent', color: isToday ? '#000' : isWeekend ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.75)', fontSize: '11px', fontWeight: isToday ? 700 : 400 }}>
                     {date.getDate()}
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                   {all.slice(0, 3).map((item, idx) => {
-                    const color = item.color || subjects?.find(s => s.id === item.subject_id)?.color || '#818CF8'
+                    const color = item.color || (item.vak ? '#FACC15' : subjects?.find(s => s.id === item.subject_id)?.color || '#818CF8')
+                    const label = item.title || item.vak || '–'
                     return (
-                      <div key={item.id || idx} style={{
-                        background: color + '28',
-                        borderLeft: `2px solid ${color}`,
-                        borderRadius: '3px',
-                        padding: '1px 5px',
-                        fontSize: '10px', color,
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        fontWeight: 500
-                      }}>
-                        {item.title}
+                      <div key={item.id || idx} style={{ background: color + '28', borderLeft: `2px solid ${color}`, borderRadius: '3px', padding: '1px 5px', fontSize: '10px', color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>
+                        {label}
                       </div>
                     )
                   })}
                   {all.length > 3 && (
-                    <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)', paddingLeft: '5px' }}>
-                      +{all.length - 3} meer
-                    </div>
+                    <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)', paddingLeft: '5px' }}>+{all.length - 3} meer</div>
                   )}
                 </div>
               </div>
@@ -532,34 +474,24 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask, onEdit
   const weekDays = getWeekDays(current)
 
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden',
-      borderRadius: '16px', background: 'rgba(255,255,255,0.015)'
-    }}>
-      {/* ── Toolbar ── */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.07)',
-        flexShrink: 0, gap: '8px', flexWrap: 'wrap'
-      }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderRadius: '16px', background: 'rgba(255,255,255,0.015)' }}>
+      {/* Toolbar */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0, gap: '8px', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <button onClick={() => setCurrent(new Date())}
             style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)', fontSize: '11px', cursor: 'pointer', fontWeight: 500 }}>
             Vandaag
           </button>
-          <button onClick={() => navigate(-1)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', padding: '4px', display: 'flex', borderRadius: '6px' }}>
+          <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', padding: '4px', display: 'flex', borderRadius: '6px' }}>
             <ChevronLeft size={16} />
           </button>
-          <button onClick={() => navigate(1)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', padding: '4px', display: 'flex', borderRadius: '6px' }}>
+          <button onClick={() => navigate(1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', padding: '4px', display: 'flex', borderRadius: '6px' }}>
             <ChevronRight size={16} />
           </button>
           <span style={{ color: 'white', fontWeight: 600, fontSize: '13px', whiteSpace: 'nowrap' }}>
             {headerLabel()}
           </span>
         </div>
-
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '2px', border: '1px solid rgba(255,255,255,0.08)' }}>
             {[['day','Dag'], ['week','Week'], ['month','Maand']].map(([v, label]) => (
@@ -576,20 +508,86 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask, onEdit
         </div>
       </div>
 
-      {/* ── View content ── */}
+      {/* View content */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {view === 'month' && <MonthView />}
         {view === 'week'  && <TimeGrid days={weekDays} />}
         {view === 'day'   && <TimeGrid days={[current]} />}
       </div>
 
-      {/* ── Event modal ── */}
+      {/* Lesson detail popup */}
+      {lessonDetail && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(12px)', padding: '16px' }}
+          onClick={() => setLessonDetail(null)}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '340px', padding: '20px' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '18px' }}>🎓</span>
+                <span style={{ color: 'white', fontWeight: 700, fontSize: '15px' }}>
+                  {lessonDetail.vak || 'Les'}
+                </span>
+                {lessonDetail.uitgevallen && (
+                  <span style={{ fontSize: '10px', color: '#FF6B6B', background: 'rgba(255,80,80,0.15)', border: '1px solid rgba(255,80,80,0.3)', borderRadius: '6px', padding: '1px 6px' }}>
+                    Uitgevallen
+                  </span>
+                )}
+              </div>
+              <button onClick={() => setLessonDetail(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}>
+                <X size={16} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {/* Tijd */}
+              {lessonDetail.start && (
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', width: '60px', flexShrink: 0 }}>Tijd</span>
+                  <span style={{ fontSize: '13px', color: 'white', fontWeight: 500 }}>
+                    {fmtTime(new Date(lessonDetail.start))}
+                    {lessonDetail.einde ? ` – ${fmtTime(new Date(lessonDetail.einde))}` : ''}
+                  </span>
+                </div>
+              )}
+              {/* Lokaal */}
+              {lessonDetail.lokaal && (
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', width: '60px', flexShrink: 0 }}>Lokaal</span>
+                  <span style={{ fontSize: '13px', color: 'white', fontWeight: 500 }}>{lessonDetail.lokaal}</span>
+                </div>
+              )}
+              {/* Docent */}
+              {lessonDetail.docent && (
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', width: '60px', flexShrink: 0 }}>Docent</span>
+                  <span style={{ fontSize: '13px', color: 'white', fontWeight: 500 }}>{lessonDetail.docent}</span>
+                </div>
+              )}
+              {/* Huiswerk */}
+              {lessonDetail.huiswerk && (
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', width: '60px', flexShrink: 0, paddingTop: '2px' }}>Huiswerk</span>
+                  <span style={{ fontSize: '12px', color: '#FACC15', fontWeight: 500, lineHeight: 1.4 }}>{lessonDetail.huiswerk}</span>
+                </div>
+              )}
+              {/* Omschrijving */}
+              {lessonDetail.omschrijving && (
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', width: '60px', flexShrink: 0, paddingTop: '2px' }}>Info</span>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', lineHeight: 1.4 }}>{lessonDetail.omschrijving}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Event modal */}
       {modal && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(12px)', padding: '16px' }}
           onClick={() => setModal(null)}>
           <div className="glass-card" style={{ width: '100%', maxWidth: '400px', padding: '24px', maxHeight: '90vh', overflowY: 'auto' }}
             onClick={e => e.stopPropagation()}>
-
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <h2 style={{ color: 'white', fontWeight: 700, fontSize: '16px', margin: 0 }}>
                 {modal.mode === 'edit' ? 'Bewerk event' : 'Nieuw event'}
@@ -598,7 +596,6 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask, onEdit
                 <X size={18} />
               </button>
             </div>
-
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <input className="glass-input" placeholder="Titel *" value={form.title}
                 onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
@@ -636,7 +633,6 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask, onEdit
                   })}
                 </div>
               )}
-              {/* Color picker */}
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 {EVENT_COLORS.map(c => (
                   <button key={c} type="button" onClick={() => setForm(p => ({ ...p, color: c }))}
@@ -644,7 +640,6 @@ export default function Timeline({ userId, tasks, subjects, onToggleTask, onEdit
                 ))}
               </div>
             </div>
-
             <div style={{ display: 'flex', gap: '8px', marginTop: '20px' }}>
               {modal.mode === 'edit' && (
                 <button onClick={handleDelete}

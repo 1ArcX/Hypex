@@ -11,7 +11,6 @@ import { LogOut, GraduationCap } from 'lucide-react'
 import SpotifyWidget from './components/SpotifyWidget'
 import ThemeSettings from './components/ThemeSettings'
 import { Settings } from 'lucide-react'
-import ProfileSetup from './components/ProfileSetup'
 import AdminPanel from './components/AdminPanel'
 import TasksWidget from './components/TasksWidget'
 import MagisterWidget from './components/MagisterWidget'
@@ -45,7 +44,15 @@ export default function App() {
   const fetchProfiles = async () => {
     const { data, error } = await supabase.from('profiles').select('*')
     if (error) console.error('Error fetching profiles:', error)
-    else setProfiles(data || [])
+    else {
+      const rows = data || []
+      setProfiles(rows)
+      // Auto-create profile for new users
+      if (user?.id && !rows.find(p => p.id === user.id)) {
+        await supabase.from('profiles').upsert({ id: user.id, full_name: user.email?.split('@')[0] || 'Student' })
+        fetchProfiles()
+      }
+    }
   }
 
   // ✅ FIX: mounted flag voorkomt state-update na unmount
@@ -79,8 +86,6 @@ export default function App() {
     return profiles.find(p => p.id === user.id) || null
   }, [profiles, user?.id])
 
-  // ✅ FIX: profileReady als computed value, niet als aparte state
-  const profileReady = !!(userProfile?.klas && (userProfile?.vakken?.length || 0) > 0)
 
   // Effect voor accent kleur
   useEffect(() => {
@@ -193,19 +198,6 @@ export default function App() {
   const displayName = userProfile?.full_name || user?.email?.split('@')[0] || 'Student'
   const completedToday = tasks.filter(t => t.completed).length
   const totalToday = tasks.length
-
-  // ✅ FIX: profiles.length > 0 check + profileReady als computed value
-  if (!profileReady && profiles.length > 0) return (
-    <>
-      <div className="mesh-bg"><div className="mesh-blob" /></div>
-      <ProfileSetup
-        userId={user.id}
-        onComplete={async () => {
-          await fetchProfiles()
-        }}
-      />
-    </>
-  )
 
   return (
     <div className="min-h-screen relative">

@@ -147,6 +147,7 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(formCreds))
       setCreds(formCreds)
       setShowSettings(false)
+      window.dispatchEvent(new Event('magisterLogin'))
       syncVakken(formCreds)
       syncLesmateriaal(formCreds)
     } catch (e) {
