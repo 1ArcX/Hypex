@@ -7,13 +7,14 @@ import TaskModal from './components/TaskModal'
 import NotesWidget from './components/NotesWidget'
 import WeatherWidget from './components/WeatherWidget'
 import PomodoroTimer from './components/PomodoroTimer'
-import { LogOut, GraduationCap, Home, CalendarDays, CheckSquare, Layers, FileText } from 'lucide-react'
+import { LogOut, GraduationCap, Home, CalendarDays, CheckSquare, Layers, FileText, Flame } from 'lucide-react'
 import SpotifyWidget from './components/SpotifyWidget'
 import ThemeSettings from './components/ThemeSettings'
 import { Settings } from 'lucide-react'
 import AdminPanel from './components/AdminPanel'
 import TasksWidget from './components/TasksWidget'
 import MagisterWidget from './components/MagisterWidget'
+import HabitsWidget from './components/HabitsWidget'
 import PasswordResetPage from './components/PasswordResetPage'
 import { Shield } from 'lucide-react'
 
@@ -283,6 +284,7 @@ export default function App() {
 
           {/* LEFT COLUMN */}
           <div className="space-y-4 sticky top-20">
+            <HabitsWidget userId={user.id} />
             <NotesWidget userId={user.id} />
             <TasksWidget
               tasks={tasks}
@@ -341,10 +343,11 @@ export default function App() {
           })
 
           const TABS = [
-            { id: 'home',   Icon: Home,         label: 'Home'   },
-            { id: 'agenda', Icon: CalendarDays,  label: 'Agenda' },
-            { id: 'taken',  Icon: CheckSquare,   label: 'Taken'  },
-            { id: 'tools',  Icon: Layers,        label: 'Tools'  },
+            { id: 'home',    Icon: Home,         label: 'Home'      },
+            { id: 'agenda',  Icon: CalendarDays,  label: 'Agenda'    },
+            { id: 'taken',   Icon: CheckSquare,   label: 'Taken'     },
+            { id: 'habits',  Icon: Flame,         label: 'Gewoontes' },
+            { id: 'tools',   Icon: Layers,        label: 'Tools'     },
           ]
 
           return (
@@ -435,6 +438,13 @@ export default function App() {
                         </div>
                       )}
                     </div>
+                  </div>
+                )}
+
+                {/* HABITS */}
+                {mobileTab === 'habits' && (
+                  <div style={{ height: '100%', overflowY: 'auto', padding: '12px 16px 16px' }}>
+                    <HabitsWidget userId={user.id} />
                   </div>
                 )}
 
