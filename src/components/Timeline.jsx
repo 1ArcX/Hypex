@@ -521,14 +521,16 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, defaultV
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '2px', border: '1px solid rgba(255,255,255,0.08)' }}>
-            {[['day','Dag'], ['week','Week'], ['month','Maand']].map(([v, label]) => (
-              <button key={v} onClick={() => setView(v)}
-                style={{ padding: '3px 10px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', border: 'none', background: view === v ? 'rgba(255,255,255,0.15)' : 'transparent', color: view === v ? 'white' : 'rgba(255,255,255,0.4)', fontWeight: view === v ? 600 : 400 }}>
-                {label}
-              </button>
-            ))}
-          </div>
+          {!isMobile && (
+            <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '2px', border: '1px solid rgba(255,255,255,0.08)' }}>
+              {[['day','Dag'], ['week','Week'], ['month','Maand']].map(([v, label]) => (
+                <button key={v} onClick={() => setView(v)}
+                  style={{ padding: '3px 10px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', border: 'none', background: view === v ? 'rgba(255,255,255,0.15)' : 'transparent', color: view === v ? 'white' : 'rgba(255,255,255,0.4)', fontWeight: view === v ? 600 : 400 }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
           <button onClick={() => openNew(current)}
             style={{ background: 'var(--accent, #00FFD1)', border: 'none', borderRadius: '8px', padding: '5px 12px', cursor: 'pointer', color: '#000', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700 }}>
             <Plus size={13} /> Nieuw
