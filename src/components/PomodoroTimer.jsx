@@ -229,8 +229,6 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, userId }
   const endTimeRef  = useRef(null)
   const intervalRef = useRef(null)
   const channelRef  = useRef(null)
-  const broadcastThrottle = useRef(null)
-  const ignoreRemoteRef = useRef(false)
 
   // Popup state
   const [popup, setPopup] = useState(null)   // { prevMode, nextMode } | null
@@ -354,6 +352,39 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, userId }
   ])
 
   // ── Cross-device sync via Supabase Realtime ───────────────────────────────
+  const broadcastState = useCallback((s, endTime) => {
+    if (!channelRef.current || !userId) return
+    channelRef.current.send({
+      type: 'broadcast', event: 'state',
+      payload: {
+        mode: s.mode, workMins: s.workMins, breakMins: s.breakMins,
+        longBreakMins: s.longBreakMins, sessionsPerLong: s.sessionsPerLong,
+        sessionsInCycle: s.sessionsInCycle, totalSessions: s.totalSessions,
+        seconds: s.seconds, running: s.running, task: s.task, endTime,
+      }
+    })
+  }, [userId])
+
+  function applyRemoteState(remote) {
+    if (!remote) return
+    const local = stateRef.current
+    // Always accept if remote is running; accept paused state only when local is also paused
+    if (!remote.running && local.running) return
+    endTimeRef.current = remote.endTime || null
+    dispatch({ type: 'RESTORE', payload: {
+      mode: remote.mode,
+      workMins: remote.workMins, breakMins: remote.breakMins,
+      longBreakMins: remote.longBreakMins, sessionsPerLong: remote.sessionsPerLong,
+      sessionsInCycle: remote.sessionsInCycle, totalSessions: remote.totalSessions,
+      seconds: remote.running && remote.endTime
+        ? Math.max(0, Math.ceil((remote.endTime - Date.now()) / 1000))
+        : remote.seconds,
+      running: remote.running,
+      task: remote.task,
+      soundEnabled: local.soundEnabled, notifEnabled: local.notifEnabled,
+    }})
+  }
+
   useEffect(() => {
     if (!userId) return
 
@@ -362,51 +393,34 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, userId }
     })
 
     channel
+      // Receive state from another device
       .on('broadcast', { event: 'state' }, ({ payload }) => {
-        if (ignoreRemoteRef.current) return
-        const remote = payload
-        if (!remote) return
-        // Accept remote state if remote timer is running or if local is not running
-        const local = stateRef.current
-        if (remote.running || !local.running) {
-          endTimeRef.current = remote.endTime || null
-          dispatch({ type: 'RESTORE', payload: {
-            mode: remote.mode,
-            workMins: remote.workMins, breakMins: remote.breakMins,
-            longBreakMins: remote.longBreakMins, sessionsPerLong: remote.sessionsPerLong,
-            sessionsInCycle: remote.sessionsInCycle, totalSessions: remote.totalSessions,
-            seconds: remote.running && remote.endTime
-              ? Math.max(0, Math.ceil((remote.endTime - Date.now()) / 1000))
-              : remote.seconds,
-            running: remote.running,
-            task: remote.task, soundEnabled: local.soundEnabled, notifEnabled: local.notifEnabled,
-          }})
+        applyRemoteState(payload)
+      })
+      // Another device just connected and is requesting current state
+      .on('broadcast', { event: 'request_state' }, () => {
+        const s = stateRef.current
+        broadcastState(s, s.running ? endTimeRef.current : null)
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          // Ask other devices for their current state
+          channel.send({ type: 'broadcast', event: 'request_state', payload: {} })
         }
       })
-      .subscribe()
 
     channelRef.current = channel
     return () => { supabase.removeChannel(channel) }
-  }, [userId])
+  }, [userId, broadcastState])
 
-  // Broadcast state changes (throttled to avoid flooding)
-  const broadcastState = useCallback((s, endTime) => {
-    if (!channelRef.current || !userId) return
-    clearTimeout(broadcastThrottle.current)
-    broadcastThrottle.current = setTimeout(() => {
-      ignoreRemoteRef.current = true
-      channelRef.current.send({
-        type: 'broadcast', event: 'state',
-        payload: {
-          mode: s.mode, workMins: s.workMins, breakMins: s.breakMins,
-          longBreakMins: s.longBreakMins, sessionsPerLong: s.sessionsPerLong,
-          sessionsInCycle: s.sessionsInCycle, totalSessions: s.totalSessions,
-          seconds: s.seconds, running: s.running, task: s.task, endTime,
-        }
-      })
-      setTimeout(() => { ignoreRemoteRef.current = false }, 300)
-    }, 100)
-  }, [userId])
+  // Periodically broadcast while running (catches devices that connect mid-session)
+  useEffect(() => {
+    if (!state.running || !userId) return
+    const iv = setInterval(() => {
+      broadcastState(stateRef.current, endTimeRef.current)
+    }, 5000)
+    return () => clearInterval(iv)
+  }, [state.running, userId, broadcastState])
 
   // ── Controls ──────────────────────────────────────────────────────────────
   const toggleRunning = () => {
