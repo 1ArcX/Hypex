@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
+import ReactDOM from 'react-dom'
 import { supabase } from '../supabaseClient'
 import { Plus, X, Trash2, Flame, Pencil, ChevronDown, ChevronUp, Minus } from 'lucide-react'
 
@@ -110,7 +111,7 @@ function HabitModal({ habit, onSave, onClose, onDelete, counterConfig }) {
     onSave({ name: name.trim(), icon, color, frequency }, counterData)
   }
 
-  return (
+  return ReactDOM.createPortal(
     <div style={{
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
       backdropFilter: 'blur(10px)', zIndex: 9999,
@@ -300,7 +301,8 @@ function HabitModal({ habit, onSave, onClose, onDelete, counterConfig }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -313,6 +315,8 @@ export default function HabitsWidget({ userId, compact = false }) {
   const [modalHabit, setModalHabit] = useState(null)
   const [loading, setLoading] = useState(true)
   const [animating, setAnimating] = useState({})
+  const channelRef = useRef(null)
+  const ignoreRemoteRef = useRef(false)
 
   const today = todayStr()
   const last7 = getLast7Days()
@@ -360,6 +364,50 @@ export default function HabitsWidget({ userId, compact = false }) {
     Promise.all([fetchHabits(), fetchCompletions()]).then(() => setLoading(false))
   }, [userId, fetchHabits, fetchCompletions])
 
+  // ── Supabase realtime sync voor counter config + values ──────────────────
+  useEffect(() => {
+    if (!userId) return
+    const channel = supabase.channel(`habits:${userId}`, { config: { broadcast: { self: false } } })
+    channel
+      .on('broadcast', { event: 'counter_config' }, ({ payload }) => {
+        if (ignoreRemoteRef.current) return
+        const merged = { ...loadCounterConfig(), ...payload }
+        setCounterConfig(merged)
+        saveCounterConfig(merged)
+      })
+      .on('broadcast', { event: 'counter_values' }, ({ payload }) => {
+        if (ignoreRemoteRef.current) return
+        const merged = { ...loadCounterValues(), ...payload }
+        setCounterValues(merged)
+        saveCounterValues(merged)
+      })
+      .on('broadcast', { event: 'request_state' }, () => {
+        // Another device joined – send current state
+        channel.send({ type: 'broadcast', event: 'counter_config', payload: loadCounterConfig() })
+        channel.send({ type: 'broadcast', event: 'counter_values', payload: loadCounterValues() })
+      })
+      .subscribe(() => {
+        // On connect, request state from other devices
+        channel.send({ type: 'broadcast', event: 'request_state', payload: {} })
+      })
+    channelRef.current = channel
+    return () => { supabase.removeChannel(channel) }
+  }, [userId])
+
+  const broadcastConfig = useCallback((cfg) => {
+    if (!channelRef.current) return
+    ignoreRemoteRef.current = true
+    channelRef.current.send({ type: 'broadcast', event: 'counter_config', payload: cfg })
+    setTimeout(() => { ignoreRemoteRef.current = false }, 200)
+  }, [])
+
+  const broadcastValues = useCallback((vals) => {
+    if (!channelRef.current) return
+    ignoreRemoteRef.current = true
+    channelRef.current.send({ type: 'broadcast', event: 'counter_values', payload: vals })
+    setTimeout(() => { ignoreRemoteRef.current = false }, 200)
+  }, [])
+
   // Toggle check habit
   const toggleCompletion = async (habit) => {
     setAnimating(a => ({ ...a, [habit.id]: true }))
@@ -389,6 +437,7 @@ export default function HabitsWidget({ userId, compact = false }) {
     }
     setCounterValues(newVals)
     saveCounterValues(newVals)
+    broadcastValues(newVals)
 
     // Mark as completion in DB when reaching target, remove when going below
     const target = cfg?.target || 1
@@ -420,11 +469,12 @@ export default function HabitsWidget({ userId, compact = false }) {
       const { data: inserted } = await supabase.from('habits').insert({ ...data, user_id: userId, sort_order: habits.length }).select().single()
       habitId = inserted?.id
     }
-    // Save counter config locally
+    // Save counter config locally + broadcast
     if (habitId) {
       const newCfg = { ...counterConfig, [habitId]: counterData }
       setCounterConfig(newCfg)
       saveCounterConfig(newCfg)
+      broadcastConfig(newCfg)
     }
     setModalHabit(null)
     fetchHabits()
