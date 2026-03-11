@@ -90,10 +90,12 @@ export default function Timeline({ userId, tasks, subjects, onEditTask }) {
   useEffect(() => { fetchEvents() }, [])
 
   useEffect(() => {
-    if (scrollRef.current) {
-      const targetHour = Math.max(0, now.getHours() - 1)
-      scrollRef.current.scrollTop = targetHour * HOUR_H
-    }
+    const t = setTimeout(() => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = Math.max(0, now.getHours() - 1) * HOUR_H
+      }
+    }, 50)
+    return () => clearTimeout(t)
   }, [view])
 
   // Listen for Magister login → clear cache and re-fetch schedule

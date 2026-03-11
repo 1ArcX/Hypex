@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { X, Palette, Sun, Moon, RotateCcw } from 'lucide-react'
+import { X, Palette, RotateCcw } from 'lucide-react'
 
 const PRESETS = [
   { name: 'Neon Cyan', accent: '#00FFD1', bg1: '#0a0a1a', bg2: '#0d1117' },
@@ -10,14 +10,13 @@ const PRESETS = [
   { name: 'Sky Blue', accent: '#60A5FA', bg1: '#0a0f1a', bg2: '#0d1420' },
 ]
 
-export default function ThemeSettings({ onClose, theme, setTheme, darkMode, setDarkMode }) {
+export default function ThemeSettings({ onClose, theme, setTheme }) {
   const [customAccent, setCustomAccent] = useState(theme.accent)
 
   const applyPreset = (preset) => {
     setTheme({ ...theme, ...preset })
     setCustomAccent(preset.accent)
     document.documentElement.style.setProperty('--accent', preset.accent)
-    if (!darkMode) return
     document.documentElement.style.setProperty('--bg1', preset.bg1)
     document.documentElement.style.setProperty('--bg2', preset.bg2)
   }
@@ -49,31 +48,6 @@ export default function ThemeSettings({ onClose, theme, setTheme, darkMode, setD
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}>
             <X size={18} />
           </button>
-        </div>
-
-        {/* Dark / Light mode toggle */}
-        <div className="mb-5">
-          <p className="text-xs font-medium mb-2" style={{ color: 'rgba(255,255,255,0.5)' }}>Weergave</p>
-          <div className="flex gap-2">
-            <button onClick={() => setDarkMode(true)}
-              className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm transition-all"
-              style={{
-                background: darkMode ? 'rgba(0,255,209,0.1)' : 'rgba(255,255,255,0.04)',
-                border: darkMode ? '1px solid rgba(0,255,209,0.3)' : '1px solid rgba(255,255,255,0.08)',
-                color: darkMode ? 'var(--accent)' : 'rgba(255,255,255,0.4)', cursor: 'pointer'
-              }}>
-              <Moon size={14} /> Dark
-            </button>
-            <button onClick={() => setDarkMode(false)}
-              className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm transition-all"
-              style={{
-                background: !darkMode ? 'rgba(0,255,209,0.1)' : 'rgba(255,255,255,0.04)',
-                border: !darkMode ? '1px solid rgba(0,255,209,0.3)' : '1px solid rgba(255,255,255,0.08)',
-                color: !darkMode ? 'var(--accent)' : 'rgba(255,255,255,0.4)', cursor: 'pointer'
-              }}>
-              <Sun size={14} /> Light
-            </button>
-          </div>
         </div>
 
         {/* Kleur presets */}

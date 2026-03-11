@@ -16,8 +16,6 @@
   --input-border: rgba(255, 255, 255, 0.1);
   --hover-bg: rgba(255, 255, 255, 0.04);
   --card-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  --timeline-line: rgba(0, 255, 209, 0.25);
-  --dot-bg: rgba(0, 255, 209, 0.25);
 }
 
 /* ===== LIGHT MODE ===== */
@@ -156,7 +154,7 @@ body {
   width: 600px;
   height: 600px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(0, 255, 209, 0.08) 0%, transparent 70%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 8%, transparent) 0%, transparent 70%);
   top: -100px;
   left: -100px;
   animation: float1 18s ease-in-out infinite;
@@ -206,10 +204,10 @@ body {
 /* ===== NEON CLOCK ===== */
 .neon-clock {
   text-shadow:
-    0 0 10px rgba(0, 255, 209, 0.9),
-    0 0 30px rgba(0, 255, 209, 0.5),
-    0 0 60px rgba(0, 255, 209, 0.2);
-  color: #00FFD1;
+    0 0 10px color-mix(in srgb, var(--accent) 90%, transparent),
+    0 0 30px color-mix(in srgb, var(--accent) 50%, transparent),
+    0 0 60px color-mix(in srgb, var(--accent) 20%, transparent);
+  color: var(--accent);
 }
 
 .neon-clock-orange {
@@ -227,15 +225,15 @@ body {
   top: 0;
   bottom: 0;
   width: 1px;
-  background: linear-gradient(to bottom, transparent, rgba(0, 255, 209, 0.3) 10%, rgba(0, 255, 209, 0.3) 90%, transparent);
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--accent) 30%, transparent) 10%, color-mix(in srgb, var(--accent) 30%, transparent) 90%, transparent);
 }
 
 .task-item {
   transition: all 0.2s ease;
 }
 .task-item:hover {
-  background: rgba(0, 255, 209, 0.06);
-  border-color: rgba(0, 255, 209, 0.3);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
   transform: translateX(4px);
 }
 
@@ -248,9 +246,9 @@ body {
   border-radius: 20px;
   font-size: 11px;
   font-weight: 500;
-  background: rgba(0, 255, 209, 0.1);
-  border: 1px solid rgba(0, 255, 209, 0.2);
-  color: #00FFD1;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  color: var(--accent);
 }
 
 .pomodoro-ring {
