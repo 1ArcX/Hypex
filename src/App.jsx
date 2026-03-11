@@ -317,7 +317,7 @@ export default function App() {
                   onEdit={openEditTask} onDelete={handleDeleteTask} onToggle={handleToggleTask} />,
       weather:  <WeatherWidget />,
       spotify:  <SpotifyWidget />,
-      pomodoro: <PomodoroTimer onModeChange={setIsBreak} />,
+      pomodoro: <PomodoroTimer onModeChange={setIsBreak} userId={user?.id} />,
     }[id] ?? null
   }
 
@@ -517,6 +517,11 @@ export default function App() {
                       </div>
                     )}
 
+                    {/* Habits compact preview */}
+                    <div onClick={() => setMobileTab('habits')} style={{ cursor: 'pointer' }}>
+                      <HabitsWidget userId={user.id} compact />
+                    </div>
+
                     <button className="btn-neon" onClick={() => { setMobileTab('taken'); openNewTask() }}
                       style={{ padding: '13px', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%' }}>
                       + Taak toevoegen
@@ -555,8 +560,8 @@ export default function App() {
                         </div>
                       )}
                       {takenTab === 'notities' && (
-                        <div style={{ height: '100%', overflowY: 'auto' }}>
-                          <NotesWidget userId={user.id} />
+                        <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                          <NotesWidget userId={user.id} fullHeight />
                         </div>
                       )}
                     </div>
@@ -580,8 +585,8 @@ export default function App() {
                     </div>
                     <div style={{ flex: 1, overflow: 'hidden', padding: '12px 16px 16px' }}>
                       <div style={{ height: '100%', overflowY: 'auto' }}>
-                        {toolTab === 'weer'     && <WeatherWidget />}
-                        {toolTab === 'pomodoro' && <PomodoroTimer onModeChange={setIsBreak} onPomodoroActive={setPomodoroActive} />}
+                        {toolTab === 'weer'     && <WeatherWidget stacked />}
+                        {toolTab === 'pomodoro' && <PomodoroTimer onModeChange={setIsBreak} onPomodoroActive={setPomodoroActive} userId={user?.id} />}
                         {toolTab === 'spotify'  && <SpotifyWidget />}
                         {toolTab === 'magister' && <MagisterWidget userId={user.id} onSubjectsSync={() => { fetchSubjects(); fetchProfiles() }} />}
                       </div>

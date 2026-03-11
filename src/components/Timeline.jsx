@@ -88,6 +88,7 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, defaultV
   const [magisterLessons, setMagisterLessons] = useState([])
   const [lessonDetail, setLessonDetail] = useState(null)
   const [scheduleVersion, setScheduleVersion] = useState(0)
+  const [magisterSyncing, setMagisterSyncing] = useState(false)
   const scrollRef = useRef(null)
   const now = new Date()
 
@@ -124,6 +125,7 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, defaultV
     }
     const creds = (() => { try { return JSON.parse(localStorage.getItem(MAGISTER_KEY)) } catch { return null } })()
     if (!creds) return
+    setMagisterSyncing(true)
     fetch('/.netlify/functions/magister', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -133,7 +135,7 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, defaultV
         sessionStorage.setItem(cacheKey, JSON.stringify(data))
         setMagisterLessons(data)
       }
-    }).catch(() => {})
+    }).catch(() => {}).finally(() => setMagisterSyncing(false))
   }, [view, toDateStr(current), scheduleVersion])
 
   const fetchEvents = async () => {
@@ -519,6 +521,12 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, defaultV
           <span style={{ color: 'white', fontWeight: 600, fontSize: '13px', whiteSpace: 'nowrap' }}>
             {headerLabel()}
           </span>
+          {magisterSyncing && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 6, background: 'rgba(250,204,21,0.1)', border: '1px solid rgba(250,204,21,0.25)' }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#FACC15', animation: 'pulse 1s infinite' }} />
+              <span style={{ fontSize: 10, color: '#FACC15', fontWeight: 500 }}>Syncing Magister</span>
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '2px', border: '1px solid rgba(255,255,255,0.08)' }}>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Plus, GripVertical, Trash2, CheckCircle2, Circle, Pencil, X } from 'lucide-react'
+import { Plus, GripVertical, Trash2, CheckCircle2, Circle, Pencil, X, AlertCircle } from 'lucide-react'
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -8,12 +8,16 @@ function todayStr() {
 function formatDate(dateStr) {
   if (!dateStr) return ''
   const d = new Date(dateStr + 'T00:00:00')
-  const today = todayStr()
-  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1)
-  const tomorrowStr = tomorrow.toISOString().slice(0, 10)
-  if (dateStr === today) return 'Vandaag'
-  if (dateStr === tomorrowStr) return 'Morgen'
-  return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const target = new Date(dateStr + 'T00:00:00')
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1)
+  const tStr = todayStr()
+  const tomStr = tomorrow.toISOString().slice(0, 10)
+  if (dateStr === tStr) return { label: 'Vandaag', overdue: false }
+  if (dateStr === tomStr) return { label: 'Morgen', overdue: false }
+  if (target < today) return { label: `Verlopen · ${d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`, overdue: true }
+  return { label: d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }), overdue: false }
 }
 
 export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle, onEdit, onDragStart }) {
@@ -132,6 +136,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
         {incomplete.map(task => {
           const subject = subjects.find(s => s.id === task.subject_id)
+          const dateInfo = task.date ? formatDate(task.date) : null
           return (
             <div
               key={task.id}
@@ -140,9 +145,14 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                 e.dataTransfer.setData('taskId', task.id)
                 onDragStart?.(task)
               }}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', cursor: 'grab', background: 'rgba(255,255,255,0.01)', transition: 'background 0.15s' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'color-mix(in srgb, var(--accent) 4%, transparent)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.01)'}>
+              style={{
+                display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', borderRadius: '10px',
+                border: dateInfo?.overdue ? '1px solid rgba(255,100,100,0.2)' : '1px solid rgba(255,255,255,0.06)',
+                cursor: 'grab', background: dateInfo?.overdue ? 'rgba(255,80,80,0.04)' : 'rgba(255,255,255,0.01)',
+                transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = dateInfo?.overdue ? 'rgba(255,80,80,0.07)' : 'color-mix(in srgb, var(--accent) 4%, transparent)'}
+              onMouseLeave={e => e.currentTarget.style.background = dateInfo?.overdue ? 'rgba(255,80,80,0.04)' : 'rgba(255,255,255,0.01)'}>
               <GripVertical size={13} style={{ color: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
               <button onClick={() => onToggle(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
                 <Circle size={16} style={{ color: 'rgba(255,255,255,0.3)' }} />
@@ -151,11 +161,14 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                 <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.85)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>
                   {task.title}
                 </p>
-                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: 0, marginTop: '2px' }}>
-                  {task.date ? formatDate(task.date) : ''}
-                  {(task.start_time || task.time) ? ` · ${task.start_time || task.time}` : ''}
-                  {task.end_time ? `–${task.end_time}` : ''}
-                  {subject ? ` · ${subject.name}` : ''}
+                <p style={{ fontSize: '11px', margin: 0, marginTop: '2px', display: 'flex', alignItems: 'center', gap: 3 }}>
+                  {dateInfo?.overdue && <AlertCircle size={9} style={{ color: '#ff6b6b', flexShrink: 0 }} />}
+                  <span style={{ color: dateInfo?.overdue ? '#ff8080' : 'rgba(255,255,255,0.3)' }}>
+                    {dateInfo?.label || ''}
+                    {(task.start_time || task.time) ? ` · ${task.start_time || task.time}` : ''}
+                    {task.end_time ? `–${task.end_time}` : ''}
+                    {subject ? ` · ${subject.name}` : ''}
+                  </span>
                 </p>
               </div>
               <button

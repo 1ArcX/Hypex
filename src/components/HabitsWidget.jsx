@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../supabaseClient'
-import { Plus, X, Trash2, Flame, Pencil } from 'lucide-react'
+import { Plus, X, Trash2, Flame, Pencil, ChevronDown, ChevronUp, Minus } from 'lucide-react'
 
 const EMOJIS = [
   '🏃','📚','💧','🧘','🥗','😴','💪','🎯','✍️','🎨',
@@ -10,14 +10,42 @@ const EMOJIS = [
 const COLORS = ['#00FFD1','#818CF8','#F59E0B','#EF4444','#10B981','#3B82F6','#EC4899','#8B5CF6']
 const DAY_LABELS = ['Ma','Di','Wo','Do','Vr','Za','Zo']
 
-// Convert JS Date.getDay() (0=Sun) to our index (0=Ma…6=Zo)
-function jsDayToFreq(jsDay) {
-  return (jsDay + 6) % 7
+// Preset habits library
+const PRESET_HABITS = [
+  { name: 'Water drinken', icon: '💧', color: '#38BDF8', type: 'counter', unit: 'glazen', target: 8 },
+  { name: 'Water drinken (ml)', icon: '💧', color: '#38BDF8', type: 'counter', unit: 'ml', target: 2000 },
+  { name: 'Sporten', icon: '🏃', color: '#10B981', type: 'check' },
+  { name: 'Lezen', icon: '📚', color: '#818CF8', type: 'check' },
+  { name: 'Meditatie', icon: '🧘', color: '#A78BFA', type: 'check' },
+  { name: 'Gezond eten', icon: '🥗', color: '#4ADE80', type: 'check' },
+  { name: 'Goed slapen', icon: '😴', color: '#6366F1', type: 'check' },
+  { name: 'Supplementen', icon: '💊', color: '#F59E0B', type: 'check' },
+  { name: 'Push-ups', icon: '💪', color: '#EF4444', type: 'counter', unit: 'keer', target: 20 },
+  { name: 'Wandelen', icon: '☀️', color: '#FACC15', type: 'check' },
+  { name: 'Journaling', icon: '✍️', color: '#EC4899', type: 'check' },
+  { name: 'Geen social media', icon: '📵', color: '#8B5CF6', type: 'check' },
+  { name: 'Fiets', icon: '🚴', color: '#00FFD1', type: 'check' },
+  { name: 'Zwemmen', icon: '🏊', color: '#38BDF8', type: 'check' },
+]
+
+const COUNTER_UNITS = ['glazen', 'ml', 'keer', 'km', 'minuten', 'pagina\'s']
+
+// localStorage helpers for counter config + values
+function loadCounterConfig() {
+  try { return JSON.parse(localStorage.getItem('habit_counter_config')) || {} } catch { return {} }
+}
+function saveCounterConfig(cfg) {
+  localStorage.setItem('habit_counter_config', JSON.stringify(cfg))
+}
+function loadCounterValues() {
+  try { return JSON.parse(localStorage.getItem('habit_counter_values')) || {} } catch { return {} }
+}
+function saveCounterValues(vals) {
+  localStorage.setItem('habit_counter_values', JSON.stringify(vals))
 }
 
-function todayStr() {
-  return new Date().toISOString().slice(0, 10)
-}
+function jsDayToFreq(jsDay) { return (jsDay + 6) % 7 }
+function todayStr() { return new Date().toISOString().slice(0, 10) }
 
 function getLast7Days() {
   const days = []
@@ -46,14 +74,41 @@ function calcStreak(completionSet, habit) {
 }
 
 // ─── Add / Edit modal ────────────────────────────────────────────────────────
-function HabitModal({ habit, onSave, onClose, onDelete }) {
+function HabitModal({ habit, onSave, onClose, onDelete, counterConfig }) {
+  const existingConfig = habit ? (counterConfig[habit.id] || {}) : {}
   const [name, setName] = useState(habit?.name || '')
   const [icon, setIcon] = useState(habit?.icon || '🌟')
   const [color, setColor] = useState(habit?.color || '#00FFD1')
   const [frequency, setFrequency] = useState(habit?.frequency ?? [0, 1, 2, 3, 4, 5, 6])
+  const [habitType, setHabitType] = useState(existingConfig.type || 'check')
+  const [counterUnit, setCounterUnit] = useState(existingConfig.unit || 'glazen')
+  const [counterTarget, setCounterTarget] = useState(existingConfig.target || 8)
+  const [showLibrary, setShowLibrary] = useState(false)
 
   const toggleDay = (i) =>
     setFrequency(f => f.includes(i) ? f.filter(d => d !== i) : [...f, i].sort((a, b) => a - b))
+
+  const pickPreset = (preset) => {
+    setName(preset.name)
+    setIcon(preset.icon)
+    setColor(preset.color)
+    if (preset.type === 'counter') {
+      setHabitType('counter')
+      setCounterUnit(preset.unit)
+      setCounterTarget(preset.target)
+    } else {
+      setHabitType('check')
+    }
+    setShowLibrary(false)
+  }
+
+  const handleSave = () => {
+    if (!name.trim()) return
+    const counterData = habitType === 'counter'
+      ? { type: 'counter', unit: counterUnit, target: counterTarget }
+      : { type: 'check' }
+    onSave({ name: name.trim(), icon, color, frequency }, counterData)
+  }
 
   return (
     <div style={{
@@ -61,9 +116,9 @@ function HabitModal({ habit, onSave, onClose, onDelete }) {
       backdropFilter: 'blur(10px)', zIndex: 200,
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
     }}>
-      <div className="glass-card" style={{ width: '100%', maxWidth: 380, padding: 24, position: 'relative' }}>
+      <div className="glass-card" style={{ width: '100%', maxWidth: 400, padding: 24, position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h2 style={{ fontSize: 16, fontWeight: 700, color: 'white', margin: 0 }}>
             {habit ? 'Gewoonte bewerken' : 'Nieuwe gewoonte'}
           </h2>
@@ -71,6 +126,49 @@ function HabitModal({ habit, onSave, onClose, onDelete }) {
             <X size={18} />
           </button>
         </div>
+
+        {/* Bibliotheek toggle */}
+        {!habit && (
+          <button
+            onClick={() => setShowLibrary(v => !v)}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '10px 12px', borderRadius: 10, marginBottom: 14, cursor: 'pointer',
+              background: showLibrary ? 'rgba(0,255,209,0.08)' : 'rgba(255,255,255,0.04)',
+              border: showLibrary ? '1px solid rgba(0,255,209,0.25)' : '1px solid rgba(255,255,255,0.08)',
+              color: showLibrary ? 'var(--accent)' : 'rgba(255,255,255,0.5)',
+              fontSize: 13, fontWeight: 500,
+            }}>
+            <span>Kies uit bibliotheek</span>
+            {showLibrary ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
+        )}
+
+        {/* Library grid */}
+        {showLibrary && (
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, marginBottom: 16,
+            maxHeight: 240, overflowY: 'auto',
+          }}>
+            {PRESET_HABITS.map((p, idx) => (
+              <button key={idx} onClick={() => pickPreset(p)} style={{
+                display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 10,
+                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                cursor: 'pointer', textAlign: 'left', transition: 'all 0.1s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor = p.color + '60' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}>
+                <span style={{ fontSize: 18 }}>{p.icon}</span>
+                <div>
+                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', margin: 0, fontWeight: 500 }}>{p.name}</p>
+                  {p.type === 'counter' && (
+                    <p style={{ fontSize: 10, color: p.color, margin: 0 }}>{p.target} {p.unit}</p>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Name + icon preview */}
         <div style={{ marginBottom: 14 }}>
@@ -85,12 +183,48 @@ function HabitModal({ habit, onSave, onClose, onDelete }) {
               placeholder="bijv. Sporten, Lezen, Water…"
               value={name}
               onChange={e => setName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && name.trim() && onSave({ name: name.trim(), icon, color, frequency })}
+              onKeyDown={e => e.key === 'Enter' && handleSave()}
               autoFocus
               style={{ flex: 1, fontSize: 14 }}
             />
           </div>
         </div>
+
+        {/* Habit type toggle */}
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, display: 'block', marginBottom: 6 }}>Type</label>
+          <div style={{ display: 'flex', gap: 6, padding: 3, background: 'rgba(255,255,255,0.04)', borderRadius: 10 }}>
+            {[['check','Aanvinken ✓'],['counter','Teller 🔢']].map(([val, lbl]) => (
+              <button key={val} onClick={() => setHabitType(val)} style={{
+                flex: 1, padding: '6px 0', borderRadius: 8, border: 'none', cursor: 'pointer',
+                background: habitType === val ? `${color}20` : 'transparent',
+                color: habitType === val ? color : 'rgba(255,255,255,0.35)',
+                fontSize: 12, fontWeight: habitType === val ? 600 : 400, transition: 'all 0.15s',
+              }}>{lbl}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Counter settings */}
+        {habitType === 'counter' && (
+          <div style={{ marginBottom: 14, padding: 12, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div>
+                <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, display: 'block', marginBottom: 4 }}>Eenheid</label>
+                <select className="glass-input" value={counterUnit} onChange={e => setCounterUnit(e.target.value)}
+                  style={{ fontSize: 12, colorScheme: 'dark', width: '100%' }}>
+                  {COUNTER_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, display: 'block', marginBottom: 4 }}>Doel</label>
+                <input type="number" className="glass-input" value={counterTarget} min={1}
+                  onChange={e => setCounterTarget(Math.max(1, +e.target.value))}
+                  style={{ fontSize: 12, colorScheme: 'dark', width: '100%' }} />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Emoji grid */}
         <div style={{ marginBottom: 14 }}>
@@ -156,15 +290,12 @@ function HabitModal({ habit, onSave, onClose, onDelete }) {
             border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)',
             color: 'rgba(255,255,255,0.45)', cursor: 'pointer', fontSize: 13,
           }}>Annuleer</button>
-          <button
-            onClick={() => name.trim() && onSave({ name: name.trim(), icon, color, frequency })}
-            disabled={!name.trim()}
-            style={{
-              flex: 2, padding: '10px', borderRadius: 10,
-              border: `1px solid ${color}50`, background: `${color}15`,
-              color, cursor: 'pointer', fontSize: 13, fontWeight: 600,
-              opacity: !name.trim() ? 0.4 : 1, transition: 'opacity 0.15s',
-            }}>
+          <button onClick={handleSave} disabled={!name.trim()} style={{
+            flex: 2, padding: '10px', borderRadius: 10,
+            border: `1px solid ${color}50`, background: `${color}15`,
+            color, cursor: 'pointer', fontSize: 13, fontWeight: 600,
+            opacity: !name.trim() ? 0.4 : 1, transition: 'opacity 0.15s',
+          }}>
             {habit ? 'Opslaan' : '+ Toevoegen'}
           </button>
         </div>
@@ -174,12 +305,14 @@ function HabitModal({ habit, onSave, onClose, onDelete }) {
 }
 
 // ─── Main widget ─────────────────────────────────────────────────────────────
-export default function HabitsWidget({ userId }) {
+export default function HabitsWidget({ userId, compact = false }) {
   const [habits, setHabits] = useState([])
   const [completions, setCompletions] = useState({})   // { habitId: Set<dateStr> }
-  const [modalHabit, setModalHabit] = useState(null)   // null | 'new' | habitObj
+  const [counterValues, setCounterValues] = useState(() => loadCounterValues())
+  const [counterConfig, setCounterConfig] = useState(() => loadCounterConfig())
+  const [modalHabit, setModalHabit] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [animating, setAnimating] = useState({})       // { habitId: bool }
+  const [animating, setAnimating] = useState({})
 
   const today = todayStr()
   const last7 = getLast7Days()
@@ -187,7 +320,18 @@ export default function HabitsWidget({ userId }) {
 
   const todayHabits = habits.filter(h => (h.frequency ?? [0,1,2,3,4,5,6]).includes(todayFreq))
   const otherHabits = habits.filter(h => !(h.frequency ?? [0,1,2,3,4,5,6]).includes(todayFreq))
-  const doneToday = todayHabits.filter(h => completions[h.id]?.has(today)).length
+
+  // A counter habit is "done" if count >= target
+  function isHabitDone(habit) {
+    const cfg = counterConfig[habit.id]
+    if (cfg?.type === 'counter') {
+      const count = counterValues[habit.id]?.[today] || 0
+      return count >= (cfg.target || 1)
+    }
+    return completions[habit.id]?.has(today) || false
+  }
+
+  const doneToday = todayHabits.filter(h => isHabitDone(h)).length
 
   const fetchHabits = useCallback(async () => {
     const { data } = await supabase
@@ -216,19 +360,15 @@ export default function HabitsWidget({ userId }) {
     Promise.all([fetchHabits(), fetchCompletions()]).then(() => setLoading(false))
   }, [userId, fetchHabits, fetchCompletions])
 
+  // Toggle check habit
   const toggleCompletion = async (habit) => {
-    const set = completions[habit.id] || new Set()
-    const done = set.has(today)
-
-    // Bounce animation
     setAnimating(a => ({ ...a, [habit.id]: true }))
     setTimeout(() => setAnimating(a => ({ ...a, [habit.id]: false })), 350)
-
-    // Optimistic
+    const set = completions[habit.id] || new Set()
+    const done = set.has(today)
     const next = new Set(set)
     if (done) next.delete(today); else next.add(today)
     setCompletions(c => ({ ...c, [habit.id]: next }))
-
     if (done) {
       await supabase.from('habit_completions').delete()
         .eq('habit_id', habit.id).eq('user_id', userId).eq('date', today)
@@ -238,11 +378,53 @@ export default function HabitsWidget({ userId }) {
     }
   }
 
-  const saveHabit = async (data) => {
+  // Increment/decrement counter habit
+  const adjustCounter = (habit, delta) => {
+    const cfg = counterConfig[habit.id]
+    const current = counterValues[habit.id]?.[today] || 0
+    const newCount = Math.max(0, current + delta)
+    const newVals = {
+      ...counterValues,
+      [habit.id]: { ...(counterValues[habit.id] || {}), [today]: newCount },
+    }
+    setCounterValues(newVals)
+    saveCounterValues(newVals)
+
+    // Mark as completion in DB when reaching target, remove when going below
+    const target = cfg?.target || 1
+    const wasDone = current >= target
+    const isDone = newCount >= target
+    if (!wasDone && isDone) {
+      supabase.from('habit_completions').insert({ habit_id: habit.id, user_id: userId, date: today }).then(() => {})
+      setCompletions(c => {
+        const s = new Set(c[habit.id] || [])
+        s.add(today)
+        return { ...c, [habit.id]: s }
+      })
+    } else if (wasDone && !isDone) {
+      supabase.from('habit_completions').delete().eq('habit_id', habit.id).eq('user_id', userId).eq('date', today).then(() => {})
+      setCompletions(c => {
+        const s = new Set(c[habit.id] || [])
+        s.delete(today)
+        return { ...c, [habit.id]: s }
+      })
+    }
+  }
+
+  const saveHabit = async (data, counterData) => {
+    let habitId
     if (modalHabit && modalHabit !== 'new') {
       await supabase.from('habits').update(data).eq('id', modalHabit.id)
+      habitId = modalHabit.id
     } else {
-      await supabase.from('habits').insert({ ...data, user_id: userId, sort_order: habits.length })
+      const { data: inserted } = await supabase.from('habits').insert({ ...data, user_id: userId, sort_order: habits.length }).select().single()
+      habitId = inserted?.id
+    }
+    // Save counter config locally
+    if (habitId) {
+      const newCfg = { ...counterConfig, [habitId]: counterData }
+      setCounterConfig(newCfg)
+      saveCounterConfig(newCfg)
     }
     setModalHabit(null)
     fetchHabits()
@@ -254,7 +436,67 @@ export default function HabitsWidget({ userId }) {
     fetchHabits()
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Compact mode (for mobile home screen preview) ────────────────────────
+  if (compact) {
+    return (
+      <div className="glass-card" style={{ padding: '14px 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Flame size={13} color="#FF8C42" />
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'white' }}>Gewoontes</span>
+          </div>
+          {todayHabits.length > 0 && (
+            <span style={{ fontSize: 11, color: doneToday === todayHabits.length ? 'var(--accent)' : 'rgba(255,255,255,0.3)', fontWeight: 600 }}>
+              {doneToday}/{todayHabits.length}
+            </span>
+          )}
+        </div>
+        {todayHabits.length > 0 && (
+          <div style={{ height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 4, marginBottom: 10, overflow: 'hidden' }}>
+            <div style={{
+              height: '100%', width: `${(doneToday / todayHabits.length) * 100}%`,
+              background: doneToday === todayHabits.length ? 'linear-gradient(90deg, var(--accent), #818CF8)' : 'var(--accent)',
+              borderRadius: 4, transition: 'width 0.4s',
+            }} />
+          </div>
+        )}
+        {loading ? (
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>Laden...</div>
+        ) : todayHabits.length === 0 ? (
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', textAlign: 'center', padding: '4px 0' }}>Geen gewoontes voor vandaag</div>
+        ) : (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {todayHabits.slice(0, 6).map(habit => {
+              const done = isHabitDone(habit)
+              const cfg = counterConfig[habit.id]
+              const count = cfg?.type === 'counter' ? (counterValues[habit.id]?.[today] || 0) : null
+              return (
+                <div key={habit.id}
+                  onClick={() => cfg?.type === 'counter' ? adjustCounter(habit, 1) : toggleCompletion(habit)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px',
+                    borderRadius: 20, cursor: 'pointer',
+                    background: done ? `${habit.color}18` : 'rgba(255,255,255,0.05)',
+                    border: done ? `1px solid ${habit.color}40` : '1px solid rgba(255,255,255,0.08)',
+                  }}>
+                  <span style={{ fontSize: 14 }}>{habit.icon}</span>
+                  {cfg?.type === 'counter' ? (
+                    <span style={{ fontSize: 11, color: done ? habit.color : 'rgba(255,255,255,0.5)' }}>
+                      {count}/{cfg.target}
+                    </span>
+                  ) : (
+                    done && <span style={{ fontSize: 11, color: habit.color }}>✓</span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ── Full render ────────────────────────────────────────────────────────────
   return (
     <>
       <div className="glass-card p-4">
@@ -289,22 +531,19 @@ export default function HabitsWidget({ userId }) {
               height: '100%',
               width: `${(doneToday / todayHabits.length) * 100}%`,
               background: doneToday === todayHabits.length
-                ? 'linear-gradient(90deg, var(--accent), #818CF8)'
-                : 'var(--accent)',
+                ? 'linear-gradient(90deg, var(--accent), #818CF8)' : 'var(--accent)',
               borderRadius: 4, transition: 'width 0.4s',
               boxShadow: '0 0 8px color-mix(in srgb, var(--accent) 50%, transparent)',
             }} />
           </div>
         )}
 
-        {/* Loading */}
         {loading && (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
             <div className="animate-spin" style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid var(--accent)', borderTopColor: 'transparent' }} />
           </div>
         )}
 
-        {/* Empty state */}
         {!loading && habits.length === 0 && (
           <div style={{ textAlign: 'center', padding: '18px 0' }}>
             <div style={{ fontSize: 30, marginBottom: 8 }}>🌱</div>
@@ -313,42 +552,80 @@ export default function HabitsWidget({ userId }) {
           </div>
         )}
 
-        {/* Today habits */}
         {!loading && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             {todayHabits.map(habit => {
               const set = completions[habit.id] || new Set()
-              const done = set.has(today)
               const streak = calcStreak(set, habit)
               const bounce = animating[habit.id]
+              const cfg = counterConfig[habit.id]
+              const isCounter = cfg?.type === 'counter'
+              const count = isCounter ? (counterValues[habit.id]?.[today] || 0) : null
+              const target = isCounter ? (cfg.target || 1) : null
+              const done = isHabitDone(habit)
 
               return (
                 <div key={habit.id}
-                  onClick={() => toggleCompletion(habit)}
+                  onClick={() => !isCounter && toggleCompletion(habit)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 10,
-                    padding: '10px 12px', borderRadius: 12, cursor: 'pointer',
+                    padding: '10px 12px', borderRadius: 12,
+                    cursor: isCounter ? 'default' : 'pointer',
                     border: done ? `1px solid ${habit.color}35` : '1px solid rgba(255,255,255,0.06)',
                     background: done ? `${habit.color}0C` : 'rgba(255,255,255,0.015)',
                     transition: 'border-color 0.2s, background 0.2s',
                   }}>
 
-                  {/* Circle check */}
-                  <div style={{
-                    width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    border: `2px solid ${done ? habit.color : 'rgba(255,255,255,0.18)'}`,
-                    background: done ? habit.color : 'transparent',
-                    transition: 'all 0.2s',
-                    transform: bounce ? 'scale(1.35)' : 'scale(1)',
-                    boxShadow: done ? `0 0 12px ${habit.color}60` : 'none',
-                  }}>
-                    {done && (
-                      <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                        <path d="M2 6.5l3 3 6-6" stroke="#000" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    )}
-                  </div>
+                  {/* Check circle OR counter controls */}
+                  {isCounter ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
+                      <button
+                        onClick={e => { e.stopPropagation(); adjustCounter(habit, -1) }}
+                        style={{
+                          width: 22, height: 22, borderRadius: '50%', border: `1px solid rgba(255,255,255,0.15)`,
+                          background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: 'rgba(255,255,255,0.4)',
+                        }}>
+                        <Minus size={10} />
+                      </button>
+                      <div style={{
+                        width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                        border: `2px solid ${done ? habit.color : 'rgba(255,255,255,0.18)'}`,
+                        background: done ? `${habit.color}20` : 'transparent',
+                        transition: 'all 0.2s',
+                        transform: bounce ? 'scale(1.2)' : 'scale(1)',
+                      }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: done ? habit.color : 'rgba(255,255,255,0.7)', lineHeight: 1 }}>{count}</span>
+                        <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', lineHeight: 1 }}>/{target}</span>
+                      </div>
+                      <button
+                        onClick={e => { e.stopPropagation(); adjustCounter(habit, 1) }}
+                        style={{
+                          width: 22, height: 22, borderRadius: '50%', border: `1px solid ${habit.color}60`,
+                          background: `${habit.color}15`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: habit.color,
+                        }}>
+                        <Plus size={10} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{
+                      width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      border: `2px solid ${done ? habit.color : 'rgba(255,255,255,0.18)'}`,
+                      background: done ? habit.color : 'transparent',
+                      transition: 'all 0.2s',
+                      transform: bounce ? 'scale(1.35)' : 'scale(1)',
+                      boxShadow: done ? `0 0 12px ${habit.color}60` : 'none',
+                    }}>
+                      {done && (
+                        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                          <path d="M2 6.5l3 3 6-6" stroke="#000" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
+                    </div>
+                  )}
 
                   {/* Icon + name + dots */}
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -357,10 +634,13 @@ export default function HabitsWidget({ userId }) {
                       <span style={{
                         fontSize: 13, fontWeight: 500,
                         color: done ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.88)',
-                        textDecoration: done ? 'line-through' : 'none',
+                        textDecoration: done && !isCounter ? 'line-through' : 'none',
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                         transition: 'color 0.2s',
                       }}>{habit.name}</span>
+                      {isCounter && (
+                        <span style={{ fontSize: 10, color: habit.color, opacity: 0.7 }}>{cfg.unit}</span>
+                      )}
                     </div>
                     {/* 7-day history dots */}
                     <div style={{ display: 'flex', gap: 3 }}>
@@ -371,9 +651,7 @@ export default function HabitsWidget({ userId }) {
                         return (
                           <div key={date} style={{
                             width: 5, height: 5, borderRadius: '50%',
-                            background: completed
-                              ? habit.color
-                              : (scheduled ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.03)'),
+                            background: completed ? habit.color : (scheduled ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.03)'),
                             boxShadow: completed ? `0 0 4px ${habit.color}80` : 'none',
                             transition: 'background 0.2s',
                           }} />
@@ -433,6 +711,7 @@ export default function HabitsWidget({ userId }) {
       {modalHabit !== null && (
         <HabitModal
           habit={modalHabit === 'new' ? null : modalHabit}
+          counterConfig={counterConfig}
           onSave={saveHabit}
           onClose={() => setModalHabit(null)}
           onDelete={deleteHabit}

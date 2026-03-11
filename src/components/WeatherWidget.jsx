@@ -117,7 +117,7 @@ function WeekRow({ day, isToday }) {
   )
 }
 
-export default function WeatherWidget() {
+export default function WeatherWidget({ stacked = false }) {
   const [weather, setWeather]       = useState(null)
   const [weekly, setWeekly]         = useState(null)
   const [rain, setRain]             = useState(null)
@@ -177,10 +177,10 @@ export default function WeatherWidget() {
     setRainLoading(false)
   }
 
-  // Switch to buien tab → fetch rain
+  // Switch to buien tab or stacked mode → fetch rain
   useEffect(() => {
-    if (tab === 'buien' && coords && !rain) loadRain()
-  }, [tab, coords])
+    if ((tab === 'buien' || stacked) && coords && !rain) loadRain()
+  }, [tab, coords, stacked])
 
   // Auto-refresh
   useEffect(() => {
@@ -253,22 +253,26 @@ export default function WeatherWidget() {
         </button>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
-        <button style={tabStyle('huidig')} onClick={() => setTab('huidig')}>Huidig</button>
-        <button style={tabStyle('buien')}  onClick={() => setTab('buien')}>Buienradar</button>
-        <button style={tabStyle('week')}   onClick={() => setTab('week')}>Week</button>
-      </div>
+      {/* Tabs (hidden in stacked mode) */}
+      {!stacked && (
+        <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+          <button style={tabStyle('huidig')} onClick={() => setTab('huidig')}>Huidig</button>
+          <button style={tabStyle('buien')}  onClick={() => { setTab('buien'); if (coords && !rain) loadRain() }}>Buienradar</button>
+          <button style={tabStyle('week')}   onClick={() => setTab('week')}>Week</button>
+        </div>
+      )}
+
 
       {error && <p className="text-xs" style={{ color: '#ff6b6b' }}>{error}</p>}
 
-      {/* ─── Tab: Huidig ─── */}
-      {tab === 'huidig' && weather && !error && (
-        <div>
+      {/* ─── Huidig ─── */}
+      {(stacked || tab === 'huidig') && weather && !error && (
+        <div style={stacked ? { marginBottom: 20 } : {}}>
+          {stacked && <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'rgba(255,255,255,0.3)', marginBottom: 10, textTransform: 'uppercase' }}>Huidig</p>}
           <div className="flex items-center gap-3 mb-2">
-            <WeatherIcon size={32} style={{ color: 'var(--accent)' }} />
+            <WeatherIcon size={stacked ? 40 : 32} style={{ color: 'var(--accent)' }} />
             <div>
-              <div className="text-3xl font-bold text-white">{Math.round(weather.temperature_2m)}°C</div>
+              <div style={{ fontSize: stacked ? 36 : 28, fontWeight: 700, color: 'white' }}>{Math.round(weather.temperature_2m)}°C</div>
               <div className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>{label}</div>
             </div>
           </div>
@@ -297,9 +301,13 @@ export default function WeatherWidget() {
         </div>
       )}
 
-      {/* ─── Tab: Buienradar ─── */}
-      {tab === 'buien' && (
-        <div>
+      {/* Divider in stacked */}
+      {stacked && weather && <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', marginBottom: 16 }} />}
+
+      {/* ─── Buienradar ─── */}
+      {(stacked || tab === 'buien') && (
+        <div style={stacked ? { marginBottom: 20 } : {}}>
+          {stacked && <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'rgba(255,255,255,0.3)', marginBottom: 10, textTransform: 'uppercase' }}>Buienradar</p>}
           {rainLoading && (
             <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: '12px 0' }}>
               Buienradar laden...
@@ -329,9 +337,13 @@ export default function WeatherWidget() {
         </div>
       )}
 
-      {/* ─── Tab: Week ─── */}
-      {tab === 'week' && (
+      {/* Divider in stacked */}
+      {stacked && <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', marginBottom: 16 }} />}
+
+      {/* ─── Week ─── */}
+      {(stacked || tab === 'week') && (
         <div>
+          {stacked && <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'rgba(255,255,255,0.3)', marginBottom: 10, textTransform: 'uppercase' }}>7-daagse prognose</p>}
           {!weekly && !error && (
             <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>Laden...</p>
           )}

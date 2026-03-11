@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { StickyNote } from 'lucide-react'
 
-export default function NotesWidget() {
+export default function NotesWidget({ fullHeight = false }) {
   const [notes, setNotes] = useState(() => localStorage.getItem('dashboard_notes') || '')
 
   useEffect(() => {
@@ -10,8 +10,8 @@ export default function NotesWidget() {
   }, [notes])
 
   return (
-    <div className="glass-card p-4 flex flex-col">
-      <div className="flex items-center gap-2 mb-3">
+    <div className="glass-card p-4 flex flex-col" style={fullHeight ? { height: '100%' } : {}}>
+      <div className="flex items-center gap-2 mb-3" style={{ flexShrink: 0 }}>
         <StickyNote size={16} style={{ color: '#00FFD1' }} />
         <h3 className="text-sm font-semibold text-white">Kladblok</h3>
         <span className="ml-auto text-xs" style={{ color: 'rgba(255,255,255,0.2)' }}>auto-opgeslagen</span>
@@ -27,8 +27,8 @@ export default function NotesWidget() {
           outline: 'none',
           color: 'rgba(255,255,255,0.7)',
           lineHeight: '1.6',
-          minHeight: '120px',
-          fontFamily: 'inherit'
+          minHeight: fullHeight ? 'unset' : '120px',
+          fontFamily: 'inherit',
         }}
       />
     </div>
