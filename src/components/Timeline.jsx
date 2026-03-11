@@ -78,7 +78,7 @@ const emptyForm = (date, hour) => ({
   color: '#818CF8', recurrence: '', recurrence_days: []
 })
 
-export default function Timeline({ userId, tasks, subjects, onEditTask, defaultView = 'week', hideWeekView = false }) {
+export default function Timeline({ userId, tasks, subjects, onEditTask, defaultView = 'week', isMobile = false }) {
   const [view, setView] = useState(defaultView)
   const [current, setCurrent] = useState(new Date())
   const [events, setEvents] = useState([])
@@ -476,6 +476,31 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, defaultV
 
   const weekDays = getWeekDays(current)
 
+  const MobileWeekStrip = () => {
+    const wDays = getWeekDays(current)
+    return (
+      <div style={{ display: 'flex', gap: 2, padding: '4px 0 8px', flexShrink: 0 }}>
+        {wDays.map((d, i) => {
+          const isSel = isSameDay(d, current)
+          const isToday = isSameDay(d, now)
+          return (
+            <button key={i} onClick={() => setCurrent(d)}
+              style={{
+                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+                padding: '6px 2px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                background: isSel ? 'var(--accent)' : isToday ? 'rgba(0,255,209,0.1)' : 'transparent',
+                color: isSel ? '#000' : isToday ? 'var(--accent)' : 'rgba(255,255,255,0.45)',
+                transition: 'background 0.15s',
+              }}>
+              <span style={{ fontSize: 9, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase' }}>{DAYS_SHORT[d.getDay()]}</span>
+              <span style={{ fontSize: 15, fontWeight: isSel || isToday ? 700 : 400, marginTop: 2 }}>{d.getDate()}</span>
+            </button>
+          )
+        })}
+      </div>
+    )
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderRadius: '16px', background: 'rgba(255,255,255,0.015)' }}>
       {/* Toolbar */}
@@ -497,7 +522,7 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, defaultV
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '2px', border: '1px solid rgba(255,255,255,0.08)' }}>
-            {[['day','Dag'], ['week','Week'], ['month','Maand']].filter(([v]) => !(v === 'week' && hideWeekView)).map(([v, label]) => (
+            {[['day','Dag'], ['week','Week'], ['month','Maand']].map(([v, label]) => (
               <button key={v} onClick={() => setView(v)}
                 style={{ padding: '3px 10px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', border: 'none', background: view === v ? 'rgba(255,255,255,0.15)' : 'transparent', color: view === v ? 'white' : 'rgba(255,255,255,0.4)', fontWeight: view === v ? 600 : 400 }}>
                 {label}
@@ -514,7 +539,15 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, defaultV
       {/* View content — call as functions to prevent remount on re-render */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {view === 'month' && MonthView({})}
-        {view === 'week'  && TimeGrid({ days: weekDays })}
+        {view === 'week' && !isMobile && TimeGrid({ days: weekDays })}
+        {view === 'week' && isMobile && (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+            {MobileWeekStrip({})}
+            <div style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
+              {TimeGrid({ days: [current] })}
+            </div>
+          </div>
+        )}
         {view === 'day'   && TimeGrid({ days: [current] })}
       </div>
 

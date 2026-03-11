@@ -74,6 +74,7 @@ export default function SpotifyWidget() {
           if (data.access_token) {
             localStorage.setItem('spotify_token', data.access_token)
             if (data.refresh_token) localStorage.setItem('spotify_refresh', data.refresh_token)
+            localStorage.setItem('spotify_expires_at', String(Date.now() + (data.expires_in || 3600) * 1000))
             setToken(data.access_token)
             localStorage.removeItem('spotify_verifier')
           }
@@ -81,22 +82,61 @@ export default function SpotifyWidget() {
     }
   }, [])
 
+  // --- Token refresh ---
+  const refreshAccessToken = useCallback(async () => {
+    const refreshToken = localStorage.getItem('spotify_refresh')
+    if (!refreshToken) { localStorage.removeItem('spotify_token'); setToken(null); return null }
+    try {
+      const res = await fetch('https://accounts.spotify.com/api/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: refreshToken,
+          client_id: CLIENT_ID,
+        })
+      })
+      const data = await res.json()
+      if (data.access_token) {
+        localStorage.setItem('spotify_token', data.access_token)
+        if (data.refresh_token) localStorage.setItem('spotify_refresh', data.refresh_token)
+        localStorage.setItem('spotify_expires_at', String(Date.now() + (data.expires_in || 3600) * 1000))
+        setToken(data.access_token)
+        return data.access_token
+      }
+    } catch {}
+    return null
+  }, [])
+
   // --- Stap 3: Haal huidig afspelende track op ---
   const fetchTrack = useCallback(async () => {
-    if (!token) return
+    let currentToken = localStorage.getItem('spotify_token')
+    if (!currentToken) return
+    // Proactively refresh if token expires within 2 minutes
+    const expiresAt = Number(localStorage.getItem('spotify_expires_at') || 0)
+    if (expiresAt && Date.now() > expiresAt - 120000) {
+      currentToken = await refreshAccessToken()
+      if (!currentToken) return
+    }
     const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${currentToken}` }
     })
-    if (res.status === 204 || res.status === 401) {
-      if (res.status === 401) { localStorage.removeItem('spotify_token'); setToken(null) }
+    if (res.status === 401) {
+      const newToken = await refreshAccessToken()
+      if (!newToken) return
+      const retry = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
+        headers: { Authorization: `Bearer ${newToken}` }
+      })
+      if (!retry.ok || retry.status === 204) return
+      const data = await retry.json()
+      if (data?.item) { setTrack(data.item); setIsPlaying(data.is_playing) }
       return
     }
+    if (res.status === 204) return
+    if (!res.ok) return
     const data = await res.json()
-    if (data?.item) {
-      setTrack(data.item)
-      setIsPlaying(data.is_playing)
-    }
-  }, [token])
+    if (data?.item) { setTrack(data.item); setIsPlaying(data.is_playing) }
+  }, [refreshAccessToken])
 
   useEffect(() => {
     fetchTrack()
@@ -113,7 +153,7 @@ export default function SpotifyWidget() {
       prev:    { method: 'POST', url: 'https://api.spotify.com/v1/me/player/previous' },
     }
     const { method, url } = endpoints[action]
-    await fetch(url, { method, headers: { Authorization: `Bearer ${token}` } })
+    await fetch(url, { method, headers: { Authorization: `Bearer ${localStorage.getItem('spotify_token')}` } })
     setTimeout(fetchTrack, 500)
   }
 

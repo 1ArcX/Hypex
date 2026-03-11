@@ -381,6 +381,17 @@ export default function App() {
                       </div>
                     )}
 
+                    {!localStorage.getItem('magister_credentials') && (
+                      <div className="glass-card" style={{ padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                        onClick={() => { setMobileTab('tools'); setToolTab('magister') }}>
+                        <div>
+                          <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', margin: '0 0 2px' }}>Magister niet gekoppeld</p>
+                          <p style={{ fontSize: 13, color: 'white', fontWeight: 500, margin: 0 }}>Koppel je Magister account</p>
+                        </div>
+                        <span style={{ fontSize: 18, color: 'rgba(255,255,255,0.2)' }}>→</span>
+                      </div>
+                    )}
+
                     <button className="btn-neon" onClick={() => { setMobileTab('taken'); openNewTask() }}
                       style={{ padding: '13px', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%' }}>
                       + Taak toevoegen
@@ -395,7 +406,7 @@ export default function App() {
                       <Timeline
                         userId={user.id} tasks={tasks} subjects={subjects}
                         onToggleTask={handleToggleTask} onEditTask={openEditTask} isAdmin={isAdmin}
-                        defaultView="day" hideWeekView
+                        isMobile
                       />
                     </div>
                   </div>
