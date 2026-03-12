@@ -78,7 +78,7 @@ const emptyForm = (date, hour) => ({
   color: '#818CF8', recurrence: '', recurrence_days: []
 })
 
-export default function Timeline({ userId, tasks, subjects, onEditTask, defaultView = 'week', isMobile = false }) {
+export default function Timeline({ userId, tasks, subjects, onEditTask, defaultView = 'week', isMobile = false, onLessonsChange, onEventsChange }) {
   const [view, setView] = useState(defaultView)
   const [current, setCurrent] = useState(new Date())
   const [events, setEvents] = useState([])
@@ -89,10 +89,13 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, defaultV
   const [lessonDetail, setLessonDetail] = useState(null)
   const [scheduleVersion, setScheduleVersion] = useState(0)
   const [magisterSyncing, setMagisterSyncing] = useState(false)
+  const [magisterError, setMagisterError] = useState(null)
   const scrollRef = useRef(null)
   const now = new Date()
 
   useEffect(() => { fetchEvents() }, [])
+  useEffect(() => { onLessonsChange?.(magisterLessons) }, [magisterLessons])
+  useEffect(() => { onEventsChange?.(events) }, [events])
 
   useLayoutEffect(() => {
     if (scrollRef.current) {
@@ -126,16 +129,23 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, defaultV
     const creds = (() => { try { return JSON.parse(localStorage.getItem(MAGISTER_KEY)) } catch { return null } })()
     if (!creds) return
     setMagisterSyncing(true)
+    setMagisterError(null)
     fetch('/.netlify/functions/magister', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...creds, action: 'schedule', start, end })
-    }).then(r => r.ok ? r.json() : null).then(data => {
+    }).then(async r => {
+      const data = await r.json()
       if (Array.isArray(data)) {
         sessionStorage.setItem(cacheKey, JSON.stringify(data))
         setMagisterLessons(data)
+        setMagisterError(null)
+      } else {
+        setMagisterError(data?.error || 'Geen lessen ontvangen')
       }
-    }).catch(() => {}).finally(() => setMagisterSyncing(false))
+    }).catch(e => {
+      setMagisterError('Verbindingsfout')
+    }).finally(() => setMagisterSyncing(false))
   }, [view, toDateStr(current), scheduleVersion])
 
   const fetchEvents = async () => {
@@ -553,6 +563,11 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, defaultV
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 6, background: 'rgba(250,204,21,0.1)', border: '1px solid rgba(250,204,21,0.25)' }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#FACC15', animation: 'pulse 1s infinite' }} />
               <span style={{ fontSize: 10, color: '#FACC15', fontWeight: 500 }}>Syncing Magister</span>
+            </div>
+          )}
+          {!magisterSyncing && magisterError && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 6, background: 'rgba(255,80,80,0.1)', border: '1px solid rgba(255,80,80,0.25)' }}>
+              <span style={{ fontSize: 10, color: '#FF6B6B', fontWeight: 500 }}>Magister: {magisterError}</span>
             </div>
           )}
         </div>

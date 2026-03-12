@@ -93,6 +93,8 @@ export default function App() {
   const [mobileTab, setMobileTab] = useState('home')
   const [toolTab, setToolTab]     = useState('weer')
   const [takenTab, setTakenTab]   = useState('taken')
+  const [magisterLessons, setMagisterLessons] = useState([])
+  const [calendarEvents, setCalendarEvents]   = useState([])
 
   // Drag-and-drop widget order
   const DEFAULT_LEFT  = ['habits', 'notes', 'tasks']
@@ -341,8 +343,41 @@ export default function App() {
   }
 
   const displayName = userProfile?.full_name || user?.email?.split('@')[0] || 'Student'
-  const completedToday = tasks.filter(t => t.completed).length
-  const totalToday = tasks.length
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayTasks = tasks.filter(t => t.date === todayStr)
+  const completedToday = todayTasks.filter(t => t.completed).length
+  const totalToday = todayTasks.length
+
+  // Next upcoming event (lesson, calendar event, or task with time — today only)
+  const nextEvent = (() => {
+    const now = new Date()
+    const nowMins = now.getHours() * 60 + now.getMinutes()
+    const pad2 = n => String(n).padStart(2, '0')
+    const items = [
+      ...tasks
+        .filter(t => t.date === todayStr && (t.time || t.start_time) && !t.completed)
+        .map(t => {
+          const ts = (t.start_time || t.time || '').slice(0, 5)
+          const [h, m] = ts.split(':').map(Number)
+          return { label: t.title, mins: (h || 0) * 60 + (m || 0), timeStr: ts, type: 'task' }
+        }),
+      ...magisterLessons
+        .filter(l => l.start && !l.uitgevallen && l.start.slice(0, 10) === todayStr)
+        .map(l => {
+          const d = new Date(l.start)
+          const mins = d.getHours() * 60 + d.getMinutes()
+          return { label: l.vak || 'Les', mins, timeStr: `${pad2(d.getHours())}:${pad2(d.getMinutes())}`, type: 'lesson' }
+        }),
+      ...calendarEvents
+        .filter(ev => ev.start_time?.slice(0, 10) === todayStr)
+        .map(ev => {
+          const d = new Date(ev.start_time)
+          const mins = d.getHours() * 60 + d.getMinutes()
+          return { label: ev.title, mins, timeStr: `${pad2(d.getHours())}:${pad2(d.getMinutes())}`, type: 'event' }
+        }),
+    ]
+    return items.filter(e => e.mins >= nowMins).sort((a, b) => a.mins - b.mins)[0] || null
+  })()
 
   return (
     <div style={{ height: '100dvh', overflow: 'hidden', position: 'relative' }}>
@@ -440,6 +475,8 @@ export default function App() {
                   onToggleTask={handleToggleTask}
                   onEditTask={openEditTask}
                   isAdmin={isAdmin}
+                  onLessonsChange={setMagisterLessons}
+                  onEventsChange={setCalendarEvents}
                 />
               </div>
             </div>
@@ -455,7 +492,6 @@ export default function App() {
         {(() => {
           const hour = new Date().getHours()
           const greeting = hour < 12 ? 'Goedemorgen' : hour < 18 ? 'Goedemiddag' : 'Goedenavond'
-          const nextTask = tasks.filter(t => !t.completed)[0] || null
 
           const subTabStyle = (active) => ({
             fontSize: 12, padding: '6px 14px', borderRadius: 20, border: 'none', cursor: 'pointer',
@@ -498,11 +534,11 @@ export default function App() {
                       </div>
                     )}
 
-                    {nextTask && (
-                      <div className="glass-card" style={{ padding: '14px 16px', cursor: 'pointer' }} onClick={() => openEditTask(nextTask)}>
-                        <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: '0 0 4px' }}>Volgende taak</p>
-                        <p style={{ fontSize: 14, color: 'white', fontWeight: 500, margin: '0 0 4px' }}>{nextTask.title}</p>
-                        {nextTask.time && <p style={{ fontSize: 12, color: 'var(--accent)', margin: 0 }}>{nextTask.time}</p>}
+                    {nextEvent && (
+                      <div className="glass-card" style={{ padding: '14px 16px' }}>
+                        <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: '0 0 4px' }}>Volgende gebeurtenis</p>
+                        <p style={{ fontSize: 14, color: 'white', fontWeight: 500, margin: '0 0 4px' }}>{nextEvent.label}</p>
+                        <p style={{ fontSize: 12, color: 'var(--accent)', margin: 0 }}>{nextEvent.timeStr}</p>
                       </div>
                     )}
 
@@ -536,6 +572,7 @@ export default function App() {
                       <Timeline
                         userId={user.id} tasks={tasks} subjects={subjects}
                         onToggleTask={handleToggleTask} onEditTask={openEditTask} isAdmin={isAdmin}
+                        onLessonsChange={setMagisterLessons} onEventsChange={setCalendarEvents}
                         isMobile
                       />
                     </div>
