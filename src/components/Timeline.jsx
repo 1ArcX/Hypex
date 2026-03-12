@@ -78,7 +78,7 @@ const emptyForm = (date, hour) => ({
   color: '#818CF8', recurrence: '', recurrence_days: []
 })
 
-export default function Timeline({ userId, tasks, subjects, onEditTask, defaultView = 'week', isMobile = false, onLessonsChange, onEventsChange }) {
+export default function Timeline({ userId, tasks, subjects, onEditTask, defaultView = 'week', isMobile = false, onLessonsChange, onEventsChange, onMagisterError }) {
   const [view, setView] = useState(defaultView)
   const [current, setCurrent] = useState(new Date())
   const [events, setEvents] = useState([])
@@ -140,11 +140,16 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, defaultV
         sessionStorage.setItem(cacheKey, JSON.stringify(data))
         setMagisterLessons(data)
         setMagisterError(null)
+        onMagisterError?.(null)
       } else {
-        setMagisterError(data?.error || 'Geen lessen ontvangen')
+        const msg = data?.error || 'Geen lessen ontvangen'
+        setMagisterError(msg)
+        onMagisterError?.(msg)
       }
-    }).catch(e => {
-      setMagisterError('Verbindingsfout')
+    }).catch(() => {
+      const msg = 'Verbindingsfout'
+      setMagisterError(msg)
+      onMagisterError?.(msg)
     }).finally(() => setMagisterSyncing(false))
   }, [view, toDateStr(current), scheduleVersion])
 

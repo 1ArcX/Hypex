@@ -95,6 +95,7 @@ export default function App() {
   const [takenTab, setTakenTab]   = useState('taken')
   const [magisterLessons, setMagisterLessons] = useState([])
   const [calendarEvents, setCalendarEvents]   = useState([])
+  const [magisterError, setMagisterError]     = useState(null)
 
   // Drag-and-drop widget order
   const DEFAULT_LEFT  = ['habits', 'notes', 'tasks']
@@ -494,6 +495,7 @@ export default function App() {
                   isAdmin={isAdmin}
                   onLessonsChange={setMagisterLessons}
                   onEventsChange={setCalendarEvents}
+                  onMagisterError={setMagisterError}
                 />
               </div>
             </div>
@@ -551,24 +553,70 @@ export default function App() {
                       </div>
                     )}
 
-                    {nextEvent && (
-                      <div className="glass-card" style={{ padding: '14px 16px' }}>
-                        <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: '0 0 4px' }}>Volgende gebeurtenis</p>
-                        <p style={{ fontSize: 14, color: 'white', fontWeight: 500, margin: '0 0 4px' }}>{nextEvent.label}</p>
-                        <p style={{ fontSize: 12, color: 'var(--accent)', margin: 0 }}>{nextEvent.timeStr}</p>
-                      </div>
-                    )}
-
-                    {!localStorage.getItem('magister_credentials') && (
-                      <div className="glass-card" style={{ padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-                        onClick={() => { setMobileTab('tools'); setToolTab('magister') }}>
-                        <div>
-                          <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', margin: '0 0 2px' }}>Magister niet gekoppeld</p>
-                          <p style={{ fontSize: 13, color: 'white', fontWeight: 500, margin: 0 }}>Koppel je Magister account</p>
+                    {/* Volgende gebeurtenis — altijd zichtbaar */}
+                    <div className="glass-card" style={{ padding: '14px 16px', cursor: nextEvent?.type === 'task' ? 'pointer' : 'default' }}>
+                      <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: '0 0 6px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Volgende gebeurtenis</p>
+                      {nextEvent ? (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div>
+                            <p style={{ fontSize: 15, color: 'white', fontWeight: 600, margin: '0 0 2px' }}>{nextEvent.label}</p>
+                            <p style={{ fontSize: 12, color: 'var(--accent)', margin: 0, fontWeight: 500 }}>{nextEvent.timeStr}</p>
+                          </div>
+                          <span style={{ fontSize: 20 }}>
+                            {nextEvent.type === 'lesson' ? '🎓' : nextEvent.type === 'event' ? '📅' : '✅'}
+                          </span>
                         </div>
-                        <span style={{ fontSize: 18, color: 'rgba(255,255,255,0.2)' }}>→</span>
-                      </div>
-                    )}
+                      ) : (
+                        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', margin: 0 }}>Niets meer gepland vandaag</p>
+                      )}
+                    </div>
+
+                    {/* Magister — grote prompt als niet gekoppeld of fout */}
+                    {(() => {
+                      const hasCreds = !!localStorage.getItem('magister_credentials')
+                      const hasError = !!magisterError
+                      if (!hasCreds || hasError) return (
+                        <div
+                          className="glass-card"
+                          onClick={() => { setMobileTab('tools'); setToolTab('magister') }}
+                          style={{
+                            padding: '18px 20px', cursor: 'pointer',
+                            border: hasError
+                              ? '1px solid rgba(255,107,107,0.35)'
+                              : '1px solid rgba(250,204,21,0.25)',
+                            background: hasError
+                              ? 'rgba(255,80,80,0.06)'
+                              : 'rgba(250,204,21,0.04)',
+                          }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                            <div style={{
+                              width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+                              background: hasError ? 'rgba(255,80,80,0.12)' : 'rgba(250,204,21,0.12)',
+                              border: hasError ? '1px solid rgba(255,80,80,0.3)' : '1px solid rgba(250,204,21,0.3)',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: 22,
+                            }}>
+                              {hasError ? '⚠️' : '🎓'}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <p style={{
+                                fontSize: 14, fontWeight: 700, color: 'white', margin: '0 0 3px',
+                              }}>
+                                {hasError ? 'Magister fout' : 'Koppel Magister'}
+                              </p>
+                              <p style={{
+                                fontSize: 12, margin: 0,
+                                color: hasError ? 'rgba(255,107,107,0.8)' : 'rgba(255,255,255,0.45)',
+                              }}>
+                                {hasError ? magisterError + ' — tik om opnieuw in te loggen' : 'Zie je rooster, cijfers en huiswerk'}
+                              </p>
+                            </div>
+                            <span style={{ fontSize: 16, color: 'rgba(255,255,255,0.25)' }}>›</span>
+                          </div>
+                        </div>
+                      )
+                      return null
+                    })()}
 
                     {/* Habits compact preview */}
                     <div onClick={() => setMobileTab('habits')} style={{ cursor: 'pointer' }}>
@@ -590,6 +638,7 @@ export default function App() {
                         userId={user.id} tasks={tasks} subjects={subjects}
                         onToggleTask={handleToggleTask} onEditTask={openEditTask} isAdmin={isAdmin}
                         onLessonsChange={setMagisterLessons} onEventsChange={setCalendarEvents}
+                        onMagisterError={setMagisterError}
                         isMobile
                       />
                     </div>
