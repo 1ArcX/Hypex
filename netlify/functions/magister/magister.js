@@ -26,7 +26,8 @@ function joinCookies(setCookieArray) {
 
 async function authenticate(school, username, password) {
   const issuerUrl = 'https://accounts.magister.net'
-  const authCode = 'd8594abbed31'
+  // Extracted from accounts.magister.net/js/account-*.js  — update when AuthCodeValidation returns
+  const authCode = '4a1e5f4a1e5f'
   const noRedirects = { redirect: 'manual', follow: 0 }
 
   const issuer = await Issuer.discover(issuerUrl)
@@ -130,18 +131,23 @@ exports.handler = async (event) => {
 
   if (!action || !username || !password) return err('action, username en password zijn verplicht')
 
-  // Let magister.js handle authentication natively (includes up-to-date PKCE flow)
+  let tokenSet
+  try {
+    tokenSet = await authenticate(school, username, password)
+  } catch (e) {
+    return err(e.message || 'Inloggen mislukt. Controleer je leerlingnummer en wachtwoord.', 401)
+  }
+
   let m
   try {
     const magister = require('magister.js').default
     m = await magister({
       school: { url: `https://${school}.magister.net` },
-      username,
-      password,
+      username, password: undefined, tokenSet,
     })
   } catch (e) {
-    console.error('Magister auth error:', e.message)
-    return err(e.message || 'Inloggen mislukt. Controleer je leerlingnummer en wachtwoord.', 401)
+    console.error('Magister session error:', e.message)
+    return err('Sessie aanmaken mislukt', 500)
   }
 
   try {

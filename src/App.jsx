@@ -379,13 +379,13 @@ export default function App() {
 
     const items = [
       ...tasks
-        .filter(t => t.date && t.date >= todayStr && (t.time || t.start_time) && !t.completed)
+        .filter(t => t.date && (t.time || t.start_time) && !t.completed)
         .map(t => {
           const ts = (t.start_time || t.time || '').slice(0, 5)
-          const [h, m] = ts.split(':').map(Number)
           const d = new Date(t.date + 'T' + ts)
           return { label: t.title, ts: d, type: 'task' }
-        }),
+        })
+        .filter(t => t.ts >= now),
       ...allLessons
         .filter(l => l.start && !l.uitgevallen && new Date(l.start) >= now)
         .map(l => {

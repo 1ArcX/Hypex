@@ -5,7 +5,7 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
-function formatDate(dateStr) {
+function formatDate(dateStr, timeStr) {
   if (!dateStr) return ''
   const d = new Date(dateStr + 'T00:00:00')
   const today = new Date()
@@ -14,9 +14,17 @@ function formatDate(dateStr) {
   const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1)
   const tStr = todayStr()
   const tomStr = tomorrow.toISOString().slice(0, 10)
-  if (dateStr === tStr) return { label: 'Vandaag', overdue: false }
-  if (dateStr === tomStr) return { label: 'Morgen', overdue: false }
   if (target < today) return { label: `Verlopen · ${d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`, overdue: true }
+  if (dateStr === tStr) {
+    // If there's a time set and it has already passed, mark as overdue
+    if (timeStr) {
+      const [h, m] = timeStr.split(':').map(Number)
+      const taskTime = new Date(); taskTime.setHours(h, m, 0, 0)
+      if (taskTime < new Date()) return { label: 'Te laat', overdue: true }
+    }
+    return { label: 'Vandaag', overdue: false }
+  }
+  if (dateStr === tomStr) return { label: 'Morgen', overdue: false }
   return { label: d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }), overdue: false }
 }
 
@@ -136,7 +144,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
         {incomplete.map(task => {
           const subject = subjects.find(s => s.id === task.subject_id)
-          const dateInfo = task.date ? formatDate(task.date) : null
+          const dateInfo = task.date ? formatDate(task.date, task.start_time || task.time) : null
           return (
             <div
               key={task.id}
