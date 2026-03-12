@@ -353,48 +353,55 @@ export default function App() {
   const completedToday = todayTasks.filter(t => t.completed).length
   const totalToday = todayTasks.length
 
-  // Next upcoming event (lesson, calendar event, or task with time — today only)
+  // Next upcoming event across coming days (lessons, calendar events, tasks with time)
   const nextEvent = (() => {
     const now = new Date()
-    const nowMins = now.getHours() * 60 + now.getMinutes()
     const pad2 = n => String(n).padStart(2, '0')
+    const fmt = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`
 
-    // Read Magister lessons from sessionStorage cache (populated when agenda tab visited)
+    const DAYS_NL = ['zondag','maandag','dinsdag','woensdag','donderdag','vrijdag','zaterdag']
+    const MONTHS_NL = ['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december']
+    const fmtLabel = d => {
+      const isToday = fmt(d) === todayStr
+      if (isToday) return `vandaag ${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+      return `${DAYS_NL[d.getDay()]} ${d.getDate()} ${MONTHS_NL[d.getMonth()]} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+    }
+
+    // Read Magister lessons from sessionStorage cache
     const weekStart = (() => {
       const d = new Date(now); const day = d.getDay()
       d.setDate(d.getDate() - (day === 0 ? 6 : day - 1)); d.setHours(0,0,0,0); return d
     })()
     const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6)
-    const fmt = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`
     const cacheKey = `magister_sched_${fmt(weekStart)}_${fmt(weekEnd)}`
     const cachedLessons = (() => { try { return JSON.parse(sessionStorage.getItem(cacheKey)) || [] } catch { return [] } })()
-    // Merge sessionStorage cache with any already-lifted lessons from Timeline
     const allLessons = cachedLessons.length ? cachedLessons : magisterLessons
 
     const items = [
       ...tasks
-        .filter(t => t.date === todayStr && (t.time || t.start_time) && !t.completed)
+        .filter(t => t.date && t.date >= todayStr && (t.time || t.start_time) && !t.completed)
         .map(t => {
           const ts = (t.start_time || t.time || '').slice(0, 5)
           const [h, m] = ts.split(':').map(Number)
-          return { label: t.title, mins: (h || 0) * 60 + (m || 0), timeStr: ts, type: 'task' }
+          const d = new Date(t.date + 'T' + ts)
+          return { label: t.title, ts: d, type: 'task' }
         }),
       ...allLessons
-        .filter(l => l.start && !l.uitgevallen && l.start.slice(0, 10) === todayStr)
+        .filter(l => l.start && !l.uitgevallen && new Date(l.start) >= now)
         .map(l => {
           const d = new Date(l.start)
-          const mins = d.getHours() * 60 + d.getMinutes()
-          return { label: l.vak || 'Les', mins, timeStr: `${pad2(d.getHours())}:${pad2(d.getMinutes())}`, type: 'lesson' }
+          return { label: l.vak || 'Les', ts: d, type: 'lesson' }
         }),
       ...calendarEvents
-        .filter(ev => ev.start_time?.slice(0, 10) === todayStr)
+        .filter(ev => ev.start_time && new Date(ev.start_time) >= now)
         .map(ev => {
           const d = new Date(ev.start_time)
-          const mins = d.getHours() * 60 + d.getMinutes()
-          return { label: ev.title, mins, timeStr: `${pad2(d.getHours())}:${pad2(d.getMinutes())}`, type: 'event' }
+          return { label: ev.title, ts: d, type: 'event' }
         }),
     ]
-    return items.filter(e => e.mins >= nowMins).sort((a, b) => a.mins - b.mins)[0] || null
+    const next = items.sort((a, b) => a.ts - b.ts)[0] || null
+    if (!next) return null
+    return { ...next, timeStr: fmtLabel(next.ts) }
   })()
 
   return (

@@ -130,26 +130,18 @@ exports.handler = async (event) => {
 
   if (!action || !username || !password) return err('action, username en password zijn verplicht')
 
-  let tokenSet
-  try {
-    tokenSet = await authenticate(school, username, password)
-  } catch (e) {
-    return err(e.message || 'Inloggen mislukt. Controleer je leerlingnummer en wachtwoord.', 401)
-  }
-
-  // Create a Magister instance with the token
+  // Let magister.js handle authentication natively (includes up-to-date PKCE flow)
   let m
   try {
     const magister = require('magister.js').default
     m = await magister({
       school: { url: `https://${school}.magister.net` },
       username,
-      password: undefined,
-      tokenSet
+      password,
     })
   } catch (e) {
-    console.error('Magister session error:', e.message)
-    return err('Sessie aanmaken mislukt', 500)
+    console.error('Magister auth error:', e.message)
+    return err(e.message || 'Inloggen mislukt. Controleer je leerlingnummer en wachtwoord.', 401)
   }
 
   try {
