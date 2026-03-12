@@ -1,0 +1,88 @@
+const { schedule } = require('@netlify/functions')
+const webpush = require('web-push')
+const { createClient } = require('@supabase/supabase-js')
+
+const VAPID_PUBLIC  = process.env.VAPID_PUBLIC_KEY
+const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY
+const VAPID_EMAIL   = process.env.VAPID_EMAIL || 'mailto:admin@example.com'
+
+webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC, VAPID_PRIVATE)
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+)
+
+async function getBuienalarm(lat, lon) {
+  const res = await fetch(
+    `https://cdn-secure.buienalarm.nl/api/3.4/forecast.php?lat=${lat}&lon=${lon}&region=nl&unit=mm/u`
+  )
+  if (!res.ok) return []
+  const text = await res.text()
+  return text.trim().split('\n').map(line => {
+    const [val] = line.split('|')
+    const precip = parseFloat(val.replace(',', '.'))
+    return isNaN(precip) ? 0 : precip
+  }).filter(v => v >= 0)
+}
+
+async function rainCheckHandler() {
+  const { data: subs, error } = await supabase
+    .from('push_subscriptions')
+    .select('*')
+    .eq('rain_enabled', true)
+
+  if (error) {
+    console.error('Could not load subscriptions:', error.message)
+    return { statusCode: 500 }
+  }
+
+  for (const sub of subs || []) {
+    try {
+      const precipValues = await getBuienalarm(sub.lat, sub.lon)
+      if (!precipValues.length) continue
+
+      // Check if rain starts in next 30 minutes (first 6 entries × 5 min)
+      const upcoming = precipValues.slice(0, 6)
+      const maxPrecip = Math.max(...upcoming)
+      if (maxPrecip < 0.1) continue
+
+      // Don't spam: check last_notified_at (> interval minutes ago)
+      const intervalMinutes = sub.rain_interval_minutes || 60
+      if (sub.last_notified_at) {
+        const lastAt = new Date(sub.last_notified_at)
+        const diffMin = (Date.now() - lastAt) / 60000
+        if (diffMin < intervalMinutes) continue
+      }
+
+      const intensity =
+        maxPrecip < 0.5 ? 'lichte regen' :
+        maxPrecip < 2   ? 'matige regen'  :
+                          'zware regen'
+
+      const payload = JSON.stringify({
+        title: 'Regen op komst!',
+        body: `Er komt ${intensity} aan in de komende 30 minuten.`,
+      })
+
+      await webpush.sendNotification(sub.subscription, payload)
+
+      // Update last_notified_at
+      await supabase
+        .from('push_subscriptions')
+        .update({ last_notified_at: new Date().toISOString() })
+        .eq('id', sub.id)
+
+    } catch (e) {
+      console.error('Push failed for sub', sub.id, e.message)
+      // If subscription is invalid/expired, remove it
+      if (e.statusCode === 410 || e.statusCode === 404) {
+        await supabase.from('push_subscriptions').delete().eq('id', sub.id)
+      }
+    }
+  }
+
+  return { statusCode: 200 }
+}
+
+exports.handler = schedule('*/15 * * * *', rainCheckHandler)

@@ -1,5 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Cloud, Sun, CloudRain, Wind, Droplets, MapPin, RefreshCw, Clock, CloudLightning, Snowflake, CloudDrizzle } from 'lucide-react'
+import { Cloud, Sun, CloudRain, Wind, Droplets, MapPin, RefreshCw, Clock, CloudLightning, Snowflake, CloudDrizzle, Bell, BellOff } from 'lucide-react'
+import { supabase } from '../supabaseClient'
+
+const VAPID_PUBLIC = 'BCsu1QaHUead0cgQ23qUKIu3_MnSi0s21LaD_c9wBcqdP43A9ojEx-nWZ4_xUDYLVMQn0CqzqdhSuLQr6eOQqh4'
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4)
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const raw = atob(base64)
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)))
+}
 
 const WMO_CODES = {
   0:  { label: 'Helder',              icon: Sun },
@@ -117,7 +127,7 @@ function WeekRow({ day, isToday }) {
   )
 }
 
-export default function WeatherWidget({ stacked = false }) {
+export default function WeatherWidget({ stacked = false, userId, onRequestPwaInstall }) {
   const [weather, setWeather]       = useState(null)
   const [weekly, setWeekly]         = useState(null)
   const [rain, setRain]             = useState(null)
@@ -129,6 +139,8 @@ export default function WeatherWidget({ stacked = false }) {
   const [lastUpdated, setLastUpdated] = useState(null)
   const [timeSince, setTimeSince]   = useState('')
   const [tab, setTab]               = useState('huidig') // 'huidig' | 'buien' | 'week'
+  const [notifEnabled, setNotifEnabled] = useState(false)
+  const [notifLoading, setNotifLoading] = useState(false)
   const timerRef = useRef(null)
 
   const fetchWeather = async (cityName = city) => {
@@ -175,6 +187,63 @@ export default function WeatherWidget({ stacked = false }) {
       setRain(data)
     } catch { setRain([]) }
     setRainLoading(false)
+  }
+
+  // Check if notifications already enabled
+  useEffect(() => {
+    if (!userId || !('Notification' in window)) return
+    supabase.from('push_subscriptions').select('id').eq('user_id', userId).eq('rain_enabled', true).maybeSingle()
+      .then(({ data }) => { if (data) setNotifEnabled(true) })
+  }, [userId])
+
+  const toggleRainNotification = async () => {
+    if (!userId) return
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      alert('Je browser ondersteunt geen push notificaties.')
+      return
+    }
+
+    // If enabling: request permission, subscribe, save
+    if (!notifEnabled) {
+      // Prompt PWA install if not in standalone mode
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone
+      if (!isStandalone && onRequestPwaInstall) {
+        onRequestPwaInstall()
+      }
+      setNotifLoading(true)
+      try {
+        const perm = await Notification.requestPermission()
+        if (perm !== 'granted') { setNotifLoading(false); return }
+
+        const reg = await navigator.serviceWorker.ready
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC),
+        })
+
+        const { error } = await supabase.from('push_subscriptions').upsert({
+          user_id: userId,
+          subscription: sub.toJSON(),
+          lat: coords?.lat ?? 52.5,
+          lon: coords?.lon ?? 5.6,
+          rain_enabled: true,
+          rain_interval_minutes: 60,
+        }, { onConflict: 'user_id' })
+
+        if (error) throw error
+        setNotifEnabled(true)
+      } catch (e) {
+        console.error('Notificatie inschakelen mislukt:', e)
+        alert('Notificaties inschakelen mislukt. Controleer je browserinstellingen.')
+      }
+      setNotifLoading(false)
+    } else {
+      // Disable
+      setNotifLoading(true)
+      await supabase.from('push_subscriptions').update({ rain_enabled: false }).eq('user_id', userId)
+      setNotifEnabled(false)
+      setNotifLoading(false)
+    }
   }
 
   // Switch to buien tab or stacked mode → fetch rain
@@ -325,10 +394,30 @@ export default function WeatherWidget({ stacked = false }) {
               <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', marginTop: 6 }}>
                 Bron: Buienalarm · komende 2 uur · per 5 min
               </p>
-              <button onClick={() => { setRain(null); loadRain() }}
-                style={{ marginTop: 6, fontSize: 10, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)' }}>
-                Vernieuwen
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+                <button onClick={() => { setRain(null); loadRain() }}
+                  style={{ fontSize: 10, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)' }}>
+                  Vernieuwen
+                </button>
+                {userId && 'Notification' in window && (
+                  <button
+                    onClick={toggleRainNotification}
+                    disabled={notifLoading}
+                    title={notifEnabled ? 'Regenmelding uitschakelen' : 'Melding bij regen'}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 4,
+                      fontSize: 10, padding: '4px 8px', borderRadius: 6, cursor: 'pointer',
+                      border: notifEnabled ? '1px solid rgba(0,200,255,0.4)' : '1px solid rgba(255,255,255,0.15)',
+                      background: notifEnabled ? 'rgba(0,200,255,0.1)' : 'rgba(255,255,255,0.05)',
+                      color: notifEnabled ? 'rgba(0,200,255,0.9)' : 'rgba(255,255,255,0.4)',
+                      opacity: notifLoading ? 0.5 : 1,
+                    }}
+                  >
+                    {notifEnabled ? <Bell size={10} /> : <BellOff size={10} />}
+                    {notifEnabled ? 'Melding aan' : 'Melding uit'}
+                  </button>
+                )}
+              </div>
             </>
           )}
           {!rainLoading && !rain && !coords && (

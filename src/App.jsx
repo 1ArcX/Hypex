@@ -4,6 +4,7 @@ import AuthPage from './components/AuthPage'
 import Clock from './components/Clock'
 import Timeline from './components/Timeline'
 import TaskModal from './components/TaskModal'
+import TaskDetailModal from './components/TaskDetailModal'
 import NotesWidget from './components/NotesWidget'
 import WeatherWidget from './components/WeatherWidget'
 import PomodoroTimer from './components/PomodoroTimer'
@@ -96,6 +97,12 @@ export default function App() {
   const [magisterLessons, setMagisterLessons] = useState([])
   const [calendarEvents, setCalendarEvents]   = useState([])
   const [magisterError, setMagisterError]     = useState(null)
+  const [detailTask, setDetailTask]           = useState(null)
+  const [nextEventSkip, setNextEventSkip]     = useState(0)
+  const [showPwaPrompt, setShowPwaPrompt]     = useState(false)
+
+  // Reset skip counter when switching to home tab
+  useEffect(() => { if (mobileTab === 'home') setNextEventSkip(0) }, [mobileTab])
 
   // Drag-and-drop widget order
   const DEFAULT_LEFT  = ['habits', 'notes', 'tasks']
@@ -321,8 +328,9 @@ export default function App() {
       notes:    <NotesWidget userId={user.id} />,
       tasks:    <TasksWidget tasks={tasks} subjects={subjects}
                   onAdd={async (data) => { if (!user?.id) return; await supabase.from('tasks').insert({ ...data, completed: false, user_id: user.id }); fetchTasks() }}
-                  onEdit={openEditTask} onDelete={handleDeleteTask} onToggle={handleToggleTask} />,
-      weather:  <WeatherWidget />,
+                  onEdit={openEditTask} onDelete={handleDeleteTask} onToggle={handleToggleTask}
+                  onViewDetail={setDetailTask} />,
+      weather:  <WeatherWidget userId={user?.id} onRequestPwaInstall={() => setShowPwaPrompt(true)} />,
       spotify:  <SpotifyWidget />,
       pomodoro: <PomodoroTimer onModeChange={setIsBreak} userId={user?.id} />,
     }[id] ?? null
@@ -383,25 +391,27 @@ export default function App() {
         .map(t => {
           const ts = (t.start_time || t.time || '').slice(0, 5)
           const d = new Date(t.date + 'T' + ts)
-          return { label: t.title, ts: d, type: 'task' }
+          return { label: t.title, ts: d, type: 'task', raw: t }
         })
         .filter(t => t.ts >= now),
       ...allLessons
         .filter(l => l.start && !l.uitgevallen && new Date(l.start) >= now)
         .map(l => {
           const d = new Date(l.start)
-          return { label: l.vak || 'Les', ts: d, type: 'lesson' }
+          return { label: l.vak || 'Les', ts: d, type: 'lesson', raw: l }
         }),
       ...calendarEvents
         .filter(ev => ev.start_time && new Date(ev.start_time) >= now)
         .map(ev => {
           const d = new Date(ev.start_time)
-          return { label: ev.title, ts: d, type: 'event' }
+          return { label: ev.title, ts: d, type: 'event', raw: ev }
         }),
-    ]
-    const next = items.sort((a, b) => a.ts - b.ts)[0] || null
-    if (!next) return null
-    return { ...next, timeStr: fmtLabel(next.ts) }
+    ].sort((a, b) => a.ts - b.ts)
+
+    const idx = Math.min(nextEventSkip, items.length - 1)
+    const next = items[Math.max(0, idx)] || null
+    if (!next) return { item: null, hasMore: false }
+    return { item: { ...next, timeStr: fmtLabel(next.ts) }, hasMore: idx < items.length - 1 }
   })()
 
   return (
@@ -561,22 +571,40 @@ export default function App() {
                     )}
 
                     {/* Volgende gebeurtenis — altijd zichtbaar */}
-                    <div className="glass-card" style={{ padding: '14px 16px', cursor: nextEvent?.type === 'task' ? 'pointer' : 'default' }}>
-                      <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: '0 0 6px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Volgende gebeurtenis</p>
-                      {nextEvent ? (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <div>
-                            <p style={{ fontSize: 15, color: 'white', fontWeight: 600, margin: '0 0 2px' }}>{nextEvent.label}</p>
-                            <p style={{ fontSize: 12, color: 'var(--accent)', margin: 0, fontWeight: 500 }}>{nextEvent.timeStr}</p>
+                    {(() => {
+                      const { item: ev, hasMore } = nextEvent
+                      return (
+                        <div className="glass-card" style={{ padding: '14px 16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                            <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: 0, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Volgende gebeurtenis</p>
+                            {ev && (
+                              <button
+                                onClick={() => setNextEventSkip(s => s + 1)}
+                                disabled={!hasMore}
+                                title="Volgende"
+                                style={{ background: 'none', border: 'none', cursor: hasMore ? 'pointer' : 'default', color: hasMore ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.12)', padding: 0, fontSize: 16, lineHeight: 1 }}>
+                                ›
+                              </button>
+                            )}
                           </div>
-                          <span style={{ fontSize: 20 }}>
-                            {nextEvent.type === 'lesson' ? '🎓' : nextEvent.type === 'event' ? '📅' : '✅'}
-                          </span>
+                          {ev ? (
+                            <div
+                              onClick={() => ev.type === 'task' && ev.raw && setDetailTask(ev.raw)}
+                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: ev.type === 'task' ? 'pointer' : 'default' }}>
+                              <div>
+                                <p style={{ fontSize: 15, color: 'white', fontWeight: 600, margin: '0 0 2px' }}>{ev.label}</p>
+                                <p style={{ fontSize: 12, color: 'var(--accent)', margin: 0, fontWeight: 500 }}>{ev.timeStr}</p>
+                              </div>
+                              <span style={{ fontSize: 20 }}>
+                                {ev.type === 'lesson' ? '🎓' : ev.type === 'event' ? '📅' : '✅'}
+                              </span>
+                            </div>
+                          ) : (
+                            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', margin: 0 }}>Niets meer gepland</p>
+                          )}
                         </div>
-                      ) : (
-                        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', margin: 0 }}>Niets meer gepland vandaag</p>
-                      )}
-                    </div>
+                      )
+                    })()}
 
                     {/* Magister — grote prompt als niet gekoppeld of fout */}
                     {(() => {
@@ -666,6 +694,7 @@ export default function App() {
                             tasks={tasks} subjects={subjects}
                             onAdd={async (data) => { if (!user?.id) return; await supabase.from('tasks').insert({ ...data, completed: false, user_id: user.id }); fetchTasks() }}
                             onEdit={openEditTask} onDelete={handleDeleteTask} onToggle={handleToggleTask}
+                            onViewDetail={setDetailTask}
                           />
                         </div>
                       )}
@@ -695,7 +724,7 @@ export default function App() {
                     </div>
                     <div style={{ flex: 1, overflow: 'hidden', padding: '12px 16px 16px' }}>
                       <div style={{ height: '100%', overflowY: 'auto' }}>
-                        {toolTab === 'weer'     && <WeatherWidget stacked />}
+                        {toolTab === 'weer'     && <WeatherWidget stacked userId={user?.id} onRequestPwaInstall={() => setShowPwaPrompt(true)} />}
                         {toolTab === 'pomodoro' && <PomodoroTimer onModeChange={setIsBreak} onPomodoroActive={setPomodoroActive} userId={user?.id} />}
                         {toolTab === 'spotify'  && <SpotifyWidget />}
                         {toolTab === 'magister' && <MagisterWidget userId={user.id} onSubjectsSync={() => { fetchSubjects(); fetchProfiles() }} />}
@@ -753,6 +782,49 @@ export default function App() {
           onSave={handleSaveTask}
           onDelete={handleDeleteTask}
         />
+      )}
+
+      {detailTask && (
+        <TaskDetailModal
+          task={detailTask}
+          subjects={subjects}
+          onEdit={(task) => { setDetailTask(null); openEditTask(task) }}
+          onDelete={(id) => { setDetailTask(null); handleDeleteTask(id) }}
+          onClose={() => setDetailTask(null)}
+        />
+      )}
+
+      {/* PWA install prompt */}
+      {showPwaPrompt && (
+        <div style={{ position:'fixed',inset:0,zIndex:10000,display:'flex',alignItems:'flex-end',justifyContent:'center',background:'rgba(0,0,0,0.7)',backdropFilter:'blur(10px)',padding:'16px' }}
+          onClick={() => setShowPwaPrompt(false)}>
+          <div className="glass-card" style={{ width:'100%',maxWidth:'440px',padding:'24px' }}
+            onClick={e => e.stopPropagation()}>
+            <h3 style={{ color:'white',fontWeight:700,fontSize:'16px',margin:'0 0 8px' }}>App installeren</h3>
+            <p style={{ fontSize:13,color:'rgba(255,255,255,0.6)',margin:'0 0 16px',lineHeight:1.5 }}>
+              Om meldingen te ontvangen (ook als de pagina gesloten is), installeer de app op je beginscherm:
+            </p>
+            <div style={{ marginBottom:16 }}>
+              <p style={{ fontSize:12,fontWeight:600,color:'var(--accent)',margin:'0 0 6px' }}>iPhone / iPad (Safari):</p>
+              <ol style={{ fontSize:12,color:'rgba(255,255,255,0.6)',paddingLeft:20,margin:0,lineHeight:1.8 }}>
+                <li>Tik op het Deel-icoon <span style={{ fontSize:14 }}>⎋</span> onderaan</li>
+                <li>Kies <b style={{ color:'white' }}>"Zet op beginscherm"</b></li>
+                <li>Tik op <b style={{ color:'white' }}>Voeg toe</b></li>
+              </ol>
+            </div>
+            <div style={{ marginBottom:20 }}>
+              <p style={{ fontSize:12,fontWeight:600,color:'var(--accent)',margin:'0 0 6px' }}>Android (Chrome):</p>
+              <ol style={{ fontSize:12,color:'rgba(255,255,255,0.6)',paddingLeft:20,margin:0,lineHeight:1.8 }}>
+                <li>Tik op het menu <b style={{ color:'white' }}>⋮</b> rechtsboven</li>
+                <li>Kies <b style={{ color:'white' }}>"App installeren"</b> of <b style={{ color:'white' }}>"Toevoegen aan beginscherm"</b></li>
+              </ol>
+            </div>
+            <button onClick={() => setShowPwaPrompt(false)}
+              style={{ width:'100%',padding:'10px',borderRadius:10,border:'1px solid rgba(255,255,255,0.15)',background:'rgba(255,255,255,0.06)',color:'white',cursor:'pointer',fontSize:13 }}>
+              Sluiten
+            </button>
+          </div>
+        </div>
       )}
     </div>
   )

@@ -28,7 +28,7 @@ function formatDate(dateStr, timeStr) {
   return { label: d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }), overdue: false }
 }
 
-export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle, onEdit, onDragStart }) {
+export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle, onEdit, onDragStart, onViewDetail }) {
   const [adding, setAdding] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [newDate, setNewDate] = useState(todayStr())
@@ -180,8 +180,8 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                 </p>
               </div>
               <button
-                onClick={() => onEdit?.(task)}
-                title="Bewerken"
+                onClick={() => onViewDetail ? onViewDetail(task) : onEdit?.(task)}
+                title="Details"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.2)', padding: '3px', flexShrink: 0, borderRadius: '4px' }}
                 onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.7)'}
                 onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.2)'}>

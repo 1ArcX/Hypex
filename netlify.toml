@@ -8,6 +8,9 @@
 [functions."magister/magister"]
   timeout = 26
 
+[functions."rain-check/rain-check"]
+  schedule = "*/15 * * * *"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

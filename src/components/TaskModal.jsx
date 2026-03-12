@@ -12,12 +12,15 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, on
   const [subjectId, setSubjectId] = useState('')
   const [color, setColor] = useState(EVENT_COLORS[0])
   const [completed, setCompleted] = useState(false)
+  const [allDay, setAllDay] = useState(false)
 
   useEffect(() => {
     if (task) {
       setTitle(task.title || '')
       setDescription(task.description || '')
       setDate(task.date || '')
+      const isAllDay = !task.start_time && !task.time && !task.end_time
+      setAllDay(isAllDay)
       setStartTime(task.start_time || task.time || '09:00')
       setEndTime(task.end_time || '10:00')
       setSubjectId(task.subject_id || '')
@@ -27,12 +30,19 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, on
       setDate(defaultDate || new Date().toISOString().slice(0,10))
       setStartTime(defaultTime || '09:00')
       setEndTime(defaultTime ? (defaultTime.slice(0,2) < '23' ? `${String(parseInt(defaultTime)+1).padStart(2,'0')}:00` : '23:59') : '10:00')
+      setAllDay(false)
     }
   }, [task, defaultTime, defaultDate])
 
   const handleSave = () => {
     if (!title.trim()) return
-    onSave({ id: task?.id, title, description, date, start_time: startTime, end_time: endTime, time: startTime, subject_id: subjectId || null, color, completed })
+    onSave({
+      id: task?.id, title, description, date,
+      start_time: allDay ? null : startTime,
+      end_time: allDay ? null : endTime,
+      time: allDay ? null : startTime,
+      subject_id: subjectId || null, color, completed
+    })
   }
 
   return (
@@ -58,18 +68,28 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, on
             <input type="date" className="glass-input" value={date} style={{colorScheme:'dark'}}
               onChange={e=>setDate(e.target.value)}/>
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
-            <div>
-              <label style={{color:'rgba(255,255,255,0.35)',fontSize:'11px',display:'block',marginBottom:'4px'}}>Starttijd</label>
-              <input type="time" className="glass-input" value={startTime} style={{colorScheme:'dark'}}
-                onChange={e=>setStartTime(e.target.value)}/>
+          {/* All-day toggle */}
+          <button type="button" onClick={()=>setAllDay(v=>!v)}
+            style={{display:'flex',alignItems:'center',gap:8,background:'none',border:'none',cursor:'pointer',color:allDay?'var(--accent)':'rgba(255,255,255,0.4)',fontSize:13,padding:0,width:'fit-content'}}>
+            <div style={{width:20,height:20,borderRadius:6,background:allDay?'color-mix(in srgb, var(--accent) 20%, transparent)':'rgba(255,255,255,0.05)',border:`1px solid ${allDay?'color-mix(in srgb, var(--accent) 50%, transparent)':'rgba(255,255,255,0.2)'}`,display:'flex',alignItems:'center',justifyContent:'center',transition:'all 0.2s',flexShrink:0}}>
+              {allDay && <span style={{fontSize:12}}>✓</span>}
             </div>
-            <div>
-              <label style={{color:'rgba(255,255,255,0.35)',fontSize:'11px',display:'block',marginBottom:'4px'}}>Eindtijd</label>
-              <input type="time" className="glass-input" value={endTime} style={{colorScheme:'dark'}}
-                onChange={e=>setEndTime(e.target.value)}/>
+            Hele dag
+          </button>
+          {!allDay && (
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              <div>
+                <label style={{color:'rgba(255,255,255,0.35)',fontSize:'11px',display:'block',marginBottom:'4px'}}>Starttijd</label>
+                <input type="time" className="glass-input" value={startTime} style={{colorScheme:'dark',width:'100%'}}
+                  onChange={e=>setStartTime(e.target.value)}/>
+              </div>
+              <div>
+                <label style={{color:'rgba(255,255,255,0.35)',fontSize:'11px',display:'block',marginBottom:'4px'}}>Eindtijd</label>
+                <input type="time" className="glass-input" value={endTime} style={{colorScheme:'dark',width:'100%'}}
+                  onChange={e=>setEndTime(e.target.value)}/>
+              </div>
             </div>
-          </div>
+          )}
 
           <div>
             <label style={{color:'rgba(255,255,255,0.35)',fontSize:'11px',display:'block',marginBottom:'4px'}}>Vak</label>
