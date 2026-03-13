@@ -98,6 +98,7 @@ export default function App() {
   const [calendarEvents, setCalendarEvents]   = useState([])
   const [magisterError, setMagisterError]     = useState(null)
   const [detailTask, setDetailTask]           = useState(null)
+  const [subjectLinks, setSubjectLinks]       = useState({})
   const [nextEventSkip, setNextEventSkip]     = useState(0)
   const [showPwaPrompt, setShowPwaPrompt]     = useState(false)
   const [homeRain, setHomeRain]               = useState(null)
@@ -183,7 +184,7 @@ export default function App() {
   // Load data
   useEffect(() => {
     if (session && user?.id) {
-      fetchTasks(); fetchSubjects(); fetchProfiles()
+      fetchTasks(); fetchSubjects(); fetchProfiles(); fetchSubjectLinks()
       // Fetch today's calendar events for home screen "next event"
       supabase.from('calendar_events').select('*').eq('user_id', user.id).then(({ data }) => {
         if (data) setCalendarEvents(data)
@@ -234,6 +235,15 @@ export default function App() {
       setSubjects(clean || [])
     } else {
       setSubjects(rows)
+    }
+  }
+
+  const fetchSubjectLinks = async () => {
+    const { data } = await supabase.from('subject_links').select('vak_naam, url')
+    if (data) {
+      const map = {}
+      data.forEach(row => { map[row.vak_naam] = row.url })
+      setSubjectLinks(map)
     }
   }
 
@@ -548,7 +558,7 @@ export default function App() {
                 />
               </div>
             </div>
-            <MagisterWidget userId={user.id} onSubjectsSync={() => { fetchSubjects(); fetchProfiles() }} />
+            <MagisterWidget userId={user.id} onSubjectsSync={() => { fetchSubjects(); fetchProfiles(); fetchSubjectLinks() }} />
           </div>
 
           {/* RIGHT COLUMN */}
@@ -825,7 +835,7 @@ export default function App() {
                         {toolTab === 'weer'     && <WeatherWidget stacked userId={user?.id} onRequestPwaInstall={() => setShowPwaPrompt(true)} />}
                         {toolTab === 'pomodoro' && <PomodoroTimer onModeChange={setIsBreak} onPomodoroActive={setPomodoroActive} userId={user?.id} />}
                         {toolTab === 'spotify'  && <SpotifyWidget />}
-                        {toolTab === 'magister' && <MagisterWidget userId={user.id} onSubjectsSync={() => { fetchSubjects(); fetchProfiles() }} />}
+                        {toolTab === 'magister' && <MagisterWidget userId={user.id} onSubjectsSync={() => { fetchSubjects(); fetchProfiles(); fetchSubjectLinks() }} />}
                       </div>
                     </div>
                   </div>
@@ -886,6 +896,7 @@ export default function App() {
         <TaskDetailModal
           task={detailTask}
           subjects={subjects}
+          subjectLinks={subjectLinks}
           onEdit={(task) => { setDetailTask(null); openEditTask(task) }}
           onDelete={(id) => { setDetailTask(null); handleDeleteTask(id) }}
           onClose={() => setDetailTask(null)}

@@ -15,13 +15,16 @@ function fmtDate(dateStr) {
   return `${DAYS_NL[d.getDay()]} ${d.getDate()} ${MONTHS_NL[d.getMonth()]}`
 }
 
-export default function TaskDetailModal({ task, subjects, onEdit, onDelete, onClose }) {
+export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onEdit, onDelete, onClose }) {
   const [editingBook, setEditingBook] = useState(false)
   const [bookInput, setBookInput] = useState('')
 
   if (!task) return null
   const subject = subjects.find(s => s.id === task.subject_id)
-  const bookUrl = subject ? localStorage.getItem(`subject_book_url_${subject.id}`) : null
+  // Magister-link (Supabase) heeft voorrang op handmatig ingestelde localStorage-link
+  const bookUrl = subject
+    ? (subjectLinks[subject.name] || localStorage.getItem(`subject_book_url_${subject.id}`))
+    : null
   const isAllDay = !task.start_time && !task.time && !task.end_time
 
   const saveBookUrl = () => {
