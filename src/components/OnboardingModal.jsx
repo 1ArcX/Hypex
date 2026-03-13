@@ -2,23 +2,39 @@ import React, { useState } from 'react'
 import { MapPin, GraduationCap, ChevronRight, Check } from 'lucide-react'
 
 export default function OnboardingModal({ user, onClose }) {
-  const needsLocation = !localStorage.getItem('weather_coords')
-  const needsMagister = !localStorage.getItem('magister_credentials')
+  // Stappen worden éénmalig berekend bij mount — niet elke re-render opnieuw.
+  // Zo valt de locatiestap niet weg zodra je iets opslaat in localStorage.
+  const [steps] = useState(() => {
+    const s = ['welcome', 'location']
+    if (!localStorage.getItem('magister_credentials')) s.push('magister')
+    s.push('done')
+    return s
+  })
 
-  const steps = ['welcome']
-  if (needsLocation) steps.push('location')
-  if (needsMagister) steps.push('magister')
-  steps.push('done')
+  const [stepIndex, setStepIndex] = useState(0)
 
-  const [stepIndex, setStepIndex]     = useState(0)
-  const [cityQuery, setCityQuery]     = useState('')
+  // Locatie: bestaande coords laden of Dronten als default
+  const [cityQuery, setCityQuery] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('weather_coords'))
+      return saved?.city || 'Dronten'
+    } catch { return 'Dronten' }
+  })
   const [cityResults, setCityResults] = useState([])
-  const [selectedCity, setSelectedCity] = useState(null)
-  const [school, setSchool]           = useState('ichthus')
-  const [leerlingnummer, setLeerlingnummer] = useState('')
-  const [wachtwoord, setWachtwoord]   = useState('')
+  const [selectedCity, setSelectedCity] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('weather_coords'))
+      if (saved?.lat) return { name: saved.city || 'Opgeslagen locatie', latitude: saved.lat, longitude: saved.lon }
+    } catch {}
+    // Dronten als default
+    return { name: 'Dronten', latitude: 52.5217, longitude: 5.7214 }
+  })
 
-  const step = steps[stepIndex]
+  const [school, setSchool]                   = useState('ichthus')
+  const [leerlingnummer, setLeerlingnummer]   = useState('')
+  const [wachtwoord, setWachtwoord]           = useState('')
+
+  const step     = steps[stepIndex]
   const progress = ((stepIndex + 1) / steps.length) * 100
 
   const finish = () => {
@@ -48,6 +64,16 @@ export default function OnboardingModal({ user, onClose }) {
     setCityResults([])
   }
 
+  const confirmLocation = () => {
+    // Sla selectedCity op als die nog niet gesaved is (bijv. Dronten default)
+    localStorage.setItem('weather_coords', JSON.stringify({
+      lat: selectedCity.latitude,
+      lon: selectedCity.longitude,
+      city: selectedCity.name,
+    }))
+    next()
+  }
+
   const saveMagister = () => {
     if (!school || !leerlingnummer || !wachtwoord) return
     localStorage.setItem('magister_credentials', JSON.stringify({
@@ -66,9 +92,13 @@ export default function OnboardingModal({ user, onClose }) {
   }
 
   const primaryBtn = (disabled) => ({
-    flex: 2, padding: '11px', background: disabled ? 'rgba(255,255,255,0.07)' : 'var(--accent)',
-    border: 'none', borderRadius: 10, color: disabled ? 'rgba(255,255,255,0.25)' : '#000',
-    fontWeight: 700, fontSize: 14, cursor: disabled ? 'default' : 'pointer', transition: 'all 0.2s',
+    flex: 2, padding: '11px',
+    background: disabled ? 'rgba(255,255,255,0.07)' : 'var(--accent)',
+    border: 'none', borderRadius: 10,
+    color: disabled ? 'rgba(255,255,255,0.25)' : '#000',
+    fontWeight: 700, fontSize: 14,
+    cursor: disabled ? 'default' : 'pointer',
+    transition: 'all 0.2s',
   })
 
   const secondaryBtn = {
@@ -163,7 +193,7 @@ export default function OnboardingModal({ user, onClose }) {
 
             <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
               <button onClick={next} style={secondaryBtn}>Overslaan</button>
-              <button onClick={next} disabled={!selectedCity} style={primaryBtn(!selectedCity)}>
+              <button onClick={confirmLocation} style={primaryBtn(false)}>
                 Bevestigen
               </button>
             </div>
@@ -228,7 +258,14 @@ export default function OnboardingModal({ user, onClose }) {
             <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, margin: '0 0 24px' }}>
               Je dashboard is klaar voor gebruik. Veel succes vandaag!
             </p>
-            <button onClick={finish} style={{ ...primaryBtn(false), width: '100%' }}>
+            <button
+              onClick={finish}
+              style={{
+                width: '100%', padding: '11px', background: 'var(--accent)',
+                border: 'none', borderRadius: 10, color: '#000',
+                fontWeight: 700, fontSize: 14, cursor: 'pointer',
+              }}
+            >
               Naar dashboard
             </button>
           </div>
