@@ -5,7 +5,8 @@ const fetch = require('node-fetch')
 
 const VAPID_PUBLIC  = process.env.VAPID_PUBLIC_KEY
 const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY
-const VAPID_EMAIL   = process.env.VAPID_EMAIL || 'mailto:admin@example.com'
+const rawEmail    = process.env.VAPID_EMAIL || 'admin@example.com'
+const VAPID_EMAIL = rawEmail.startsWith('mailto:') ? rawEmail : `mailto:${rawEmail}`
 
 webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC, VAPID_PRIVATE)
 
