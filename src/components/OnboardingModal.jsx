@@ -193,6 +193,7 @@ export default function OnboardingModal({ user, onClose }) {
                 placeholder="Leerlingnummer"
                 style={inputStyle}
                 autoCapitalize="none"
+                autoComplete="off"
               />
               <input
                 value={wachtwoord}
@@ -200,6 +201,7 @@ export default function OnboardingModal({ user, onClose }) {
                 type="password"
                 placeholder="Wachtwoord"
                 style={inputStyle}
+                autoComplete="new-password"
               />
             </div>
             <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', marginTop: 8 }}>
