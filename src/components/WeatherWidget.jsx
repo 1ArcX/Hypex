@@ -38,10 +38,12 @@ const WMO_CODES = {
 const DAY_NAMES = ['Zo', 'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za']
 const REFRESH_INTERVAL = 10 * 60 * 1000
 
-// Buienalarm via Netlify proxy (voorkomt CORS blokkade op mobiel)
-// API retourneert JSON: { start (unix s), delta (s), precip: float[] }
+// Buienalarm API — heeft Access-Control-Allow-Origin: * dus direct aanroepen kan
+// Retourneert JSON: { start (unix s), delta (s), precip: float[] }
 async function fetchBuienalarm(lat, lon) {
-  const res = await fetch(`/.netlify/functions/buienalarm?lat=${lat}&lon=${lon}`)
+  const res = await fetch(
+    `https://cdn-secure.buienalarm.nl/api/3.4/forecast.php?lat=${lat}&lon=${lon}&region=nl&unit=mm/u`
+  )
   const json = await res.json()
   if (!json?.precip?.length) return []
   return json.precip.map((precip, i) => {
