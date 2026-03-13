@@ -150,5 +150,30 @@ exports.handler = async (event) => {
     }
   }
 
+  if (action === 'day_planning') {
+    const date = body.date  // 'YYYY-MM-DD'
+    if (!date) return err('date is verplicht')
+    const qs = new URLSearchParams({
+      'date[gte]': date,
+      'date[lte]': date,
+      limit: 100,
+      sorting: '+start_datetime'
+    }).toString()
+    const authHeaders = { ...PMT_HEADERS, 'x-api-user': auth.token }
+    const res = await fetch(`${API_V2}/shifts?${qs}`, { headers: authHeaders, timeout: 10000 })
+    const data = await res.json()
+    if (!res.ok) return err(data?.result?.[0]?.message || 'Dag planning ophalen mislukt', 500)
+    const raw = (data.result || [])
+      .filter(s => s.start_datetime && s.start_datetime !== s.end_datetime
+                 && !s.start_datetime.endsWith('00:00'))
+    const dayShifts = raw.map(s => ({
+      start: s.start_datetime.split(' ')[1]?.slice(0, 5) || '',
+      end:   s.end_datetime.split(' ')[1]?.slice(0, 5) || '',
+      department_id: s.department_id,
+      isOwn: s.account_id === auth.accountId
+    }))
+    return ok({ dayShifts, date, total: dayShifts.length })
+  }
+
   return err(`Onbekende actie: ${action}`)
 }

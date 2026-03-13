@@ -4,11 +4,26 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#00FFD1" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
     <title>Student Dashboard</title>
-    <script type="module" crossorigin src="/assets/index-CJsYaF8N.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-DlwN73yd.css">
+    <style>
+      /* Prevent iOS zoom on input focus */
+      input, textarea, select { font-size: 16px !important; }
+      input[type="time"], input[type="date"] { font-size: 16px !important; }
+    </style>
+    <script type="module" crossorigin src="/assets/index-DWSIKW5h.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DG2bIxnE.css">
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {})
+        })
+      }
+    </script>
   </body>
 </html>

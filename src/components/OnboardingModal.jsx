@@ -134,7 +134,7 @@ export default function OnboardingModal({ user, onClose }) {
         {step === 'welcome' && (
           <div>
             <div style={{ fontSize: 40, marginBottom: 10 }}>👋</div>
-            <h2 style={{ color: 'white', fontSize: 21, fontWeight: 700, margin: '0 0 8px' }}>Welkom bij Hypex</h2>
+            <h2 style={{ color: 'white', fontSize: 21, fontWeight: 700, margin: '0 0 8px' }}>Welkom bij Dash</h2>
             <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, lineHeight: 1.65, margin: '0 0 24px' }}>
               Laten we je dashboard even snel instellen. Dit duurt minder dan een minuut.
             </p>

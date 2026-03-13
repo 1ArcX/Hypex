@@ -51,10 +51,13 @@ export default function WorkWidget() {
   const [year, setYear] = useState(new Date().getFullYear())
   const [showSettings, setShowSettings] = useState(false)
   const [expanded, setExpanded] = useState(true)
+  const [selectedDay, setSelectedDay] = useState(null)
+  const [dayShifts, setDayShifts] = useState(null)
+  const [dayLoading, setDayLoading] = useState(false)
 
   useEffect(() => {
     if (creds) fetchSchedule(creds, week, year)
-  }, [creds])
+  }, [])
 
   const fetchSchedule = async (c, w, y) => {
     if (!c) return
@@ -84,14 +87,33 @@ export default function WorkWidget() {
     if (!formCreds.username || !formCreds.password) return
     setLoading(true); setError(null)
     try {
-      await callPmt(formCreds, 'login')
+      const data = await callPmt(formCreds, 'schedule', { week, year })
       localStorage.setItem(STORAGE_KEY, JSON.stringify(formCreds))
       setCreds(formCreds)
+      setShifts(data.shifts || [])
       setShowSettings(false)
     } catch (e) {
       setError(e.message)
     }
     setLoading(false)
+  }
+
+  const fetchDayPlanning = async (date) => {
+    if (selectedDay === date) { setSelectedDay(null); return }
+    setSelectedDay(date); setDayShifts(null); setDayLoading(true)
+    try {
+      const data = await callPmt(creds, 'day_planning', { date })
+      setDayShifts(data.dayShifts || [])
+    } catch (e) {
+      setDayShifts([])
+    }
+    setDayLoading(false)
+  }
+
+  function toPmtDayUrl(dateStr) {
+    if (!dateStr) return BASE_URL
+    const d = new Date(dateStr)
+    return `${BASE_URL}/planning/department-schedule/${d.getDate()}-${d.getMonth() + 1}-${d.getFullYear()}`
   }
 
   const logout = () => {
@@ -234,7 +256,9 @@ export default function WorkWidget() {
                     </div>
                   ) : (
                     shifts.map((shift, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', borderRadius: '10px', background: accentBg(5), border: accentBorder(15) }}>
+                      <div key={i}
+                        onClick={() => fetchDayPlanning(shift.date)}
+                        style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', borderRadius: '10px', background: selectedDay === shift.date ? accentBg(12) : accentBg(5), border: selectedDay === shift.date ? accentBorder(35) : accentBorder(15), cursor: 'pointer', transition: 'background 0.15s' }}>
                         <Briefcase size={13} style={{ color: 'var(--accent)', opacity: 0.7, flexShrink: 0 }} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
@@ -251,9 +275,65 @@ export default function WorkWidget() {
                             </p>
                           )}
                         </div>
+                        {selectedDay === shift.date
+                          ? <ChevronUp size={12} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                          : <ChevronDown size={12} style={{ color: 'rgba(255,255,255,0.25)', flexShrink: 0 }} />
+                        }
                       </div>
                     ))
                   )}
+
+                  {/* Day planning panel */}
+                  {selectedDay && (
+                    <div style={{ borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', padding: '10px 12px', marginTop: '2px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', fontWeight: 500 }}>
+                          Wie werkt er op {formatShiftDate(selectedDay)}?
+                        </span>
+                        <button onClick={() => setSelectedDay(null)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '0', lineHeight: 0 }}>
+                          <ChevronUp size={12} />
+                        </button>
+                      </div>
+
+                      {dayLoading && (
+                        <div style={{ textAlign: 'center', padding: '8px', color: 'rgba(255,255,255,0.3)', fontSize: '11px' }}>
+                          <RefreshCw size={12} style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }} />
+                        </div>
+                      )}
+
+                      {!dayLoading && dayShifts && (
+                        <>
+                          {dayShifts.length === 0 ? (
+                            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: 0, textAlign: 'center' }}>Geen shifts gevonden</p>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                              {dayShifts.map((s, i) => (
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', borderRadius: '7px', background: s.isOwn ? accentBg(12) : 'rgba(255,255,255,0.03)', border: s.isOwn ? accentBorder(30) : '1px solid rgba(255,255,255,0.05)' }}>
+                                  <span style={{ fontSize: '11px', color: s.isOwn ? 'var(--accent)' : 'rgba(255,255,255,0.7)', fontWeight: s.isOwn ? 600 : 400, flexShrink: 0 }}>
+                                    {s.start} – {s.end}
+                                  </span>
+                                  <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', flex: 1 }}>
+                                    afd. {s.department_id}
+                                  </span>
+                                  {s.isOwn && <span style={{ fontSize: '10px', color: 'var(--accent)', flexShrink: 0 }}>(jouw shift)</span>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <div style={{ marginTop: '8px', textAlign: 'center' }}>
+                            <a href={toPmtDayUrl(selectedDay)} target="_blank" rel="noopener noreferrer"
+                              style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                              onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
+                              onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.25)'}>
+                              <ExternalLink size={10} /> Open dag planning in PMT
+                            </a>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
                   <div style={{ textAlign: 'center', marginTop: '4px' }}>
                     <a href={pmtUrl} target="_blank" rel="noopener noreferrer"
                       style={{ fontSize: '11px', color: 'rgba(255,255,255,0.2)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
