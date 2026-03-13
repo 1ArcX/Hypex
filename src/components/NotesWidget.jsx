@@ -38,7 +38,7 @@ function formatDate(iso) {
   return `${d.getDate()} ${months[d.getMonth()]}`
 }
 
-export default function NotesWidget({ userId, fullHeight = false }) {
+export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 0 }) {
   const [folders, setFolders]       = useState([])
   const [notes, setNotes]           = useState([])
   const [activeNote, setActiveNote] = useState(null)
@@ -71,6 +71,13 @@ export default function NotesWidget({ userId, fullHeight = false }) {
     fetchFolders()
     fetchNotes()
   }, [fetchFolders, fetchNotes])
+
+  // Hersync bij externe trigger (alleen als de editor niet open is)
+  useEffect(() => {
+    if (syncTrigger === 0 || activeNote) return
+    fetchFolders()
+    fetchNotes()
+  }, [syncTrigger])
 
   const createNote = async () => {
     const { data } = await supabase.from('notes').insert({

@@ -8,7 +8,7 @@ import TaskDetailModal from './components/TaskDetailModal'
 import NotesWidget from './components/NotesWidget'
 import WeatherWidget from './components/WeatherWidget'
 import PomodoroTimer from './components/PomodoroTimer'
-import { LogOut, GraduationCap, Home, CalendarDays, CheckSquare, Layers, FileText, Flame, GripVertical } from 'lucide-react'
+import { LogOut, GraduationCap, Home, CalendarDays, CheckSquare, Layers, FileText, Flame, GripVertical, RefreshCw } from 'lucide-react'
 import SpotifyWidget from './components/SpotifyWidget'
 import ThemeSettings from './components/ThemeSettings'
 import { Settings } from 'lucide-react'
@@ -104,6 +104,9 @@ export default function App() {
   const [showPwaPrompt, setShowPwaPrompt]     = useState(false)
   const [homeRain, setHomeRain]               = useState(null)
   const [showOnboarding, setShowOnboarding]   = useState(false)
+  const [syncTrigger, setSyncTrigger]         = useState(0)
+  const [syncing, setSyncing]                 = useState(false)
+  const [syncFlash, setSyncFlash]             = useState(false)
 
   // Reset skip counter when switching to home tab
   useEffect(() => { if (mobileTab === 'home') setNextEventSkip(0) }, [mobileTab])
@@ -222,6 +225,29 @@ export default function App() {
     window.addEventListener('refreshTasks', handler)
     return () => window.removeEventListener('refreshTasks', handler)
   }, [user?.id])
+
+  // Auto-sync elke 30 seconden
+  const doSync = useCallback(async () => {
+    if (!user?.id) return
+    setSyncing(true)
+    await Promise.all([
+      fetchTasks(),
+      fetchSubjects(),
+      supabase.from('calendar_events').select('*').eq('user_id', user.id).then(({ data }) => {
+        if (data) setCalendarEvents(data)
+      }),
+    ])
+    setSyncTrigger(t => t + 1)
+    setSyncing(false)
+    setSyncFlash(true)
+    setTimeout(() => setSyncFlash(false), 2000)
+  }, [user?.id])
+
+  useEffect(() => {
+    if (!session || !user?.id) return
+    const interval = setInterval(doSync, 30000)
+    return () => clearInterval(interval)
+  }, [session, user?.id, doSync])
 
   const fetchTasks = async () => {
     if (!user?.id) return
@@ -374,8 +400,8 @@ export default function App() {
 
   function getWidgetElement(id) {
     return {
-      habits:   <HabitsWidget userId={user.id} />,
-      notes:    <NotesWidget userId={user.id} />,
+      habits:   <HabitsWidget userId={user.id} syncTrigger={syncTrigger} />,
+      notes:    <NotesWidget userId={user.id} syncTrigger={syncTrigger} />,
       tasks:    <TasksWidget tasks={tasks} subjects={subjects}
                   onAdd={async (data) => { if (!user?.id) return; await supabase.from('tasks').insert({ ...data, completed: false, user_id: user.id }); fetchTasks() }}
                   onEdit={openEditTask} onDelete={handleDeleteTask} onToggle={handleToggleTask}
@@ -515,6 +541,24 @@ export default function App() {
           )}
 
           <div className="flex items-center gap-2">
+            {/* Sync indicator */}
+            <span
+              title="Taken, notities en gewoontes worden elke 30 seconden automatisch gesynchroniseerd"
+              style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'default' }}
+            >
+              <RefreshCw
+                size={12}
+                style={{
+                  color: syncFlash ? '#1DB954' : 'rgba(255,255,255,0.2)',
+                  transition: 'color 0.5s',
+                  animation: syncing ? 'spin 0.8s linear infinite' : 'none',
+                }}
+              />
+              <span className="hidden sm:block" style={{ fontSize: 10, color: syncFlash ? '#1DB954' : 'rgba(255,255,255,0.2)', transition: 'color 0.5s' }}>
+                {syncing ? 'Syncing…' : '30s'}
+              </span>
+            </span>
+
             <span className="text-xs hidden sm:block" style={{ color: 'rgba(255,255,255,0.3)' }}>
               {user?.email}
             </span>
@@ -835,7 +879,7 @@ export default function App() {
                       )}
                       {takenTab === 'notities' && (
                         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                          <NotesWidget userId={user.id} fullHeight />
+                          <NotesWidget userId={user.id} syncTrigger={syncTrigger} fullHeight />
                         </div>
                       )}
                     </div>

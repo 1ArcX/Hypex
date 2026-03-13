@@ -307,7 +307,7 @@ function HabitModal({ habit, onSave, onClose, onDelete, counterConfig }) {
 }
 
 // ─── Main widget ─────────────────────────────────────────────────────────────
-export default function HabitsWidget({ userId, compact = false }) {
+export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 }) {
   const [habits, setHabits] = useState([])
   const [completions, setCompletions] = useState({})   // { habitId: Set<dateStr> }
   const [counterValues, setCounterValues] = useState(() => loadCounterValues())
@@ -363,6 +363,13 @@ export default function HabitsWidget({ userId, compact = false }) {
     if (!userId) return
     Promise.all([fetchHabits(), fetchCompletions()]).then(() => setLoading(false))
   }, [userId, fetchHabits, fetchCompletions])
+
+  // Hersync bij externe trigger
+  useEffect(() => {
+    if (syncTrigger === 0 || !userId) return
+    fetchHabits()
+    fetchCompletions()
+  }, [syncTrigger])
 
   // ── Supabase realtime sync voor counter config + values ──────────────────
   useEffect(() => {
