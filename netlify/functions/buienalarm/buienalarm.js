@@ -1,3 +1,5 @@
+const fetch = require('node-fetch')
+
 exports.handler = async (event) => {
   const { lat, lon } = event.queryStringParameters || {}
   if (!lat || !lon) return { statusCode: 400, body: 'Missing lat/lon' }

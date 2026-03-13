@@ -1,6 +1,7 @@
 const { schedule } = require('@netlify/functions')
 const webpush = require('web-push')
 const { createClient } = require('@supabase/supabase-js')
+const fetch = require('node-fetch')
 
 const VAPID_PUBLIC  = process.env.VAPID_PUBLIC_KEY
 const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY
