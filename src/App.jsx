@@ -8,7 +8,7 @@ import TaskDetailModal from './components/TaskDetailModal'
 import NotesWidget from './components/NotesWidget'
 import WeatherWidget from './components/WeatherWidget'
 import PomodoroTimer from './components/PomodoroTimer'
-import { LogOut, GraduationCap, Home, CalendarDays, CheckSquare, Layers, FileText, Flame, GripVertical } from 'lucide-react'
+import { LogOut, GraduationCap, Home, CalendarDays, CheckSquare, Layers, FileText, Flame, GripVertical, BookOpen } from 'lucide-react'
 import SpotifyWidget from './components/SpotifyWidget'
 import ThemeSettings from './components/ThemeSettings'
 import { Settings } from 'lucide-react'
@@ -523,6 +523,15 @@ export default function App() {
               style={{ padding: '6px 12px', fontSize: '12px', borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.03)' }}>
               <LogOut size={13} />
               <span className="hidden sm:inline">Uitloggen</span>
+            </button>
+
+            {/* Tutorial knop */}
+            <button onClick={() => setShowOnboarding(true)} title="Tutorial"
+              style={{
+                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '12px', padding: '8px', cursor: 'pointer', color: 'rgba(255,255,255,0.6)'
+              }}>
+              <BookOpen size={16} />
             </button>
 
             {/* Instellingen knop */}
