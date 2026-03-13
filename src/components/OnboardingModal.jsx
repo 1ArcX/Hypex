@@ -14,7 +14,7 @@ export default function OnboardingModal({ user, onClose }) {
   const [cityQuery, setCityQuery]     = useState('')
   const [cityResults, setCityResults] = useState([])
   const [selectedCity, setSelectedCity] = useState(null)
-  const [school, setSchool]           = useState('')
+  const [school, setSchool]           = useState('ichthus')
   const [leerlingnummer, setLeerlingnummer] = useState('')
   const [wachtwoord, setWachtwoord]   = useState('')
 
