@@ -18,12 +18,9 @@ async function getBuienalarm(lat, lon) {
     `https://cdn-secure.buienalarm.nl/api/3.4/forecast.php?lat=${lat}&lon=${lon}&region=nl&unit=mm/u`
   )
   if (!res.ok) return []
-  const text = await res.text()
-  return text.trim().split('\n').map(line => {
-    const [val] = line.split('|')
-    const precip = parseFloat(val.replace(',', '.'))
-    return isNaN(precip) ? 0 : precip
-  }).filter(v => v >= 0)
+  const json = await res.json()
+  if (!json?.precip?.length) return []
+  return json.precip.map(v => isNaN(v) ? 0 : v)
 }
 
 async function rainCheckHandler() {

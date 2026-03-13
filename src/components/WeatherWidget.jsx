@@ -39,16 +39,16 @@ const DAY_NAMES = ['Zo', 'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za']
 const REFRESH_INTERVAL = 10 * 60 * 1000
 
 // Buienalarm via Netlify proxy (voorkomt CORS blokkade op mobiel)
+// API retourneert JSON: { start (unix s), delta (s), precip: float[] }
 async function fetchBuienalarm(lat, lon) {
-  const res = await fetch(
-    `/.netlify/functions/buienalarm?lat=${lat}&lon=${lon}`
-  )
-  const text = await res.text()
-  return text.trim().split('\n').map(line => {
-    const [val, time] = line.split('|')
-    const precip = parseFloat(val.replace(',', '.'))
-    return { precip: isNaN(precip) ? 0 : precip, time: time?.trim() || '' }
-  }).filter(d => d.time)
+  const res = await fetch(`/.netlify/functions/buienalarm?lat=${lat}&lon=${lon}`)
+  const json = await res.json()
+  if (!json?.precip?.length) return []
+  return json.precip.map((precip, i) => {
+    const d = new Date((json.start + i * json.delta) * 1000)
+    const time = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
+    return { precip: isNaN(precip) ? 0 : precip, time }
+  })
 }
 
 // SVG area chart — Buienalarm style
