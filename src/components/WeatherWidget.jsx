@@ -38,10 +38,10 @@ const WMO_CODES = {
 const DAY_NAMES = ['Zo', 'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za']
 const REFRESH_INTERVAL = 10 * 60 * 1000
 
-// Buienalarm text format: "precipitationValue|timestamp" lines, every 5 min, 24 entries = 2 hours
+// Buienalarm via Netlify proxy (voorkomt CORS blokkade op mobiel)
 async function fetchBuienalarm(lat, lon) {
   const res = await fetch(
-    `https://cdn-secure.buienalarm.nl/api/3.4/forecast.php?lat=${lat}&lon=${lon}&region=nl&unit=mm/u`
+    `/.netlify/functions/buienalarm?lat=${lat}&lon=${lon}`
   )
   const text = await res.text()
   return text.trim().split('\n').map(line => {
@@ -439,31 +439,34 @@ export default function WeatherWidget({ stacked = false, userId, onRequestPwaIns
               <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', marginTop: 6 }}>
                 Bron: Buienalarm · komende 2 uur · per 5 min
               </p>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
-                <button onClick={() => { setRain(null); loadRain() }}
-                  style={{ fontSize: 10, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)' }}>
-                  Vernieuwen
-                </button>
-                {userId && 'Notification' in window && (
-                  <button
-                    onClick={toggleRainNotification}
-                    disabled={notifLoading}
-                    title={notifEnabled ? 'Regenmelding uitschakelen' : 'Melding bij regen'}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 4,
-                      fontSize: 10, padding: '4px 8px', borderRadius: 6, cursor: 'pointer',
-                      border: notifEnabled ? '1px solid rgba(0,200,255,0.4)' : '1px solid rgba(255,255,255,0.15)',
-                      background: notifEnabled ? 'rgba(0,200,255,0.1)' : 'rgba(255,255,255,0.05)',
-                      color: notifEnabled ? 'rgba(0,200,255,0.9)' : 'rgba(255,255,255,0.4)',
-                      opacity: notifLoading ? 0.5 : 1,
-                    }}
-                  >
-                    {notifEnabled ? <Bell size={10} /> : <BellOff size={10} />}
-                    {notifEnabled ? 'Melding aan' : 'Melding uit'}
-                  </button>
-                )}
-              </div>
             </>
+          )}
+          {/* Vernieuwen + notificatieknop altijd zichtbaar (niet afhankelijk van rain data) */}
+          {!rainLoading && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+              <button onClick={() => { setRain(null); loadRain() }}
+                style={{ fontSize: 10, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)' }}>
+                {rain === null && !coords ? 'Zoek eerst een stad' : 'Vernieuwen'}
+              </button>
+              {userId && 'Notification' in window && (
+                <button
+                  onClick={toggleRainNotification}
+                  disabled={notifLoading}
+                  title={notifEnabled ? 'Regenmelding uitschakelen' : 'Melding bij regen'}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    fontSize: 10, padding: '4px 8px', borderRadius: 6, cursor: 'pointer',
+                    border: notifEnabled ? '1px solid rgba(0,200,255,0.4)' : '1px solid rgba(255,255,255,0.15)',
+                    background: notifEnabled ? 'rgba(0,200,255,0.1)' : 'rgba(255,255,255,0.05)',
+                    color: notifEnabled ? 'rgba(0,200,255,0.9)' : 'rgba(255,255,255,0.4)',
+                    opacity: notifLoading ? 0.5 : 1,
+                  }}
+                >
+                  {notifEnabled ? <Bell size={10} /> : <BellOff size={10} />}
+                  {notifEnabled ? 'Melding aan' : 'Melding uit'}
+                </button>
+              )}
+            </div>
           )}
           {!rainLoading && rain?.length === 0 && (
             <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>Geen buiendata beschikbaar.</p>
