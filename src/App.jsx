@@ -8,7 +8,7 @@ import TaskDetailModal from './components/TaskDetailModal'
 import NotesWidget from './components/NotesWidget'
 import WeatherWidget from './components/WeatherWidget'
 import PomodoroTimer from './components/PomodoroTimer'
-import { LogOut, GraduationCap, Home, CalendarDays, CheckSquare, Layers, FileText, Flame, GripVertical, BookOpen } from 'lucide-react'
+import { LogOut, GraduationCap, Home, CalendarDays, CheckSquare, Layers, FileText, Flame, GripVertical } from 'lucide-react'
 import SpotifyWidget from './components/SpotifyWidget'
 import ThemeSettings from './components/ThemeSettings'
 import { Settings } from 'lucide-react'
@@ -526,12 +526,17 @@ export default function App() {
             </button>
 
             {/* Tutorial knop */}
-            <button onClick={() => setShowOnboarding(true)} title="Tutorial"
+            <button onClick={() => setShowOnboarding(true)}
               style={{
-                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '12px', padding: '8px', cursor: 'pointer', color: 'rgba(255,255,255,0.6)'
+                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '12px', padding: '6px 12px', cursor: 'pointer',
               }}>
-              <BookOpen size={16} />
+              <span style={{
+                fontSize: 12, fontWeight: 600, letterSpacing: '0.02em',
+                backgroundImage: 'linear-gradient(90deg, var(--accent), #a78bfa)',
+                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+              }}>Tutorial</span>
             </button>
 
             {/* Instellingen knop */}
