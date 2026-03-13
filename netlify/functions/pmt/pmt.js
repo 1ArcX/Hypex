@@ -158,8 +158,9 @@ exports.handler = async (event) => {
     if (!date) return err('date is verplicht')
     const authHeaders = { ...PMT_HEADERS, 'x-api-user': auth.token }
 
+    // Geen sorting param — die breekt de date filter in de PMT API
     const shiftsQs = new URLSearchParams({
-      'date[gte]': date, 'date[lte]': date, limit: 100, sorting: '+start_datetime'
+      'date[gte]': date, 'date[lte]': date, limit: 200
     }).toString()
 
     // ISO week berekenen voor employees endpoint (vereist YYYY-WW formaat)
@@ -189,8 +190,12 @@ exports.handler = async (event) => {
     for (const e of (empData.result || [])) empMap[String(e.account_id)] = e.name
 
     const raw = (shiftsData.result || []).filter(s =>
-      s.start_datetime && s.start_datetime !== s.end_datetime && !s.start_datetime.endsWith('00:00')
+      s.start_datetime &&
+      s.start_datetime.startsWith(date) &&
+      s.start_datetime !== s.end_datetime &&
+      !s.start_datetime.endsWith('00:00')
     )
+    raw.sort((a, b) => a.start_datetime.localeCompare(b.start_datetime))
     const dayShifts = raw.map(s => ({
       start: s.start_datetime.split(' ')[1]?.slice(0, 5) || '',
       end:   s.end_datetime.split(' ')[1]?.slice(0, 5) || '',
