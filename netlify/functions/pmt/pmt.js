@@ -112,8 +112,11 @@ function mapShift(item) {
 
 function currentISOWeek() {
   const d = new Date()
-  const jan4 = new Date(d.getFullYear(), 0, 4)
-  return Math.ceil(((d - jan4) / 86400000 + jan4.getDay() + 1) / 7)
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+  const day = date.getUTCDay() || 7
+  date.setUTCDate(date.getUTCDate() + 4 - day)
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1))
+  return Math.ceil((((date - yearStart) / 86400000) + 1) / 7)
 }
 
 exports.handler = async (event) => {
@@ -151,26 +154,40 @@ exports.handler = async (event) => {
   }
 
   if (action === 'day_planning') {
-    const date = body.date  // 'YYYY-MM-DD'
+    const date = body.date
     if (!date) return err('date is verplicht')
-    const qs = new URLSearchParams({
-      'date[gte]': date,
-      'date[lte]': date,
-      limit: 100,
-      sorting: '+start_datetime'
-    }).toString()
     const authHeaders = { ...PMT_HEADERS, 'x-api-user': auth.token }
-    const res = await fetch(`${API_V2}/shifts?${qs}`, { headers: authHeaders, timeout: 10000 })
-    const data = await res.json()
-    if (!res.ok) return err(data?.result?.[0]?.message || 'Dag planning ophalen mislukt', 500)
-    const raw = (data.result || [])
-      .filter(s => s.start_datetime && s.start_datetime !== s.end_datetime
-                 && !s.start_datetime.endsWith('00:00'))
+
+    const shiftsQs = new URLSearchParams({
+      'date[gte]': date, 'date[lte]': date, limit: 100, sorting: '+start_datetime'
+    }).toString()
+
+    const [deptRes, empRes, shiftsRes] = await Promise.all([
+      fetch(`${API_V2}/departments?date=${date}`, { headers: authHeaders, timeout: 10000 }),
+      fetch(`${API_V2}/stores/${auth.storeId}/employees?exchange=true&limit=10000`, { headers: authHeaders, timeout: 10000 }),
+      fetch(`${API_V2}/shifts?${shiftsQs}`, { headers: authHeaders, timeout: 10000 })
+    ])
+
+    const [deptData, empData, shiftsData] = await Promise.all([
+      deptRes.json(), empRes.json(), shiftsRes.json()
+    ])
+
+    if (!shiftsRes.ok) return err(shiftsData?.result?.[0]?.message || 'Dag planning ophalen mislukt', 500)
+
+    const deptMap = {}
+    for (const d of (deptData.result || [])) deptMap[d.department_id] = d.department_name
+    const empMap = {}
+    for (const e of (empData.result || [])) empMap[e.account_id] = e.name
+
+    const raw = (shiftsData.result || []).filter(s =>
+      s.start_datetime && s.start_datetime !== s.end_datetime && !s.start_datetime.endsWith('00:00')
+    )
     const dayShifts = raw.map(s => ({
       start: s.start_datetime.split(' ')[1]?.slice(0, 5) || '',
       end:   s.end_datetime.split(' ')[1]?.slice(0, 5) || '',
-      department_id: s.department_id,
-      isOwn: s.account_id === auth.accountId
+      department: deptMap[s.department_id] || String(s.department_id),
+      name: empMap[s.account_id] || null,
+      isOwn: String(s.account_id) === String(auth.accountId)
     }))
     return ok({ dayShifts, date, total: dayShifts.length })
   }

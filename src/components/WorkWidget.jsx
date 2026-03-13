@@ -7,8 +7,11 @@ const BASE_URL = 'https://jumbo7044.personeelstool.nl'
 
 function currentISOWeek() {
   const d = new Date()
-  const jan4 = new Date(d.getFullYear(), 0, 4)
-  return Math.ceil(((d - jan4) / 86400000 + jan4.getDay() + 1) / 7)
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+  const day = date.getUTCDay() || 7
+  date.setUTCDate(date.getUTCDate() + 4 - day)
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1))
+  return Math.ceil((((date - yearStart) / 86400000) + 1) / 7)
 }
 
 function isoWeeksInYear(year) {
@@ -309,14 +312,26 @@ export default function WorkWidget() {
                           ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                               {dayShifts.map((s, i) => (
-                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', borderRadius: '7px', background: s.isOwn ? accentBg(12) : 'rgba(255,255,255,0.03)', border: s.isOwn ? accentBorder(30) : '1px solid rgba(255,255,255,0.05)' }}>
-                                  <span style={{ fontSize: '11px', color: s.isOwn ? 'var(--accent)' : 'rgba(255,255,255,0.7)', fontWeight: s.isOwn ? 600 : 400, flexShrink: 0 }}>
-                                    {s.start} – {s.end}
-                                  </span>
-                                  <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', flex: 1 }}>
-                                    afd. {s.department_id}
-                                  </span>
-                                  {s.isOwn && <span style={{ fontSize: '10px', color: 'var(--accent)', flexShrink: 0 }}>(jouw shift)</span>}
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px',
+                                  borderRadius: '7px',
+                                  background: s.isOwn ? accentBg(12) : 'rgba(255,255,255,0.03)',
+                                  border: s.isOwn ? accentBorder(30) : '1px solid rgba(255,255,255,0.05)' }}>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <span style={{ fontSize: '11px', color: s.isOwn ? 'var(--accent)' : 'rgba(255,255,255,0.85)',
+                                        fontWeight: s.isOwn ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {s.name ? s.name.split(' ')[0] : '—'}
+                                        {s.isOwn && <span style={{ fontSize: '10px', marginLeft: '5px', opacity: 0.7 }}>(jij)</span>}
+                                      </span>
+                                      <span style={{ fontSize: '11px', color: s.isOwn ? 'var(--accent)' : 'rgba(255,255,255,0.6)',
+                                        fontWeight: 500, flexShrink: 0 }}>
+                                        {s.start} – {s.end}
+                                      </span>
+                                    </div>
+                                    <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', margin: '1px 0 0' }}>
+                                      {s.department}
+                                    </p>
+                                  </div>
                                 </div>
                               ))}
                             </div>

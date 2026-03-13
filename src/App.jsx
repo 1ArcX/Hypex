@@ -910,7 +910,7 @@ export default function App() {
                 {mobileTab === 'tools' && (
                   <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                     <div style={{ display: 'flex', gap: 8, padding: '12px 16px 0', overflowX: 'auto', flexShrink: 0 }}>
-                      {[['weer','Weer'],['pomodoro','Pomodoro'],['spotify','Spotify'],['magister','Magister']].map(([id, label]) => (
+                      {[['weer','Weer'],['pomodoro','Pomodoro'],['spotify','Spotify'],['magister','Magister'], ...(isAdmin ? [['werk','Werk']] : [])].map(([id, label]) => (
                         <button key={id} style={subTabStyle(toolTab === id)} onClick={() => setToolTab(id)}>{label}</button>
                       ))}
                     </div>
@@ -920,6 +920,7 @@ export default function App() {
                         {toolTab === 'pomodoro' && <PomodoroTimer onModeChange={setIsBreak} onPomodoroActive={setPomodoroActive} userId={user?.id} />}
                         {toolTab === 'spotify'  && <SpotifyWidget />}
                         {toolTab === 'magister' && <MagisterWidget userId={user.id} onSubjectsSync={() => { fetchSubjects(); fetchProfiles(); fetchSubjectLinks() }} />}
+                        {toolTab === 'werk' && isAdmin && <WorkWidget />}
                       </div>
                     </div>
                   </div>
