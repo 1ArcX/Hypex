@@ -51,41 +51,76 @@ async function fetchBuienalarm(lat, lon) {
   }).filter(d => d.time)
 }
 
-// Mini rain bar chart component
+// SVG area chart — Buienalarm style
 function RainChart({ data }) {
+  const W = 260, H = 80, PAD_L = 28, PAD_B = 18, PAD_R = 4, PAD_T = 6
+  const innerW = W - PAD_L - PAD_R
+  const innerH = H - PAD_T - PAD_B
   const max = Math.max(...data.map(d => d.precip), 0.5)
+
+  // Y-axis ticks
+  const yTicks = max <= 1 ? [0, 0.5, 1] : max <= 2 ? [0, 1, 2] : [0, 2, Math.ceil(max)]
+
+  const xOf = i => PAD_L + (i / (data.length - 1)) * innerW
+  const yOf = v => PAD_T + innerH - (v / yTicks[yTicks.length - 1]) * innerH
+
+  // Build SVG path
+  const points = data.map((d, i) => [xOf(i), yOf(d.precip)])
+  const lineD = points.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
+  const areaD = `${lineD} L${points[points.length-1][0].toFixed(1)},${(PAD_T+innerH).toFixed(1)} L${PAD_L},${(PAD_T+innerH).toFixed(1)} Z`
+
+  // Time label indices: every 6 = 30 min
+  const labelIdxs = [0, 6, 12, 18, 23]
+
   return (
     <div style={{ marginTop: 8 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 60 }}>
-        {data.map((d, i) => {
-          const h = Math.round((d.precip / max) * 56)
-          const isRaining = d.precip > 0.1
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: 'visible', display: 'block' }}>
+        <defs>
+          <linearGradient id="rainGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="rgba(0,180,255,0.55)" />
+            <stop offset="100%" stopColor="rgba(0,180,255,0.03)" />
+          </linearGradient>
+        </defs>
+
+        {/* Y gridlines + labels */}
+        {yTicks.map(v => {
+          const y = yOf(v)
           return (
-            <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: 60 }}>
-              <div
-                title={`${d.precip.toFixed(1)} mm/u om ${d.time}`}
-                style={{
-                  width: '100%',
-                  height: Math.max(h, 2),
-                  background: isRaining
-                    ? `rgba(0,200,255,${0.3 + (d.precip / max) * 0.7})`
-                    : 'rgba(255,255,255,0.06)',
-                  borderRadius: '2px 2px 0 0',
-                  transition: 'height 0.3s',
-                }}
-              />
-            </div>
+            <g key={v}>
+              <line x1={PAD_L} y1={y} x2={W - PAD_R} y2={y}
+                stroke="rgba(255,255,255,0.07)" strokeWidth="1" strokeDasharray="3,3" />
+              <text x={PAD_L - 3} y={y + 3} textAnchor="end"
+                style={{ fontSize: 7, fill: 'rgba(255,255,255,0.3)', fontFamily: 'sans-serif' }}>
+                {v}
+              </text>
+            </g>
           )
         })}
-      </div>
-      {/* time labels: show every 6 bars = 30 min */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 3 }}>
-        {[0, 6, 12, 18, 23].map(i => (
-          <span key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>
-            {data[i]?.time?.slice(0, 5) || ''}
-          </span>
+
+        {/* Area fill */}
+        <path d={areaD} fill="url(#rainGrad)" />
+
+        {/* Line */}
+        <path d={lineD} fill="none" stroke="rgba(0,200,255,0.85)" strokeWidth="1.5" strokeLinejoin="round" />
+
+        {/* Dots on rainy points */}
+        {data.map((d, i) => d.precip > 0.1 && (
+          <circle key={i} cx={xOf(i)} cy={yOf(d.precip)} r="2"
+            fill="rgba(0,200,255,0.9)" />
         ))}
-      </div>
+
+        {/* X axis baseline */}
+        <line x1={PAD_L} y1={PAD_T + innerH} x2={W - PAD_R} y2={PAD_T + innerH}
+          stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
+
+        {/* X time labels */}
+        {labelIdxs.map(i => (
+          <text key={i} x={xOf(i)} y={H - 2} textAnchor="middle"
+            style={{ fontSize: 7, fill: 'rgba(255,255,255,0.35)', fontFamily: 'sans-serif' }}>
+            {data[i]?.time?.slice(0, 5) || ''}
+          </text>
+        ))}
+      </svg>
     </div>
   )
 }
@@ -232,6 +267,14 @@ export default function WeatherWidget({ stacked = false, userId, onRequestPwaIns
 
         if (error) throw error
         setNotifEnabled(true)
+
+        // Test notificatie
+        const reg2 = await navigator.serviceWorker.ready
+        reg2.showNotification('Buien notificaties aangezet', {
+          body: 'Je ontvangt een melding als het gaat regenen.',
+          icon: '/icon-192.png',
+          tag: 'rain-enabled',
+        })
       } catch (e) {
         console.error('Notificatie inschakelen mislukt:', e)
         alert('Notificaties inschakelen mislukt. Controleer je browserinstellingen.')
