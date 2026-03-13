@@ -162,9 +162,18 @@ exports.handler = async (event) => {
       'date[gte]': date, 'date[lte]': date, limit: 100, sorting: '+start_datetime'
     }).toString()
 
+    // ISO week berekenen voor employees endpoint (vereist YYYY-WW formaat)
+    const dateObj = new Date(date)
+    const utcDate = new Date(Date.UTC(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate()))
+    const dow = utcDate.getUTCDay() || 7
+    utcDate.setUTCDate(utcDate.getUTCDate() + 4 - dow)
+    const yearStart = new Date(Date.UTC(utcDate.getUTCFullYear(), 0, 1))
+    const isoWeek = Math.ceil((((utcDate - yearStart) / 86400000) + 1) / 7)
+    const yearWeek = `${utcDate.getUTCFullYear()}-${String(isoWeek).padStart(2, '0')}`
+
     const [deptRes, empRes, shiftsRes] = await Promise.all([
       fetch(`${API_V2}/departments?date=${date}`, { headers: authHeaders, timeout: 10000 }),
-      fetch(`${API_V2}/stores/${auth.storeId}/employees?exchange=true&limit=10000`, { headers: authHeaders, timeout: 10000 }),
+      fetch(`${API_V2}/stores/${auth.storeId}/employees?exchange=true&week=${yearWeek}&limit=10000`, { headers: authHeaders, timeout: 10000 }),
       fetch(`${API_V2}/shifts?${shiftsQs}`, { headers: authHeaders, timeout: 10000 })
     ])
 
@@ -177,7 +186,7 @@ exports.handler = async (event) => {
     const deptMap = {}
     for (const d of (deptData.result || [])) deptMap[d.department_id] = d.department_name
     const empMap = {}
-    for (const e of (empData.result || [])) empMap[e.account_id] = e.name
+    for (const e of (empData.result || [])) empMap[String(e.account_id)] = e.name
 
     const raw = (shiftsData.result || []).filter(s =>
       s.start_datetime && s.start_datetime !== s.end_datetime && !s.start_datetime.endsWith('00:00')
@@ -186,7 +195,7 @@ exports.handler = async (event) => {
       start: s.start_datetime.split(' ')[1]?.slice(0, 5) || '',
       end:   s.end_datetime.split(' ')[1]?.slice(0, 5) || '',
       department: deptMap[s.department_id] || String(s.department_id),
-      name: empMap[s.account_id] || null,
+      name: empMap[String(s.account_id)] || null,
       isOwn: String(s.account_id) === String(auth.accountId)
     }))
     return ok({ dayShifts, date, total: dayShifts.length })
