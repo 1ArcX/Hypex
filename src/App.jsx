@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from './supabaseClient'
 import AuthPage from './components/AuthPage'
 import Clock from './components/Clock'
@@ -16,6 +16,7 @@ import AdminPanel from './components/AdminPanel'
 import TasksWidget from './components/TasksWidget'
 import MagisterWidget from './components/MagisterWidget'
 import HabitsWidget from './components/HabitsWidget'
+import WorkWidget from './components/WorkWidget'
 import PasswordResetPage from './components/PasswordResetPage'
 import OnboardingModal from './components/OnboardingModal'
 import { Shield } from 'lucide-react'
@@ -153,6 +154,17 @@ export default function App() {
   // ✅ FIX: user vroeg beschikbaar via useMemo (geen undefined bij vakken/kalender)
   const user = useMemo(() => session?.user || null, [session])
   const isAdmin = user?.email === ADMIN_EMAIL
+
+  // Add 'work' widget to admin's right column if not already present
+  useEffect(() => {
+    if (!isAdmin) return
+    setWidgetOrder(prev => {
+      if (prev.right.includes('work')) return prev
+      const next = { ...prev, right: ['work', ...prev.right] }
+      localStorage.setItem('widget_order', JSON.stringify(next))
+      return next
+    })
+  }, [isAdmin])
 
   const fetchProfiles = async () => {
     const { data, error } = await supabase.from('profiles').select('*')
@@ -409,6 +421,7 @@ export default function App() {
       weather:  <WeatherWidget userId={user?.id} onRequestPwaInstall={() => setShowPwaPrompt(true)} />,
       spotify:  <SpotifyWidget />,
       pomodoro: <PomodoroTimer onModeChange={setIsBreak} userId={user?.id} />,
+      work:     isAdmin ? <WorkWidget /> : null,
     }[id] ?? null
   }
 
