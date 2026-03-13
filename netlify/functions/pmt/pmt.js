@@ -172,14 +172,20 @@ exports.handler = async (event) => {
     const isoWeek = Math.ceil((((utcDate - yearStart) / 86400000) + 1) / 7)
     const yearWeek = `${utcDate.getUTCFullYear()}-${String(isoWeek).padStart(2, '0')}`
 
-    const [deptRes, empRes, shiftsRes] = await Promise.all([
+    // Haal eigen schedule ook op — shifts endpoint mist soms de eigen shift
+    const ownScheduleQs = new URLSearchParams({
+      'date[gte]': date, 'date[lte]': date, account_id: auth.accountId
+    }).toString()
+
+    const [deptRes, empRes, shiftsRes, ownRes] = await Promise.all([
       fetch(`${API_V2}/departments?date=${date}`, { headers: authHeaders, timeout: 10000 }),
       fetch(`${API_V2}/stores/${auth.storeId}/employees?exchange=true&week=${yearWeek}&limit=10000`, { headers: authHeaders, timeout: 10000 }),
-      fetch(`${API_V2}/shifts?${shiftsQs}`, { headers: authHeaders, timeout: 10000 })
+      fetch(`${API_V2}/shifts?${shiftsQs}`, { headers: authHeaders, timeout: 10000 }),
+      fetch(`${API_V2}/schedules?${ownScheduleQs}`, { headers: authHeaders, timeout: 10000 })
     ])
 
-    const [deptData, empData, shiftsData] = await Promise.all([
-      deptRes.json(), empRes.json(), shiftsRes.json()
+    const [deptData, empData, shiftsData, ownData] = await Promise.all([
+      deptRes.json(), empRes.json(), shiftsRes.json(), ownRes.json()
     ])
 
     if (!shiftsRes.ok) return err(shiftsData?.result?.[0]?.message || 'Dag planning ophalen mislukt', 500)
@@ -195,14 +201,39 @@ exports.handler = async (event) => {
       s.start_datetime !== s.end_datetime &&
       !s.start_datetime.endsWith('00:00')
     )
+
+    // Eigen shift via schedules endpoint toevoegen als die niet al in shifts zit
+    // (shifts endpoint mist soms de eigen shift voor verleden dagen)
+    const ownSchedules = (ownData.result || []).filter(s =>
+      s.schedule_time_from && s.schedule_time_from.startsWith(date)
+    )
+    const ownInShifts = raw.some(s => String(s.account_id) === String(auth.accountId))
+    if (!ownInShifts) {
+      for (const own of ownSchedules) {
+        raw.push({
+          start_datetime: own.schedule_time_from,
+          end_datetime: own.schedule_time_to,
+          department_id: own.department?.department_id,
+          account_id: auth.accountId
+        })
+      }
+    }
+
     raw.sort((a, b) => a.start_datetime.localeCompare(b.start_datetime))
-    const dayShifts = raw.map(s => ({
-      start: s.start_datetime.split(' ')[1]?.slice(0, 5) || '',
-      end:   s.end_datetime.split(' ')[1]?.slice(0, 5) || '',
-      department: deptMap[s.department_id] || String(s.department_id),
-      name: empMap[String(s.account_id)] || null,
-      isOwn: String(s.account_id) === String(auth.accountId)
-    }))
+    const dayShifts = raw.map(s => {
+      // Voor eigen shift: gebruik schedules tijden (definitief) indien beschikbaar
+      const isOwn = String(s.account_id) === String(auth.accountId)
+      const ownSched = isOwn ? ownSchedules[0] : null
+      const startDt = ownSched ? ownSched.schedule_time_from : s.start_datetime
+      const endDt   = ownSched ? ownSched.schedule_time_to   : s.end_datetime
+      return {
+        start: startDt.split(' ')[1]?.slice(0, 5) || '',
+        end:   endDt.split(' ')[1]?.slice(0, 5) || '',
+        department: deptMap[s.department_id] || (ownSched ? ownSched.department?.department_name : null) || String(s.department_id),
+        name: empMap[String(s.account_id)] || null,
+        isOwn
+      }
+    })
     return ok({ dayShifts, date, total: dayShifts.length })
   }
 
