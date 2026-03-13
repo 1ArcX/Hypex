@@ -17,6 +17,7 @@ import TasksWidget from './components/TasksWidget'
 import MagisterWidget from './components/MagisterWidget'
 import HabitsWidget from './components/HabitsWidget'
 import PasswordResetPage from './components/PasswordResetPage'
+import OnboardingModal from './components/OnboardingModal'
 import { Shield } from 'lucide-react'
 
 const ADMIN_EMAIL = 'zhafirfachri@gmail.com'
@@ -102,6 +103,7 @@ export default function App() {
   const [nextEventSkip, setNextEventSkip]     = useState(0)
   const [showPwaPrompt, setShowPwaPrompt]     = useState(false)
   const [homeRain, setHomeRain]               = useState(null)
+  const [showOnboarding, setShowOnboarding]   = useState(false)
 
   // Reset skip counter when switching to home tab
   useEffect(() => { if (mobileTab === 'home') setNextEventSkip(0) }, [mobileTab])
@@ -162,6 +164,17 @@ export default function App() {
       }
     }
   }
+
+  // Onboarding: toon bij eerste login als locatie of Magister niet is ingesteld
+  useEffect(() => {
+    if (!user) return
+    const done = localStorage.getItem(`onboarding_done_${user.id}`)
+    if (!done) {
+      const needsLocation = !localStorage.getItem('weather_coords')
+      const needsMagister = !localStorage.getItem('magister_credentials')
+      if (needsLocation || needsMagister) setShowOnboarding(true)
+    }
+  }, [user])
 
   // ✅ FIX: mounted flag voorkomt state-update na unmount
   useEffect(() => {
@@ -901,6 +914,11 @@ export default function App() {
           onDelete={(id) => { setDetailTask(null); handleDeleteTask(id) }}
           onClose={() => setDetailTask(null)}
         />
+      )}
+
+      {/* Onboarding tutorial */}
+      {showOnboarding && (
+        <OnboardingModal user={user} onClose={() => setShowOnboarding(false)} />
       )}
 
       {/* PWA install prompt */}
