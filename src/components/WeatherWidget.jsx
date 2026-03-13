@@ -53,6 +53,7 @@ async function fetchBuienalarm(lat, lon) {
 
 // SVG area chart — Buienalarm style
 function RainChart({ data }) {
+  if (!data?.length) return null
   const W = 260, H = 80, PAD_L = 28, PAD_B = 18, PAD_R = 4, PAD_T = 6
   const innerW = W - PAD_L - PAD_R
   const innerH = H - PAD_T - PAD_B
@@ -61,7 +62,8 @@ function RainChart({ data }) {
   // Y-axis ticks
   const yTicks = max <= 1 ? [0, 0.5, 1] : max <= 2 ? [0, 1, 2] : [0, 2, Math.ceil(max)]
 
-  const xOf = i => PAD_L + (i / (data.length - 1)) * innerW
+  const divisor = data.length > 1 ? data.length - 1 : 1
+  const xOf = i => PAD_L + (i / divisor) * innerW
   const yOf = v => PAD_T + innerH - (v / yTicks[yTicks.length - 1]) * innerH
 
   // Build SVG path
@@ -425,7 +427,7 @@ export default function WeatherWidget({ stacked = false, userId, onRequestPwaIns
               Buienradar laden...
             </p>
           )}
-          {!rainLoading && rain && (
+          {!rainLoading && rain?.length > 0 && (
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                 <CloudRain size={13} style={{ color: rainMax > 0 ? 'rgba(0,200,255,0.8)' : 'rgba(255,255,255,0.3)' }} />
@@ -462,6 +464,9 @@ export default function WeatherWidget({ stacked = false, userId, onRequestPwaIns
                 )}
               </div>
             </>
+          )}
+          {!rainLoading && rain?.length === 0 && (
+            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>Geen buiendata beschikbaar.</p>
           )}
           {!rainLoading && !rain && !coords && (
             <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>Zoek eerst een stad.</p>
