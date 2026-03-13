@@ -192,6 +192,7 @@ export default function WeatherWidget({ stacked = false, userId, onRequestPwaIns
       if (!geoData.results?.length) { setError('Stad niet gevonden'); setLoading(false); return }
       const { latitude, longitude, name } = geoData.results[0]
       setCoords({ lat: latitude, lon: longitude })
+      localStorage.setItem('weather_coords', JSON.stringify({ lat: latitude, lon: longitude }))
 
       // Current + daily in one call
       const wRes = await fetch(

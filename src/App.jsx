@@ -100,9 +100,36 @@ export default function App() {
   const [detailTask, setDetailTask]           = useState(null)
   const [nextEventSkip, setNextEventSkip]     = useState(0)
   const [showPwaPrompt, setShowPwaPrompt]     = useState(false)
+  const [homeRain, setHomeRain]               = useState(null)
 
   // Reset skip counter when switching to home tab
   useEffect(() => { if (mobileTab === 'home') setNextEventSkip(0) }, [mobileTab])
+
+  // Fetch rain data for home screen
+  useEffect(() => {
+    if (!session) return
+    const fetchHomeRain = async () => {
+      try {
+        const stored = localStorage.getItem('weather_coords')
+        const { lat, lon } = stored ? JSON.parse(stored) : { lat: 52.52, lon: 5.72 }
+        const res = await fetch(
+          `https://cdn-secure.buienalarm.nl/api/3.4/forecast.php?lat=${lat}&lon=${lon}&region=nl&unit=mm/u`
+        )
+        const json = await res.json()
+        if (!json?.precip?.length) return
+        setHomeRain(json.precip.map((precip, i) => {
+          const d = new Date((json.start + i * json.delta) * 1000)
+          return {
+            precip: isNaN(precip) ? 0 : precip,
+            time: `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
+          }
+        }))
+      } catch {}
+    }
+    fetchHomeRain()
+    const iv = setInterval(fetchHomeRain, 10 * 60 * 1000)
+    return () => clearInterval(iv)
+  }, [session])
 
   // Drag-and-drop widget order
   const DEFAULT_LEFT  = ['habits', 'notes', 'tasks']
@@ -383,7 +410,12 @@ export default function App() {
     const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6)
     const cacheKey = `magister_sched_${fmt(weekStart)}_${fmt(weekEnd)}`
     const cachedLessons = (() => { try { return JSON.parse(sessionStorage.getItem(cacheKey)) || [] } catch { return [] } })()
-    const allLessons = cachedLessons.length ? cachedLessons : magisterLessons
+    // Ook volgende week ophalen uit cache
+    const nextWeekStart = new Date(weekStart); nextWeekStart.setDate(weekStart.getDate() + 7)
+    const nextWeekEnd   = new Date(weekEnd);   nextWeekEnd.setDate(weekEnd.getDate() + 7)
+    const nextCacheKey  = `magister_sched_${fmt(nextWeekStart)}_${fmt(nextWeekEnd)}`
+    const nextWeekLessons = (() => { try { return JSON.parse(sessionStorage.getItem(nextCacheKey)) || [] } catch { return [] } })()
+    const allLessons = [...(cachedLessons.length ? cachedLessons : magisterLessons), ...nextWeekLessons]
 
     const items = [
       ...tasks
@@ -651,6 +683,72 @@ export default function App() {
                         </div>
                       )
                       return null
+                    })()}
+
+                    {/* Regen grafiek — toon als het regent */}
+                    {homeRain && Math.max(...homeRain.slice(0,12).map(d=>d.precip)) > 0.1 && (() => {
+                      const data = homeRain
+                      const maxP = Math.max(...data.map(d=>d.precip), 0.5)
+                      const W=260,H=64,PL=4,PB=14,PR=4,PT=4
+                      const iW=W-PL-PR, iH=H-PT-PB
+                      const xOf=i=>PL+(i/(data.length-1||1))*iW
+                      const yOf=v=>PT+iH-(v/maxP)*iH
+                      const pts=data.map((d,i)=>[xOf(i),yOf(d.precip)])
+                      const lineD=pts.map(([x,y],i)=>`${i===0?'M':'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
+                      const areaD=`${lineD} L${pts[pts.length-1][0].toFixed(1)},${(PT+iH).toFixed(1)} L${PL},${(PT+iH).toFixed(1)} Z`
+                      const maxLabel = maxP<0.5?'Lichte regen':maxP<2?'Matige regen':'Zware regen'
+                      return (
+                        <div className="glass-card" onClick={() => { setMobileTab('tools'); setToolTab('weer') }}
+                          style={{ padding:'12px 14px', border:'1px solid rgba(0,180,255,0.25)', background:'rgba(0,150,255,0.06)', cursor:'pointer' }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
+                            <span style={{ fontSize:14 }}>🌧️</span>
+                            <span style={{ fontSize:12, color:'rgba(0,200,255,0.9)', fontWeight:600 }}>{maxLabel} de komende 2 uur</span>
+                            <span style={{ fontSize:10, color:'rgba(255,255,255,0.3)', marginLeft:'auto' }}>›</span>
+                          </div>
+                          <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display:'block', overflow:'visible' }}>
+                            <defs>
+                              <linearGradient id="hRainGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="rgba(0,180,255,0.5)" />
+                                <stop offset="100%" stopColor="rgba(0,180,255,0.02)" />
+                              </linearGradient>
+                            </defs>
+                            <path d={areaD} fill="url(#hRainGrad)" />
+                            <path d={lineD} fill="none" stroke="rgba(0,200,255,0.8)" strokeWidth="1.5" strokeLinejoin="round" />
+                            <line x1={PL} y1={PT+iH} x2={W-PR} y2={PT+iH} stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+                            {[0,6,12,18,23].map(i=>(
+                              <text key={i} x={xOf(Math.min(i,data.length-1))} y={H-1} textAnchor="middle"
+                                style={{ fontSize:7, fill:'rgba(255,255,255,0.3)', fontFamily:'sans-serif' }}>
+                                {data[Math.min(i,data.length-1)]?.time||''}
+                              </text>
+                            ))}
+                          </svg>
+                        </div>
+                      )
+                    })()}
+
+                    {/* Oningeplande taken */}
+                    {(() => {
+                      const unplanned = tasks.filter(t => !t.completed && !t.date)
+                      if (!unplanned.length) return null
+                      return (
+                        <div className="glass-card" style={{ padding:'12px 14px', border:'1px solid rgba(250,204,21,0.15)', background:'rgba(250,204,21,0.03)' }}>
+                          <p style={{ fontSize:10, color:'rgba(250,204,21,0.7)', margin:'0 0 8px', letterSpacing:'0.06em', textTransform:'uppercase', fontWeight:600 }}>
+                            📋 Nog in te plannen ({unplanned.length})
+                          </p>
+                          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                            {unplanned.map(task => {
+                              const subject = subjects.find(s => s.id === task.subject_id)
+                              return (
+                                <div key={task.id} onClick={() => setDetailTask(task)}
+                                  style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', cursor:'pointer' }}>
+                                  <span style={{ fontSize:13, color:'rgba(255,255,255,0.75)', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{task.title}</span>
+                                  {subject && <span style={{ fontSize:10, color:'rgba(255,255,255,0.3)', flexShrink:0 }}>{subject.name}</span>}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
                     })()}
 
                     {/* Habits compact preview */}
