@@ -1,5 +1,5 @@
-import React from 'react'
-import { X, Pencil, Trash2, BookOpen, Clock, Calendar, Tag, FileText } from 'lucide-react'
+import React, { useState } from 'react'
+import { X, Pencil, Trash2, BookOpen, Clock, Calendar, Tag, FileText, Link } from 'lucide-react'
 
 const DAYS_NL    = ['zondag','maandag','dinsdag','woensdag','donderdag','vrijdag','zaterdag']
 const MONTHS_NL  = ['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december']
@@ -16,10 +16,26 @@ function fmtDate(dateStr) {
 }
 
 export default function TaskDetailModal({ task, subjects, onEdit, onDelete, onClose }) {
+  const [editingBook, setEditingBook] = useState(false)
+  const [bookInput, setBookInput] = useState('')
+
   if (!task) return null
   const subject = subjects.find(s => s.id === task.subject_id)
   const bookUrl = subject ? localStorage.getItem(`subject_book_url_${subject.id}`) : null
   const isAllDay = !task.start_time && !task.time && !task.end_time
+
+  const saveBookUrl = () => {
+    if (subject) {
+      if (bookInput.trim()) localStorage.setItem(`subject_book_url_${subject.id}`, bookInput.trim())
+      else localStorage.removeItem(`subject_book_url_${subject.id}`)
+    }
+    setEditingBook(false)
+  }
+
+  const startEditBook = () => {
+    setBookInput(bookUrl || '')
+    setEditingBook(true)
+  }
 
   return (
     <div
@@ -83,21 +99,47 @@ export default function TaskDetailModal({ task, subjects, onEdit, onDelete, onCl
           </div>
         )}
 
-        {/* Online book button */}
-        {bookUrl && (
-          <a
-            href={bookUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display:'flex',alignItems:'center',justifyContent:'center',gap:6,
-              padding:'9px',borderRadius:10,marginBottom:12,
-              background:'rgba(129,140,248,0.12)',border:'1px solid rgba(129,140,248,0.3)',
-              color:'#818CF8',textDecoration:'none',fontSize:13,fontWeight:600,
-            }}
-          >
-            <BookOpen size={14} /> Online boek openen
-          </a>
+        {/* Online book */}
+        {subject && (
+          <div style={{ marginBottom: 12 }}>
+            {editingBook ? (
+              <div style={{ display:'flex',gap:6 }}>
+                <input
+                  className="glass-input"
+                  placeholder="https://..."
+                  value={bookInput}
+                  onChange={e => setBookInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') saveBookUrl(); if (e.key === 'Escape') setEditingBook(false) }}
+                  autoFocus
+                  style={{ flex:1,fontSize:12 }}
+                />
+                <button onClick={saveBookUrl} style={{ padding:'6px 12px',borderRadius:8,border:'none',background:'var(--accent)',color:'#000',cursor:'pointer',fontSize:12,fontWeight:600 }}>
+                  Opslaan
+                </button>
+                <button onClick={() => setEditingBook(false)} style={{ padding:'6px 10px',borderRadius:8,border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'rgba(255,255,255,0.4)',cursor:'pointer',fontSize:12 }}>
+                  <X size={13} />
+                </button>
+              </div>
+            ) : bookUrl ? (
+              <div style={{ display:'flex',gap:6 }}>
+                <a
+                  href={bookUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:6,padding:'9px',borderRadius:10,background:'rgba(129,140,248,0.12)',border:'1px solid rgba(129,140,248,0.3)',color:'#818CF8',textDecoration:'none',fontSize:13,fontWeight:600 }}
+                >
+                  <BookOpen size={14} /> Online boek openen
+                </a>
+                <button onClick={startEditBook} title="Bewerk link" style={{ padding:'9px 12px',borderRadius:10,border:'1px solid rgba(129,140,248,0.3)',background:'rgba(129,140,248,0.08)',color:'#818CF8',cursor:'pointer' }}>
+                  <Pencil size={13} />
+                </button>
+              </div>
+            ) : (
+              <button onClick={startEditBook} style={{ width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:6,padding:'9px',borderRadius:10,border:'1px dashed rgba(255,255,255,0.15)',background:'transparent',color:'rgba(255,255,255,0.3)',cursor:'pointer',fontSize:12 }}>
+                <Link size={13} /> Voeg boeklink toe
+              </button>
+            )}
+          </div>
         )}
 
         {/* Actions */}

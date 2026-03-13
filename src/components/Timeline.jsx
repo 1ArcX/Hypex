@@ -141,6 +141,20 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, defaultV
         setMagisterLessons(data)
         setMagisterError(null)
         onMagisterError?.(null)
+        // Background-fetch volgende week zodat nextEvent op home werkt
+        const nextStart = new Date(days[0]); nextStart.setDate(nextStart.getDate() + 7)
+        const nextEnd   = new Date(days[days.length - 1]); nextEnd.setDate(nextEnd.getDate() + 7)
+        const nextKey   = `magister_sched_${toDateStr(nextStart)}_${toDateStr(nextEnd)}`
+        if (!sessionStorage.getItem(nextKey) && creds) {
+          fetch('/.netlify/functions/magister', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...creds, action: 'schedule', start: toDateStr(nextStart), end: toDateStr(nextEnd) })
+          }).then(async r => {
+            const d = await r.json()
+            if (Array.isArray(d)) sessionStorage.setItem(nextKey, JSON.stringify(d))
+          }).catch(() => {})
+        }
       } else {
         const msg = data?.error || 'Geen lessen ontvangen'
         setMagisterError(msg)
@@ -244,7 +258,7 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, defaultV
   }
 
   // ─── TIME GRID (day + week) ───────────────────────────────────────────
-  const TimeGrid = ({ days }) => {
+  const TimeGrid = ({ days, hideHeader = false }) => {
     const nowMins = now.getHours() * 60 + now.getMinutes()
     const nowTop = (nowMins / 60) * HOUR_H
     const showNowLine = days.some(d => isSameDay(d, now))
@@ -255,29 +269,31 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, defaultV
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
 
         {/* Day header row */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: `${TIME_COL}px repeat(${N}, 1fr)`,
-          borderBottom: '1px solid rgba(255,255,255,0.07)',
-          flexShrink: 0,
-        }}>
-          <div />
-          {days.map((d, i) => {
-            const isToday = isSameDay(d, now)
-            return (
-              <div key={i} style={{ padding: '8px 6px', textAlign: 'center' }}>
-                <div style={{ fontSize: '11px', fontWeight: 500, letterSpacing: '0.06em', color: isToday ? 'var(--accent, #00FFD1)' : 'rgba(255,255,255,0.35)', marginBottom: '4px', textTransform: 'uppercase' }}>
-                  {DAYS_SHORT[d.getDay()]}
+        {!hideHeader && (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: `${TIME_COL}px repeat(${N}, 1fr)`,
+            borderBottom: '1px solid rgba(255,255,255,0.07)',
+            flexShrink: 0,
+          }}>
+            <div />
+            {days.map((d, i) => {
+              const isToday = isSameDay(d, now)
+              return (
+                <div key={i} style={{ padding: '8px 6px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 500, letterSpacing: '0.06em', color: isToday ? 'var(--accent, #00FFD1)' : 'rgba(255,255,255,0.35)', marginBottom: '4px', textTransform: 'uppercase' }}>
+                    {DAYS_SHORT[d.getDay()]}
+                  </div>
+                  <div
+                    onClick={() => { if (!isDay) { setCurrent(d); setView('day') } }}
+                    style={{ width: isDay ? '36px' : '28px', height: isDay ? '36px' : '28px', borderRadius: '50%', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', background: isToday ? 'var(--accent, #00FFD1)' : 'transparent', color: isToday ? '#000' : 'rgba(255,255,255,0.85)', fontSize: isDay ? '18px' : '13px', fontWeight: isToday ? 700 : 400, cursor: isDay ? 'default' : 'pointer', transition: 'background 0.15s' }}>
+                    {d.getDate()}
+                  </div>
                 </div>
-                <div
-                  onClick={() => { if (!isDay) { setCurrent(d); setView('day') } }}
-                  style={{ width: isDay ? '36px' : '28px', height: isDay ? '36px' : '28px', borderRadius: '50%', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', background: isToday ? 'var(--accent, #00FFD1)' : 'transparent', color: isToday ? '#000' : 'rgba(255,255,255,0.85)', fontSize: isDay ? '18px' : '13px', fontWeight: isToday ? 700 : 400, cursor: isDay ? 'default' : 'pointer', transition: 'background 0.15s' }}>
-                  {d.getDate()}
-                </div>
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        )}
 
         {/* Scrollable grid body */}
         <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', position: 'relative' }}>
@@ -600,7 +616,7 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, defaultV
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
             {MobileWeekStrip({})}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
-              {TimeGrid({ days: [current] })}
+              {TimeGrid({ days: [current], hideHeader: true })}
             </div>
           </div>
         )}

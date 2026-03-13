@@ -356,7 +356,7 @@ export default function App() {
       tasks:    <TasksWidget tasks={tasks} subjects={subjects}
                   onAdd={async (data) => { if (!user?.id) return; await supabase.from('tasks').insert({ ...data, completed: false, user_id: user.id }); fetchTasks() }}
                   onEdit={openEditTask} onDelete={handleDeleteTask} onToggle={handleToggleTask}
-                  onViewDetail={setDetailTask} />,
+                  onViewDetail={setDetailTask} onNew={() => openNewTask()} />,
       weather:  <WeatherWidget userId={user?.id} onRequestPwaInstall={() => setShowPwaPrompt(true)} />,
       spotify:  <SpotifyWidget />,
       pomodoro: <PomodoroTimer onModeChange={setIsBreak} userId={user?.id} />,
@@ -792,7 +792,7 @@ export default function App() {
                             tasks={tasks} subjects={subjects}
                             onAdd={async (data) => { if (!user?.id) return; await supabase.from('tasks').insert({ ...data, completed: false, user_id: user.id }); fetchTasks() }}
                             onEdit={openEditTask} onDelete={handleDeleteTask} onToggle={handleToggleTask}
-                            onViewDetail={setDetailTask}
+                            onViewDetail={setDetailTask} onNew={() => openNewTask()}
                           />
                         </div>
                       )}

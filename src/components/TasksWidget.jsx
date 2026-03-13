@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Plus, GripVertical, Trash2, CheckCircle2, Circle, Pencil, X, AlertCircle } from 'lucide-react'
+import { Plus, GripVertical, Trash2, CheckCircle2, Circle, X, AlertCircle } from 'lucide-react'
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -28,7 +28,7 @@ function formatDate(dateStr, timeStr) {
   return { label: d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }), overdue: false }
 }
 
-export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle, onEdit, onDragStart, onViewDetail }) {
+export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle, onEdit, onDragStart, onViewDetail, onNew }) {
   const [adding, setAdding] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [newDate, setNewDate] = useState(todayStr())
@@ -70,10 +70,10 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
           <span style={{ color: 'var(--accent)' }}>✅</span> Taken
         </h3>
         <button
-          onClick={() => { setAdding(!adding); setNewTitle('') }}
+          onClick={() => { if (onNew) { onNew() } else { setAdding(!adding); setNewTitle('') } }}
           style={{ background: 'color-mix(in srgb, var(--accent) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', borderRadius: '8px', padding: '4px 8px', cursor: 'pointer', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
-          {adding ? <X size={12} /> : <Plus size={12} />}
-          {adding ? 'Annuleer' : 'Nieuw'}
+          {adding && !onNew ? <X size={12} /> : <Plus size={12} />}
+          {adding && !onNew ? 'Annuleer' : 'Nieuw'}
         </button>
       </div>
 
@@ -153,16 +153,17 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                 e.dataTransfer.setData('taskId', task.id)
                 onDragStart?.(task)
               }}
+              onClick={() => onViewDetail ? onViewDetail(task) : onEdit?.(task)}
               style={{
                 display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', borderRadius: '10px',
                 border: dateInfo?.overdue ? '1px solid rgba(255,100,100,0.2)' : '1px solid rgba(255,255,255,0.06)',
-                cursor: 'grab', background: dateInfo?.overdue ? 'rgba(255,80,80,0.04)' : 'rgba(255,255,255,0.01)',
+                cursor: 'pointer', background: dateInfo?.overdue ? 'rgba(255,80,80,0.04)' : 'rgba(255,255,255,0.01)',
                 transition: 'background 0.15s',
               }}
               onMouseEnter={e => e.currentTarget.style.background = dateInfo?.overdue ? 'rgba(255,80,80,0.07)' : 'color-mix(in srgb, var(--accent) 4%, transparent)'}
               onMouseLeave={e => e.currentTarget.style.background = dateInfo?.overdue ? 'rgba(255,80,80,0.04)' : 'rgba(255,255,255,0.01)'}>
               <GripVertical size={13} style={{ color: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
-              <button onClick={() => onToggle(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
+              <button onClick={e => { e.stopPropagation(); onToggle(task) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
                 <Circle size={16} style={{ color: 'rgba(255,255,255,0.3)' }} />
               </button>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -180,15 +181,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                 </p>
               </div>
               <button
-                onClick={() => onViewDetail ? onViewDetail(task) : onEdit?.(task)}
-                title="Details"
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.2)', padding: '3px', flexShrink: 0, borderRadius: '4px' }}
-                onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.7)'}
-                onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.2)'}>
-                <Pencil size={12} />
-              </button>
-              <button
-                onClick={() => onDelete(task.id)}
+                onClick={e => { e.stopPropagation(); onDelete(task.id) }}
                 title="Verwijderen"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,80,80,0.35)', padding: '3px', flexShrink: 0, borderRadius: '4px' }}
                 onMouseEnter={e => e.currentTarget.style.color = '#ff6b6b'}
