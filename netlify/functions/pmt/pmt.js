@@ -158,11 +158,6 @@ exports.handler = async (event) => {
     if (!date) return err('date is verplicht')
     const authHeaders = { ...PMT_HEADERS, 'x-api-user': auth.token }
 
-    // Geen sorting param — die breekt de date filter in de PMT API
-    const shiftsQs = new URLSearchParams({
-      'date[gte]': date, 'date[lte]': date, limit: 200
-    }).toString()
-
     // ISO week berekenen voor employees endpoint (vereist YYYY-WW formaat)
     const dateObj = new Date(date)
     const utcDate = new Date(Date.UTC(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate()))
@@ -172,64 +167,73 @@ exports.handler = async (event) => {
     const isoWeek = Math.ceil((((utcDate - yearStart) / 86400000) + 1) / 7)
     const yearWeek = `${utcDate.getUTCFullYear()}-${String(isoWeek).padStart(2, '0')}`
 
-    // Haal eigen schedule ook op — shifts endpoint mist soms de eigen shift
+    // Haal eerst departments op (nodig voor shifts query)
+    const deptRes = await fetch(`${API_V2}/departments?date=${date}`, { headers: authHeaders, timeout: 10000 })
+    const deptData = await deptRes.json()
+    const deptMap = {}
+    const deptIds = (deptData.result || []).map(d => { deptMap[d.department_id] = d.department_name; return d.department_id }).join(',')
+
+    // Exacte params die de PMT app gebruikt (reverse engineered uit JS bundle)
+    // Collega shifts: date= (enkelvoudig), ignore_lent_out, account_id[neq], dept csv
+    const colleagueQs = new URLSearchParams({
+      date,
+      ignore_lent_out: true,
+      'account_id[neq]': auth.accountId,
+      department_id: deptIds
+    }).toString()
+    // Eigen shift: date= + account_id=
+    const myQs = new URLSearchParams({ date, account_id: auth.accountId }).toString()
+    // Eigen schedule als fallback (definitieve tijden)
     const ownScheduleQs = new URLSearchParams({
       'date[gte]': date, 'date[lte]': date, account_id: auth.accountId
     }).toString()
 
-    const [deptRes, empRes, shiftsRes, ownRes] = await Promise.all([
-      fetch(`${API_V2}/departments?date=${date}`, { headers: authHeaders, timeout: 10000 }),
+    const [empRes, colleagueRes, myRes, ownRes] = await Promise.all([
       fetch(`${API_V2}/stores/${auth.storeId}/employees?exchange=true&week=${yearWeek}&limit=10000`, { headers: authHeaders, timeout: 10000 }),
-      fetch(`${API_V2}/shifts?${shiftsQs}`, { headers: authHeaders, timeout: 10000 }),
+      fetch(`${API_V2}/shifts?${colleagueQs}`, { headers: authHeaders, timeout: 10000 }),
+      fetch(`${API_V2}/shifts?${myQs}`, { headers: authHeaders, timeout: 10000 }),
       fetch(`${API_V2}/schedules?${ownScheduleQs}`, { headers: authHeaders, timeout: 10000 })
     ])
 
-    const [deptData, empData, shiftsData, ownData] = await Promise.all([
-      deptRes.json(), empRes.json(), shiftsRes.json(), ownRes.json()
+    const [empData, colleagueData, myData, ownData] = await Promise.all([
+      empRes.json(), colleagueRes.json(), myRes.json(), ownRes.json()
     ])
 
-    if (!shiftsRes.ok) return err(shiftsData?.result?.[0]?.message || 'Dag planning ophalen mislukt', 500)
+    if (!colleagueRes.ok) return err(colleagueData?.result?.[0]?.message || 'Dag planning ophalen mislukt', 500)
 
-    const deptMap = {}
-    for (const d of (deptData.result || [])) deptMap[d.department_id] = d.department_name
     const empMap = {}
     for (const e of (empData.result || [])) empMap[String(e.account_id)] = e.name
 
-    const raw = (shiftsData.result || []).filter(s =>
-      s.start_datetime &&
-      s.start_datetime.startsWith(date) &&
-      s.start_datetime !== s.end_datetime &&
-      !s.start_datetime.endsWith('00:00')
+    const filterShifts = arr => (arr || []).filter(s =>
+      s.start_datetime && s.start_datetime.startsWith(date) &&
+      s.start_datetime !== s.end_datetime && !s.start_datetime.endsWith('00:00')
     )
+    const colleagues = filterShifts(colleagueData.result)
+    const myShifts   = filterShifts(myData.result)
 
-    // Eigen shift via schedules endpoint toevoegen als die niet al in shifts zit
-    // (shifts endpoint mist soms de eigen shift voor verleden dagen)
-    const ownSchedules = (ownData.result || []).filter(s =>
-      s.schedule_time_from && s.schedule_time_from.startsWith(date)
-    )
-    const ownInShifts = raw.some(s => String(s.account_id) === String(auth.accountId))
-    if (!ownInShifts) {
-      for (const own of ownSchedules) {
-        raw.push({
-          start_datetime: own.schedule_time_from,
-          end_datetime: own.schedule_time_to,
-          department_id: own.department?.department_id,
-          account_id: auth.accountId
-        })
-      }
+    // Eigen shift via schedules toevoegen als shifts endpoint hem mist (verleden dagen)
+    const ownSchedules = (ownData.result || []).filter(s => s.schedule_time_from?.startsWith(date))
+    const ownInShifts = myShifts.some(s => String(s.account_id) === String(auth.accountId))
+    if (!ownInShifts && ownSchedules.length > 0) {
+      myShifts.push({
+        start_datetime: ownSchedules[0].schedule_time_from,
+        end_datetime:   ownSchedules[0].schedule_time_to,
+        department_id:  ownSchedules[0].department?.department_id,
+        account_id: auth.accountId
+      })
     }
 
+    const raw = [...myShifts, ...colleagues]
     raw.sort((a, b) => a.start_datetime.localeCompare(b.start_datetime))
+
     const dayShifts = raw.map(s => {
-      // Voor eigen shift: gebruik schedules tijden (definitief) indien beschikbaar
       const isOwn = String(s.account_id) === String(auth.accountId)
-      const ownSched = isOwn ? ownSchedules[0] : null
-      const startDt = ownSched ? ownSched.schedule_time_from : s.start_datetime
-      const endDt   = ownSched ? ownSched.schedule_time_to   : s.end_datetime
+      // Voor eigen shift: gebruik definitieve schedules tijden
+      const ownSched = isOwn && ownSchedules[0] ? ownSchedules[0] : null
       return {
-        start: startDt.split(' ')[1]?.slice(0, 5) || '',
-        end:   endDt.split(' ')[1]?.slice(0, 5) || '',
-        department: deptMap[s.department_id] || (ownSched ? ownSched.department?.department_name : null) || String(s.department_id),
+        start: (ownSched ? ownSched.schedule_time_from : s.start_datetime).split(' ')[1]?.slice(0, 5) || '',
+        end:   (ownSched ? ownSched.schedule_time_to   : s.end_datetime).split(' ')[1]?.slice(0, 5) || '',
+        department: deptMap[s.department_id] || (ownSched?.department?.department_name) || String(s.department_id || ''),
         name: empMap[String(s.account_id)] || null,
         isOwn
       }
