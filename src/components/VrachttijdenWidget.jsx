@@ -124,13 +124,6 @@ export default function VrachttijdenWidget() {
       const arr = Array.isArray(raw) ? raw : Object.values(raw)
       setStops(arr)
       setLastUpdate(new Date())
-      // Auto-test alle APIs op eerste load zodat we de structuur kunnen zien
-      if (arr.length > 0) {
-        const firstUuid = arr[0]?.tripStatus?.uuid
-        fetch(API, { method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ action:'testApis', token:t.accessToken, refreshToken:t.refreshToken, tripUuid: firstUuid })
-        }).then(r=>r.json()).then(d=>console.log('[Simacan testApis]', JSON.stringify(d, null, 2))).catch(()=>{})
-      }
     } catch (e) { setError(e.message) }
     setLoading(false)
   }, [saveTokens])
@@ -179,6 +172,21 @@ export default function VrachttijdenWidget() {
     setLoginLoading(false)
   }, [saveTokens, fetchStops])
 
+  // ─── Google Encoded Polyline decoder ─────────────────────────────────────
+  function decodePolyline(enc) {
+    const pts = []; let i = 0, lat = 0, lng = 0
+    while (i < enc.length) {
+      let b, s = 0, r = 0
+      do { b = enc.charCodeAt(i++) - 63; r |= (b & 0x1f) << s; s += 5 } while (b >= 0x20)
+      lat += r & 1 ? ~(r >> 1) : r >> 1
+      s = 0; r = 0
+      do { b = enc.charCodeAt(i++) - 63; r |= (b & 0x1f) << s; s += 5 } while (b >= 0x20)
+      lng += r & 1 ? ~(r >> 1) : r >> 1
+      pts.push([lat / 1e5, lng / 1e5])
+    }
+    return pts
+  }
+
   // ─── Kaart init ───────────────────────────────────────────────────────────
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return
@@ -194,40 +202,49 @@ export default function VrachttijdenWidget() {
   const showRouteOnMap = useCallback((routeData, stop) => {
     const L = window.L; const map = mapInstanceRef.current
     if (!L || !map) return
-    // Verwijder oude markers/route
     markersRef.current.forEach(m => map.removeLayer(m)); markersRef.current = []
     if (routeLayerRef.current) { map.removeLayer(routeLayerRef.current); routeLayerRef.current = null }
 
-    const bounds = [[STORE_LAT, STORE_LNG]]
     const color  = activityColor(stop?.tripStatus?.activity)
+    const stops  = routeData?.stops || []
+    const bounds = [[STORE_LAT, STORE_LNG]]
+    const allPts = []
 
-    // Route polyline — probeer meerdere veldnamen
-    const coords = routeData?.route?.coordinates || routeData?.routeCoordinates || routeData?.path?.coordinates || routeData?.geometry?.coordinates
-    if (coords?.length > 1) {
-      const latlngs = coords.map(c => Array.isArray(c) ? [c[1], c[0]] : [c.lat ?? c.latitude, c.lon ?? c.lng ?? c.longitude])
-      routeLayerRef.current = L.polyline(latlngs, { color, weight: 3, opacity: 0.6 }).addTo(map)
-      latlngs.forEach(p => bounds.push(p))
+    // Teken route-segmenten (encoded polyline per stop)
+    for (const s of stops) {
+      if (!s.polyline) continue
+      const pts = decodePolyline(s.polyline)
+      if (pts.length < 2) continue
+      pts.forEach(p => { allPts.push(p); bounds.push(p) })
+      L.polyline(pts, { color, weight: 3, opacity: 0.6 }).addTo(map)
+      markersRef.current.push({ remove: () => {} }) // tracked via layer groups
+    }
+    if (allPts.length > 0) {
+      // Vervang losse polylines door één gecombineerde layer voor cleanup
+      markersRef.current.forEach(m => m._map && map.removeLayer(m))
+      const combined = L.polyline(allPts, { color, weight: 3, opacity: 0.7 }).addTo(map)
+      routeLayerRef.current = combined
+      markersRef.current = []
     }
 
-    // Voertuig positie — probeer meerdere veldnamen
-    const veh = routeData?.vehiclePosition || routeData?.vehicle || routeData?.currentPosition
-    const lat  = veh?.latitude ?? veh?.lat
-    const lng  = veh?.longitude ?? veh?.lon ?? veh?.lng
-    if (lat && lng) {
-      bounds.push([lat, lng])
-      const ico = L.divIcon({ html: `<div style="width:14px;height:14px;background:${color};border-radius:3px;border:2px solid white;box-shadow:0 0 5px ${color};transform:rotate(45deg)"></div>`, className:'', iconAnchor:[7,7] })
-      const m = L.marker([lat, lng], { icon: ico }).addTo(map)
-        .bindPopup(`<b>${stop?.trip?.tripId || 'Rit'}</b><br/>${stop?.tripStatus?.carrierName || ''}`)
+    // Stop-markers met naam tooltip
+    for (const s of stops) {
+      if (!s.lat || !s.lng) continue
+      bounds.push([s.lat, s.lng])
+      const isActive = s.active
+      const isStore  = s.name?.includes('7044') || s.name?.toLowerCase().includes('dronten')
+      const html = isStore
+        ? `<div style="width:11px;height:11px;background:#00FFD1;border-radius:50%;border:2px solid white;box-shadow:0 0 6px #00FFD1"></div>`
+        : isActive
+        ? `<div style="width:14px;height:14px;background:${color};border-radius:3px;border:2px solid white;box-shadow:0 0 6px ${color};transform:rotate(45deg)"></div>`
+        : `<div style="width:8px;height:8px;background:rgba(255,255,255,0.4);border-radius:50%;border:1px solid rgba(255,255,255,0.6)"></div>`
+      const ico = L.divIcon({ html, className:'', iconAnchor: isActive ? [7,7] : [4,4] })
+      const m = L.marker([s.lat, s.lng], { icon: ico }).addTo(map)
+      if (s.name) m.bindPopup(`<b>${s.name}</b>${isActive ? '<br/><i>Actief</i>' : ''}`)
       markersRef.current.push(m)
     }
 
-    // Log eerste keer zodat we velden kunnen zien
-    if (!routeData._logged) {
-      console.log('[Simacan] tripRoute velden:', JSON.stringify(routeData).slice(0, 600))
-      routeData._logged = true
-    }
-
-    if (bounds.length > 1) map.fitBounds(bounds, { padding: [24, 24] })
+    if (bounds.length > 1) map.fitBounds(bounds, { padding: [20, 20] })
   }, [])
 
   const fetchAndShowRoute = useCallback(async (stop) => {

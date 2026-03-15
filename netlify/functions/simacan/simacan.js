@@ -115,9 +115,21 @@ exports.handler = async (event) => {
     if (!tripUuid) return err('tripUuid is verplicht')
     const result = await callApi(`/api/internal/v3/stopAndRoutes/${tripUuid}`, token, refreshToken)
     if (result.status === 401) return err('Sessie verlopen.', 401)
-    // Also try v2 locationStops for vehicle position
-    const data = result.data || {}
-    return ok({ ...data, _newTokens: result.newAccessToken ? { accessToken: result.newAccessToken, refreshToken: result.newRefreshToken } : undefined })
+    // Normaliseer: object met genummerde keys → array van stops
+    const raw = result.data || {}
+    const stops = Object.values(raw).filter(s => s && typeof s === 'object' && (s.address || s.stopNumber !== undefined))
+    const normalized = stops.map(s => ({
+      id:          s.id,
+      uuid:        s.uuid,
+      stopNumber:  s.stopNumber,
+      label:       s.label,
+      active:      s.active,
+      name:        s.address?.name || s.address?.city || '',
+      lat:         s.address?.location?.latitude  ?? (s.address?.coordinates?.[1]),
+      lng:         s.address?.location?.longitude ?? (s.address?.coordinates?.[0]),
+      polyline:    s.route?.polyline || null,
+    }))
+    return ok({ stops: normalized, _newTokens: result.newAccessToken ? { accessToken: result.newAccessToken, refreshToken: result.newRefreshToken } : undefined })
   }
 
   if (action === 'testApis') {
