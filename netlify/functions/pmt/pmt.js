@@ -167,47 +167,53 @@ exports.handler = async (event) => {
     const isoWeek = Math.ceil((((utcDate - yearStart) / 86400000) + 1) / 7)
     const yearWeek = `${utcDate.getUTCFullYear()}-${String(isoWeek).padStart(2, '0')}`
 
-    // Alle fetches parallel: departments (voor naam-mapping), employees, alle shifts op deze dag, eigen schedule
-    const colleagueQs = new URLSearchParams({
-      date,
-      ignore_lent_out: true,
-      'account_id[neq]': auth.accountId,
-      limit: 300
-    }).toString()
+    // Stap 1: eigen shift + departments + employees parallel (hebben we department_id nodig voor collega-query)
     const myQs = new URLSearchParams({ date, account_id: auth.accountId }).toString()
     const ownScheduleQs = new URLSearchParams({
       'date[gte]': date, 'date[lte]': date, account_id: auth.accountId
     }).toString()
 
-    const [deptRes, empRes, colleagueRes, myRes, ownRes] = await Promise.all([
+    const [deptRes, empRes, myRes, ownRes] = await Promise.all([
       fetch(`${API_V2}/departments?date=${date}`, { headers: authHeaders, timeout: 10000 }),
       fetch(`${API_V2}/stores/${auth.storeId}/employees?exchange=true&week=${yearWeek}&limit=10000`, { headers: authHeaders, timeout: 10000 }),
-      fetch(`${API_V2}/shifts?${colleagueQs}`, { headers: authHeaders, timeout: 10000 }),
       fetch(`${API_V2}/shifts?${myQs}`, { headers: authHeaders, timeout: 10000 }),
       fetch(`${API_V2}/schedules?${ownScheduleQs}`, { headers: authHeaders, timeout: 10000 })
     ])
 
-    const [deptData, empData, colleagueData, myData, ownData] = await Promise.all([
-      deptRes.json(), empRes.json(), colleagueRes.json(), myRes.json(), ownRes.json()
+    const [deptData, empData, myData, ownData] = await Promise.all([
+      deptRes.json(), empRes.json(), myRes.json(), ownRes.json()
     ])
 
     const deptMap = {}
     for (const d of (deptData.result || [])) deptMap[d.department_id] = d.department_name
+
+    // department_id bepalen uit eigen shift (of schedules als fallback)
+    const filterShifts = arr => (arr || []).filter(s =>
+      s.start_datetime && s.start_datetime.startsWith(date) &&
+      s.start_datetime !== s.end_datetime && !s.start_datetime.endsWith('00:00')
+    )
+    const myShifts = filterShifts(myData.result)
+    const ownSchedules = (ownData.result || []).filter(s => s.schedule_time_from?.startsWith(date))
+    const deptId = myShifts[0]?.department_id || ownSchedules[0]?.department?.department_id
+
+    // Stap 2: collega shifts met exacte department_id (zoals de app dat doet)
+    const colleagueQs = new URLSearchParams({
+      date,
+      ignore_lent_out: true,
+      'account_id[neq]': auth.accountId,
+      ...(deptId ? { department_id: deptId } : {})
+    }).toString()
+    const colleagueRes = await fetch(`${API_V2}/shifts?${colleagueQs}`, { headers: authHeaders, timeout: 10000 })
+    const colleagueData = await colleagueRes.json()
 
     if (!colleagueRes.ok) return err(colleagueData?.result?.[0]?.message || 'Dag planning ophalen mislukt', 500)
 
     const empMap = {}
     for (const e of (empData.result || [])) empMap[String(e.account_id)] = e.name
 
-    const filterShifts = arr => (arr || []).filter(s =>
-      s.start_datetime && s.start_datetime.startsWith(date) &&
-      s.start_datetime !== s.end_datetime && !s.start_datetime.endsWith('00:00')
-    )
     const colleagues = filterShifts(colleagueData.result)
-    const myShifts   = filterShifts(myData.result)
 
     // Eigen shift via schedules toevoegen als shifts endpoint hem mist (verleden dagen)
-    const ownSchedules = (ownData.result || []).filter(s => s.schedule_time_from?.startsWith(date))
     const ownInShifts = myShifts.some(s => String(s.account_id) === String(auth.accountId))
     if (!ownInShifts && ownSchedules.length > 0) {
       myShifts.push({
