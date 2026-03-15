@@ -8,7 +8,7 @@ import TaskDetailModal from './components/TaskDetailModal'
 import NotesWidget from './components/NotesWidget'
 import WeatherWidget from './components/WeatherWidget'
 import PomodoroTimer from './components/PomodoroTimer'
-import { LogOut, GraduationCap, Home, CalendarDays, CheckSquare, Layers, FileText, Flame, GripVertical, RefreshCw } from 'lucide-react'
+import { LogOut, GraduationCap, Home, CalendarDays, CheckSquare, Layers, FileText, Flame, GripVertical, RefreshCw, Briefcase } from 'lucide-react'
 import SpotifyWidget from './components/SpotifyWidget'
 import ThemeSettings from './components/ThemeSettings'
 import { Settings } from 'lucide-react'
@@ -17,6 +17,7 @@ import TasksWidget from './components/TasksWidget'
 import MagisterWidget from './components/MagisterWidget'
 import HabitsWidget from './components/HabitsWidget'
 import WorkWidget from './components/WorkWidget'
+import VrachttijdenWidget from './components/VrachttijdenWidget'
 import PasswordResetPage from './components/PasswordResetPage'
 import OnboardingModal from './components/OnboardingModal'
 import { Shield } from 'lucide-react'
@@ -667,6 +668,7 @@ export default function App() {
             { id: 'agenda',  Icon: CalendarDays,  label: 'Agenda'    },
             { id: 'taken',   Icon: CheckSquare,   label: 'Taken'     },
             { id: 'habits',  Icon: Flame,         label: 'Gewoontes' },
+            ...(isAdmin ? [{ id: 'werk', Icon: Briefcase, label: 'Werk' }] : []),
             { id: 'tools',   Icon: Layers,        label: 'Tools'     },
           ]
 
@@ -906,11 +908,19 @@ export default function App() {
                   </div>
                 )}
 
+                {/* WERK */}
+                {mobileTab === 'werk' && isAdmin && (
+                  <div style={{ height: '100%', overflowY: 'auto', padding: '16px 16px 80px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <WorkWidget />
+                    <VrachttijdenWidget />
+                  </div>
+                )}
+
                 {/* TOOLS */}
                 {mobileTab === 'tools' && (
                   <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                     <div style={{ display: 'flex', gap: 8, padding: '12px 16px 0', overflowX: 'auto', flexShrink: 0 }}>
-                      {[['weer','Weer'],['pomodoro','Pomodoro'],['spotify','Spotify'],['magister','Magister'], ...(isAdmin ? [['werk','Werk']] : [])].map(([id, label]) => (
+                      {[['weer','Weer'],['pomodoro','Pomodoro'],['spotify','Spotify'],['magister','Magister']].map(([id, label]) => (
                         <button key={id} style={subTabStyle(toolTab === id)} onClick={() => setToolTab(id)}>{label}</button>
                       ))}
                     </div>
@@ -920,7 +930,6 @@ export default function App() {
                         {toolTab === 'pomodoro' && <PomodoroTimer onModeChange={setIsBreak} onPomodoroActive={setPomodoroActive} userId={user?.id} />}
                         {toolTab === 'spotify'  && <SpotifyWidget />}
                         {toolTab === 'magister' && <MagisterWidget userId={user.id} onSubjectsSync={() => { fetchSubjects(); fetchProfiles(); fetchSubjectLinks() }} />}
-                        {toolTab === 'werk' && isAdmin && <WorkWidget />}
                       </div>
                     </div>
                   </div>
