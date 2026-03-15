@@ -1,12 +1,10 @@
 const fetch = require('node-fetch')
 
-const KEYCLOAK_URL = 'https://sso.simacan.com/auth/realms/jumbo-sc/protocol/openid-connect/token'
-const AUTH_SERVICE  = 'https://auth-service.services.simacan.com'
-const CONTROL_TOWER = 'https://sct-web-api-prod.simacan.com'
-const SHIPPER       = 'jumbo_sc'
-const REALM         = 'jumbo-sc'
-const LOCATION_ID   = '7044'
-const CLIENT_ID     = 'arrival-display'
+const KEYCLOAK_TOKEN_URL = 'https://sso.simacan.com/auth/realms/jumbo-sc/protocol/openid-connect/token'
+const CONTROL_TOWER     = 'https://sct-web-api-prod.simacan.com'
+const SHIPPER           = 'jumbo_sc'
+const LOCATION_ID       = '7044'
+const CLIENT_ID         = 'frontend'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -22,42 +20,30 @@ function err(msg, status = 400) {
   return { statusCode: status, headers: CORS_HEADERS, body: JSON.stringify({ error: msg }) }
 }
 
-async function loginSimacan(username, password) {
-  // Stap 1: Keycloak password grant
-  const res = await fetch(KEYCLOAK_URL, {
+async function refreshAccessToken(refreshToken) {
+  const res = await fetch(KEYCLOAK_TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ grant_type: 'password', username, password, client_id: CLIENT_ID }).toString(),
-    timeout: 12000
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      client_id: CLIENT_ID,
+      refresh_token: refreshToken
+    }).toString(),
+    timeout: 10000
   })
-
   if (!res.ok) {
     const text = await res.text()
-    let msg = 'Simacan login mislukt'
-    try {
-      const json = JSON.parse(text)
-      msg = json.error_description || json.error || msg
-    } catch {}
-    throw new Error(msg)
+    throw new Error('Token vernieuwen mislukt: ' + text.slice(0, 80))
   }
+  return res.json()
+}
 
-  const { access_token } = await res.json()
-
-  // Stap 2: Wissel Keycloak token in voor Simacan-specifieke token
-  try {
-    const authRes = await fetch(`${AUTH_SERVICE}/api/v1/auth/${SHIPPER}/${REALM}`, {
-      headers: { 'Authorization': `Bearer ${access_token}` },
-      timeout: 10000
-    })
-    if (authRes.ok) {
-      const authData = await authRes.json()
-      const simToken = authData.token || authData.access_token
-      if (simToken) return simToken
-    }
-  } catch (_) {}
-
-  // Fallback: gebruik Keycloak token direct
-  return access_token
+async function apiCall(token, path) {
+  const res = await fetch(`${CONTROL_TOWER}${path}`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+    timeout: 12000
+  })
+  return { status: res.status, data: await res.json() }
 }
 
 exports.handler = async (event) => {
@@ -67,50 +53,64 @@ exports.handler = async (event) => {
   let body
   try { body = JSON.parse(event.body || '{}') } catch { return err('Invalid JSON') }
 
-  const { action, username, password } = body
-  if (!action || !username || !password) return err('action, username en password zijn verplicht')
+  const { action, token, refreshToken } = body
+  if (!action) return err('action is verplicht')
 
-  let token
-  try {
-    token = await loginSimacan(username, password)
-  } catch (e) {
-    return err(e.message || 'Simacan login mislukt', 401)
+  // Token vernieuwen
+  if (action === 'refresh') {
+    if (!refreshToken) return err('refreshToken is verplicht')
+    try {
+      const tokens = await refreshAccessToken(refreshToken)
+      return ok({ accessToken: tokens.access_token, refreshToken: tokens.refresh_token, expiresIn: tokens.expires_in })
+    } catch (e) {
+      return err(e.message, 401)
+    }
   }
 
-  if (action === 'login') {
-    return ok({ success: true })
+  if (!token) return err('token is verplicht')
+
+  // Helper: voer API call uit, refresh automatisch bij 401
+  async function callApi(path, currentToken, currentRefresh) {
+    let { status, data } = await apiCall(currentToken, path)
+
+    // Token verlopen — refresh proberen
+    if (status === 401 && currentRefresh) {
+      try {
+        const newTokens = await refreshAccessToken(currentRefresh)
+        const retry = await apiCall(newTokens.access_token, path)
+        return {
+          status: retry.status,
+          data: retry.data,
+          newAccessToken: newTokens.access_token,
+          newRefreshToken: newTokens.refresh_token
+        }
+      } catch (_) {}
+    }
+    return { status, data }
   }
 
   if (action === 'locationStops') {
     const date = body.date || new Date().toISOString()
-    const qs = new URLSearchParams({ locationId: LOCATION_ID, timestamp: date }).toString()
-    const res = await fetch(`${CONTROL_TOWER}/api/internal/v2/${SHIPPER}/locations/locationStops?${qs}`, {
-      headers: { 'Authorization': `Bearer ${token}` },
-      timeout: 12000
-    })
-    const data = await res.json()
-    if (!res.ok) return err(data?.message || 'Vrachttijden ophalen mislukt', 500)
-    return ok(data)
+    const path = `/api/internal/v2/${SHIPPER}/locations/locationStops?locationId=${LOCATION_ID}&timestamp=${encodeURIComponent(date)}`
+    const result = await callApi(path, token, refreshToken)
+    if (result.status === 401) return err('Sessie verlopen. Vernieuw je token in de instellingen.', 401)
+    if (!result.data || result.status >= 500) return err('Vrachttijden ophalen mislukt', 500)
+    return ok({ ...result.data, _newTokens: result.newAccessToken ? { accessToken: result.newAccessToken, refreshToken: result.newRefreshToken } : undefined })
   }
 
   if (action === 'notifications') {
-    const res = await fetch(`${CONTROL_TOWER}/api/internal/v2/${SHIPPER}/client/notification/${LOCATION_ID}`, {
-      headers: { 'Authorization': `Bearer ${token}` },
-      timeout: 10000
-    })
-    const data = await res.json()
-    return ok(data)
+    const path = `/api/internal/v2/${SHIPPER}/client/notification/${LOCATION_ID}`
+    const result = await callApi(path, token, refreshToken)
+    if (result.status === 401) return err('Sessie verlopen.', 401)
+    return ok(result.data)
   }
 
   if (action === 'tripRoute') {
     const { tripUuid } = body
     if (!tripUuid) return err('tripUuid is verplicht')
-    const res = await fetch(`${CONTROL_TOWER}/api/internal/v3/stopAndRoutes/${tripUuid}`, {
-      headers: { 'Authorization': `Bearer ${token}` },
-      timeout: 10000
-    })
-    const data = await res.json()
-    return ok(data)
+    const result = await callApi(`/api/internal/v3/stopAndRoutes/${tripUuid}`, token, refreshToken)
+    if (result.status === 401) return err('Sessie verlopen.', 401)
+    return ok(result.data)
   }
 
   return err(`Onbekende actie: ${action}`)
