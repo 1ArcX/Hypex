@@ -314,10 +314,11 @@ export default function WorkWidget() {
                               {dayShifts.map((s, i) => (
                                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px',
                                   borderRadius: '7px',
+                                  opacity: s.worksToday === false ? 0.4 : 1,
                                   background: s.isOwn ? accentBg(12) : 'rgba(255,255,255,0.03)',
                                   border: s.isOwn ? accentBorder(30) : '1px solid rgba(255,255,255,0.05)' }}>
                                   <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
                                       <span style={{ fontSize: '11px', color: s.isOwn ? 'var(--accent)' : 'rgba(255,255,255,0.85)',
                                         fontWeight: s.isOwn ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                         {s.name ? s.name.split(' ')[0] : '—'}
@@ -325,7 +326,7 @@ export default function WorkWidget() {
                                       </span>
                                       <span style={{ fontSize: '11px', color: s.isOwn ? 'var(--accent)' : 'rgba(255,255,255,0.6)',
                                         fontWeight: 500, flexShrink: 0 }}>
-                                        {s.start} – {s.end}
+                                        {s.start && s.end ? `${s.start} – ${s.end}` : '—'}
                                       </span>
                                     </div>
                                     <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', margin: '1px 0 0' }}>
