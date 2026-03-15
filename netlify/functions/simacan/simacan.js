@@ -95,10 +95,7 @@ exports.handler = async (event) => {
     const result = await callApi(path, token, refreshToken)
     if (result.status === 401) return err('Sessie verlopen. Vernieuw je token in de instellingen.', 401)
     if (!result.data || result.status >= 500) return err('Vrachttijden ophalen mislukt', 500)
-    // _debugFirstStop: eerste stop raw voor veldnamen-inspectie
-    const allItems = result.data?.locationStops || result.data?.stops || result.data?.result || (Array.isArray(result.data) ? result.data : Object.values(result.data || {}))
-    const _debugFirstStop = Array.isArray(allItems) && allItems.length > 0 ? allItems[0] : result.data
-    return ok({ ...result.data, _debugFirstStop, _newTokens: result.newAccessToken ? { accessToken: result.newAccessToken, refreshToken: result.newRefreshToken } : undefined })
+    return ok({ ...result.data, _newTokens: result.newAccessToken ? { accessToken: result.newAccessToken, refreshToken: result.newRefreshToken } : undefined })
   }
 
   if (action === 'notifications') {

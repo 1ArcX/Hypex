@@ -1,103 +1,76 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Truck, RefreshCw, AlertCircle, MapPin, ChevronDown, ChevronUp, LogIn, LogOut, Settings } from 'lucide-react'
+import { Truck, RefreshCw, AlertCircle, ChevronDown, ChevronUp, LogIn, LogOut } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 
-const API            = '/.netlify/functions/simacan'
-const STORAGE_KEY    = 'simacan_tokens'
-const KC_BASE        = 'https://sso.simacan.com/auth/realms/jumbo-sc/protocol/openid-connect'
-const KC_CLIENT_ID   = 'frontend'
+const API          = '/.netlify/functions/simacan'
+const STORAGE_KEY  = 'simacan_tokens'
+const KC_BASE      = 'https://sso.simacan.com/auth/realms/jumbo-sc/protocol/openid-connect'
+const KC_CLIENT_ID = 'frontend'
 
-// Jumbo 7044 — Ede als fallback kaartcentrum
-const STORE_LAT = 52.0268
-const STORE_LNG = 5.6643
-
-// ─── PKCE helpers ────────────────────────────────────────────────────────────
+// ─── PKCE helpers ─────────────────────────────────────────────────────────────
 function randomBase64url(len = 32) {
   const arr = new Uint8Array(len)
   crypto.getRandomValues(arr)
-  return btoa(String.fromCharCode(...arr)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+  return btoa(String.fromCharCode(...arr)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'')
 }
-
 async function sha256Base64url(plain) {
   const data = new TextEncoder().encode(plain)
   const digest = await crypto.subtle.digest('SHA-256', data)
-  return btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+  return btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'')
 }
-
 async function exchangeCode(code, verifier, redirectUri) {
   const res = await fetch(`${KC_BASE}/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type:    'authorization_code',
-      client_id:     KC_CLIENT_ID,
-      code,
-      code_verifier: verifier,
-      redirect_uri:  redirectUri
-    }).toString()
+    body: new URLSearchParams({ grant_type:'authorization_code', client_id:KC_CLIENT_ID, code, code_verifier:verifier, redirect_uri:redirectUri }).toString()
   })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error_description || data.error || 'Token ophalen mislukt')
   return data
 }
 
-async function refreshTokens(refreshToken) {
-  const res = await fetch(`${KC_BASE}/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type:    'refresh_token',
-      client_id:     KC_CLIENT_ID,
-      refresh_token: refreshToken
-    }).toString()
-  })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error_description || 'Token vernieuwen mislukt')
-  return data
-}
-
-// ─── Formatters ──────────────────────────────────────────────────────────────
-function formatTime(iso) {
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function fmt(iso) {
   if (!iso) return '—'
   const d = new Date(iso)
-  return isNaN(d) ? '—' : d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
+  return isNaN(d) ? '—' : d.toLocaleTimeString('nl-NL', { hour:'2-digit', minute:'2-digit' })
 }
 
-function timeDiff(iso) {
-  if (!iso) return null
-  const m = Math.round((new Date(iso) - Date.now()) / 60000)
-  if (m < -120) return null
-  if (m < 0)   return `${Math.abs(m)}m geleden`
-  if (m === 0) return 'Nu'
-  return `over ${m}m`
+function delayBadge(minutes) {
+  if (minutes == null) return null
+  if (Math.abs(minutes) < 2) return null
+  if (minutes > 0) return { text: `+${minutes}m`, color: '#f87171' }
+  return { text: `${minutes}m`, color: '#4ade80' }
 }
 
-function statusColor(s) {
-  if (!s) return 'rgba(255,255,255,0.4)'
-  const l = s.toLowerCase()
-  if (l.includes('arrived') || l.includes('delivered') || l.includes('completed')) return '#4ade80'
-  if (l.includes('delay')   || l.includes('late'))                                 return '#f87171'
-  if (l.includes('route')   || l.includes('transit')   || l.includes('on_time'))   return '#60a5fa'
-  return 'rgba(255,255,255,0.5)'
+function activityColor(a) {
+  if (!a) return 'rgba(255,255,255,0.35)'
+  if (a === 'AFGEROND')   return '#4ade80'
+  if (a === 'GEANNULEERD') return 'rgba(255,255,255,0.2)'
+  if (a === 'GEPLAND')    return 'rgba(255,255,255,0.35)'
+  return '#60a5fa' // ONDERWEG, ACTIEF, etc.
+}
+function activityLabel(a) {
+  const map = { AFGEROND:'Afgerond', GEPLAND:'Gepland', ONDERWEG:'Onderweg', ACTIEF:'Bezig', GEANNULEERD:'Geannuleerd' }
+  return map[a] || a || ''
 }
 
-function statusLabel(s) {
-  if (!s) return ''
-  const l = s.toLowerCase()
-  if (l.includes('arrived') || l.includes('completed')) return 'Aangekomen'
-  if (l.includes('delivered'))  return 'Geleverd'
-  if (l.includes('delay'))      return 'Vertraagd'
-  if (l.includes('on_time'))    return 'Op tijd'
-  if (l.includes('route') || l.includes('transit')) return 'Onderweg'
-  if (l.includes('planned'))    return 'Gepland'
-  return s
+function palletSummary(drops) {
+  const counts = {}
+  for (const d of drops || []) {
+    if (d.cancelled) continue
+    for (const lc of d.loadCarriers || []) {
+      const t = lc.loadCarrierType || 'OVERIG'
+      counts[t] = (counts[t] || 0) + (lc.plannedAmount || 0)
+    }
+  }
+  return counts
 }
+const PALLET_LABELS = { DIEPVRIES:'❄ Diepvries', AMBIENT:'Ambient', VERS:'Vers', OVERIG:'Overig', KOEL:'Koel' }
 
-// ─── Component ───────────────────────────────────────────────────────────────
+// ─── Component ────────────────────────────────────────────────────────────────
 export default function VrachttijdenWidget() {
-  const [tokens, setTokens] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) } catch { return null }
-  })
+  const [tokens,      setTokens]      = useState(() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) } catch { return null } })
   const [stops,       setStops]       = useState(null)
   const [loading,     setLoading]     = useState(false)
   const [loginLoading,setLoginLoading]= useState(false)
@@ -106,10 +79,9 @@ export default function VrachttijdenWidget() {
   const [selectedStop,setSelectedStop]= useState(null)
   const [selectedDate,setSelectedDate]= useState(() => new Date().toISOString().slice(0,10))
 
-  const mapRef         = useRef(null)
-  const mapInstanceRef = useRef(null)
-  const markersRef     = useRef([])
   const tokensRef      = useRef(tokens)
+  const selectedDateRef = useRef(selectedDate)
+  useEffect(() => { selectedDateRef.current = selectedDate }, [selectedDate])
 
   const accentBg     = p => `color-mix(in srgb, var(--accent) ${p}%, transparent)`
   const accentBorder = p => `1px solid color-mix(in srgb, var(--accent) ${p}%, transparent)`
@@ -119,14 +91,10 @@ export default function VrachttijdenWidget() {
     setTokens(t)
     if (t) localStorage.setItem(STORAGE_KEY, JSON.stringify(t))
     else   localStorage.removeItem(STORAGE_KEY)
-    // Sync naar Supabase user_metadata zodat alle apparaten toegang hebben
     supabase.auth.updateUser({ data: { simacan_tokens: t || null } }).catch(() => {})
   }, [])
 
-  const selectedDateRef = useRef(selectedDate)
-  useEffect(() => { selectedDateRef.current = selectedDate }, [selectedDate])
-
-  // ─── Ophalen vrachttijden ─────────────────────────────────────────────────
+  // ─── Ophalen ──────────────────────────────────────────────────────────────
   const fetchStops = useCallback(async (t = tokensRef.current, date = selectedDateRef.current) => {
     if (!t?.accessToken) return
     setLoading(true); setError(null)
@@ -134,146 +102,74 @@ export default function VrachttijdenWidget() {
       const res = await fetch(API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'locationStops', token: t.accessToken, refreshToken: t.refreshToken, date: new Date(date + 'T12:00:00').toISOString() })
+        body: JSON.stringify({ action:'locationStops', token:t.accessToken, refreshToken:t.refreshToken, date: new Date(date+'T12:00:00').toISOString() })
       })
       const data = await res.json()
-
-      // Automatisch nieuwe tokens opslaan als functie ze heeft ververst
-      if (data._newTokens) {
-        saveTokens({ accessToken: data._newTokens.accessToken, refreshToken: data._newTokens.refreshToken || t.refreshToken })
-      }
-
+      if (data._newTokens) saveTokens({ accessToken:data._newTokens.accessToken, refreshToken:data._newTokens.refreshToken || t.refreshToken })
       if (!res.ok) {
-        // Token verlopen en geen refresh beschikbaar → opnieuw inloggen
         if (res.status === 401) { saveTokens(null); setError('Sessie verlopen. Log opnieuw in.'); setLoading(false); return }
         throw new Error(data.error || 'Serverfout')
       }
-
-      if (data._debugFirstStop) console.log('[Simacan] eerste stop velden:', JSON.stringify(data._debugFirstStop, null, 2))
-      const raw = data.locationStops || data.stops || data.result || data || []
+      const raw = data.locationStops || data.stops || data.result || (Array.isArray(data) ? data : [])
       setStops(Array.isArray(raw) ? raw : Object.values(raw))
       setLastUpdate(new Date())
-    } catch (e) {
-      setError(e.message)
-    }
+    } catch (e) { setError(e.message) }
     setLoading(false)
   }, [saveTokens])
 
-  // ─── Tokens laden bij start ───────────────────────────────────────────────
+  // ─── Start ────────────────────────────────────────────────────────────────
   useEffect(() => {
-    // Lokale tokens al geladen via useState initializer — start direct
     if (tokens) { fetchStops(tokens); return }
-
-    // Geen lokale tokens: probeer Supabase user_metadata als fallback (voor mobiel)
     supabase.auth.getUser().then(({ data: { user } }) => {
       const t = user?.user_metadata?.simacan_tokens
-      if (t?.accessToken) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(t))
-        tokensRef.current = t
-        setTokens(t)
-        fetchStops(t)
-      }
+      if (t?.accessToken) { localStorage.setItem(STORAGE_KEY, JSON.stringify(t)); tokensRef.current = t; setTokens(t); fetchStops(t) }
     }).catch(() => {})
   }, [])
 
   useEffect(() => {
-    if (!tokens) return
-    if (selectedDate !== new Date().toISOString().slice(0,10)) return // geen auto-refresh voor andere dagen
+    if (!tokens || selectedDate !== new Date().toISOString().slice(0,10)) return
     const t = setInterval(() => fetchStops(), 60000)
     return () => clearInterval(t)
   }, [!!tokens, selectedDate, fetchStops])
 
-  // ─── PKCE OAuth login — alleen beschikbaar op localhost:3000 ────────────
+  // ─── Login (alleen localhost:3000) ────────────────────────────────────────
   const isLocalhost = window.location.hostname === 'localhost'
   const REDIRECT_URI = 'http://localhost:3000/simacan-callback.html'
 
   const handleLogin = useCallback(async () => {
     setLoginLoading(true); setError(null)
     try {
-      const verifier  = randomBase64url(32)
-      const challenge = await sha256Base64url(verifier)
-      const state     = randomBase64url(16)
-
-      const authUrl = `${KC_BASE}/auth?` + new URLSearchParams({
-        client_id:             KC_CLIENT_ID,
-        response_type:         'code',
-        scope:                 'openid offline_access',
-        redirect_uri:          REDIRECT_URI,
-        state,
-        code_challenge:        challenge,
-        code_challenge_method: 'S256'
-      }).toString()
-
+      const verifier = randomBase64url(32); const challenge = await sha256Base64url(verifier); const state = randomBase64url(16)
+      const authUrl = `${KC_BASE}/auth?` + new URLSearchParams({ client_id:KC_CLIENT_ID, response_type:'code', scope:'openid offline_access', redirect_uri:REDIRECT_URI, state, code_challenge:challenge, code_challenge_method:'S256' }).toString()
       const popup = window.open(authUrl, 'simacan_login', 'width=520,height=640,left=200,top=100')
       if (!popup) throw new Error('Popup geblokkeerd. Sta popups toe voor deze site.')
-
       await new Promise((resolve, reject) => {
         const handler = async (event) => {
-          // Accepteer berichten van localhost:3000 (callback pagina) of eigen origin
           if (event.origin !== 'http://localhost:3000' && event.origin !== window.location.origin) return
-          if (event.data?.type === 'simacan_auth_error') {
-            window.removeEventListener('message', handler)
-            reject(new Error(event.data.description || event.data.error)); return
-          }
+          if (event.data?.type === 'simacan_auth_error') { window.removeEventListener('message', handler); reject(new Error(event.data.description || event.data.error)); return }
           if (event.data?.type !== 'simacan_auth') return
           if (event.data.state !== state) { reject(new Error('State mismatch')); return }
           window.removeEventListener('message', handler)
-          try {
-            const tokenData = await exchangeCode(event.data.code, verifier, REDIRECT_URI)
-            const t = { accessToken: tokenData.access_token, refreshToken: tokenData.refresh_token }
-            saveTokens(t)
-            fetchStops(t)
-            resolve()
-          } catch (e) { reject(e) }
+          try { const td = await exchangeCode(event.data.code, verifier, REDIRECT_URI); const t = { accessToken:td.access_token, refreshToken:td.refresh_token }; saveTokens(t); fetchStops(t); resolve() }
+          catch (e) { reject(e) }
         }
         window.addEventListener('message', handler)
-        setTimeout(() => { window.removeEventListener('message', handler); reject(new Error('Login timeout')) }, 5 * 60 * 1000)
-        const checkClosed = setInterval(() => {
-          if (popup.closed) { clearInterval(checkClosed); window.removeEventListener('message', handler); reject(new Error('Login geannuleerd')) }
-        }, 500)
+        setTimeout(() => { window.removeEventListener('message', handler); reject(new Error('Login timeout')) }, 5*60*1000)
+        const chk = setInterval(() => { if (popup.closed) { clearInterval(chk); window.removeEventListener('message', handler); reject(new Error('Login geannuleerd')) } }, 500)
       })
-    } catch (e) {
-      setError(e.message)
-    }
+    } catch (e) { setError(e.message) }
     setLoginLoading(false)
   }, [saveTokens, fetchStops])
 
-  // ─── Kaart ────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!mapRef.current || mapInstanceRef.current) return
-    const L = window.L; if (!L) return
-    const map = L.map(mapRef.current, { zoomControl: false, attributionControl: false }).setView([STORE_LAT, STORE_LNG], 8)
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(map)
-    const storeIco = L.divIcon({ html: `<div style="width:10px;height:10px;background:#00FFD1;border-radius:50%;border:2px solid white;box-shadow:0 0 6px #00FFD1"></div>`, className: '', iconAnchor: [5,5] })
-    L.marker([STORE_LAT, STORE_LNG], { icon: storeIco }).addTo(map).bindPopup('Jumbo 7044')
-    mapInstanceRef.current = map
-  }, [])
+  // ─── Datum helpers ────────────────────────────────────────────────────────
+  const today = new Date().toISOString().slice(0,10)
+  const changeDate = (nd) => { setSelectedDate(nd); setStops(null); setSelectedStop(null); fetchStops(tokensRef.current, nd) }
 
-  useEffect(() => {
-    const L = window.L; const map = mapInstanceRef.current
-    if (!L || !map || !stops) return
-    markersRef.current.forEach(m => map.removeLayer(m)); markersRef.current = []
-    const bounds = []
-    stops.forEach((stop, i) => {
-      const lat = stop.vehicle?.latitude ?? stop.vehicle?.lat ?? stop.currentLocation?.lat
-      const lng = stop.vehicle?.longitude ?? stop.vehicle?.lng ?? stop.currentLocation?.lng ?? stop.currentLocation?.lon
-      if (!lat || !lng) return
-      bounds.push([lat, lng])
-      const sel = selectedStop?.tripUuid === stop.tripUuid
-      const col = statusColor(stop.status)
-      const ico = L.divIcon({ html: `<div style="width:${sel?16:11}px;height:${sel?16:11}px;background:${col};border-radius:3px;border:2px solid rgba(255,255,255,0.8);box-shadow:0 0 5px ${col};transform:rotate(45deg)"></div>`, className: '', iconAnchor: [sel?8:5.5,sel?8:5.5] })
-      const plate = stop.vehicle?.licencePlate || stop.vehicle?.licensePlate || `Rit ${i+1}`
-      const m = L.marker([lat, lng], { icon: ico }).addTo(map)
-        .bindPopup(`<b>${plate}</b><br/>${statusLabel(stop.status)}<br/>${formatTime(stop.estimatedArrival || stop.plannedArrival)}`)
-      m.on('click', () => setSelectedStop(stop))
-      markersRef.current.push(m)
-    })
-    if (bounds.length > 1) map.fitBounds(bounds, { padding: [20,20] })
-    else if (bounds.length === 1) map.setView(bounds[0], 11)
-  }, [stops, selectedStop])
-
-  // ─── Render ───────────────────────────────────────────────────────────────
-  const sorted = stops ? [...stops].sort((a,b) => new Date(a.estimatedArrival||a.plannedArrival||0) - new Date(b.estimatedArrival||b.plannedArrival||0)) : []
+  // ─── Gesorteerde stops ────────────────────────────────────────────────────
+  const sorted = stops ? [...stops]
+    .filter(s => !s.cancelled)
+    .sort((a,b) => new Date(a.plannedStartTime||0) - new Date(b.plannedStartTime||0))
+    : []
 
   return (
     <div className="glass-card p-4">
@@ -282,50 +178,24 @@ export default function VrachttijdenWidget() {
         <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
           <Truck size={15} style={{ color:'var(--accent)', opacity:0.8 }} />
           <span style={{ color:'white', fontWeight:600, fontSize:'13px' }}>Vrachttijden</span>
-          {lastUpdate && selectedDate === new Date().toISOString().slice(0,10) && (
-            <span style={{ fontSize:'10px', color:'rgba(255,255,255,0.3)' }}>{lastUpdate.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})}</span>
-          )}
+          {lastUpdate && selectedDate === today && <span style={{ fontSize:'10px', color:'rgba(255,255,255,0.3)' }}>{lastUpdate.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})}</span>}
         </div>
         <div style={{ display:'flex', gap:'4px', alignItems:'center' }}>
-          {tokens && (
-            <button onClick={() => fetchStops()} disabled={loading}
-              style={{ background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.3)', padding:'3px', borderRadius:'6px' }}
-              onMouseEnter={e=>e.currentTarget.style.color='var(--accent)'}
-              onMouseLeave={e=>e.currentTarget.style.color='rgba(255,255,255,0.3)'}>
-              <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-            </button>
-          )}
-          {tokens && (
-            <button onClick={() => { saveTokens(null); setStops(null); setError(null) }}
-              style={{ background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'8px', padding:'3px 7px', cursor:'pointer', color:'rgba(255,255,255,0.4)', fontSize:'11px', display:'flex', alignItems:'center', gap:'4px' }}
-              onMouseEnter={e=>e.currentTarget.style.color='#f87171'}
-              onMouseLeave={e=>e.currentTarget.style.color='rgba(255,255,255,0.4)'}>
-              <LogOut size={11} /> Uitloggen
-            </button>
-          )}
+          {tokens && <button onClick={() => fetchStops()} disabled={loading} style={{ background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.3)', padding:'3px', borderRadius:'6px' }} onMouseEnter={e=>e.currentTarget.style.color='var(--accent)'} onMouseLeave={e=>e.currentTarget.style.color='rgba(255,255,255,0.3)'}><RefreshCw size={13} style={{ animation:loading?'spin 1s linear infinite':'none' }} /></button>}
+          {tokens && <button onClick={() => { saveTokens(null); setStops(null); setError(null) }} style={{ background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'8px', padding:'3px 7px', cursor:'pointer', color:'rgba(255,255,255,0.4)', fontSize:'11px', display:'flex', alignItems:'center', gap:'4px' }} onMouseEnter={e=>e.currentTarget.style.color='#f87171'} onMouseLeave={e=>e.currentTarget.style.color='rgba(255,255,255,0.4)'}><LogOut size={11} /> Uitloggen</button>}
         </div>
       </div>
 
       {/* Datum navigatie */}
       {tokens && (
         <div style={{ display:'flex', alignItems:'center', gap:'6px', marginBottom:'10px' }}>
-          <button onClick={() => {
-            const d = new Date(selectedDate); d.setDate(d.getDate() - 1)
-            const nd = d.toISOString().slice(0,10); setSelectedDate(nd); setStops(null); fetchStops(tokensRef.current, nd)
-          }} style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'8px', padding:'4px 8px', cursor:'pointer', color:'rgba(255,255,255,0.6)', fontSize:'16px', lineHeight:1 }}>‹</button>
-          <input type="date" value={selectedDate}
-            onChange={e => { const nd = e.target.value; if (!nd) return; setSelectedDate(nd); setStops(null); fetchStops(tokensRef.current, nd) }}
+          <button onClick={() => { const d=new Date(selectedDate); d.setDate(d.getDate()-1); changeDate(d.toISOString().slice(0,10)) }}
+            style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'8px', padding:'4px 8px', cursor:'pointer', color:'rgba(255,255,255,0.6)', fontSize:'16px', lineHeight:1 }}>‹</button>
+          <input type="date" value={selectedDate} onChange={e => { if (e.target.value) changeDate(e.target.value) }}
             style={{ flex:1, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'8px', padding:'4px 8px', color:'white', fontSize:'12px', textAlign:'center', cursor:'pointer' }} />
-          <button onClick={() => {
-            const d = new Date(selectedDate); d.setDate(d.getDate() + 1)
-            const nd = d.toISOString().slice(0,10); setSelectedDate(nd); setStops(null); fetchStops(tokensRef.current, nd)
-          }} style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'8px', padding:'4px 8px', cursor:'pointer', color:'rgba(255,255,255,0.6)', fontSize:'16px', lineHeight:1 }}>›</button>
-          {selectedDate !== new Date().toISOString().slice(0,10) && (
-            <button onClick={() => { const nd = new Date().toISOString().slice(0,10); setSelectedDate(nd); setStops(null); fetchStops(tokensRef.current, nd) }}
-              style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'8px', padding:'4px 7px', cursor:'pointer', color:'rgba(255,255,255,0.5)', fontSize:'10px', whiteSpace:'nowrap' }}>
-              Vandaag
-            </button>
-          )}
+          <button onClick={() => { const d=new Date(selectedDate); d.setDate(d.getDate()+1); changeDate(d.toISOString().slice(0,10)) }}
+            style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'8px', padding:'4px 8px', cursor:'pointer', color:'rgba(255,255,255,0.6)', fontSize:'16px', lineHeight:1 }}>›</button>
+          {selectedDate !== today && <button onClick={() => changeDate(today)} style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'8px', padding:'4px 7px', cursor:'pointer', color:'rgba(255,255,255,0.5)', fontSize:'10px', whiteSpace:'nowrap' }}>Vandaag</button>}
         </div>
       )}
 
@@ -335,14 +205,10 @@ export default function VrachttijdenWidget() {
           <Truck size={28} style={{ color:'var(--accent)', opacity:0.5 }} />
           {isLocalhost ? (
             <>
-              <p style={{ fontSize:'12px', color:'rgba(255,255,255,0.4)', margin:0, textAlign:'center' }}>
-                Log eenmalig in — daarna werkt het automatisch op alle apparaten.
-              </p>
+              <p style={{ fontSize:'12px', color:'rgba(255,255,255,0.4)', margin:0, textAlign:'center' }}>Log eenmalig in — daarna werkt het automatisch op alle apparaten.</p>
               <button onClick={handleLogin} disabled={loginLoading}
-                style={{ display:'flex', alignItems:'center', gap:'8px', padding:'9px 20px', borderRadius:'10px', border: accentBorder(40), background: accentBg(12), color:'var(--accent)', cursor: loginLoading ? 'wait' : 'pointer', fontSize:'13px', fontWeight:600 }}>
-                {loginLoading
-                  ? <><RefreshCw size={14} style={{ animation:'spin 1s linear infinite' }} /> Bezig...</>
-                  : <><LogIn size={14} /> Inloggen met Simacan</>}
+                style={{ display:'flex', alignItems:'center', gap:'8px', padding:'9px 20px', borderRadius:'10px', border:accentBorder(40), background:accentBg(12), color:'var(--accent)', cursor:loginLoading?'wait':'pointer', fontSize:'13px', fontWeight:600 }}>
+                {loginLoading ? <><RefreshCw size={14} style={{ animation:'spin 1s linear infinite' }} /> Bezig...</> : <><LogIn size={14} /> Inloggen met Simacan</>}
               </button>
             </>
           ) : (
@@ -351,11 +217,7 @@ export default function VrachttijdenWidget() {
               (run <span style={{ color:'rgba(255,255,255,0.6)', fontFamily:'monospace' }}>npm run dev</span>), daarna werkt het hier vanzelf.
             </p>
           )}
-          {error && (
-            <div style={{ display:'flex', alignItems:'center', gap:'6px', color:'#ff6b6b', fontSize:'11px', textAlign:'center' }}>
-              <AlertCircle size={12} style={{ flexShrink:0 }} /> {error}
-            </div>
-          )}
+          {error && <div style={{ display:'flex', alignItems:'center', gap:'6px', color:'#ff6b6b', fontSize:'11px', textAlign:'center' }}><AlertCircle size={12} style={{ flexShrink:0 }} /> {error}</div>}
         </div>
       )}
 
@@ -364,89 +226,100 @@ export default function VrachttijdenWidget() {
         <>
           {loading && !stops && (
             <div style={{ textAlign:'center', padding:'20px', color:'rgba(255,255,255,0.3)', fontSize:'12px' }}>
-              <RefreshCw size={16} style={{ animation:'spin 1s linear infinite', display:'block', margin:'0 auto 6px' }} />
-              Laden...
+              <RefreshCw size={16} style={{ animation:'spin 1s linear infinite', display:'block', margin:'0 auto 6px' }} />Laden...
             </div>
           )}
-
           {error && !loading && (
             <div style={{ padding:'10px', borderRadius:'10px', background:'rgba(255,80,80,0.06)', border:'1px solid rgba(255,80,80,0.2)', display:'flex', alignItems:'center', gap:'8px' }}>
-              <AlertCircle size={13} style={{ color:'#ff6b6b', flexShrink:0 }} />
-              <span style={{ color:'#ff6b6b', fontSize:'11px' }}>{error}</span>
+              <AlertCircle size={13} style={{ color:'#ff6b6b', flexShrink:0 }} /><span style={{ color:'#ff6b6b', fontSize:'11px' }}>{error}</span>
             </div>
           )}
 
           {stops && (
             <>
-              {/* Kaart */}
-              <div ref={mapRef} style={{ width:'100%', height:'185px', borderRadius:'10px', overflow:'hidden', marginBottom:'10px', border:'1px solid rgba(255,255,255,0.08)' }} />
-
               {sorted.length === 0 ? (
-                <p style={{ fontSize:'12px', color:'rgba(255,255,255,0.4)', textAlign:'center', padding:'12px 0' }}>
-                  Geen vrachttijden voor vandaag
-                </p>
+                <p style={{ fontSize:'12px', color:'rgba(255,255,255,0.4)', textAlign:'center', padding:'12px 0' }}>Geen ritten voor {selectedDate === today ? 'vandaag' : selectedDate}</p>
               ) : (
                 <div style={{ display:'flex', flexDirection:'column', gap:'4px' }}>
                   {sorted.map((stop, i) => {
-                    const plate    = stop.vehicle?.licencePlate || stop.vehicle?.licensePlate || stop.vehicleId || `Rit ${i+1}`
-                    const arrival  = stop.actualArrival || stop.estimatedArrival || stop.plannedArrival
-                    const diff     = timeDiff(stop.estimatedArrival || stop.plannedArrival)
-                    const color    = statusColor(stop.status)
-                    const isSel    = selectedStop?.tripUuid === stop.tripUuid
-                    const hasPos   = !!(stop.vehicle?.latitude ?? stop.vehicle?.lat ?? stop.currentLocation?.lat)
+                    const activity = stop.tripStatus?.activity
+                    const color    = activityColor(activity)
+                    const isSel    = selectedStop?.id === stop.id
+                    const arrival  = stop.actualStartTime || stop.eta || stop.plannedStartTime
+                    const badge    = delayBadge(stop.delay)
+                    const carrier  = stop.tripStatus?.carrierName?.replace(' B.V.','').replace(' N.V.','') || ''
+                    const dc       = stop.tripStatus?.startLocation?.name || ''
+                    const pallets  = palletSummary(stop.drops)
+                    const palletStr = Object.entries(pallets).map(([t,n]) => `${n}× ${PALLET_LABELS[t]||t}`).join('  ')
 
                     return (
-                      <div key={stop.tripUuid || i}
-                        onClick={() => setSelectedStop(isSel ? null : stop)}
-                        style={{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 10px', borderRadius:'10px', cursor:'pointer', transition:'background 0.15s',
+                      <div key={stop.id || i} onClick={() => setSelectedStop(isSel ? null : stop)}
+                        style={{ padding:'8px 10px', borderRadius:'10px', cursor:'pointer', transition:'background 0.15s',
                           background: isSel ? accentBg(8) : 'rgba(255,255,255,0.03)',
                           border: isSel ? accentBorder(25) : '1px solid rgba(255,255,255,0.06)' }}>
-                        <Truck size={13} style={{ color, flexShrink:0 }} />
-                        <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:'8px' }}>
+
+                        {/* Rij 1: route + tijd + badge */}
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:'8px' }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:'6px', minWidth:0 }}>
+                            <Truck size={12} style={{ color, flexShrink:0 }} />
                             <span style={{ fontSize:'12px', color:'rgba(255,255,255,0.85)', fontWeight:500, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                              {plate}
-                              {hasPos && <MapPin size={9} style={{ marginLeft:'4px', opacity:0.4, verticalAlign:'middle' }} />}
+                              {stop.trip?.tripId || `Rit ${i+1}`}
                             </span>
-                            <div style={{ display:'flex', alignItems:'center', gap:'6px', flexShrink:0 }}>
-                              {diff && <span style={{ fontSize:'10px', color, fontWeight:500 }}>{diff}</span>}
-                              <span style={{ fontSize:'12px', color:'var(--accent)', fontWeight:600 }}>{formatTime(arrival)}</span>
-                            </div>
+                            {stop.tripStatus?.vehicleType && <span style={{ fontSize:'10px', color:'rgba(255,255,255,0.3)', flexShrink:0 }}>{stop.tripStatus.vehicleType}</span>}
                           </div>
-                          <div style={{ display:'flex', justifyContent:'space-between', marginTop:'2px' }}>
-                            <span style={{ fontSize:'10px', color }}>{statusLabel(stop.status)}</span>
-                            {stop.plannedArrival && stop.estimatedArrival && stop.plannedArrival !== stop.estimatedArrival && (
-                              <span style={{ fontSize:'10px', color:'rgba(255,255,255,0.3)' }}>gepland {formatTime(stop.plannedArrival)}</span>
-                            )}
+                          <div style={{ display:'flex', alignItems:'center', gap:'6px', flexShrink:0 }}>
+                            {badge && <span style={{ fontSize:'10px', color:badge.color, fontWeight:600 }}>{badge.text}</span>}
+                            <span style={{ fontSize:'13px', color:'var(--accent)', fontWeight:700 }}>{fmt(arrival)}</span>
+                            {isSel ? <ChevronUp size={11} style={{ color:'var(--accent)' }} /> : <ChevronDown size={11} style={{ color:'rgba(255,255,255,0.2)' }} />}
                           </div>
                         </div>
-                        {isSel ? <ChevronUp size={11} style={{ color:'var(--accent)', flexShrink:0 }} /> : <ChevronDown size={11} style={{ color:'rgba(255,255,255,0.2)', flexShrink:0 }} />}
+
+                        {/* Rij 2: vervoerder + status + tijdvenster */}
+                        <div style={{ display:'flex', justifyContent:'space-between', marginTop:'3px', gap:'8px' }}>
+                          <span style={{ fontSize:'10px', color:'rgba(255,255,255,0.4)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                            {[dc, carrier].filter(Boolean).join(' · ')}
+                          </span>
+                          <div style={{ display:'flex', gap:'6px', flexShrink:0 }}>
+                            {stop.timeWindowStart && stop.timeWindowEnd && (
+                              <span style={{ fontSize:'10px', color:'rgba(255,255,255,0.3)' }}>{fmt(stop.timeWindowStart)}–{fmt(stop.timeWindowEnd)}</span>
+                            )}
+                            <span style={{ fontSize:'10px', color }}>{activityLabel(activity)}</span>
+                          </div>
+                        </div>
+
+                        {/* Pallets */}
+                        {palletStr && <div style={{ fontSize:'10px', color:'rgba(255,255,255,0.3)', marginTop:'2px' }}>{palletStr}</div>}
+
+                        {/* Detail panel */}
+                        {isSel && (
+                          <div style={{ marginTop:'8px', paddingTop:'8px', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', flexDirection:'column', gap:'3px' }}>
+                            {[
+                              ['Route',      stop.trip?.tripId],
+                              ['Van DC',     stop.tripStatus?.startLocation?.name],
+                              ['Vervoerder', stop.tripStatus?.carrierName],
+                              ['Voertuig',   stop.tripStatus?.vehicleType],
+                              ['Gepland',    fmt(stop.plannedStartTime)],
+                              ['Tijdvenster',stop.timeWindowStart ? `${fmt(stop.timeWindowStart)} – ${fmt(stop.timeWindowEnd)}` : null],
+                              ['ETA',        stop.eta && stop.eta !== stop.plannedStartTime ? fmt(stop.eta) : null],
+                              ['Werkelijk',  fmt(stop.actualStartTime)],
+                              ['Vertrek',    fmt(stop.actualEndTime || stop.plannedEndTime)],
+                              ['Vertraging', stop.delay != null ? (stop.delay === 0 ? 'Op tijd' : stop.delay > 0 ? `+${stop.delay} min` : `${stop.delay} min (vroeg)`) : null],
+                              ...Object.entries(pallets).map(([t,n]) => [PALLET_LABELS[t]||t, `${n} pallets`])
+                            ].filter(([,v]) => v && v !== '—').map(([label, value]) => (
+                              <div key={label} style={{ display:'flex', justifyContent:'space-between', fontSize:'11px' }}>
+                                <span style={{ color:'rgba(255,255,255,0.35)' }}>{label}</span>
+                                <span style={{ color:'rgba(255,255,255,0.8)' }}>{value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )
                   })}
                 </div>
               )}
-
-              {selectedStop && (
-                <div style={{ marginTop:'8px', padding:'10px', borderRadius:'10px', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', fontSize:'11px', display:'flex', flexDirection:'column', gap:'4px' }}>
-                  {[
-                    ['Kenteken', selectedStop.vehicle?.licencePlate || selectedStop.vehicle?.licensePlate],
-                    ['Gepland',  formatTime(selectedStop.plannedArrival)],
-                    ['Verwacht', formatTime(selectedStop.estimatedArrival)],
-                    ['Werkelijk',formatTime(selectedStop.actualArrival)],
-                    ['Status',   statusLabel(selectedStop.status)],
-                    ['Order',    selectedStop.orderNumber],
-                  ].filter(([,v]) => v && v !== '—').map(([label, value]) => (
-                    <div key={label} style={{ display:'flex', justifyContent:'space-between' }}>
-                      <span style={{ color:'rgba(255,255,255,0.4)' }}>{label}</span>
-                      <span style={{ color:'rgba(255,255,255,0.85)' }}>{value}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
               <p style={{ fontSize:'10px', color:'rgba(255,255,255,0.2)', margin:'8px 0 0', textAlign:'right' }}>
-                Simacan · {sorted.length} rit{sorted.length !== 1 ? 'ten' : ''} · ↺ 60s
+                Simacan · {sorted.length} rit{sorted.length!==1?'ten':''}{selectedDate===today?' · ↺ 60s':''}
               </p>
             </>
           )}
