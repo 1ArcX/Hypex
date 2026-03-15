@@ -104,6 +104,7 @@ export default function VrachttijdenWidget() {
   const [error,       setError]       = useState(null)
   const [lastUpdate,  setLastUpdate]  = useState(null)
   const [selectedStop,setSelectedStop]= useState(null)
+  const [selectedDate,setSelectedDate]= useState(() => new Date().toISOString().slice(0,10))
 
   const mapRef         = useRef(null)
   const mapInstanceRef = useRef(null)
@@ -122,15 +123,18 @@ export default function VrachttijdenWidget() {
     supabase.auth.updateUser({ data: { simacan_tokens: t || null } }).catch(() => {})
   }, [])
 
+  const selectedDateRef = useRef(selectedDate)
+  useEffect(() => { selectedDateRef.current = selectedDate }, [selectedDate])
+
   // ─── Ophalen vrachttijden ─────────────────────────────────────────────────
-  const fetchStops = useCallback(async (t = tokensRef.current) => {
+  const fetchStops = useCallback(async (t = tokensRef.current, date = selectedDateRef.current) => {
     if (!t?.accessToken) return
     setLoading(true); setError(null)
     try {
       const res = await fetch(API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'locationStops', token: t.accessToken, refreshToken: t.refreshToken, date: new Date().toISOString() })
+        body: JSON.stringify({ action: 'locationStops', token: t.accessToken, refreshToken: t.refreshToken, date: new Date(date + 'T12:00:00').toISOString() })
       })
       const data = await res.json()
 
@@ -173,9 +177,10 @@ export default function VrachttijdenWidget() {
 
   useEffect(() => {
     if (!tokens) return
+    if (selectedDate !== new Date().toISOString().slice(0,10)) return // geen auto-refresh voor andere dagen
     const t = setInterval(() => fetchStops(), 60000)
     return () => clearInterval(t)
-  }, [!!tokens, fetchStops])
+  }, [!!tokens, selectedDate, fetchStops])
 
   // ─── PKCE OAuth login — alleen beschikbaar op localhost:3000 ────────────
   const isLocalhost = window.location.hostname === 'localhost'
@@ -276,7 +281,9 @@ export default function VrachttijdenWidget() {
         <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
           <Truck size={15} style={{ color:'var(--accent)', opacity:0.8 }} />
           <span style={{ color:'white', fontWeight:600, fontSize:'13px' }}>Vrachttijden</span>
-          {lastUpdate && <span style={{ fontSize:'10px', color:'rgba(255,255,255,0.3)' }}>{lastUpdate.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})}</span>}
+          {lastUpdate && selectedDate === new Date().toISOString().slice(0,10) && (
+            <span style={{ fontSize:'10px', color:'rgba(255,255,255,0.3)' }}>{lastUpdate.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})}</span>
+          )}
         </div>
         <div style={{ display:'flex', gap:'4px', alignItems:'center' }}>
           {tokens && (
@@ -297,6 +304,29 @@ export default function VrachttijdenWidget() {
           )}
         </div>
       </div>
+
+      {/* Datum navigatie */}
+      {tokens && (
+        <div style={{ display:'flex', alignItems:'center', gap:'6px', marginBottom:'10px' }}>
+          <button onClick={() => {
+            const d = new Date(selectedDate); d.setDate(d.getDate() - 1)
+            const nd = d.toISOString().slice(0,10); setSelectedDate(nd); setStops(null); fetchStops(tokensRef.current, nd)
+          }} style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'8px', padding:'4px 8px', cursor:'pointer', color:'rgba(255,255,255,0.6)', fontSize:'16px', lineHeight:1 }}>‹</button>
+          <input type="date" value={selectedDate}
+            onChange={e => { const nd = e.target.value; if (!nd) return; setSelectedDate(nd); setStops(null); fetchStops(tokensRef.current, nd) }}
+            style={{ flex:1, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'8px', padding:'4px 8px', color:'white', fontSize:'12px', textAlign:'center', cursor:'pointer' }} />
+          <button onClick={() => {
+            const d = new Date(selectedDate); d.setDate(d.getDate() + 1)
+            const nd = d.toISOString().slice(0,10); setSelectedDate(nd); setStops(null); fetchStops(tokensRef.current, nd)
+          }} style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'8px', padding:'4px 8px', cursor:'pointer', color:'rgba(255,255,255,0.6)', fontSize:'16px', lineHeight:1 }}>›</button>
+          {selectedDate !== new Date().toISOString().slice(0,10) && (
+            <button onClick={() => { const nd = new Date().toISOString().slice(0,10); setSelectedDate(nd); setStops(null); fetchStops(tokensRef.current, nd) }}
+              style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'8px', padding:'4px 7px', cursor:'pointer', color:'rgba(255,255,255,0.5)', fontSize:'10px', whiteSpace:'nowrap' }}>
+              Vandaag
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Niet ingelogd */}
       {!tokens && (
