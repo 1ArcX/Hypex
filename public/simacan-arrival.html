@@ -12,7 +12,6 @@
 
   #app { display: flex; flex-direction: column; height: 100vh; }
   #map { width: 100%; height: 55vh; flex-shrink: 0; }
-  #map .leaflet-tile-pane { filter: grayscale(1) brightness(1.05); }
   #list { flex: 1; overflow-y: auto; background: #FFC72C; padding: 8px; }
 
   @media (min-width: 768px) {
@@ -20,6 +19,19 @@
     #map { width: 60%; height: 100vh; }
     #list { width: 40%; height: 100vh; overflow-y: auto; }
   }
+
+  /* Nummerlabels op de kaart */
+  .num-label {
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    font-weight: bold;
+    font-size: 11px;
+    color: #333;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .num-label::before { display: none !important; }
 
   .stop-item {
     display: flex; align-items: center; gap: 10px;
@@ -54,17 +66,25 @@
 <script>
 var map = L.map('map').setView([52.70, 5.90], 8)
 
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+var tileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19,
   attribution: '© OpenStreetMap'
 }).addTo(map)
+
+// Grijze kaart via filter op de tile-container
+tileLayer.on('load', function() {
+  var pane = map.getPane('tilePane')
+  if (pane) pane.style.filter = 'grayscale(1) brightness(1.08)'
+})
+// Ook meteen toepassen voor al geladen tiles
+map.getPane('tilePane').style.filter = 'grayscale(1) brightness(1.08)'
 
 var route = [
   [52.45,5.48],[52.51,5.75],[52.51,5.90],[52.52,6.10],[52.60,6.30],[52.72,6.47],
   [52.60,6.30],[52.52,6.10],[52.51,5.90],[52.67,5.64],[52.68,5.76],
   [52.90,5.81],[52.97,5.76],[53.00,5.68],[53.05,5.58],[53.12,5.52]
 ]
-L.polyline(route, { color: '#333', weight: 4 }).addTo(map)
+L.polyline(route, { color: '#e65c00', weight: 4, opacity: 0.9 }).addTo(map)
 
 var stopsData = [
   { pos: [52.45,5.48], name: 'DC Lelystad',        status: 'done'   },
@@ -80,25 +100,30 @@ var stopsData = [
   { pos: [53.12,5.52], name: 'Harlingen',           status: 'plan'   }
 ]
 
+var fillColors = { done: '#28a745', active: '#FFC72C', plan: '#fff' }
 var markers = []
 
 stopsData.forEach(function(stop, i) {
-  var marker = L.marker(stop.pos, {
-    icon: L.divIcon({
-      html: '<div style="width:26px;height:26px;border-radius:50%;background:#fff;border:2px solid #333;line-height:22px;text-align:center;font-size:11px;font-weight:bold;font-family:Arial">'+(i+1)+'</div>',
-      className: '', iconSize: [26,26], iconAnchor: [13,13]
-    })
+  var cm = L.circleMarker(stop.pos, {
+    radius: 13,
+    fillColor: fillColors[stop.status],
+    color: '#333',
+    weight: 2,
+    fillOpacity: 1
   }).addTo(map)
-  markers.push(marker)
+  cm.bindTooltip(String(i + 1), { permanent: true, direction: 'center', className: 'num-label' })
+  markers.push(cm)
 })
 
+// Truck marker
 L.marker([52.60,6.20], {
   icon: L.divIcon({
     html: '<div style="width:36px;height:36px;border-radius:50%;background:#FFC72C;border:3px solid #333;line-height:30px;text-align:center;font-size:18px">🚚</div>',
-    className: '', iconSize: [36,36], iconAnchor: [18,18]
+    iconSize: [36,36], iconAnchor: [18,18], className: ''
   })
 }).addTo(map).bindPopup('Huidige positie').openPopup()
 
+// Stoppenlijst
 var statusLabel = { done: '✓ Afgerond', active: '→ Onderweg', plan: 'Gepland' }
 var statusClass = { done: 'status-done', active: 'status-active', plan: 'status-plan' }
 
@@ -107,10 +132,10 @@ stopsData.forEach(function(stop, i) {
   var item = document.createElement('div')
   item.className = 'stop-item' + (stop.status === 'active' ? ' active' : '')
   item.innerHTML =
-    '<div class="stop-badge">'+(i+1)+'</div>' +
+    '<div class="stop-badge">' + (i + 1) + '</div>' +
     '<div class="stop-info">' +
-      '<div class="stop-name">'+stop.name+'</div>' +
-      '<div class="stop-status '+statusClass[stop.status]+'">'+statusLabel[stop.status]+'</div>' +
+      '<div class="stop-name">' + stop.name + '</div>' +
+      '<div class="stop-status ' + statusClass[stop.status] + '">' + statusLabel[stop.status] + '</div>' +
     '</div>'
   item.addEventListener('click', function() {
     map.setView(stop.pos, 13)
