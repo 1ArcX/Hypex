@@ -95,7 +95,12 @@ exports.handler = async (event) => {
     const result = await callApi(path, token, refreshToken)
     if (result.status === 401) return err('Sessie verlopen. Vernieuw je token in de instellingen.', 401)
     if (!result.data || result.status >= 500) return err('Vrachttijden ophalen mislukt', 500)
-    return ok({ ...result.data, _newTokens: result.newAccessToken ? { accessToken: result.newAccessToken, refreshToken: result.newRefreshToken } : undefined })
+    // API geeft stops terug als object (keyed by id) of als array — normaliseer naar array
+    const raw = result.data?.locationStops || result.data?.stops || result.data?.result
+    const locationStops = raw
+      ? (Array.isArray(raw) ? raw : Object.values(raw))
+      : Object.values(result.data).filter(v => v && typeof v === 'object' && v.id && v.trip)
+    return ok({ locationStops, _newTokens: result.newAccessToken ? { accessToken: result.newAccessToken, refreshToken: result.newRefreshToken } : undefined })
   }
 
   if (action === 'notifications') {
