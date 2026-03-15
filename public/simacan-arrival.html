@@ -2,323 +2,83 @@
 <html lang="nl">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Jumbo 7044 – Arrival Display</title>
+  <title>Arrival Display</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; font-family: 'Segoe UI', Arial, sans-serif; overflow: hidden; }
-
-    #app { display: flex; flex-direction: column; height: 100vh; }
-
-    /* Header */
-    #header {
-      background: #FFC72C;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 24px;
-      height: 64px;
-      flex-shrink: 0;
-      border-bottom: 3px solid #e0a800;
-    }
-    #header-left { display: flex; align-items: center; gap: 14px; }
-    #logo {
-      background: #FFC72C;
-      border: 3px solid #1a1a1a;
-      border-radius: 6px;
-      padding: 3px 9px;
-      font-size: 20px;
-      font-weight: 900;
-      color: #1a1a1a;
-    }
-    #title { font-size: 18px; font-weight: 700; color: #1a1a1a; }
-    #sub { font-size: 12px; color: rgba(0,0,0,0.5); margin-top: 2px; }
-    #clock-time { font-size: 30px; font-weight: 800; color: #1a1a1a; line-height: 1; }
-    #clock-date { font-size: 12px; color: rgba(0,0,0,0.55); margin-top: 2px; text-align: right; }
-
-    /* Body */
-    #body { display: flex; flex: 1; overflow: hidden; }
-
-    /* Links */
-    #left { width: 50%; background: #FFC72C; display: flex; flex-direction: column; overflow: hidden; }
-    #list-header {
-      padding: 10px 20px 8px;
-      border-bottom: 2px solid rgba(0,0,0,0.12);
-      font-size: 11px;
-      font-weight: 700;
-      color: rgba(0,0,0,0.5);
-      text-transform: uppercase;
-      letter-spacing: 0.7px;
-    }
-    #cols {
-      display: grid;
-      grid-template-columns: 44px 1fr 70px 76px 70px;
-      padding: 7px 20px;
-      background: rgba(0,0,0,0.07);
-      border-bottom: 1px solid rgba(0,0,0,0.12);
-    }
-    .th { font-size: 10px; font-weight: 700; color: rgba(0,0,0,0.45); text-transform: uppercase; letter-spacing: 0.4px; }
-    .th.r { text-align: right; }
-
-    #list { flex: 1; overflow-y: auto; scrollbar-width: none; }
-    #list::-webkit-scrollbar { display: none; }
-
-    .row {
-      display: grid;
-      grid-template-columns: 44px 1fr 70px 76px 70px;
-      padding: 10px 20px;
-      border-bottom: 1px solid rgba(0,0,0,0.08);
-      cursor: pointer;
-      align-items: center;
-      transition: background 0.1s;
-    }
-    .row:hover { background: rgba(255,255,255,0.3); }
-    .row.sel { background: rgba(255,255,255,0.5); border-left: 4px solid #1a1a1a; padding-left: 16px; }
-
-    .badge {
-      width: 26px; height: 26px; border-radius: 50%;
-      background: #fff; border: 2px solid #4a4a4a;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 11px; font-weight: 700; color: #1a1a1a;
-    }
-    .badge.done { background: #aaa; border-color: #aaa; color: #fff; }
-    .badge.going { background: #1a1a1a; border-color: #1a1a1a; color: #FFC72C; }
-
-    .rname { font-size: 13px; font-weight: 600; color: #1a1a1a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .rsub  { font-size: 10px; color: rgba(0,0,0,0.5); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-    .rtime { text-align: right; font-size: 15px; font-weight: 700; color: #1a1a1a; }
-    .rdelay { font-size: 10px; text-align: right; }
-
-    .rwin { text-align: right; font-size: 11px; color: rgba(0,0,0,0.5); line-height: 1.4; }
-
-    .rstatus { text-align: right; }
-    .pill {
-      display: inline-block; padding: 3px 7px; border-radius: 20px;
-      font-size: 10px; font-weight: 700;
-    }
-    .pill-gepland  { background: rgba(0,0,0,0.1);  color: rgba(0,0,0,0.55); }
-    .pill-onderweg { background: #1a1a1a;           color: #FFC72C; }
-    .pill-actief   { background: #e67e00;            color: #fff; }
-    .pill-afgerond { background: rgba(0,0,0,0.08);  color: rgba(0,0,0,0.35); }
-
-    /* Rechts: kaart */
-    #right { width: 50%; position: relative; }
-    #map { width: 100%; height: 100%; }
-
-    #reset-btn {
-      position: absolute; bottom: 14px; left: 12px; z-index: 1000;
-      background: rgba(255,255,255,0.92); border: 1px solid #bbb;
-      border-radius: 7px; padding: 6px 12px; font-size: 12px;
-      font-weight: 600; cursor: pointer; color: #333; display: none;
-    }
-    #reset-btn:hover { background: #fff; }
+    html, body, #map { height: 100%; margin: 0; padding: 0; }
   </style>
 </head>
 <body>
-<div id="app">
-  <div id="header">
-    <div id="header-left">
-      <div id="logo">jumbo</div>
-      <div>
-        <div id="title">Arrival Display — DC Raalte</div>
-        <div id="sub">Jumbo 7044 · Dronten · Goederenverwerking</div>
-      </div>
-    </div>
-    <div>
-      <div id="clock-time">--:--</div>
-      <div id="clock-date">--</div>
-    </div>
-  </div>
-
-  <div id="body">
-    <div id="left">
-      <div id="list-header">Verwachte leveringen vandaag</div>
-      <div id="cols">
-        <div class="th">#</div>
-        <div class="th">Vervoerder / DC</div>
-        <div class="th r">Aankomst</div>
-        <div class="th r">Tijdvenster</div>
-        <div class="th r">Status</div>
-      </div>
-      <div id="list"></div>
-    </div>
-    <div id="right">
-      <div id="map"></div>
-      <button id="reset-btn" onclick="resetView()">↩ Volledig overzicht</button>
-    </div>
-  </div>
-</div>
-
+<div id="map"></div>
 <script>
-// ── Klok ──────────────────────────────────────────────────────────────────────
-function tick() {
-  const n = new Date()
-  document.getElementById('clock-time').textContent =
-    n.toLocaleTimeString('nl-NL', { hour:'2-digit', minute:'2-digit' })
-  document.getElementById('clock-date').textContent =
-    n.toLocaleDateString('nl-NL', { weekday:'long', day:'numeric', month:'long', year:'numeric' })
-}
-tick(); setInterval(tick, 1000)
+  var map = L.map('map', { zoomControl: true }).setView([52.70, 5.90], 8)
 
-// ── Data ──────────────────────────────────────────────────────────────────────
-function at(h, m) { const d = new Date(); d.setHours(h,m,0,0); return d }
-function ft(d) { return d.toLocaleTimeString('nl-NL', { hour:'2-digit', minute:'2-digit' }) }
-
-const DATA = [
-  { id:1, trip:'CDV-2410-A', carrier:'Den Hartogh Logistics', dc:'DC Raalte',
-    arrival:at(6,15), w1:at(6,0),  w2:at(6,30),  status:'AFGEROND', delay:-3,
-    route:[[52.45,5.48],[52.51,5.75],[52.51,5.90],[52.52,6.10],[52.60,6.30],[52.72,6.47]],
-    stops:[[52.45,5.48],[52.51,5.90],[52.72,6.47],[52.52,6.10]] },
-  { id:2, trip:'CDV-2410-B', carrier:'Van Dijk Transport',    dc:'DC Raalte',
-    arrival:at(7,42), w1:at(7,30), w2:at(8,0),   status:'ONDERWEG', delay:12,
-    route:[[52.51,5.90],[52.67,5.64],[52.68,5.76],[52.90,5.81],[52.97,5.76],[53.00,5.68],[53.05,5.58],[53.12,5.52]],
-    stops:[[52.51,5.90],[52.67,5.64],[52.90,5.81],[53.12,5.52]] },
-  { id:3, trip:'CDV-2410-C', carrier:'Jumbo Logistiek',       dc:'DC Woerden',
-    arrival:at(8,30), w1:at(8,15), w2:at(8,45),  status:'ONDERWEG', delay:0,
-    route:[[52.08,4.88],[52.25,5.10],[52.40,5.30],[52.45,5.48],[52.67,5.64],[52.68,5.76]],
-    stops:[[52.08,4.88],[52.40,5.30],[52.45,5.48],[52.68,5.76]] },
-  { id:4, trip:'CDV-2410-D', carrier:'Ploeger Logistics',     dc:'DC Tilburg',
-    arrival:at(9,5),  w1:at(9,0),  w2:at(9,30),  status:'GEPLAND',  delay:null,
-    route:[[51.56,5.07],[52.00,5.38],[52.20,5.55],[52.51,5.75]],
-    stops:[[51.56,5.07],[52.00,5.38],[52.51,5.75]] },
-  { id:5, trip:'CDV-2410-E', carrier:'Jan de Rijk',           dc:'DC Nieuwegein',
-    arrival:at(10,20),w1:at(10,0), w2:at(10,45), status:'GEPLAND',  delay:null,
-    route:[[52.03,5.10],[52.20,5.25],[52.45,5.48],[52.67,5.64],[52.90,5.81]],
-    stops:[[52.03,5.10],[52.45,5.48],[52.67,5.64],[52.90,5.81]] },
-  { id:6, trip:'CDV-2411-A', carrier:'Den Hartogh Logistics', dc:'DC Raalte',
-    arrival:at(11,45),w1:at(11,30),w2:at(12,0),  status:'GEPLAND',  delay:null,
-    route:[[52.72,6.47],[52.52,6.10],[52.51,5.90],[52.67,5.64],[53.12,5.52]],
-    stops:[[52.72,6.47],[52.51,5.90],[52.67,5.64],[53.12,5.52]] },
-  { id:7, trip:'CDV-2411-B', carrier:'Van Dijk Transport',    dc:'DC Raalte',
-    arrival:at(13,10),w1:at(13,0), w2:at(13,30), status:'GEPLAND',  delay:null,
-    route:[[52.51,5.90],[52.97,5.76],[53.12,5.52]],
-    stops:[[52.51,5.90],[52.97,5.76],[53.12,5.52]] },
-  { id:8, trip:'CDV-2411-C', carrier:'Jumbo Logistiek',       dc:'DC Woerden',
-    arrival:at(14,30),w1:at(14,15),w2:at(15,0),  status:'GEPLAND',  delay:null,
-    route:[[52.08,4.88],[52.40,5.30],[52.51,5.75],[52.90,5.81],[53.12,5.52]],
-    stops:[[52.08,4.88],[52.51,5.75],[52.90,5.81],[53.12,5.52]] }
-]
-
-function delayTxt(d) {
-  if (d == null) return ''
-  if (d === 0) return 'Op tijd'
-  return d > 0 ? `+${d} min` : `${d} min vroeg`
-}
-function delayColor(d) {
-  if (!d) return ''
-  return d > 0 ? 'color:#c0392b;' : 'color:#27ae60;'
-}
-function pillClass(s) {
-  return { AFGEROND:'afgerond', GEPLAND:'gepland', ONDERWEG:'onderweg', ACTIEF:'actief' }[s] || 'gepland'
-}
-function pillLabel(s) {
-  return { AFGEROND:'Afgerond', GEPLAND:'Gepland', ONDERWEG:'Onderweg', ACTIEF:'Bezig' }[s] || s
-}
-
-// ── Leaflet kaart ─────────────────────────────────────────────────────────────
-const DEFAULT_CENTER = [52.80, 6.05]
-const DEFAULT_ZOOM   = 7
-
-const map = L.map('map', {
-  center: DEFAULT_CENTER,
-  zoom: DEFAULT_ZOOM,
-  zoomControl: false,
-  attributionControl: true
-})
-
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
-  subdomains: 'abcd',
-  maxZoom: 19
-}).addTo(map)
-
-// ── Teken routes + markers ────────────────────────────────────────────────────
-const routeLayers   = {}  // id → polyline
-const markerGroups  = {}  // id → [markers]
-
-DATA.forEach(a => {
-  const isDone   = a.status === 'AFGEROND'
-  const isGoing  = a.status === 'ONDERWEG'
-
-  // Routelijn
-  const line = L.polyline(a.route, {
-    color:   isDone ? '#bbbbbb' : isGoing ? '#1a1a1a' : '#6b6b6b',
-    weight:  isGoing ? 5 : 3,
-    opacity: isDone ? 0.4 : 0.75,
-    dashArray: (a.status === 'GEPLAND') ? '6 4' : null
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '© OpenStreetMap'
   }).addTo(map)
-  line.on('click', () => selectRow(a))
-  routeLayers[a.id] = line
 
-  // Stop-markers
-  markerGroups[a.id] = a.stops.map((coord, i) => {
-    const el = document.createElement('div')
-    el.style.cssText = `
-      width:26px; height:26px; border-radius:50%;
-      background:${isDone ? '#aaa' : '#fff'};
-      border:2px solid ${isDone ? '#aaa' : '#4a4a4a'};
-      display:flex; align-items:center; justify-content:center;
-      font-size:11px; font-weight:700; color:${isDone ? '#fff' : '#1a1a1a'};
-      cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,0.22);
-      font-family:'Segoe UI',Arial,sans-serif;
-    `
-    el.textContent = i + 1
-    const icon = L.divIcon({ html: el.outerHTML, className: '', iconSize: [26,26], iconAnchor: [13,13] })
-    const m = L.marker(coord, { icon }).addTo(map)
-    m.on('click', () => selectRow(a))
-    return m
+  // Route coordinaten (lat, lng)
+  var route = [
+    [52.45, 5.48],
+    [52.51, 5.75],
+    [52.51, 5.90],
+    [52.52, 6.10],
+    [52.60, 6.30],
+    [52.72, 6.47],
+    [52.60, 6.30],
+    [52.52, 6.10],
+    [52.51, 5.90],
+    [52.67, 5.64],
+    [52.68, 5.76],
+    [52.90, 5.81],
+    [52.97, 5.76],
+    [53.00, 5.68],
+    [53.05, 5.58],
+    [53.12, 5.52]
+  ]
+
+  // Teken routelijn
+  L.polyline(route, { color: '#333', weight: 4, opacity: 0.7 }).addTo(map)
+
+  // Stops met nummer
+  var stops = [
+    { pos: [52.45, 5.48], label: '1', name: 'Lelystad',   done: true  },
+    { pos: [52.51, 5.90], label: '2', name: 'Kampen',     done: true  },
+    { pos: [52.72, 6.47], label: '3', name: 'Hoogeveen',  done: false },
+    { pos: [52.52, 6.10], label: '4', name: 'Zwolle',     done: false },
+    { pos: [52.67, 5.64], label: '5', name: 'Urk',        done: false },
+    { pos: [52.68, 5.76], label: '6', name: 'Emmeloord',  done: false },
+    { pos: [52.90, 5.81], label: '7', name: 'Heerenveen', done: false },
+    { pos: [52.97, 5.76], label: '8', name: 'Sneek N',    done: false },
+    { pos: [53.00, 5.68], label: '9', name: 'Sneek',      done: false },
+    { pos: [53.05, 5.58], label:'10', name: 'Bolsward',   done: false },
+    { pos: [53.12, 5.52], label:'11', name: 'Harlingen',  done: false }
+  ]
+
+  stops.forEach(function(s) {
+    var bg    = s.done ? '#888' : '#fff'
+    var color = s.done ? '#fff' : '#000'
+    var border= s.done ? '#888' : '#333'
+    var icon = L.divIcon({
+      html: '<div style="width:26px;height:26px;border-radius:50%;background:' + bg + ';border:2px solid ' + border + ';display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:' + color + ';font-family:Arial">' + s.label + '</div>',
+      className: '',
+      iconSize: [26, 26],
+      iconAnchor: [13, 13]
+    })
+    L.marker(s.pos, { icon: icon }).addTo(map).bindPopup('<b>' + s.label + '. ' + s.name + '</b>')
   })
-})
 
-// ── Lijst renderen ────────────────────────────────────────────────────────────
-let selId = null
-
-function renderList() {
-  const el = document.getElementById('list')
-  el.innerHTML = ''
-  DATA.forEach((a, i) => {
-    const isSel  = selId === a.id
-    const isDone = a.status === 'AFGEROND'
-    const isGoing= a.status === 'ONDERWEG'
-    const badgeClass = isDone ? 'done' : isGoing ? 'going' : ''
-    const div = document.createElement('div')
-    div.className = 'row' + (isSel ? ' sel' : '')
-    div.onclick = () => selectRow(a)
-    div.innerHTML = `
-      <div><div class="badge ${badgeClass}">${i+1}</div></div>
-      <div>
-        <div class="rname">${a.carrier}</div>
-        <div class="rsub">${a.dc} · ${a.trip}</div>
-      </div>
-      <div class="rtime" style="${delayColor(a.delay)}">${ft(a.arrival)}<div class="rdelay" style="${delayColor(a.delay)}">${delayTxt(a.delay)}</div></div>
-      <div class="rwin">${ft(a.w1)}<br>${ft(a.w2)}</div>
-      <div class="rstatus"><span class="pill pill-${pillClass(a.status)}">${pillLabel(a.status)}</span></div>
-    `
-    el.appendChild(div)
+  // Huidige positie (onderweg tussen stop 2 en 3)
+  var huidigPos = [52.60, 6.20]
+  var truckIcon = L.divIcon({
+    html: '<div style="width:36px;height:36px;border-radius:50%;background:#FFC72C;border:3px solid #1a1a1a;display:flex;align-items:center;justify-content:center;font-size:18px">🚚</div>',
+    className: '',
+    iconSize: [36, 36],
+    iconAnchor: [18, 18]
   })
-}
-renderList()
-
-// ── Selecteer rit ──────────────────────────────────────────────────────────────
-function selectRow(a) {
-  if (selId === a.id) { resetView(); return }
-  selId = a.id
-  renderList()
-
-  const bounds = L.latLngBounds(a.stops)
-  map.fitBounds(bounds, { padding: [60, 60] })
-  document.getElementById('reset-btn').style.display = 'block'
-}
-
-function resetView() {
-  selId = null
-  renderList()
-  map.setView(DEFAULT_CENTER, DEFAULT_ZOOM)
-  document.getElementById('reset-btn').style.display = 'none'
-}
+  L.marker(huidigPos, { icon: truckIcon }).addTo(map).bindPopup('<b>Huidige positie</b><br>Onderweg naar stop 3').openPopup()
 </script>
 </body>
 </html>
