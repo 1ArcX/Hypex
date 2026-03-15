@@ -106,7 +106,7 @@ export default function WorkWidget() {
     setSelectedDay(date); setDayShifts(null); setDayLoading(true)
     try {
       const data = await callPmt(creds, 'day_planning', { date })
-      setDayShifts(data.dayShifts || [])
+      setDayShifts({ shifts: data.dayShifts || [], ownDeptCount: data.ownDeptCount || 0 })
     } catch (e) {
       setDayShifts([])
     }
@@ -307,33 +307,40 @@ export default function WorkWidget() {
 
                       {!dayLoading && dayShifts && (
                         <>
-                          {dayShifts.length === 0 ? (
+                          {dayShifts.shifts.length === 0 ? (
                             <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: 0, textAlign: 'center' }}>Geen shifts gevonden</p>
                           ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                              {dayShifts.map((s, i) => (
-                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px',
-                                  borderRadius: '7px',
-                                  opacity: s.worksToday === false ? 0.4 : 1,
-                                  background: s.isOwn ? accentBg(12) : 'rgba(255,255,255,0.03)',
-                                  border: s.isOwn ? accentBorder(30) : '1px solid rgba(255,255,255,0.05)' }}>
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
-                                      <span style={{ fontSize: '11px', color: s.isOwn ? 'var(--accent)' : 'rgba(255,255,255,0.85)',
-                                        fontWeight: s.isOwn ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {s.name ? s.name.split(' ')[0] : '—'}
-                                        {s.isOwn && <span style={{ fontSize: '10px', marginLeft: '5px', opacity: 0.7 }}>(jij)</span>}
-                                      </span>
-                                      <span style={{ fontSize: '11px', color: s.isOwn ? 'var(--accent)' : 'rgba(255,255,255,0.6)',
-                                        fontWeight: 500, flexShrink: 0 }}>
-                                        {s.start && s.end ? `${s.start} – ${s.end}` : '—'}
-                                      </span>
+                              {dayShifts.shifts.map((s, i) => (
+                                <React.Fragment key={i}>
+                                  {i === dayShifts.ownDeptCount && dayShifts.ownDeptCount > 0 && dayShifts.shifts.length > dayShifts.ownDeptCount && (
+                                    <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)', padding: '4px 4px 2px', marginTop: '2px' }}>
+                                      Andere afdelingen
                                     </div>
-                                    <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', margin: '1px 0 0' }}>
-                                      {s.department}
-                                    </p>
+                                  )}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px',
+                                    borderRadius: '7px',
+                                    opacity: s.worksToday === false ? 0.4 : 1,
+                                    background: s.isOwn ? accentBg(12) : 'rgba(255,255,255,0.03)',
+                                    border: s.isOwn ? accentBorder(30) : '1px solid rgba(255,255,255,0.05)' }}>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+                                        <span style={{ fontSize: '11px', color: s.isOwn ? 'var(--accent)' : 'rgba(255,255,255,0.85)',
+                                          fontWeight: s.isOwn ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {s.name ? s.name.split(' ')[0] : '—'}
+                                          {s.isOwn && <span style={{ fontSize: '10px', marginLeft: '5px', opacity: 0.7 }}>(jij)</span>}
+                                        </span>
+                                        <span style={{ fontSize: '11px', color: s.isOwn ? 'var(--accent)' : 'rgba(255,255,255,0.6)',
+                                          fontWeight: 500, flexShrink: 0 }}>
+                                          {s.start && s.end ? `${s.start} – ${s.end}` : '—'}
+                                        </span>
+                                      </div>
+                                      <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', margin: '1px 0 0' }}>
+                                        {s.department}
+                                      </p>
+                                    </div>
                                   </div>
-                                </div>
+                                </React.Fragment>
                               ))}
                             </div>
                           )}
