@@ -4,661 +4,321 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Jumbo 7044 – Arrival Display</title>
-  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
-  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; font-family: 'Segoe UI', Arial, sans-serif; overflow: hidden; }
 
-    html, body {
-      height: 100%;
-      font-family: 'Segoe UI', Arial, sans-serif;
-      background: #f0f0f0;
-      overflow: hidden;
-    }
+    #app { display: flex; flex-direction: column; height: 100vh; }
 
-    /* ── Layout ─────────────────────────────────────────────── */
-    #app {
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-    }
-
-    /* ── Header ─────────────────────────────────────────────── */
+    /* Header */
     #header {
       background: #FFC72C;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 28px;
-      height: 72px;
+      padding: 0 24px;
+      height: 64px;
       flex-shrink: 0;
       border-bottom: 3px solid #e0a800;
     }
-    #header-left {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-    }
-    #jumbo-logo {
+    #header-left { display: flex; align-items: center; gap: 14px; }
+    #logo {
       background: #FFC72C;
       border: 3px solid #1a1a1a;
-      border-radius: 8px;
-      padding: 4px 10px;
-      font-size: 22px;
+      border-radius: 6px;
+      padding: 3px 9px;
+      font-size: 20px;
       font-weight: 900;
       color: #1a1a1a;
-      letter-spacing: -0.5px;
     }
-    #header-title {
-      font-size: 20px;
-      font-weight: 700;
-      color: #1a1a1a;
-    }
-    #header-sub {
-      font-size: 13px;
-      font-weight: 500;
-      color: rgba(0,0,0,0.55);
-      margin-top: 1px;
-    }
-    #header-clock {
-      text-align: right;
-    }
-    #clock-time {
-      font-size: 32px;
-      font-weight: 800;
-      color: #1a1a1a;
-      letter-spacing: -1px;
-      line-height: 1;
-    }
-    #clock-date {
-      font-size: 13px;
-      color: rgba(0,0,0,0.6);
-      font-weight: 500;
-      margin-top: 2px;
-    }
+    #title { font-size: 18px; font-weight: 700; color: #1a1a1a; }
+    #sub { font-size: 12px; color: rgba(0,0,0,0.5); margin-top: 2px; }
+    #clock-time { font-size: 30px; font-weight: 800; color: #1a1a1a; line-height: 1; }
+    #clock-date { font-size: 12px; color: rgba(0,0,0,0.55); margin-top: 2px; text-align: right; }
 
-    /* ── Body: panelen ───────────────────────────────────────── */
-    #body {
-      display: flex;
-      flex: 1;
-      overflow: hidden;
-    }
+    /* Body */
+    #body { display: flex; flex: 1; overflow: hidden; }
 
-    /* ── Linker paneel (Arrivals) ────────────────────────────── */
-    #left-panel {
-      width: 50%;
-      background: #FFC72C;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    #arrivals-header {
-      padding: 14px 24px 10px;
+    /* Links */
+    #left { width: 50%; background: #FFC72C; display: flex; flex-direction: column; overflow: hidden; }
+    #list-header {
+      padding: 10px 20px 8px;
       border-bottom: 2px solid rgba(0,0,0,0.12);
-    }
-    #arrivals-title {
-      font-size: 13px;
-      font-weight: 700;
-      color: rgba(0,0,0,0.6);
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-    }
-
-    /* Tabel header */
-    #table-head {
-      display: grid;
-      grid-template-columns: 56px 1fr 72px 80px 64px;
-      padding: 8px 24px;
-      border-bottom: 1px solid rgba(0,0,0,0.15);
-      background: rgba(0,0,0,0.06);
-    }
-    .th {
       font-size: 11px;
       font-weight: 700;
       color: rgba(0,0,0,0.5);
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.7px;
     }
-    .th.right { text-align: right; }
-
-    /* Ritten lijst */
-    #arrivals-list {
-      flex: 1;
-      overflow-y: auto;
-      scrollbar-width: none;
-    }
-    #arrivals-list::-webkit-scrollbar { display: none; }
-
-    .arrival-row {
+    #cols {
       display: grid;
-      grid-template-columns: 56px 1fr 72px 80px 64px;
-      padding: 11px 24px;
+      grid-template-columns: 44px 1fr 70px 76px 70px;
+      padding: 7px 20px;
+      background: rgba(0,0,0,0.07);
+      border-bottom: 1px solid rgba(0,0,0,0.12);
+    }
+    .th { font-size: 10px; font-weight: 700; color: rgba(0,0,0,0.45); text-transform: uppercase; letter-spacing: 0.4px; }
+    .th.r { text-align: right; }
+
+    #list { flex: 1; overflow-y: auto; scrollbar-width: none; }
+    #list::-webkit-scrollbar { display: none; }
+
+    .row {
+      display: grid;
+      grid-template-columns: 44px 1fr 70px 76px 70px;
+      padding: 10px 20px;
       border-bottom: 1px solid rgba(0,0,0,0.08);
       cursor: pointer;
-      transition: background 0.12s;
       align-items: center;
+      transition: background 0.1s;
     }
-    .arrival-row:hover {
-      background: rgba(255,255,255,0.3);
-    }
-    .arrival-row.active {
-      background: rgba(255,255,255,0.5);
-      border-left: 4px solid #1a1a1a;
-      padding-left: 20px;
-    }
+    .row:hover { background: rgba(255,255,255,0.3); }
+    .row.sel { background: rgba(255,255,255,0.5); border-left: 4px solid #1a1a1a; padding-left: 16px; }
 
-    .col-num {
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    .badge {
+      width: 26px; height: 26px; border-radius: 50%;
+      background: #fff; border: 2px solid #4a4a4a;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; color: #1a1a1a;
     }
-    .stop-badge {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: #fff;
-      border: 2px solid #4a4a4a;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 11px;
-      font-weight: 700;
-      color: #1a1a1a;
-      flex-shrink: 0;
-    }
-    .stop-badge.done {
-      background: #4a4a4a;
-      color: #fff;
-      border-color: #4a4a4a;
-    }
-    .stop-badge.active-stop {
-      background: #1a1a1a;
-      color: #FFC72C;
-      border-color: #1a1a1a;
-    }
+    .badge.done { background: #aaa; border-color: #aaa; color: #fff; }
+    .badge.going { background: #1a1a1a; border-color: #1a1a1a; color: #FFC72C; }
 
-    .col-info { min-width: 0; }
-    .col-info .name {
-      font-size: 14px;
-      font-weight: 600;
-      color: #1a1a1a;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .col-info .sub {
-      font-size: 11px;
-      color: rgba(0,0,0,0.5);
-      margin-top: 1px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
+    .rname { font-size: 13px; font-weight: 600; color: #1a1a1a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rsub  { font-size: 10px; color: rgba(0,0,0,0.5); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    .col-time {
-      text-align: right;
-    }
-    .col-time .time-val {
-      font-size: 16px;
-      font-weight: 700;
-      color: #1a1a1a;
-    }
-    .col-time .time-label {
-      font-size: 10px;
-      color: rgba(0,0,0,0.45);
-    }
+    .rtime { text-align: right; font-size: 15px; font-weight: 700; color: #1a1a1a; }
+    .rdelay { font-size: 10px; text-align: right; }
 
-    .col-window {
-      text-align: right;
-      font-size: 11px;
-      color: rgba(0,0,0,0.55);
-      line-height: 1.4;
-    }
+    .rwin { text-align: right; font-size: 11px; color: rgba(0,0,0,0.5); line-height: 1.4; }
 
-    .col-status { text-align: right; }
-    .status-pill {
-      display: inline-block;
-      padding: 3px 8px;
-      border-radius: 20px;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.3px;
+    .rstatus { text-align: right; }
+    .pill {
+      display: inline-block; padding: 3px 7px; border-radius: 20px;
+      font-size: 10px; font-weight: 700;
     }
-    .status-gepland  { background: rgba(0,0,0,0.1);  color: rgba(0,0,0,0.6); }
-    .status-onderweg { background: #1a1a1a;           color: #FFC72C; }
-    .status-actief   { background: #e67e00;            color: #fff; }
-    .status-afgerond { background: rgba(0,0,0,0.12);  color: rgba(0,0,0,0.4); text-decoration: line-through; }
+    .pill-gepland  { background: rgba(0,0,0,0.1);  color: rgba(0,0,0,0.55); }
+    .pill-onderweg { background: #1a1a1a;           color: #FFC72C; }
+    .pill-actief   { background: #e67e00;            color: #fff; }
+    .pill-afgerond { background: rgba(0,0,0,0.08);  color: rgba(0,0,0,0.35); }
 
-    /* ── Rechter paneel (Kaart) ──────────────────────────────── */
-    #right-panel {
-      width: 50%;
-      position: relative;
-    }
+    /* Rechts: kaart */
+    #right { width: 50%; position: relative; }
+    #map { width: 100%; height: 100%; }
 
-    #map {
-      width: 100%;
-      height: 100%;
-    }
-
-    /* Kaart overlay: geselecteerde rit info */
-    #map-overlay {
-      position: absolute;
-      top: 12px;
-      left: 12px;
-      background: rgba(255,255,255,0.95);
-      border-radius: 10px;
-      padding: 10px 14px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.15);
-      font-size: 12px;
-      color: #1a1a1a;
-      max-width: 200px;
-      display: none;
-    }
-    #map-overlay .ov-title {
-      font-weight: 700;
-      font-size: 13px;
-      margin-bottom: 4px;
-    }
-    #map-overlay .ov-row {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      margin-top: 2px;
-    }
-    #map-overlay .ov-label { color: #888; }
-    #map-overlay .ov-val   { font-weight: 600; }
-
-    /* Reset knop */
     #reset-btn {
-      position: absolute;
-      bottom: 16px;
-      left: 12px;
-      background: rgba(255,255,255,0.9);
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      padding: 6px 12px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      color: #333;
-      display: none;
+      position: absolute; bottom: 14px; left: 12px; z-index: 1000;
+      background: rgba(255,255,255,0.92); border: 1px solid #bbb;
+      border-radius: 7px; padding: 6px 12px; font-size: 12px;
+      font-weight: 600; cursor: pointer; color: #333; display: none;
     }
     #reset-btn:hover { background: #fff; }
-
-    /* Attributie aanpassen */
-    .maplibregl-ctrl-attrib {
-      font-size: 10px !important;
-    }
   </style>
 </head>
 <body>
-
 <div id="app">
-
-  <!-- Header -->
   <div id="header">
     <div id="header-left">
-      <div id="jumbo-logo">jumbo</div>
+      <div id="logo">jumbo</div>
       <div>
-        <div id="header-title">Arrival Display — DC Raalte</div>
-        <div id="header-sub">Jumbo 7044 · Dronten · Goederenverwerking</div>
+        <div id="title">Arrival Display — DC Raalte</div>
+        <div id="sub">Jumbo 7044 · Dronten · Goederenverwerking</div>
       </div>
     </div>
-    <div id="header-clock">
+    <div>
       <div id="clock-time">--:--</div>
       <div id="clock-date">--</div>
     </div>
   </div>
 
-  <!-- Body -->
   <div id="body">
-
-    <!-- Links: arrivals -->
-    <div id="left-panel">
-      <div id="arrivals-header">
-        <div id="arrivals-title">Verwachte leveringen vandaag</div>
-      </div>
-      <div id="table-head">
+    <div id="left">
+      <div id="list-header">Verwachte leveringen vandaag</div>
+      <div id="cols">
         <div class="th">#</div>
         <div class="th">Vervoerder / DC</div>
-        <div class="th right">Aankomst</div>
-        <div class="th right">Tijdvenster</div>
-        <div class="th right">Status</div>
+        <div class="th r">Aankomst</div>
+        <div class="th r">Tijdvenster</div>
+        <div class="th r">Status</div>
       </div>
-      <div id="arrivals-list">
-        <!-- gevuld via JS -->
-      </div>
+      <div id="list"></div>
     </div>
-
-    <!-- Rechts: kaart -->
-    <div id="right-panel">
+    <div id="right">
       <div id="map"></div>
-      <div id="map-overlay">
-        <div class="ov-title" id="ov-trip">—</div>
-        <div class="ov-row"><span class="ov-label">Vervoerder</span><span class="ov-val" id="ov-carrier">—</span></div>
-        <div class="ov-row"><span class="ov-label">Aankomst</span><span class="ov-val" id="ov-arrival">—</span></div>
-        <div class="ov-row"><span class="ov-label">Vertraging</span><span class="ov-val" id="ov-delay">—</span></div>
-      </div>
       <button id="reset-btn" onclick="resetView()">↩ Volledig overzicht</button>
     </div>
-
   </div>
 </div>
 
 <script>
-// ─── Demo data ──────────────────────────────────────────────────────────────
-const TODAY = new Date()
-function todayAt(h, m) {
-  const d = new Date(TODAY)
-  d.setHours(h, m, 0, 0)
-  return d
+// ── Klok ──────────────────────────────────────────────────────────────────────
+function tick() {
+  const n = new Date()
+  document.getElementById('clock-time').textContent =
+    n.toLocaleTimeString('nl-NL', { hour:'2-digit', minute:'2-digit' })
+  document.getElementById('clock-date').textContent =
+    n.toLocaleDateString('nl-NL', { weekday:'long', day:'numeric', month:'long', year:'numeric' })
 }
-function fmtTime(d) {
-  return d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
-}
-function fmtWindow(d1, d2) {
-  return `${fmtTime(d1)} – ${fmtTime(d2)}`
-}
+tick(); setInterval(tick, 1000)
 
-const ARRIVALS = [
-  {
-    id: 1, tripId: 'CDV-2410-A',
-    carrier: 'Den Hartogh Logistics',
-    dc: 'DC Raalte',
-    coords: [[5.48, 52.45],[5.75, 52.51],[5.90, 52.51],[6.10, 52.52],[6.30, 52.60],[6.47, 52.72],[6.30, 52.60],[6.10, 52.52],[5.90, 52.51]],
-    stops: [[5.48,52.45],[5.90,52.51],[6.47,52.72],[6.10,52.52]],
-    arrival: todayAt(6, 15), winStart: todayAt(6, 0), winEnd: todayAt(6, 30),
-    status: 'AFGEROND', delay: -3,
-    pallets: '14× Ambient  6× ❄ Diepvries'
-  },
-  {
-    id: 2, tripId: 'CDV-2410-B',
-    carrier: 'Van Dijk Transport',
-    dc: 'DC Raalte',
-    coords: [[5.90, 52.51],[5.64, 52.67],[5.76, 52.68],[5.81, 52.90],[5.76, 52.97],[5.68, 53.00],[5.58, 53.05],[5.52, 53.12]],
-    stops: [[5.90,52.51],[5.64,52.67],[5.76,52.68],[5.81,52.90],[5.68,53.00],[5.52,53.12]],
-    arrival: todayAt(7, 42), winStart: todayAt(7, 30), winEnd: todayAt(8, 0),
-    status: 'ONDERWEG', delay: 12,
-    pallets: '22× Ambient  4× Vers'
-  },
-  {
-    id: 3, tripId: 'CDV-2410-C',
-    carrier: 'Jumbo Logistiek',
-    dc: 'DC Woerden',
-    coords: [[4.88, 52.08],[5.10, 52.25],[5.30, 52.40],[5.48, 52.45],[5.64, 52.67],[5.76, 52.68]],
-    stops: [[4.88,52.08],[5.30,52.40],[5.48,52.45],[5.76,52.68]],
-    arrival: todayAt(8, 30), winStart: todayAt(8, 15), winEnd: todayAt(8, 45),
-    status: 'ONDERWEG', delay: 0,
-    pallets: '30× Ambient  12× Koel'
-  },
-  {
-    id: 4, tripId: 'CDV-2410-D',
-    carrier: 'Ploeger Logistics',
-    dc: 'DC Tilburg',
-    coords: [[5.07, 51.56],[5.20, 51.80],[5.38, 52.00],[5.55, 52.20],[5.75, 52.51]],
-    stops: [[5.07,51.56],[5.38,52.00],[5.55,52.20],[5.75,52.51]],
-    arrival: todayAt(9, 5), winStart: todayAt(9, 0), winEnd: todayAt(9, 30),
-    status: 'GEPLAND', delay: null,
-    pallets: '18× ❄ Diepvries  8× Vers'
-  },
-  {
-    id: 5, tripId: 'CDV-2410-E',
-    carrier: 'Jan de Rijk',
-    dc: 'DC Nieuwegein',
-    coords: [[5.10, 52.03],[5.25, 52.20],[5.48, 52.45],[5.64, 52.67],[5.81, 52.90]],
-    stops: [[5.10,52.03],[5.48,52.45],[5.64,52.67],[5.81,52.90]],
-    arrival: todayAt(10, 20), winStart: todayAt(10, 0), winEnd: todayAt(10, 45),
-    status: 'GEPLAND', delay: null,
-    pallets: '26× Ambient'
-  },
-  {
-    id: 6, tripId: 'CDV-2411-A',
-    carrier: 'Den Hartogh Logistics',
-    dc: 'DC Raalte',
-    coords: [[6.47, 52.72],[6.30, 52.60],[6.10, 52.52],[5.90, 52.51],[5.75, 52.51],[5.64, 52.67],[5.52, 53.12]],
-    stops: [[6.47,52.72],[6.10,52.52],[5.90,52.51],[5.64,52.67],[5.52,53.12]],
-    arrival: todayAt(11, 45), winStart: todayAt(11, 30), winEnd: todayAt(12, 0),
-    status: 'GEPLAND', delay: null,
-    pallets: '20× Ambient  10× Koel  4× ❄ Diepvries'
-  },
-  {
-    id: 7, tripId: 'CDV-2411-B',
-    carrier: 'Van Dijk Transport',
-    dc: 'DC Raalte',
-    coords: [[5.90, 52.51],[5.76, 52.97],[5.68, 53.00],[5.52, 53.12]],
-    stops: [[5.90,52.51],[5.76,52.97],[5.52,53.12]],
-    arrival: todayAt(13, 10), winStart: todayAt(13, 0), winEnd: todayAt(13, 30),
-    status: 'GEPLAND', delay: null,
-    pallets: '16× Vers  8× Koel'
-  },
-  {
-    id: 8, tripId: 'CDV-2411-C',
-    carrier: 'Jumbo Logistiek',
-    dc: 'DC Woerden',
-    coords: [[4.88, 52.08],[5.30, 52.40],[5.75, 52.51],[5.81, 52.90],[5.52, 53.12]],
-    stops: [[4.88,52.08],[5.30,52.40],[5.75,52.51],[5.52,53.12]],
-    arrival: todayAt(14, 30), winStart: todayAt(14, 15), winEnd: todayAt(15, 0),
-    status: 'GEPLAND', delay: null,
-    pallets: '24× Ambient  6× ❄ Diepvries'
-  }
+// ── Data ──────────────────────────────────────────────────────────────────────
+function at(h, m) { const d = new Date(); d.setHours(h,m,0,0); return d }
+function ft(d) { return d.toLocaleTimeString('nl-NL', { hour:'2-digit', minute:'2-digit' }) }
+
+const DATA = [
+  { id:1, trip:'CDV-2410-A', carrier:'Den Hartogh Logistics', dc:'DC Raalte',
+    arrival:at(6,15), w1:at(6,0),  w2:at(6,30),  status:'AFGEROND', delay:-3,
+    route:[[52.45,5.48],[52.51,5.75],[52.51,5.90],[52.52,6.10],[52.60,6.30],[52.72,6.47]],
+    stops:[[52.45,5.48],[52.51,5.90],[52.72,6.47],[52.52,6.10]] },
+  { id:2, trip:'CDV-2410-B', carrier:'Van Dijk Transport',    dc:'DC Raalte',
+    arrival:at(7,42), w1:at(7,30), w2:at(8,0),   status:'ONDERWEG', delay:12,
+    route:[[52.51,5.90],[52.67,5.64],[52.68,5.76],[52.90,5.81],[52.97,5.76],[53.00,5.68],[53.05,5.58],[53.12,5.52]],
+    stops:[[52.51,5.90],[52.67,5.64],[52.90,5.81],[53.12,5.52]] },
+  { id:3, trip:'CDV-2410-C', carrier:'Jumbo Logistiek',       dc:'DC Woerden',
+    arrival:at(8,30), w1:at(8,15), w2:at(8,45),  status:'ONDERWEG', delay:0,
+    route:[[52.08,4.88],[52.25,5.10],[52.40,5.30],[52.45,5.48],[52.67,5.64],[52.68,5.76]],
+    stops:[[52.08,4.88],[52.40,5.30],[52.45,5.48],[52.68,5.76]] },
+  { id:4, trip:'CDV-2410-D', carrier:'Ploeger Logistics',     dc:'DC Tilburg',
+    arrival:at(9,5),  w1:at(9,0),  w2:at(9,30),  status:'GEPLAND',  delay:null,
+    route:[[51.56,5.07],[52.00,5.38],[52.20,5.55],[52.51,5.75]],
+    stops:[[51.56,5.07],[52.00,5.38],[52.51,5.75]] },
+  { id:5, trip:'CDV-2410-E', carrier:'Jan de Rijk',           dc:'DC Nieuwegein',
+    arrival:at(10,20),w1:at(10,0), w2:at(10,45), status:'GEPLAND',  delay:null,
+    route:[[52.03,5.10],[52.20,5.25],[52.45,5.48],[52.67,5.64],[52.90,5.81]],
+    stops:[[52.03,5.10],[52.45,5.48],[52.67,5.64],[52.90,5.81]] },
+  { id:6, trip:'CDV-2411-A', carrier:'Den Hartogh Logistics', dc:'DC Raalte',
+    arrival:at(11,45),w1:at(11,30),w2:at(12,0),  status:'GEPLAND',  delay:null,
+    route:[[52.72,6.47],[52.52,6.10],[52.51,5.90],[52.67,5.64],[53.12,5.52]],
+    stops:[[52.72,6.47],[52.51,5.90],[52.67,5.64],[53.12,5.52]] },
+  { id:7, trip:'CDV-2411-B', carrier:'Van Dijk Transport',    dc:'DC Raalte',
+    arrival:at(13,10),w1:at(13,0), w2:at(13,30), status:'GEPLAND',  delay:null,
+    route:[[52.51,5.90],[52.97,5.76],[53.12,5.52]],
+    stops:[[52.51,5.90],[52.97,5.76],[53.12,5.52]] },
+  { id:8, trip:'CDV-2411-C', carrier:'Jumbo Logistiek',       dc:'DC Woerden',
+    arrival:at(14,30),w1:at(14,15),w2:at(15,0),  status:'GEPLAND',  delay:null,
+    route:[[52.08,4.88],[52.40,5.30],[52.51,5.75],[52.90,5.81],[53.12,5.52]],
+    stops:[[52.08,4.88],[52.51,5.75],[52.90,5.81],[53.12,5.52]] }
 ]
 
-// ─── Klok ───────────────────────────────────────────────────────────────────
-function updateClock() {
-  const now = new Date()
-  document.getElementById('clock-time').textContent =
-    now.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
-  document.getElementById('clock-date').textContent =
-    now.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-}
-updateClock()
-setInterval(updateClock, 1000)
-
-// ─── Arrivals lijst ─────────────────────────────────────────────────────────
-let selectedId = null
-
-function statusLabel(s) {
-  return { AFGEROND: 'Afgerond', GEPLAND: 'Gepland', ONDERWEG: 'Onderweg', ACTIEF: 'Bezig' }[s] || s
-}
-function statusClass(s) {
-  return { AFGEROND: 'afgerond', GEPLAND: 'gepland', ONDERWEG: 'onderweg', ACTIEF: 'actief' }[s] || 'gepland'
-}
-function delayText(d) {
-  if (d == null) return '—'
+function delayTxt(d) {
+  if (d == null) return ''
   if (d === 0) return 'Op tijd'
-  return d > 0 ? `+${d} min` : `${d} min (vroeg)`
+  return d > 0 ? `+${d} min` : `${d} min vroeg`
 }
+function delayColor(d) {
+  if (!d) return ''
+  return d > 0 ? 'color:#c0392b;' : 'color:#27ae60;'
+}
+function pillClass(s) {
+  return { AFGEROND:'afgerond', GEPLAND:'gepland', ONDERWEG:'onderweg', ACTIEF:'actief' }[s] || 'gepland'
+}
+function pillLabel(s) {
+  return { AFGEROND:'Afgerond', GEPLAND:'Gepland', ONDERWEG:'Onderweg', ACTIEF:'Bezig' }[s] || s
+}
+
+// ── Leaflet kaart ─────────────────────────────────────────────────────────────
+const DEFAULT_CENTER = [52.80, 6.05]
+const DEFAULT_ZOOM   = 7
+
+const map = L.map('map', {
+  center: DEFAULT_CENTER,
+  zoom: DEFAULT_ZOOM,
+  zoomControl: false,
+  attributionControl: true
+})
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
+  subdomains: 'abcd',
+  maxZoom: 19
+}).addTo(map)
+
+// ── Teken routes + markers ────────────────────────────────────────────────────
+const routeLayers   = {}  // id → polyline
+const markerGroups  = {}  // id → [markers]
+
+DATA.forEach(a => {
+  const isDone   = a.status === 'AFGEROND'
+  const isGoing  = a.status === 'ONDERWEG'
+
+  // Routelijn
+  const line = L.polyline(a.route, {
+    color:   isDone ? '#bbbbbb' : isGoing ? '#1a1a1a' : '#6b6b6b',
+    weight:  isGoing ? 5 : 3,
+    opacity: isDone ? 0.4 : 0.75,
+    dashArray: (a.status === 'GEPLAND') ? '6 4' : null
+  }).addTo(map)
+  line.on('click', () => selectRow(a))
+  routeLayers[a.id] = line
+
+  // Stop-markers
+  markerGroups[a.id] = a.stops.map((coord, i) => {
+    const el = document.createElement('div')
+    el.style.cssText = `
+      width:26px; height:26px; border-radius:50%;
+      background:${isDone ? '#aaa' : '#fff'};
+      border:2px solid ${isDone ? '#aaa' : '#4a4a4a'};
+      display:flex; align-items:center; justify-content:center;
+      font-size:11px; font-weight:700; color:${isDone ? '#fff' : '#1a1a1a'};
+      cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,0.22);
+      font-family:'Segoe UI',Arial,sans-serif;
+    `
+    el.textContent = i + 1
+    const icon = L.divIcon({ html: el.outerHTML, className: '', iconSize: [26,26], iconAnchor: [13,13] })
+    const m = L.marker(coord, { icon }).addTo(map)
+    m.on('click', () => selectRow(a))
+    return m
+  })
+})
+
+// ── Lijst renderen ────────────────────────────────────────────────────────────
+let selId = null
 
 function renderList() {
-  const el = document.getElementById('arrivals-list')
+  const el = document.getElementById('list')
   el.innerHTML = ''
-  ARRIVALS.forEach((a, i) => {
-    const isActive = selectedId === a.id
+  DATA.forEach((a, i) => {
+    const isSel  = selId === a.id
+    const isDone = a.status === 'AFGEROND'
+    const isGoing= a.status === 'ONDERWEG'
+    const badgeClass = isDone ? 'done' : isGoing ? 'going' : ''
     const div = document.createElement('div')
-    div.className = 'arrival-row' + (isActive ? ' active' : '')
-    div.onclick = () => selectArrival(a)
-
-    const badgeClass = a.status === 'AFGEROND' ? 'done' : isActive ? 'active-stop' : ''
-    const delayColor = a.delay > 0 ? 'color:#e67e00;font-weight:700' : a.delay < 0 ? 'color:#2d7a2d;font-weight:700' : ''
-
+    div.className = 'row' + (isSel ? ' sel' : '')
+    div.onclick = () => selectRow(a)
     div.innerHTML = `
-      <div class="col-num"><div class="stop-badge ${badgeClass}">${i+1}</div></div>
-      <div class="col-info">
-        <div class="name">${a.carrier}</div>
-        <div class="sub">${a.dc} · ${a.pallets}</div>
+      <div><div class="badge ${badgeClass}">${i+1}</div></div>
+      <div>
+        <div class="rname">${a.carrier}</div>
+        <div class="rsub">${a.dc} · ${a.trip}</div>
       </div>
-      <div class="col-time">
-        <div class="time-val" style="${delayColor}">${fmtTime(a.arrival)}</div>
-        <div class="time-label">${a.delay != null && a.delay !== 0 ? delayText(a.delay) : a.tripId}</div>
-      </div>
-      <div class="col-window">${fmtWindow(a.winStart, a.winEnd)}</div>
-      <div class="col-status"><span class="status-pill status-${statusClass(a.status)}">${statusLabel(a.status)}</span></div>
+      <div class="rtime" style="${delayColor(a.delay)}">${ft(a.arrival)}<div class="rdelay" style="${delayColor(a.delay)}">${delayTxt(a.delay)}</div></div>
+      <div class="rwin">${ft(a.w1)}<br>${ft(a.w2)}</div>
+      <div class="rstatus"><span class="pill pill-${pillClass(a.status)}">${pillLabel(a.status)}</span></div>
     `
     el.appendChild(div)
   })
 }
 renderList()
 
-// ─── MapLibre initialisatie ──────────────────────────────────────────────────
-const DEFAULT_CENTER = [6.05, 52.80]
-const DEFAULT_ZOOM   = 7.2
-
-// Fallback naar Carto Positron als TomTom CDN niet beschikbaar is
-const STYLE_TOMTOM = 'https://cdn.simacan.com/map/styles/tomtom_street_light_orbis.json'
-const STYLE_CARTO  = {
-  version: 8,
-  sources: {
-    'carto-tiles': {
-      type: 'raster',
-      tiles: ['https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png'],
-      tileSize: 256,
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>'
-    }
-  },
-  layers: [{ id: 'carto-base', type: 'raster', source: 'carto-tiles' }]
-}
-
-const map = new maplibregl.Map({
-  container: 'map',
-  style: STYLE_TOMTOM,
-  center: DEFAULT_CENTER,
-  zoom: DEFAULT_ZOOM,
-  bearing: 0,
-  pitch: 0,
-  attributionControl: true,
-  navigationControl: false
-})
-
-// Als TomTom style mislukt → fallback naar Carto
-map.on('error', (e) => {
-  if (e.source === undefined || e.error?.status === 403 || e.error?.status === 0) {
-    try { map.setStyle(STYLE_CARTO) } catch {}
-  }
-})
-
-// Verberg navigatiecontrols (zijn niet toegevoegd, maar voor zekerheid)
-// Geen map.addControl(new maplibregl.NavigationControl()) → geen knoppen
-
-// ─── Kaart geladen: teken alle routes ───────────────────────────────────────
-map.on('load', () => {
-
-  ARRIVALS.forEach((a, i) => {
-    const srcId   = `route-${a.id}`
-    const layerId = `route-line-${a.id}`
-
-    // Routelijn source
-    map.addSource(srcId, {
-      type: 'geojson',
-      data: {
-        type: 'Feature',
-        geometry: { type: 'LineString', coordinates: a.coords }
-      }
-    })
-
-    // Achtergrond lijn (wit, dik) voor contrast
-    map.addLayer({
-      id: `${layerId}-bg`,
-      type: 'line',
-      source: srcId,
-      layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': '#ffffff', 'line-width': 8, 'line-opacity': 0.7 }
-    })
-
-    // Hoofd routelijn
-    map.addLayer({
-      id: layerId,
-      type: 'line',
-      source: srcId,
-      layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: {
-        'line-color': a.status === 'AFGEROND' ? '#aaaaaa' : a.status === 'ONDERWEG' ? '#1a1a1a' : '#6b6b6b',
-        'line-width': a.status === 'ONDERWEG' ? 6 : 4,
-        'line-opacity': a.status === 'AFGEROND' ? 0.35 : 0.8,
-        'line-dasharray': a.status === 'GEPLAND' ? ['literal', [4, 3]] : ['literal', [1]]
-      }
-    })
-  })
-
-  // Stop-markers toevoegen voor ALLE ritten
-  ARRIVALS.forEach((a, aIdx) => {
-    a.stops.forEach((coord, sIdx) => {
-      const el = document.createElement('div')
-      el.className = 'stop-badge'
-      el.textContent = sIdx + 1
-      el.style.cssText = `
-        width:28px; height:28px; border-radius:50%;
-        background:${a.status === 'AFGEROND' ? '#aaa' : '#fff'};
-        border:2px solid ${a.status === 'AFGEROND' ? '#aaa' : '#4a4a4a'};
-        display:flex; align-items:center; justify-content:center;
-        font-size:11px; font-weight:700; color:${a.status === 'AFGEROND' ? '#fff' : '#1a1a1a'};
-        cursor:pointer; transition:transform 0.15s;
-        box-shadow:0 1px 4px rgba(0,0,0,0.25);
-      `
-      el.addEventListener('mouseenter', () => { el.style.transform = 'scale(1.15)' })
-      el.addEventListener('mouseleave', () => { el.style.transform = '' })
-      el.addEventListener('click', () => selectArrival(a))
-
-      new maplibregl.Marker({ element: el })
-        .setLngLat(coord)
-        .addTo(map)
-    })
-  })
-})
-
-// ─── Selecteer rit ──────────────────────────────────────────────────────────
-function selectArrival(arrival) {
-  if (selectedId === arrival.id) {
-    resetView()
-    return
-  }
-  selectedId = arrival.id
+// ── Selecteer rit ──────────────────────────────────────────────────────────────
+function selectRow(a) {
+  if (selId === a.id) { resetView(); return }
+  selId = a.id
   renderList()
-  showOverlay(arrival)
 
-  // Bereken bounds van alle stop-coördinaten
-  const lngs = arrival.stops.map(c => c[0])
-  const lats = arrival.stops.map(c => c[1])
-  const sw = [Math.min(...lngs) - 0.05, Math.min(...lats) - 0.05]
-  const ne = [Math.max(...lngs) + 0.05, Math.max(...lats) + 0.05]
-
-  map.fitBounds([sw, ne], {
-    padding: { top: 60, bottom: 60, left: 60, right: 60 },
-    duration: 600
-  })
-
+  const bounds = L.latLngBounds(a.stops)
+  map.fitBounds(bounds, { padding: [60, 60] })
   document.getElementById('reset-btn').style.display = 'block'
 }
 
 function resetView() {
-  selectedId = null
+  selId = null
   renderList()
-  hideOverlay()
-  map.flyTo({ center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM, duration: 600 })
+  map.setView(DEFAULT_CENTER, DEFAULT_ZOOM)
   document.getElementById('reset-btn').style.display = 'none'
 }
-
-// ─── Kaart overlay ──────────────────────────────────────────────────────────
-function showOverlay(a) {
-  document.getElementById('ov-trip').textContent    = a.tripId
-  document.getElementById('ov-carrier').textContent = a.carrier
-  document.getElementById('ov-arrival').textContent = fmtTime(a.arrival)
-  document.getElementById('ov-delay').textContent   = delayText(a.delay)
-  document.getElementById('map-overlay').style.display = 'block'
-}
-function hideOverlay() {
-  document.getElementById('map-overlay').style.display = 'none'
-}
-
-// ─── Auto-scroll aktieve rit in beeld ───────────────────────────────────────
-// Scroll vanzelf naar de "ONDERWEG" rit bij laden
-window.addEventListener('load', () => {
-  const idx = ARRIVALS.findIndex(a => a.status === 'ONDERWEG')
-  if (idx > 2) {
-    const rows = document.querySelectorAll('.arrival-row')
-    rows[idx]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }
-})
 </script>
 </body>
 </html>
