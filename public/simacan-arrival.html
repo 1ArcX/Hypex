@@ -1,84 +1,51 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>Arrival Display</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <style>
-    html, body, #map { height: 100%; margin: 0; padding: 0; }
-  </style>
+<meta charset="UTF-8">
+<title>Arrival Display</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  body { margin: 0; }
+  #map { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; }
+</style>
 </head>
 <body>
 <div id="map"></div>
 <script>
-  var map = L.map('map', { zoomControl: true }).setView([52.70, 5.90], 8)
+var map = L.map('map').setView([52.70, 5.90], 8)
 
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '© OpenStreetMap'
-  }).addTo(map)
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution: '© OpenStreetMap'
+}).addTo(map)
 
-  // Route coordinaten (lat, lng)
-  var route = [
-    [52.45, 5.48],
-    [52.51, 5.75],
-    [52.51, 5.90],
-    [52.52, 6.10],
-    [52.60, 6.30],
-    [52.72, 6.47],
-    [52.60, 6.30],
-    [52.52, 6.10],
-    [52.51, 5.90],
-    [52.67, 5.64],
-    [52.68, 5.76],
-    [52.90, 5.81],
-    [52.97, 5.76],
-    [53.00, 5.68],
-    [53.05, 5.58],
-    [53.12, 5.52]
-  ]
+var route = [
+  [52.45,5.48],[52.51,5.75],[52.51,5.90],[52.52,6.10],[52.60,6.30],[52.72,6.47],
+  [52.60,6.30],[52.52,6.10],[52.51,5.90],[52.67,5.64],[52.68,5.76],
+  [52.90,5.81],[52.97,5.76],[53.00,5.68],[53.05,5.58],[53.12,5.52]
+]
+L.polyline(route, { color: '#333', weight: 4 }).addTo(map)
 
-  // Teken routelijn
-  L.polyline(route, { color: '#333', weight: 4, opacity: 0.7 }).addTo(map)
-
-  // Stops met nummer
-  var stops = [
-    { pos: [52.45, 5.48], label: '1', name: 'Lelystad',   done: true  },
-    { pos: [52.51, 5.90], label: '2', name: 'Kampen',     done: true  },
-    { pos: [52.72, 6.47], label: '3', name: 'Hoogeveen',  done: false },
-    { pos: [52.52, 6.10], label: '4', name: 'Zwolle',     done: false },
-    { pos: [52.67, 5.64], label: '5', name: 'Urk',        done: false },
-    { pos: [52.68, 5.76], label: '6', name: 'Emmeloord',  done: false },
-    { pos: [52.90, 5.81], label: '7', name: 'Heerenveen', done: false },
-    { pos: [52.97, 5.76], label: '8', name: 'Sneek N',    done: false },
-    { pos: [53.00, 5.68], label: '9', name: 'Sneek',      done: false },
-    { pos: [53.05, 5.58], label:'10', name: 'Bolsward',   done: false },
-    { pos: [53.12, 5.52], label:'11', name: 'Harlingen',  done: false }
-  ]
-
-  stops.forEach(function(s) {
-    var bg    = s.done ? '#888' : '#fff'
-    var color = s.done ? '#fff' : '#000'
-    var border= s.done ? '#888' : '#333'
-    var icon = L.divIcon({
-      html: '<div style="width:26px;height:26px;border-radius:50%;background:' + bg + ';border:2px solid ' + border + ';display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:' + color + ';font-family:Arial">' + s.label + '</div>',
-      className: '',
-      iconSize: [26, 26],
-      iconAnchor: [13, 13]
+var stops = [
+  [52.45,5.48],[52.51,5.90],[52.72,6.47],[52.52,6.10],[52.67,5.64],
+  [52.68,5.76],[52.90,5.81],[52.97,5.76],[53.00,5.68],[53.05,5.58],[53.12,5.52]
+]
+stops.forEach(function(pos, i) {
+  L.marker(pos, {
+    icon: L.divIcon({
+      html: '<div style="width:26px;height:26px;border-radius:50%;background:#fff;border:2px solid #333;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;font-family:Arial">'+(i+1)+'</div>',
+      className: '', iconSize: [26,26], iconAnchor: [13,13]
     })
-    L.marker(s.pos, { icon: icon }).addTo(map).bindPopup('<b>' + s.label + '. ' + s.name + '</b>')
-  })
+  }).addTo(map)
+})
 
-  // Huidige positie (onderweg tussen stop 2 en 3)
-  var huidigPos = [52.60, 6.20]
-  var truckIcon = L.divIcon({
-    html: '<div style="width:36px;height:36px;border-radius:50%;background:#FFC72C;border:3px solid #1a1a1a;display:flex;align-items:center;justify-content:center;font-size:18px">🚚</div>',
-    className: '',
-    iconSize: [36, 36],
-    iconAnchor: [18, 18]
+L.marker([52.60,6.20], {
+  icon: L.divIcon({
+    html: '<div style="width:36px;height:36px;border-radius:50%;background:#FFC72C;border:3px solid #333;display:flex;align-items:center;justify-content:center;font-size:18px">🚚</div>',
+    className: '', iconSize: [36,36], iconAnchor: [18,18]
   })
-  L.marker(huidigPos, { icon: truckIcon }).addTo(map).bindPopup('<b>Huidige positie</b><br>Onderweg naar stop 3').openPopup()
+}).addTo(map).bindPopup('Huidige positie').openPopup()
 </script>
 </body>
 </html>
