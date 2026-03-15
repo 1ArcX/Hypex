@@ -115,7 +115,9 @@ exports.handler = async (event) => {
     if (!tripUuid) return err('tripUuid is verplicht')
     const result = await callApi(`/api/internal/v3/stopAndRoutes/${tripUuid}`, token, refreshToken)
     if (result.status === 401) return err('Sessie verlopen.', 401)
-    return ok(result.data)
+    // Also try v2 locationStops for vehicle position
+    const data = result.data || {}
+    return ok({ ...data, _newTokens: result.newAccessToken ? { accessToken: result.newAccessToken, refreshToken: result.newRefreshToken } : undefined })
   }
 
   return err(`Onbekende actie: ${action}`)

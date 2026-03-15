@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Truck, RefreshCw, AlertCircle, ChevronDown, ChevronUp, LogIn, LogOut } from 'lucide-react'
+import { Truck, RefreshCw, AlertCircle, ChevronDown, ChevronUp, LogIn, LogOut, MapPin } from 'lucide-react'
 import { supabase } from '../supabaseClient'
+
+// Jumbo 7044 — Dronten
+const STORE_LAT = 52.5222
+const STORE_LNG = 5.7178
 
 const API          = '/.netlify/functions/simacan'
 const STORAGE_KEY  = 'simacan_tokens'
@@ -79,9 +83,15 @@ export default function VrachttijdenWidget() {
   const [selectedStop,setSelectedStop]= useState(null)
   const [selectedDate,setSelectedDate]= useState(() => new Date().toISOString().slice(0,10))
 
-  const tokensRef      = useRef(tokens)
+  const tokensRef       = useRef(tokens)
   const selectedDateRef = useRef(selectedDate)
   useEffect(() => { selectedDateRef.current = selectedDate }, [selectedDate])
+
+  const mapRef         = useRef(null)
+  const mapInstanceRef = useRef(null)
+  const markersRef     = useRef([])
+  const routeLayerRef  = useRef(null)
+  const [routeCache,   setRouteCache]  = useState({})
 
   const accentBg     = p => `color-mix(in srgb, var(--accent) ${p}%, transparent)`
   const accentBorder = p => `1px solid color-mix(in srgb, var(--accent) ${p}%, transparent)`
@@ -161,6 +171,72 @@ export default function VrachttijdenWidget() {
     setLoginLoading(false)
   }, [saveTokens, fetchStops])
 
+  // ─── Kaart init ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!mapRef.current || mapInstanceRef.current) return
+    const L = window.L; if (!L) return
+    const map = L.map(mapRef.current, { zoomControl: false, attributionControl: false }).setView([STORE_LAT, STORE_LNG], 9)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(map)
+    const storeIco = L.divIcon({ html: `<div style="width:11px;height:11px;background:#00FFD1;border-radius:50%;border:2px solid white;box-shadow:0 0 6px #00FFD1"></div>`, className:'', iconAnchor:[5,5] })
+    L.marker([STORE_LAT, STORE_LNG], { icon: storeIco }).addTo(map).bindPopup('Jumbo 7044 – Dronten')
+    mapInstanceRef.current = map
+  }, [])
+
+  // ─── Route ophalen en op kaart zetten ────────────────────────────────────
+  const showRouteOnMap = useCallback((routeData, stop) => {
+    const L = window.L; const map = mapInstanceRef.current
+    if (!L || !map) return
+    // Verwijder oude markers/route
+    markersRef.current.forEach(m => map.removeLayer(m)); markersRef.current = []
+    if (routeLayerRef.current) { map.removeLayer(routeLayerRef.current); routeLayerRef.current = null }
+
+    const bounds = [[STORE_LAT, STORE_LNG]]
+    const color  = activityColor(stop?.tripStatus?.activity)
+
+    // Route polyline — probeer meerdere veldnamen
+    const coords = routeData?.route?.coordinates || routeData?.routeCoordinates || routeData?.path?.coordinates || routeData?.geometry?.coordinates
+    if (coords?.length > 1) {
+      const latlngs = coords.map(c => Array.isArray(c) ? [c[1], c[0]] : [c.lat ?? c.latitude, c.lon ?? c.lng ?? c.longitude])
+      routeLayerRef.current = L.polyline(latlngs, { color, weight: 3, opacity: 0.6 }).addTo(map)
+      latlngs.forEach(p => bounds.push(p))
+    }
+
+    // Voertuig positie — probeer meerdere veldnamen
+    const veh = routeData?.vehiclePosition || routeData?.vehicle || routeData?.currentPosition
+    const lat  = veh?.latitude ?? veh?.lat
+    const lng  = veh?.longitude ?? veh?.lon ?? veh?.lng
+    if (lat && lng) {
+      bounds.push([lat, lng])
+      const ico = L.divIcon({ html: `<div style="width:14px;height:14px;background:${color};border-radius:3px;border:2px solid white;box-shadow:0 0 5px ${color};transform:rotate(45deg)"></div>`, className:'', iconAnchor:[7,7] })
+      const m = L.marker([lat, lng], { icon: ico }).addTo(map)
+        .bindPopup(`<b>${stop?.trip?.tripId || 'Rit'}</b><br/>${stop?.tripStatus?.carrierName || ''}`)
+      markersRef.current.push(m)
+    }
+
+    // Log eerste keer zodat we velden kunnen zien
+    if (!routeData._logged) {
+      console.log('[Simacan] tripRoute velden:', JSON.stringify(routeData).slice(0, 600))
+      routeData._logged = true
+    }
+
+    if (bounds.length > 1) map.fitBounds(bounds, { padding: [24, 24] })
+  }, [])
+
+  const fetchAndShowRoute = useCallback(async (stop) => {
+    const uuid = stop?.tripStatus?.uuid
+    if (!uuid || !tokensRef.current?.accessToken) return
+    if (routeCache[uuid]) { showRouteOnMap(routeCache[uuid], stop); return }
+    try {
+      const res = await fetch(API, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action:'tripRoute', token:tokensRef.current.accessToken, refreshToken:tokensRef.current.refreshToken, tripUuid:uuid })
+      })
+      const data = await res.json()
+      setRouteCache(prev => ({ ...prev, [uuid]: data }))
+      showRouteOnMap(data, stop)
+    } catch {}
+  }, [routeCache, showRouteOnMap])
+
   // ─── Datum helpers ────────────────────────────────────────────────────────
   const today = new Date().toISOString().slice(0,10)
   const changeDate = (nd) => { setSelectedDate(nd); setStops(null); setSelectedStop(null); fetchStops(tokensRef.current, nd) }
@@ -237,6 +313,9 @@ export default function VrachttijdenWidget() {
 
           {stops && (
             <>
+              {/* Kaart */}
+              <div ref={mapRef} style={{ width:'100%', height:'180px', borderRadius:'10px', overflow:'hidden', marginBottom:'10px', border:'1px solid rgba(255,255,255,0.08)' }} />
+
               {sorted.length === 0 ? (
                 <p style={{ fontSize:'12px', color:'rgba(255,255,255,0.4)', textAlign:'center', padding:'12px 0' }}>Geen ritten voor {selectedDate === today ? 'vandaag' : selectedDate}</p>
               ) : (
@@ -253,7 +332,7 @@ export default function VrachttijdenWidget() {
                     const palletStr = Object.entries(pallets).map(([t,n]) => `${n}× ${PALLET_LABELS[t]||t}`).join('  ')
 
                     return (
-                      <div key={stop.id || i} onClick={() => setSelectedStop(isSel ? null : stop)}
+                      <div key={stop.id || i} onClick={() => { const next = isSel ? null : stop; setSelectedStop(next); if (next) fetchAndShowRoute(next) }}
                         style={{ padding:'8px 10px', borderRadius:'10px', cursor:'pointer', transition:'background 0.15s',
                           background: isSel ? accentBg(8) : 'rgba(255,255,255,0.03)',
                           border: isSel ? accentBorder(25) : '1px solid rgba(255,255,255,0.06)' }}>
