@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Simacan login...</title>
+<style>body{margin:0;display:flex;align-items:center;justify-content:center;height:100vh;background:#0a0a1a;color:rgba(255,255,255,0.6);font-family:sans-serif;font-size:14px;}</style>
+</head>
+<body>
+<span>Inloggen...</span>
+<script>
+  // Leest auth code of fout uit URL en stuurt naar parent window
+  const params = new URLSearchParams(window.location.search)
+  const hash   = new URLSearchParams(window.location.hash.slice(1))
+
+  const code  = params.get('code')
+  const error = params.get('error') || hash.get('error')
+  const state = params.get('state')
+
+  if (window.opener) {
+    if (code)  window.opener.postMessage({ type: 'simacan_auth', code, state }, window.location.origin)
+    if (error) window.opener.postMessage({ type: 'simacan_auth_error', error, description: params.get('error_description') }, window.location.origin)
+    window.close()
+  } else {
+    document.querySelector('span').textContent = 'Venster sluiten...'
+    window.close()
+  }
+</script>
+</body>
+</html>
