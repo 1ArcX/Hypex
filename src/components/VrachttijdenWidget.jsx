@@ -151,14 +151,46 @@ export default function VrachttijdenWidget() {
     setLoading(false)
   }, [saveTokens])
 
-  useEffect(() => { if (tokens) fetchStops(tokens) }, [])
+  // ─── Afhandeling redirect-flow (mobiel) ──────────────────────────────────
+  useEffect(() => {
+    const pending = localStorage.getItem('simacan_pending_code')
+    const pendingErr = localStorage.getItem('simacan_pending_error')
+    if (pendingErr) {
+      localStorage.removeItem('simacan_pending_error')
+      setError(pendingErr)
+      setLoginLoading(false)
+      return
+    }
+    if (!pending) {
+      if (tokens) fetchStops(tokens)
+      return
+    }
+    localStorage.removeItem('simacan_pending_code')
+    const { code, state } = JSON.parse(pending)
+    const verifier = localStorage.getItem('simacan_pkce_verifier')
+    const savedState = localStorage.getItem('simacan_pkce_state')
+    localStorage.removeItem('simacan_pkce_verifier')
+    localStorage.removeItem('simacan_pkce_state')
+    if (!verifier || state !== savedState) { setError('Login mislukt (state mismatch)'); return }
+    setLoginLoading(true)
+    const redirectUri = `${window.location.origin}/simacan-callback.html`
+    exchangeCode(code, verifier, redirectUri)
+      .then(tokenData => {
+        const t = { accessToken: tokenData.access_token, refreshToken: tokenData.refresh_token }
+        saveTokens(t)
+        fetchStops(t)
+      })
+      .catch(e => setError(e.message))
+      .finally(() => setLoginLoading(false))
+  }, [])
+
   useEffect(() => {
     if (!tokens) return
     const t = setInterval(() => fetchStops(), 60000)
     return () => clearInterval(t)
   }, [!!tokens, fetchStops])
 
-  // ─── PKCE OAuth popup login ───────────────────────────────────────────────
+  // ─── PKCE OAuth login (popup op desktop, redirect op mobiel) ────────────
   const handleLogin = useCallback(async () => {
     setLoginLoading(true); setError(null)
     try {
@@ -166,6 +198,7 @@ export default function VrachttijdenWidget() {
       const challenge  = await sha256Base64url(verifier)
       const state      = randomBase64url(16)
       const redirectUri = `${window.location.origin}/simacan-callback.html`
+      const isMobile   = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)
 
       const authUrl = `${KC_BASE}/auth?` + new URLSearchParams({
         client_id:             KC_CLIENT_ID,
@@ -177,10 +210,18 @@ export default function VrachttijdenWidget() {
         code_challenge_method: 'S256'
       }).toString()
 
-      const popup = window.open(authUrl, 'simacan_login', 'width=520,height=640,left=200,top=100')
-      if (!popup) throw new Error('Popup geblokkeerd. Sta popups toe voor deze site.')
+      // Probeer popup; als geblokkeerd of mobiel → gebruik redirect
+      const popup = !isMobile && window.open(authUrl, 'simacan_login', 'width=520,height=640,left=200,top=100')
 
-      // Luister naar postMessage van de callback pagina
+      if (!popup) {
+        // Redirect flow: sla verifier + state op, stuur door naar Keycloak
+        localStorage.setItem('simacan_pkce_verifier', verifier)
+        localStorage.setItem('simacan_pkce_state', state)
+        window.location.href = authUrl
+        return // pagina wordt omgeleid, component unmount
+      }
+
+      // Popup flow: wacht op postMessage van callback pagina
       await new Promise((resolve, reject) => {
         const handler = async (event) => {
           if (event.origin !== window.location.origin) return
@@ -200,9 +241,7 @@ export default function VrachttijdenWidget() {
           } catch (e) { reject(e) }
         }
         window.addEventListener('message', handler)
-        // Timeout na 5 minuten
         setTimeout(() => { window.removeEventListener('message', handler); reject(new Error('Login timeout')) }, 5 * 60 * 1000)
-        // Detecteer als popup gesloten wordt zonder login
         const checkClosed = setInterval(() => {
           if (popup.closed) { clearInterval(checkClosed); window.removeEventListener('message', handler); reject(new Error('Login geannuleerd')) }
         }, 500)

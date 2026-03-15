@@ -160,8 +160,9 @@ export default function App() {
   useEffect(() => {
     if (!isAdmin) return
     setWidgetOrder(prev => {
-      if (prev.right.includes('work')) return prev
-      const next = { ...prev, right: ['work', ...prev.right] }
+      if (prev.right.includes('work') && prev.right.includes('vrachttijden')) return prev
+      const base = prev.right.filter(id => id !== 'work' && id !== 'vrachttijden')
+      const next = { ...prev, right: ['work', 'vrachttijden', ...base] }
       localStorage.setItem('widget_order', JSON.stringify(next))
       return next
     })
@@ -422,7 +423,8 @@ export default function App() {
       weather:  <WeatherWidget userId={user?.id} onRequestPwaInstall={() => setShowPwaPrompt(true)} />,
       spotify:  <SpotifyWidget />,
       pomodoro: <PomodoroTimer onModeChange={setIsBreak} userId={user?.id} />,
-      work:     isAdmin ? <WorkWidget /> : null,
+      work:         isAdmin ? <WorkWidget /> : null,
+      vrachttijden: isAdmin ? <VrachttijdenWidget /> : null,
     }[id] ?? null
   }
 

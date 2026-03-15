@@ -6,7 +6,6 @@
 <body>
 <span>Inloggen...</span>
 <script>
-  // Leest auth code of fout uit URL en stuurt naar parent window
   const params = new URLSearchParams(window.location.search)
   const hash   = new URLSearchParams(window.location.hash.slice(1))
 
@@ -15,12 +14,18 @@
   const state = params.get('state')
 
   if (window.opener) {
+    // Popup flow: stuur naar parent
     if (code)  window.opener.postMessage({ type: 'simacan_auth', code, state }, window.location.origin)
     if (error) window.opener.postMessage({ type: 'simacan_auth_error', error, description: params.get('error_description') }, window.location.origin)
     window.close()
   } else {
-    document.querySelector('span').textContent = 'Venster sluiten...'
-    window.close()
+    // Redirect flow (mobiel): sla op in localStorage en ga terug
+    if (code) {
+      localStorage.setItem('simacan_pending_code', JSON.stringify({ code, state }))
+    } else if (error) {
+      localStorage.setItem('simacan_pending_error', params.get('error_description') || error)
+    }
+    window.location.href = '/'
   }
 </script>
 </body>
