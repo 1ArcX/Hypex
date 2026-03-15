@@ -149,6 +149,7 @@ export default function VrachttijdenWidget() {
         throw new Error(data.error || 'Serverfout')
       }
 
+      if (data._debugFirstStop) console.log('[Simacan] eerste stop velden:', JSON.stringify(data._debugFirstStop, null, 2))
       const raw = data.locationStops || data.stops || data.result || data || []
       setStops(Array.isArray(raw) ? raw : Object.values(raw))
       setLastUpdate(new Date())
