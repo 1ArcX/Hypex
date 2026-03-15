@@ -192,7 +192,7 @@ export default function VrachttijdenWidget() {
     if (!tokens || !mapRef.current || mapInstanceRef.current) return
     const L = window.L; if (!L) return
     const map = L.map(mapRef.current, { zoomControl: false, attributionControl: false }).setView([STORE_LAT, STORE_LNG], 9)
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(map)
+    L.tileLayer('https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(map)
     const storeIco = L.divIcon({ html: `<div style="width:11px;height:11px;background:#00FFD1;border-radius:50%;border:2px solid white;box-shadow:0 0 6px #00FFD1"></div>`, className:'', iconAnchor:[5,5] })
     L.marker([STORE_LAT, STORE_LNG], { icon: storeIco }).addTo(map).bindPopup('Jumbo 7044 – Dronten')
     mapInstanceRef.current = map
