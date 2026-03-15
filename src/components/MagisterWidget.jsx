@@ -171,8 +171,11 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
       setCreds(formCreds)
       setShowSettings(false)
       window.dispatchEvent(new Event('magisterLogin'))
-      syncVakken(formCreds)
-      syncLesmateriaal(formCreds)
+      // Direct ophalen zonder op useEffect te wachten
+      fetchAllData(formCreds)
+      fetchProfile()
+      fetchLinks()
+      syncVakken(formCreds).then(() => syncLesmateriaal(formCreds))
     } catch (e) {
       setError(e.message)
     }
