@@ -2,22 +2,61 @@
 <html>
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Arrival Display</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
-  body { margin: 0; }
-  #map { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Arial, sans-serif; }
+
+  #app { display: flex; flex-direction: column; height: 100vh; }
+  #map { width: 100%; height: 55vh; flex-shrink: 0; }
+  #list { flex: 1; overflow-y: auto; background: #FFC72C; padding: 8px; }
+
+  @media (min-width: 768px) {
+    #app { flex-direction: row; }
+    #map { width: 60%; height: 100vh; }
+    #list { width: 40%; height: 100vh; overflow-y: auto; }
+  }
+
+  .stop-item {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(255,255,255,0.5); border-radius: 8px;
+    padding: 10px 12px; margin-bottom: 6px; cursor: pointer;
+    transition: background 0.15s;
+  }
+  .stop-item:hover { background: rgba(255,255,255,0.8); }
+  .stop-item.active { background: rgba(255,255,255,0.9); font-weight: bold; }
+
+  .stop-badge {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: #fff; border: 2px solid #333;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: bold; flex-shrink: 0;
+  }
+
+  .stop-info { flex: 1; min-width: 0; }
+  .stop-name { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stop-status { font-size: 11px; color: #555; }
+
+  .status-done   { color: #28a745; }
+  .status-active { color: #e65c00; font-weight: bold; }
+  .status-plan   { color: #666; }
 </style>
 </head>
 <body>
-<div id="map"></div>
+<div id="app">
+  <div id="map"></div>
+  <div id="list"></div>
+</div>
 <script>
 var map = L.map('map').setView([52.70, 5.90], 8)
 
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
   maxZoom: 19,
-  attribution: '© OpenStreetMap'
+  subdomains: 'abcd',
+  attribution: '© OpenStreetMap © CARTO'
 }).addTo(map)
 
 var route = [
@@ -27,17 +66,30 @@ var route = [
 ]
 L.polyline(route, { color: '#333', weight: 4 }).addTo(map)
 
-var stops = [
-  [52.45,5.48],[52.51,5.90],[52.72,6.47],[52.52,6.10],[52.67,5.64],
-  [52.68,5.76],[52.90,5.81],[52.97,5.76],[53.00,5.68],[53.05,5.58],[53.12,5.52]
+var stopsData = [
+  { pos: [52.45,5.48], name: 'DC Lelystad',        status: 'done'   },
+  { pos: [52.51,5.90], name: 'Almere Muziekwijk',   status: 'done'   },
+  { pos: [52.72,6.47], name: 'Hoogeveen Noord',     status: 'done'   },
+  { pos: [52.52,6.10], name: 'Emmeloord Centrum',   status: 'active' },
+  { pos: [52.67,5.64], name: 'Dronten',             status: 'plan'   },
+  { pos: [52.68,5.76], name: 'Swifterbant',         status: 'plan'   },
+  { pos: [52.90,5.81], name: 'Heerenveen Oost',     status: 'plan'   },
+  { pos: [52.97,5.76], name: 'Joure',               status: 'plan'   },
+  { pos: [53.00,5.68], name: 'Sneek Zuid',          status: 'plan'   },
+  { pos: [53.05,5.58], name: 'Bolsward',            status: 'plan'   },
+  { pos: [53.12,5.52], name: 'Harlingen',           status: 'plan'   }
 ]
-stops.forEach(function(pos, i) {
-  L.marker(pos, {
+
+var markers = []
+
+stopsData.forEach(function(stop, i) {
+  var marker = L.marker(stop.pos, {
     icon: L.divIcon({
       html: '<div style="width:26px;height:26px;border-radius:50%;background:#fff;border:2px solid #333;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;font-family:Arial">'+(i+1)+'</div>',
       className: '', iconSize: [26,26], iconAnchor: [13,13]
     })
   }).addTo(map)
+  markers.push(marker)
 })
 
 L.marker([52.60,6.20], {
@@ -46,6 +98,28 @@ L.marker([52.60,6.20], {
     className: '', iconSize: [36,36], iconAnchor: [18,18]
   })
 }).addTo(map).bindPopup('Huidige positie').openPopup()
+
+var statusLabel = { done: '✓ Afgerond', active: '→ Onderweg', plan: 'Gepland' }
+var statusClass = { done: 'status-done', active: 'status-active', plan: 'status-plan' }
+
+var list = document.getElementById('list')
+stopsData.forEach(function(stop, i) {
+  var item = document.createElement('div')
+  item.className = 'stop-item' + (stop.status === 'active' ? ' active' : '')
+  item.innerHTML =
+    '<div class="stop-badge">'+(i+1)+'</div>' +
+    '<div class="stop-info">' +
+      '<div class="stop-name">'+stop.name+'</div>' +
+      '<div class="stop-status '+statusClass[stop.status]+'">'+statusLabel[stop.status]+'</div>' +
+    '</div>'
+  item.addEventListener('click', function() {
+    map.setView(stop.pos, 13)
+    markers[i].openPopup()
+    document.querySelectorAll('.stop-item').forEach(function(el) { el.classList.remove('active') })
+    item.classList.add('active')
+  })
+  list.appendChild(item)
+})
 </script>
 </body>
 </html>
