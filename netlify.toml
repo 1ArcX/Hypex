@@ -11,6 +11,17 @@
 [functions."rain-check/rain-check"]
   schedule = "*/15 * * * *"
 
+[[headers]]
+  for = "/simacan-arrival.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[redirects]]
+  from = "/simacan-arrival.html"
+  to = "/simacan-arrival.html"
+  status = 200
+  force = false
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
