@@ -167,98 +167,74 @@ exports.handler = async (event) => {
     const isoWeek = Math.ceil((((utcDate - yearStart) / 86400000) + 1) / 7)
     const yearWeek = `${utcDate.getUTCFullYear()}-${String(isoWeek).padStart(2, '0')}`
 
-    // Stap 1: eigen shift + departments + employees parallel (hebben we department_id nodig voor collega-query)
-    const myQs = new URLSearchParams({ date, account_id: auth.accountId }).toString()
+    // Stap 1 parallel: departments, employees, team-shifts (voor account list + dept_id), eigen schedule
     const ownScheduleQs = new URLSearchParams({
       'date[gte]': date, 'date[lte]': date, account_id: auth.accountId
     }).toString()
+    const teamQs = new URLSearchParams({
+      date, ignore_lent_out: true, department_id: 102, limit: 500
+    }).toString()
 
-    const [deptRes, empRes, myRes, ownRes] = await Promise.all([
+    const [deptRes, empRes, teamRes, ownRes] = await Promise.all([
       fetch(`${API_V2}/departments?date=${date}`, { headers: authHeaders, timeout: 10000 }),
       fetch(`${API_V2}/stores/${auth.storeId}/employees?exchange=true&week=${yearWeek}&limit=10000`, { headers: authHeaders, timeout: 10000 }),
-      fetch(`${API_V2}/shifts?${myQs}`, { headers: authHeaders, timeout: 10000 }),
+      fetch(`${API_V2}/shifts?${teamQs}`, { headers: authHeaders, timeout: 10000 }),
       fetch(`${API_V2}/schedules?${ownScheduleQs}`, { headers: authHeaders, timeout: 10000 })
     ])
 
-    const [deptData, empData, myData, ownData] = await Promise.all([
-      deptRes.json(), empRes.json(), myRes.json(), ownRes.json()
+    const [deptData, empData, teamData, ownData] = await Promise.all([
+      deptRes.json(), empRes.json(), teamRes.json(), ownRes.json()
     ])
+
+    if (!teamRes.ok) return err(teamData?.result?.[0]?.message || 'Dag planning ophalen mislukt', 500)
 
     const deptMap = {}
     for (const d of (deptData.result || [])) deptMap[d.department_id] = d.department_name
-
-    // department_id bepalen uit eigen shift (of schedules als fallback)
-    const filterShifts = arr => (arr || []).filter(s =>
-      s.start_datetime && s.start_datetime.startsWith(date) &&
-      s.start_datetime !== s.end_datetime && !s.start_datetime.endsWith('00:00')
-    )
-    const myShifts = filterShifts(myData.result)
-    const ownSchedules = (ownData.result || []).filter(s => s.schedule_time_from?.startsWith(date))
-    const deptId = myShifts[0]?.department_id || ownSchedules[0]?.department?.department_id
-
-    // Stap 2: alle teamleden van jouw afdeling ophalen
-    // date= filtert NIET op datum — geeft actief team "as of" die datum terug (max 13 collega's)
-    const colleagueQs = new URLSearchParams({
-      date,
-      ignore_lent_out: true,
-      'account_id[neq]': auth.accountId,
-      sorting: '+start_datetime',
-      ...(deptId ? { department_id: deptId } : {})
-    }).toString()
-    const colleagueRes = await fetch(`${API_V2}/shifts?${colleagueQs}`, { headers: authHeaders, timeout: 10000 })
-    const colleagueData = await colleagueRes.json()
-
-    if (!colleagueRes.ok) return err(colleagueData?.result?.[0]?.message || 'Dag planning ophalen mislukt', 500)
-
     const empMap = {}
     for (const e of (empData.result || [])) empMap[String(e.account_id)] = e.name
 
-    // Collega's: alle teamleden (geen datum-filter — date= geeft team terug, niet dag-shifts)
-    const colleagues = (colleagueData.result || [])
+    // Team account IDs (inclusief eigen account)
+    const teamIds = (teamData.result || []).map(s => s.account_id)
+    if (!teamIds.includes(auth.accountId)) teamIds.push(auth.accountId)
 
-    // Eigen shift via schedules (definitieve tijd) of eigen shifts endpoint
-    const ownInShifts = myShifts.some(s => String(s.account_id) === String(auth.accountId))
-    if (!ownInShifts && ownSchedules.length > 0) {
-      myShifts.push({
-        start_datetime: ownSchedules[0].schedule_time_from,
-        end_datetime:   ownSchedules[0].schedule_time_to,
-        department_id:  ownSchedules[0].department?.department_id,
-        account_id: auth.accountId
-      })
-    }
+    // Stap 2: simpleShifts voor elk teamlid parallel — geeft werkelijke tijden op die dag
+    const API_V3 = `${BASE_URL}/api/v3`
+    const simpleResults = await Promise.all(teamIds.map(id =>
+      fetch(`${API_V3}/environments/5/stores/${auth.storeId}/employee/${id}/simpleShifts?from_date=${date}&to_date=${date}`, { headers: authHeaders, timeout: 10000 })
+        .then(r => r.json())
+        .then(d => ({ account_id: id, shifts: (d.result?.shift_instances || []).filter(s => s.start_datetime?.startsWith(date)) }))
+        .catch(() => ({ account_id: id, shifts: [] }))
+    ))
 
-    // Combineer: eigen shift bovenaan, dan collega's gesorteerd op start tijd van die dag
-    const ownEntry = myShifts.length > 0 ? myShifts[0] : null
-    const ownSched = ownSchedules[0] || null
+    const ownSchedules = (ownData.result || []).filter(s => s.schedule_time_from?.startsWith(date))
 
-    // Collega's: splits in "werkt vandaag" (start_datetime op date) en "rest van team"
-    const workingToday = colleagues.filter(s => s.start_datetime?.startsWith(date) && s.start_datetime !== s.end_datetime && !s.start_datetime.endsWith('00:00'))
-    const teamRest = colleagues.filter(s => !s.start_datetime?.startsWith(date) || s.start_datetime === s.end_datetime || s.start_datetime.endsWith('00:00'))
-
-    workingToday.sort((a, b) => a.start_datetime.localeCompare(b.start_datetime))
-    teamRest.sort((a, b) => (a.start_datetime || '').localeCompare(b.start_datetime || ''))
-
-    const mapShiftEntry = (s, forceIsOwn = false) => {
-      const isOwn = forceIsOwn || String(s.account_id) === String(auth.accountId)
-      const useOwnSched = isOwn && ownSched
-      const startDt = useOwnSched ? ownSched.schedule_time_from : s.start_datetime
-      const endDt   = useOwnSched ? ownSched.schedule_time_to   : s.end_datetime
-      const onDate  = startDt?.startsWith(date) && startDt !== endDt && !startDt.endsWith('00:00')
+    const dayShifts = simpleResults.map(({ account_id, shifts }) => {
+      const isOwn = String(account_id) === String(auth.accountId)
+      // Voor eigen account: gebruik schedules tijden als authoritative (definitieve rooster)
+      const ownSched = isOwn && ownSchedules[0] ? ownSchedules[0] : null
+      const shift = ownSched ? null : shifts[0]
+      const startDt = ownSched ? ownSched.schedule_time_from : shift?.start_datetime
+      const endDt   = ownSched ? ownSched.schedule_time_to   : shift?.end_datetime
+      const deptId  = shift?.department_id || ownSched?.department?.department_id || 102
       return {
-        start: onDate ? (startDt.split(' ')[1]?.slice(0, 5) || '') : null,
-        end:   onDate ? (endDt.split(' ')[1]?.slice(0, 5) || '')   : null,
-        department: deptMap[s.department_id] || ownSched?.department?.department_name || String(s.department_id || ''),
-        name: empMap[String(s.account_id)] || null,
+        start: startDt ? startDt.split(' ')[1]?.slice(0, 5) || startDt.slice(11, 16) : null,
+        end:   endDt   ? endDt.split(' ')[1]?.slice(0, 5)   || endDt.slice(11, 16)   : null,
+        department: deptMap[deptId] || String(deptId),
+        name: empMap[String(account_id)] || null,
         isOwn,
-        worksToday: !!onDate
+        worksToday: !!(startDt)
       }
-    }
+    })
 
-    const dayShifts = [
-      ...(ownEntry ? [mapShiftEntry(ownEntry, true)] : []),
-      ...workingToday.map(s => mapShiftEntry(s)),
-      ...teamRest.map(s => mapShiftEntry(s))
-    ]
+    // Sorteer: jijzelf bovenaan, dan op starttijd, geen shift onderaan
+    dayShifts.sort((a, b) => {
+      if (a.isOwn) return -1
+      if (b.isOwn) return 1
+      if (a.start && !b.start) return -1
+      if (!a.start && b.start) return 1
+      return (a.start || '').localeCompare(b.start || '')
+    })
+
     return ok({ dayShifts, date, total: dayShifts.length })
   }
 
