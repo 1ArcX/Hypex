@@ -121,8 +121,16 @@ export default function VrachttijdenWidget() {
         throw new Error(data.error || 'Serverfout')
       }
       const raw = data.locationStops || data.stops || data.result || (Array.isArray(data) ? data : [])
-      setStops(Array.isArray(raw) ? raw : Object.values(raw))
+      const arr = Array.isArray(raw) ? raw : Object.values(raw)
+      setStops(arr)
       setLastUpdate(new Date())
+      // Auto-test alle APIs op eerste load zodat we de structuur kunnen zien
+      if (arr.length > 0) {
+        const firstUuid = arr[0]?.tripStatus?.uuid
+        fetch(API, { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ action:'testApis', token:t.accessToken, refreshToken:t.refreshToken, tripUuid: firstUuid })
+        }).then(r=>r.json()).then(d=>console.log('[Simacan testApis]', JSON.stringify(d, null, 2))).catch(()=>{})
+      }
     } catch (e) { setError(e.message) }
     setLoading(false)
   }, [saveTokens])

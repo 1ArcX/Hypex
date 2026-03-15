@@ -120,5 +120,31 @@ exports.handler = async (event) => {
     return ok({ ...data, _newTokens: result.newAccessToken ? { accessToken: result.newAccessToken, refreshToken: result.newRefreshToken } : undefined })
   }
 
+  if (action === 'testApis') {
+    const { tripUuid } = body
+    const tests = [
+      { name: 'locationStops',    path: `/api/internal/v2/${SHIPPER}/locations/locationStops?locationId=${LOCATION_ID}&timestamp=${encodeURIComponent(new Date().toISOString())}` },
+      { name: 'stops',            path: `/api/internal/v2/${SHIPPER}/locations/stops?locationId=${LOCATION_ID}` },
+      { name: 'drops',            path: `/api/internal/v2/${SHIPPER}/locations/drops?locationId=${LOCATION_ID}` },
+      { name: 'clientLocationStops', path: `/api/internal/v2/${SHIPPER}/client/locationstops/${LOCATION_ID}` },
+      { name: 'clientLocationDrops', path: `/api/internal/v2/${SHIPPER}/client/locationdrops?locationId=${LOCATION_ID}` },
+      ...(tripUuid ? [{ name: 'stopAndRoutes', path: `/api/internal/v3/stopAndRoutes/${tripUuid}` }] : []),
+    ]
+    const results = {}
+    for (const t of tests) {
+      try {
+        const r = await callApi(t.path, token, refreshToken)
+        const data = r.data
+        // Geef eerste item + top-level keys terug
+        const topKeys = Object.keys(data || {})
+        const firstItem = Array.isArray(data) ? data[0] : (Array.isArray(data?.[topKeys[0]]) ? data[topKeys[0]][0] : data?.[topKeys[0]])
+        results[t.name] = { status: r.status, topKeys, firstItemKeys: firstItem ? Object.keys(firstItem) : null, firstItem }
+      } catch (e) {
+        results[t.name] = { error: e.message }
+      }
+    }
+    return ok(results)
+  }
+
   return err(`Onbekende actie: ${action}`)
 }
