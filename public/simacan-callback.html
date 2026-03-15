@@ -15,8 +15,8 @@
 
   if (window.opener) {
     // Popup flow: stuur naar parent
-    if (code)  window.opener.postMessage({ type: 'simacan_auth', code, state }, window.location.origin)
-    if (error) window.opener.postMessage({ type: 'simacan_auth_error', error, description: params.get('error_description') }, window.location.origin)
+    if (code)  window.opener.postMessage({ type: 'simacan_auth', code, state }, '*')
+    if (error) window.opener.postMessage({ type: 'simacan_auth_error', error, description: params.get('error_description') }, '*')
     window.close()
   } else {
     // Redirect flow (mobiel): sla op in localStorage en ga terug

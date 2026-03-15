@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Truck, RefreshCw, AlertCircle, MapPin, ChevronDown, ChevronUp, LogIn, LogOut, Settings } from 'lucide-react'
+import { supabase } from '../supabaseClient'
 
 const API            = '/.netlify/functions/simacan'
 const STORAGE_KEY    = 'simacan_tokens'
@@ -117,6 +118,8 @@ export default function VrachttijdenWidget() {
     setTokens(t)
     if (t) localStorage.setItem(STORAGE_KEY, JSON.stringify(t))
     else   localStorage.removeItem(STORAGE_KEY)
+    // Sync naar Supabase user_metadata zodat alle apparaten toegang hebben
+    supabase.auth.updateUser({ data: { simacan_tokens: t || null } }).catch(() => {})
   }, [])
 
   // ─── Ophalen vrachttijden ─────────────────────────────────────────────────
@@ -151,37 +154,21 @@ export default function VrachttijdenWidget() {
     setLoading(false)
   }, [saveTokens])
 
-  // ─── Afhandeling redirect-flow (mobiel) ──────────────────────────────────
+  // ─── Tokens laden bij start ───────────────────────────────────────────────
   useEffect(() => {
-    const pending = localStorage.getItem('simacan_pending_code')
-    const pendingErr = localStorage.getItem('simacan_pending_error')
-    if (pendingErr) {
-      localStorage.removeItem('simacan_pending_error')
-      setError(pendingErr)
-      setLoginLoading(false)
-      return
-    }
-    if (!pending) {
-      if (tokens) fetchStops(tokens)
-      return
-    }
-    localStorage.removeItem('simacan_pending_code')
-    const { code, state } = JSON.parse(pending)
-    const verifier = localStorage.getItem('simacan_pkce_verifier')
-    const savedState = localStorage.getItem('simacan_pkce_state')
-    localStorage.removeItem('simacan_pkce_verifier')
-    localStorage.removeItem('simacan_pkce_state')
-    if (!verifier || state !== savedState) { setError('Login mislukt (state mismatch)'); return }
-    setLoginLoading(true)
-    const redirectUri = `${window.location.origin}/simacan-callback.html`
-    exchangeCode(code, verifier, redirectUri)
-      .then(tokenData => {
-        const t = { accessToken: tokenData.access_token, refreshToken: tokenData.refresh_token }
-        saveTokens(t)
+    // Lokale tokens al geladen via useState initializer — start direct
+    if (tokens) { fetchStops(tokens); return }
+
+    // Geen lokale tokens: probeer Supabase user_metadata als fallback (voor mobiel)
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      const t = user?.user_metadata?.simacan_tokens
+      if (t?.accessToken) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(t))
+        tokensRef.current = t
+        setTokens(t)
         fetchStops(t)
-      })
-      .catch(e => setError(e.message))
-      .finally(() => setLoginLoading(false))
+      }
+    }).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -190,53 +177,46 @@ export default function VrachttijdenWidget() {
     return () => clearInterval(t)
   }, [!!tokens, fetchStops])
 
-  // ─── PKCE OAuth login (popup op desktop, redirect op mobiel) ────────────
+  // ─── PKCE OAuth login — alleen beschikbaar op localhost:3000 ────────────
+  const isLocalhost = window.location.hostname === 'localhost'
+  const REDIRECT_URI = 'http://localhost:3000/simacan-callback.html'
+
   const handleLogin = useCallback(async () => {
     setLoginLoading(true); setError(null)
     try {
-      const verifier   = randomBase64url(32)
-      const challenge  = await sha256Base64url(verifier)
-      const state      = randomBase64url(16)
-      const redirectUri = `${window.location.origin}/simacan-callback.html`
-      const isMobile   = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)
+      const verifier  = randomBase64url(32)
+      const challenge = await sha256Base64url(verifier)
+      const state     = randomBase64url(16)
 
       const authUrl = `${KC_BASE}/auth?` + new URLSearchParams({
         client_id:             KC_CLIENT_ID,
         response_type:         'code',
         scope:                 'openid offline_access',
-        redirect_uri:          redirectUri,
+        redirect_uri:          REDIRECT_URI,
         state,
         code_challenge:        challenge,
         code_challenge_method: 'S256'
       }).toString()
 
-      // Probeer popup; als geblokkeerd of mobiel → gebruik redirect
-      const popup = !isMobile && window.open(authUrl, 'simacan_login', 'width=520,height=640,left=200,top=100')
+      const popup = window.open(authUrl, 'simacan_login', 'width=520,height=640,left=200,top=100')
+      if (!popup) throw new Error('Popup geblokkeerd. Sta popups toe voor deze site.')
 
-      if (!popup) {
-        // Redirect flow: sla verifier + state op, stuur door naar Keycloak
-        localStorage.setItem('simacan_pkce_verifier', verifier)
-        localStorage.setItem('simacan_pkce_state', state)
-        window.location.href = authUrl
-        return // pagina wordt omgeleid, component unmount
-      }
-
-      // Popup flow: wacht op postMessage van callback pagina
       await new Promise((resolve, reject) => {
         const handler = async (event) => {
-          if (event.origin !== window.location.origin) return
+          // Accepteer berichten van localhost:3000 (callback pagina) of eigen origin
+          if (event.origin !== 'http://localhost:3000' && event.origin !== window.location.origin) return
           if (event.data?.type === 'simacan_auth_error') {
             window.removeEventListener('message', handler)
-            reject(new Error(event.data.description || event.data.error))
-            return
+            reject(new Error(event.data.description || event.data.error)); return
           }
           if (event.data?.type !== 'simacan_auth') return
           if (event.data.state !== state) { reject(new Error('State mismatch')); return }
           window.removeEventListener('message', handler)
           try {
-            const tokenData = await exchangeCode(event.data.code, verifier, redirectUri)
-            saveTokens({ accessToken: tokenData.access_token, refreshToken: tokenData.refresh_token })
-            fetchStops({ accessToken: tokenData.access_token, refreshToken: tokenData.refresh_token })
+            const tokenData = await exchangeCode(event.data.code, verifier, REDIRECT_URI)
+            const t = { accessToken: tokenData.access_token, refreshToken: tokenData.refresh_token }
+            saveTokens(t)
+            fetchStops(t)
             resolve()
           } catch (e) { reject(e) }
         }
@@ -322,15 +302,24 @@ export default function VrachttijdenWidget() {
       {!tokens && (
         <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'10px', padding:'20px 0' }}>
           <Truck size={28} style={{ color:'var(--accent)', opacity:0.5 }} />
-          <p style={{ fontSize:'12px', color:'rgba(255,255,255,0.4)', margin:0, textAlign:'center' }}>
-            Log in met je Simacan-account om vrachttijden en de live kaart te zien.
-          </p>
-          <button onClick={handleLogin} disabled={loginLoading}
-            style={{ display:'flex', alignItems:'center', gap:'8px', padding:'9px 20px', borderRadius:'10px', border: accentBorder(40), background: accentBg(12), color:'var(--accent)', cursor: loginLoading ? 'wait' : 'pointer', fontSize:'13px', fontWeight:600 }}>
-            {loginLoading
-              ? <><RefreshCw size={14} style={{ animation:'spin 1s linear infinite' }} /> Bezig...</>
-              : <><LogIn size={14} /> Inloggen met Simacan</>}
-          </button>
+          {isLocalhost ? (
+            <>
+              <p style={{ fontSize:'12px', color:'rgba(255,255,255,0.4)', margin:0, textAlign:'center' }}>
+                Log eenmalig in — daarna werkt het automatisch op alle apparaten.
+              </p>
+              <button onClick={handleLogin} disabled={loginLoading}
+                style={{ display:'flex', alignItems:'center', gap:'8px', padding:'9px 20px', borderRadius:'10px', border: accentBorder(40), background: accentBg(12), color:'var(--accent)', cursor: loginLoading ? 'wait' : 'pointer', fontSize:'13px', fontWeight:600 }}>
+                {loginLoading
+                  ? <><RefreshCw size={14} style={{ animation:'spin 1s linear infinite' }} /> Bezig...</>
+                  : <><LogIn size={14} /> Inloggen met Simacan</>}
+              </button>
+            </>
+          ) : (
+            <p style={{ fontSize:'12px', color:'rgba(255,255,255,0.4)', margin:0, textAlign:'center', lineHeight:'1.5' }}>
+              Log eenmalig in via <span style={{ color:'var(--accent)', fontFamily:'monospace' }}>localhost:3000</span><br/>
+              (run <span style={{ color:'rgba(255,255,255,0.6)', fontFamily:'monospace' }}>npm run dev</span>), daarna werkt het hier vanzelf.
+            </p>
+          )}
           {error && (
             <div style={{ display:'flex', alignItems:'center', gap:'6px', color:'#ff6b6b', fontSize:'11px', textAlign:'center' }}>
               <AlertCircle size={12} style={{ flexShrink:0 }} /> {error}
