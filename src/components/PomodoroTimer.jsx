@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useCallback, useReducer, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Play, Pause, RotateCcw, SkipForward, Settings, X, Bell, BellOff, Volume2, VolumeX, Coffee, Zap } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 
@@ -565,14 +566,15 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, userId }
 
   return (
     <>
-      {/* Completion popup */}
-      {popup && (
+      {/* Completion popup — via portal zodat het boven alle widgets staat */}
+      {popup && createPortal(
         <CompletionPopup
           prevMode={popup.prevMode}
           nextMode={popup.nextMode}
           onStart={startAfterPopup}
           onSkip={skipPopup}
-        />
+        />,
+        document.body
       )}
 
       <div
