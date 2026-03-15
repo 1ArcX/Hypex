@@ -167,37 +167,32 @@ exports.handler = async (event) => {
     const isoWeek = Math.ceil((((utcDate - yearStart) / 86400000) + 1) / 7)
     const yearWeek = `${utcDate.getUTCFullYear()}-${String(isoWeek).padStart(2, '0')}`
 
-    // Haal eerst departments op (nodig voor shifts query)
-    const deptRes = await fetch(`${API_V2}/departments?date=${date}`, { headers: authHeaders, timeout: 10000 })
-    const deptData = await deptRes.json()
-    const deptMap = {}
-    const deptIds = (deptData.result || []).map(d => { deptMap[d.department_id] = d.department_name; return d.department_id }).join(',')
-
-    // Exacte params die de PMT app gebruikt (reverse engineered uit JS bundle)
-    // Collega shifts: date= (enkelvoudig), ignore_lent_out, account_id[neq], dept csv
+    // Alle fetches parallel: departments (voor naam-mapping), employees, alle shifts op deze dag, eigen schedule
     const colleagueQs = new URLSearchParams({
       date,
       ignore_lent_out: true,
       'account_id[neq]': auth.accountId,
-      department_id: deptIds
+      limit: 300
     }).toString()
-    // Eigen shift: date= + account_id=
     const myQs = new URLSearchParams({ date, account_id: auth.accountId }).toString()
-    // Eigen schedule als fallback (definitieve tijden)
     const ownScheduleQs = new URLSearchParams({
       'date[gte]': date, 'date[lte]': date, account_id: auth.accountId
     }).toString()
 
-    const [empRes, colleagueRes, myRes, ownRes] = await Promise.all([
+    const [deptRes, empRes, colleagueRes, myRes, ownRes] = await Promise.all([
+      fetch(`${API_V2}/departments?date=${date}`, { headers: authHeaders, timeout: 10000 }),
       fetch(`${API_V2}/stores/${auth.storeId}/employees?exchange=true&week=${yearWeek}&limit=10000`, { headers: authHeaders, timeout: 10000 }),
       fetch(`${API_V2}/shifts?${colleagueQs}`, { headers: authHeaders, timeout: 10000 }),
       fetch(`${API_V2}/shifts?${myQs}`, { headers: authHeaders, timeout: 10000 }),
       fetch(`${API_V2}/schedules?${ownScheduleQs}`, { headers: authHeaders, timeout: 10000 })
     ])
 
-    const [empData, colleagueData, myData, ownData] = await Promise.all([
-      empRes.json(), colleagueRes.json(), myRes.json(), ownRes.json()
+    const [deptData, empData, colleagueData, myData, ownData] = await Promise.all([
+      deptRes.json(), empRes.json(), colleagueRes.json(), myRes.json(), ownRes.json()
     ])
+
+    const deptMap = {}
+    for (const d of (deptData.result || [])) deptMap[d.department_id] = d.department_name
 
     if (!colleagueRes.ok) return err(colleagueData?.result?.[0]?.message || 'Dag planning ophalen mislukt', 500)
 
