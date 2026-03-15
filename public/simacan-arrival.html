@@ -66,18 +66,10 @@
 <script>
 var map = L.map('map').setView([52.70, 5.90], 8)
 
-var tileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19,
-  attribution: '© OpenStreetMap'
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom: 16,
+  attribution: '© Esri'
 }).addTo(map)
-
-// Grijze kaart via filter op de tile-container
-tileLayer.on('load', function() {
-  var pane = map.getPane('tilePane')
-  if (pane) pane.style.filter = 'grayscale(1) brightness(1.08)'
-})
-// Ook meteen toepassen voor al geladen tiles
-map.getPane('tilePane').style.filter = 'grayscale(1) brightness(1.08)'
 
 var route = [
   [52.45,5.48],[52.51,5.75],[52.51,5.90],[52.52,6.10],[52.60,6.30],[52.72,6.47],
