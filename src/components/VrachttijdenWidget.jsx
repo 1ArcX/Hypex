@@ -189,14 +189,14 @@ export default function VrachttijdenWidget() {
 
   // ─── Kaart init ───────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!mapRef.current || mapInstanceRef.current) return
+    if (!tokens || !mapRef.current || mapInstanceRef.current) return
     const L = window.L; if (!L) return
     const map = L.map(mapRef.current, { zoomControl: false, attributionControl: false }).setView([STORE_LAT, STORE_LNG], 9)
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(map)
     const storeIco = L.divIcon({ html: `<div style="width:11px;height:11px;background:#00FFD1;border-radius:50%;border:2px solid white;box-shadow:0 0 6px #00FFD1"></div>`, className:'', iconAnchor:[5,5] })
     L.marker([STORE_LAT, STORE_LNG], { icon: storeIco }).addTo(map).bindPopup('Jumbo 7044 – Dronten')
     mapInstanceRef.current = map
-  }, [])
+  }, [!!tokens])
 
   // ─── Route ophalen en op kaart zetten ────────────────────────────────────
   const showRouteOnMap = useCallback((routeData, stop) => {
@@ -210,21 +210,16 @@ export default function VrachttijdenWidget() {
     const bounds = [[STORE_LAT, STORE_LNG]]
     const allPts = []
 
-    // Teken route-segmenten (encoded polyline per stop)
+    // Verzamel alle punten van alle route-segmenten
     for (const s of stops) {
       if (!s.polyline) continue
       const pts = decodePolyline(s.polyline)
       if (pts.length < 2) continue
       pts.forEach(p => { allPts.push(p); bounds.push(p) })
-      L.polyline(pts, { color, weight: 3, opacity: 0.6 }).addTo(map)
-      markersRef.current.push({ remove: () => {} }) // tracked via layer groups
     }
     if (allPts.length > 0) {
-      // Vervang losse polylines door één gecombineerde layer voor cleanup
-      markersRef.current.forEach(m => m._map && map.removeLayer(m))
       const combined = L.polyline(allPts, { color, weight: 3, opacity: 0.7 }).addTo(map)
       routeLayerRef.current = combined
-      markersRef.current = []
     }
 
     // Stop-markers met naam tooltip
@@ -336,11 +331,11 @@ export default function VrachttijdenWidget() {
             </div>
           )}
 
+          {/* Kaart — altijd in DOM zodra ingelogd, zodat Leaflet kan initialiseren */}
+          <div ref={mapRef} style={{ width:'100%', height:'180px', borderRadius:'10px', overflow:'hidden', marginBottom:'10px', border:'1px solid rgba(255,255,255,0.08)', display: stops ? 'block' : 'none' }} />
+
           {stops && (
             <>
-              {/* Kaart */}
-              <div ref={mapRef} style={{ width:'100%', height:'180px', borderRadius:'10px', overflow:'hidden', marginBottom:'10px', border:'1px solid rgba(255,255,255,0.08)' }} />
-
               {sorted.length === 0 ? (
                 <p style={{ fontSize:'12px', color:'rgba(255,255,255,0.4)', textAlign:'center', padding:'12px 0' }}>Geen ritten voor {selectedDate === today ? 'vandaag' : selectedDate}</p>
               ) : (
