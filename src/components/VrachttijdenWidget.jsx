@@ -55,7 +55,6 @@ function decodePolyline(encoded) {
 // Dark raster style — vermijdt MapLibre 5.x worker-compatibiliteitsproblemen met vector dark styles
 const DARK_MAP_STYLE = {
   version: 8,
-  glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
   sources: {
     'carto-dark': {
       type: 'raster',
@@ -295,7 +294,7 @@ export default function VrachttijdenWidget() {
       setLastUpdate(new Date())
 
       // ── Notificaties controleren ──────────────────────────────────────────
-      if (Notification.permission === 'granted') {
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
         for (const stop of arr) {
           if (!notifyStopsRef.current.has(stop.id)) continue
           const eta    = stop.actualStartTime || stop.eta || stop.plannedStartTime
@@ -366,6 +365,7 @@ export default function VrachttijdenWidget() {
     if (notifyStopsRef.current.has(stopId)) {
       setNotifyStops(p => { const n = new Set(p); n.delete(stopId); return n })
     } else {
+      if (typeof Notification === 'undefined') return
       if (Notification.permission !== 'granted') {
         const perm = await Notification.requestPermission()
         if (perm !== 'granted') return
