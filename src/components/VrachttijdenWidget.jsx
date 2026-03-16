@@ -52,8 +52,8 @@ function decodePolyline(encoded) {
   return coords
 }
 
-// ─── Route map component ───────────────────────────────────────────────────────
-function RouteMap({ routeStops, vehiclePos }) {
+// ─── Route map component (fullscreen popup, dark style) ───────────────────────
+function RouteMap({ routeStops, vehiclePos, onClose, tripLabel }) {
   const containerRef = useRef(null)
 
   useEffect(() => {
@@ -61,7 +61,7 @@ function RouteMap({ routeStops, vehiclePos }) {
 
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: 'https://tiles.openfreemap.org/styles/bright',
+      style: 'https://tiles.openfreemap.org/styles/dark',
       center: [STORE_LNG, STORE_LAT],
       zoom: 8,
       attributionControl: false,
@@ -69,7 +69,6 @@ function RouteMap({ routeStops, vehiclePos }) {
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
 
     map.on('load', () => {
-      // Collect all polyline coordinates for full route line
       const allCoords = []
       for (const s of routeStops) {
         if (s.polyline) allCoords.push(...decodePolyline(s.polyline))
@@ -80,42 +79,36 @@ function RouteMap({ routeStops, vehiclePos }) {
           type: 'geojson',
           data: { type: 'Feature', geometry: { type: 'LineString', coordinates: allCoords } }
         })
-        // Witte outline (rand) onder de blauwe lijn — geeft "wegmarkering" effect
         map.addLayer({
           id: 'route-line-outline',
-          type: 'line',
-          source: 'route',
+          type: 'line', source: 'route',
           layout: { 'line-cap': 'round', 'line-join': 'round' },
-          paint: { 'line-color': '#ffffff', 'line-width': 8, 'line-opacity': 0.9 }
+          paint: { 'line-color': 'rgba(255,255,255,0.25)', 'line-width': 9 }
         })
         map.addLayer({
           id: 'route-line',
-          type: 'line',
-          source: 'route',
+          type: 'line', source: 'route',
           layout: { 'line-cap': 'round', 'line-join': 'round' },
           paint: { 'line-color': '#3b82f6', 'line-width': 5, 'line-opacity': 1 }
         })
 
-        // Fit map to route + store + vehicle
         const bounds = allCoords.reduce(
           (b, c) => b.extend(c),
           new maplibregl.LngLatBounds(allCoords[0], allCoords[0])
         )
         bounds.extend([STORE_LNG, STORE_LAT])
         if (vehiclePos) bounds.extend([vehiclePos.lng, vehiclePos.lat])
-        map.fitBounds(bounds, { padding: 40, maxZoom: 13 })
+        map.fitBounds(bounds, { padding: 60, maxZoom: 13 })
       } else {
-        // Geen route — zoom op beschikbare punten
         const pts = [[STORE_LNG, STORE_LAT]]
         if (vehiclePos) pts.push([vehiclePos.lng, vehiclePos.lat])
         routeStops.forEach(s => { if (s.lat != null) pts.push([s.lng, s.lat]) })
         if (pts.length > 1) {
           const bounds = pts.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(pts[0], pts[0]))
-          map.fitBounds(bounds, { padding: 60, maxZoom: 13 })
+          map.fitBounds(bounds, { padding: 80, maxZoom: 13 })
         }
       }
 
-      // Numbered stop markers
       for (const s of routeStops) {
         if (s.lat == null || s.lng == null) continue
         const el = document.createElement('div')
@@ -124,32 +117,29 @@ function RouteMap({ routeStops, vehiclePos }) {
           'background:#3b82f6', 'border:2px solid white',
           'display:flex', 'align-items:center', 'justify-content:center',
           'color:white', 'font-size:11px', 'font-weight:700',
-          'box-shadow:0 2px 6px rgba(0,0,0,0.45)', 'cursor:default'
+          'box-shadow:0 2px 8px rgba(0,0,0,0.6)', 'cursor:default'
         ].join(';')
         el.textContent = s.stopNumber != null ? String(s.stopNumber) : ''
         new maplibregl.Marker({ element: el }).setLngLat([s.lng, s.lat]).addTo(map)
       }
 
-      // Live voertuig — oranje truck-icoon
       if (vehiclePos?.lat != null && vehiclePos?.lng != null) {
         const el = document.createElement('div')
         el.style.cssText = [
-          'width:32px', 'height:32px', 'border-radius:50%',
+          'width:34px', 'height:34px', 'border-radius:50%',
           'background:#f97316', 'border:2px solid white',
           'display:flex', 'align-items:center', 'justify-content:center',
-          'box-shadow:0 2px 10px rgba(249,115,22,0.7)', 'cursor:default',
-          'font-size:16px'
+          'box-shadow:0 0 16px rgba(249,115,22,0.8)', 'cursor:default', 'font-size:18px'
         ].join(';')
         el.textContent = '🚛'
         new maplibregl.Marker({ element: el }).setLngLat([vehiclePos.lng, vehiclePos.lat]).addTo(map)
       }
 
-      // Winkel — blauwe stip
       const storeEl = document.createElement('div')
       storeEl.style.cssText = [
         'width:16px', 'height:16px', 'border-radius:50%',
         'background:#3b82f6', 'border:3px solid white',
-        'box-shadow:0 2px 10px rgba(59,130,246,0.7)'
+        'box-shadow:0 0 12px rgba(59,130,246,0.8)'
       ].join(';')
       new maplibregl.Marker({ element: storeEl }).setLngLat([STORE_LNG, STORE_LAT]).addTo(map)
     })
@@ -158,7 +148,37 @@ function RouteMap({ routeStops, vehiclePos }) {
   }, [routeStops])
 
   return (
-    <div ref={containerRef} style={{ width: '100%', height: '260px', borderRadius: '10px', overflow: 'hidden', marginTop: '10px' }} />
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9999,
+      background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(12px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '16px',
+    }} onClick={onClose}>
+      <div style={{
+        width: '100%', maxWidth: '860px', height: 'min(80vh, 600px)',
+        borderRadius: '16px', overflow: 'hidden', position: 'relative',
+        border: '1px solid rgba(255,255,255,0.1)',
+        boxShadow: '0 24px 80px rgba(0,0,0,0.7)',
+      }} onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '12px 16px',
+          background: 'linear-gradient(to bottom, rgba(10,10,26,0.95), rgba(10,10,26,0))',
+        }}>
+          <span style={{ color: 'white', fontWeight: 600, fontSize: '14px' }}>
+            🚛 {tripLabel || 'Route'}
+          </span>
+          <button onClick={onClose} style={{
+            background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)',
+            borderRadius: '8px', padding: '4px 10px', cursor: 'pointer',
+            color: 'rgba(255,255,255,0.7)', fontSize: '12px', fontWeight: 500,
+          }}>✕ Sluiten</button>
+        </div>
+        <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+      </div>
+    </div>
   )
 }
 
@@ -517,10 +537,7 @@ export default function VrachttijdenWidget() {
                               </div>
                             )}
 
-                            {/* Kaart */}
-                            {mapShown && rd?.stops && !rd.loading && (
-                              <RouteMap routeStops={rd.stops} vehiclePos={rd.vehiclePos} />
-                            )}
+                            {/* Kaart popup wordt buiten dit panel gerenderd (zie onder sorted.map) */}
                           </div>
                         )}
                       </div>
@@ -535,6 +552,21 @@ export default function VrachttijdenWidget() {
           )}
         </>
       )}
+
+      {/* Kaart fullscreen popup — buiten de widget card zodat hij over alles heen valt */}
+      {(() => {
+        const activeMapStop = sorted.find(s => showMap[s.id])
+        const rd = activeMapStop ? routeData[activeMapStop.id] : null
+        if (!activeMapStop || !rd?.stops || rd.loading) return null
+        return (
+          <RouteMap
+            routeStops={rd.stops}
+            vehiclePos={rd.vehiclePos}
+            tripLabel={activeMapStop.trip?.tripId || activeMapStop.tripStatus?.tripName}
+            onClose={() => setShowMap(p => ({ ...p, [activeMapStop.id]: false }))}
+          />
+        )
+      })()}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
