@@ -53,7 +53,7 @@ function decodePolyline(encoded) {
 }
 
 // ─── Route map component ───────────────────────────────────────────────────────
-function RouteMap({ routeStops }) {
+function RouteMap({ routeStops, vehiclePos }) {
   const containerRef = useRef(null)
 
   useEffect(() => {
@@ -69,15 +69,11 @@ function RouteMap({ routeStops }) {
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
 
     map.on('load', () => {
-      console.log('[RouteMap] routeStops:', routeStops)
-      console.log('[RouteMap] voorbeeld stop:', routeStops[0])
-
       // Collect all polyline coordinates for full route line
       const allCoords = []
       for (const s of routeStops) {
         if (s.polyline) allCoords.push(...decodePolyline(s.polyline))
       }
-      console.log('[RouteMap] allCoords length:', allCoords.length)
 
       if (allCoords.length > 0) {
         map.addSource('route', {
@@ -91,13 +87,23 @@ function RouteMap({ routeStops }) {
           paint: { 'line-color': '#3b82f6', 'line-width': 4, 'line-opacity': 0.9, 'line-cap': 'round', 'line-join': 'round' }
         })
 
-        // Fit map to route + store
+        // Fit map to route + store + vehicle
         const bounds = allCoords.reduce(
           (b, c) => b.extend(c),
           new maplibregl.LngLatBounds(allCoords[0], allCoords[0])
         )
         bounds.extend([STORE_LNG, STORE_LAT])
+        if (vehiclePos) bounds.extend([vehiclePos.lng, vehiclePos.lat])
         map.fitBounds(bounds, { padding: 40, maxZoom: 13 })
+      } else {
+        // Geen route — zoom op beschikbare punten
+        const pts = [[STORE_LNG, STORE_LAT]]
+        if (vehiclePos) pts.push([vehiclePos.lng, vehiclePos.lat])
+        routeStops.forEach(s => { if (s.lat != null) pts.push([s.lng, s.lat]) })
+        if (pts.length > 1) {
+          const bounds = pts.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(pts[0], pts[0]))
+          map.fitBounds(bounds, { padding: 60, maxZoom: 13 })
+        }
       }
 
       // Numbered stop markers
@@ -115,7 +121,21 @@ function RouteMap({ routeStops }) {
         new maplibregl.Marker({ element: el }).setLngLat([s.lng, s.lat]).addTo(map)
       }
 
-      // Our store — solid blue dot (active stop)
+      // Live voertuig — oranje truck-icoon
+      if (vehiclePos?.lat != null && vehiclePos?.lng != null) {
+        const el = document.createElement('div')
+        el.style.cssText = [
+          'width:32px', 'height:32px', 'border-radius:50%',
+          'background:#f97316', 'border:2px solid white',
+          'display:flex', 'align-items:center', 'justify-content:center',
+          'box-shadow:0 2px 10px rgba(249,115,22,0.7)', 'cursor:default',
+          'font-size:16px'
+        ].join(';')
+        el.textContent = '🚛'
+        new maplibregl.Marker({ element: el }).setLngLat([vehiclePos.lng, vehiclePos.lat]).addTo(map)
+      }
+
+      // Winkel — blauwe stip
       const storeEl = document.createElement('div')
       storeEl.style.cssText = [
         'width:16px', 'height:16px', 'border-radius:50%',
@@ -226,19 +246,18 @@ export default function VrachttijdenWidget() {
 
   // ─── Route ophalen voor kaart ─────────────────────────────────────────────
   const fetchRoute = useCallback(async (stop) => {
-    const stopId  = stop.id
-    const tripUuid = stop.trip?.uuid || stop.uuid || stop.tripStatus?.tripUuid
-      || stop.trip?.id || stop.tripStatus?.id || stop.tripId
-    // Altijd loggen zodat we de structuur zien
-    console.log('[fetchRoute] stop keys:', Object.keys(stop))
-    console.log('[fetchRoute] stop.trip:', JSON.stringify(stop.trip))
-    console.log('[fetchRoute] stop.tripStatus keys:', stop.tripStatus ? Object.keys(stop.tripStatus) : null)
-    console.log('[fetchRoute] stop.id:', stop.id, '| stop.uuid:', stop.uuid, '| tripUuid gebruikt:', tripUuid)
+    const stopId   = stop.id
+    const tripUuid = stop.tripStatus?.uuid   // correcte UUID zit in tripStatus.uuid
+    const lkp      = stop.tripStatus?.lastKnownPosition
+    const vehiclePos = lkp?.latitude != null
+      ? { lat: lkp.latitude, lng: lkp.longitude }
+      : lkp?.lat != null ? { lat: lkp.lat, lng: lkp.lng } : null
+
     if (!tripUuid) {
-      setRouteData(p => ({ ...p, [stopId]: { stops: [], error: `Geen UUID gevonden. Keys: ${Object.keys(stop).join(', ')}` } }))
+      setRouteData(p => ({ ...p, [stopId]: { stops: [], vehiclePos, error: 'Geen trip-UUID in tripStatus' } }))
       return
     }
-    setRouteData(p => ({ ...p, [stopId]: { stops: [], loading: true } }))
+    setRouteData(p => ({ ...p, [stopId]: { stops: [], vehiclePos, loading: true } }))
     try {
       const res = await fetch(API, {
         method: 'POST',
@@ -246,10 +265,9 @@ export default function VrachttijdenWidget() {
         body: JSON.stringify({ action:'tripRoute', token:tokensRef.current.accessToken, refreshToken:tokensRef.current.refreshToken, tripUuid })
       })
       const data = await res.json()
-      console.log('[fetchRoute] stops.length:', data.stops?.length, '| rawDebug:', JSON.stringify(data._rawDebug, null, 2))
       if (data._newTokens) saveTokens({ accessToken:data._newTokens.accessToken, refreshToken:data._newTokens.refreshToken || tokensRef.current.refreshToken })
       if (!res.ok) throw new Error(data.error || 'Route ophalen mislukt')
-      setRouteData(p => ({ ...p, [stopId]: { stops: data.stops || [], loading: false } }))
+      setRouteData(p => ({ ...p, [stopId]: { stops: data.stops || [], vehiclePos, loading: false } }))
     } catch (e) {
       setRouteData(p => ({ ...p, [stopId]: { stops: [], loading: false, error: e.message } }))
     }
@@ -490,7 +508,7 @@ export default function VrachttijdenWidget() {
 
                             {/* Kaart */}
                             {mapShown && rd?.stops && !rd.loading && (
-                              <RouteMap routeStops={rd.stops} />
+                              <RouteMap routeStops={rd.stops} vehiclePos={rd.vehiclePos} />
                             )}
                           </div>
                         )}
