@@ -229,15 +229,13 @@ export default function VrachttijdenWidget() {
     const stopId  = stop.id
     const tripUuid = stop.trip?.uuid || stop.uuid || stop.tripStatus?.tripUuid
       || stop.trip?.id || stop.tripStatus?.id || stop.tripId
+    // Altijd loggen zodat we de structuur zien
+    console.log('[fetchRoute] stop keys:', Object.keys(stop))
+    console.log('[fetchRoute] stop.trip:', JSON.stringify(stop.trip))
+    console.log('[fetchRoute] stop.tripStatus keys:', stop.tripStatus ? Object.keys(stop.tripStatus) : null)
+    console.log('[fetchRoute] stop.id:', stop.id, '| stop.uuid:', stop.uuid, '| tripUuid gebruikt:', tripUuid)
     if (!tripUuid) {
-      // Debug: toon beschikbare velden zodat we de juiste UUID-key kunnen vinden
-      const debugInfo = {
-        topKeys: Object.keys(stop),
-        trip: stop.trip ? Object.entries(stop.trip) : null,
-        tripStatus: stop.tripStatus ? Object.keys(stop.tripStatus) : null,
-      }
-      console.log('[VrachttijdenWidget] stop object:', stop)
-      setRouteData(p => ({ ...p, [stopId]: { stops: [], error: `Geen UUID gevonden. Keys: ${debugInfo.topKeys.join(', ')}` } }))
+      setRouteData(p => ({ ...p, [stopId]: { stops: [], error: `Geen UUID gevonden. Keys: ${Object.keys(stop).join(', ')}` } }))
       return
     }
     setRouteData(p => ({ ...p, [stopId]: { stops: [], loading: true } }))
