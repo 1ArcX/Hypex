@@ -1,6 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import maplibregl from 'maplibre-gl'
-import 'maplibre-gl/dist/maplibre-gl.css'
 import { Truck, RefreshCw, AlertCircle, ChevronDown, ChevronUp, LogIn, LogOut, Map, Bell, BellOff } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 
@@ -73,93 +71,110 @@ function RouteMap({ routeStops, vehiclePos, onClose, tripLabel }) {
 
   useEffect(() => {
     if (!containerRef.current) return
+    let map
+    let cancelled = false
 
-    const map = new maplibregl.Map({
-      container: containerRef.current,
-      style: DARK_MAP_STYLE,
-      center: [STORE_LNG, STORE_LAT],
-      zoom: 8,
-      attributionControl: false,
-    })
-    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
+    // Dynamisch laden zodat MapLibre niet bij app-start initialiseert
+    import('maplibre-gl').then(mod => {
+      const mgl = mod.default || mod
+      if (cancelled || !containerRef.current) return
 
-    map.on('load', () => {
-      const allCoords = []
-      for (const s of routeStops) {
-        if (s.polyline) allCoords.push(...decodePolyline(s.polyline))
+      // Laad CSS eenmalig
+      if (!document.querySelector('link[data-maplibre]')) {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = 'https://unpkg.com/maplibre-gl@5.20.1/dist/maplibre-gl.css'
+        link.setAttribute('data-maplibre', '1')
+        document.head.appendChild(link)
       }
 
-      if (allCoords.length > 0) {
-        map.addSource('route', {
-          type: 'geojson',
-          data: { type: 'Feature', geometry: { type: 'LineString', coordinates: allCoords } }
-        })
-        map.addLayer({
-          id: 'route-line-outline',
-          type: 'line', source: 'route',
-          layout: { 'line-cap': 'round', 'line-join': 'round' },
-          paint: { 'line-color': 'rgba(255,255,255,0.25)', 'line-width': 9 }
-        })
-        map.addLayer({
-          id: 'route-line',
-          type: 'line', source: 'route',
-          layout: { 'line-cap': 'round', 'line-join': 'round' },
-          paint: { 'line-color': '#3b82f6', 'line-width': 5, 'line-opacity': 1 }
-        })
+      map = new mgl.Map({
+        container: containerRef.current,
+        style: DARK_MAP_STYLE,
+        center: [STORE_LNG, STORE_LAT],
+        zoom: 8,
+        attributionControl: false,
+      })
+      map.addControl(new mgl.AttributionControl({ compact: true }), 'bottom-right')
 
-        const bounds = allCoords.reduce(
-          (b, c) => b.extend(c),
-          new maplibregl.LngLatBounds(allCoords[0], allCoords[0])
-        )
-        bounds.extend([STORE_LNG, STORE_LAT])
-        if (vehiclePos) bounds.extend([vehiclePos.lng, vehiclePos.lat])
-        map.fitBounds(bounds, { padding: 60, maxZoom: 13 })
-      } else {
-        const pts = [[STORE_LNG, STORE_LAT]]
-        if (vehiclePos) pts.push([vehiclePos.lng, vehiclePos.lat])
-        routeStops.forEach(s => { if (s.lat != null) pts.push([s.lng, s.lat]) })
-        if (pts.length > 1) {
-          const bounds = pts.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(pts[0], pts[0]))
-          map.fitBounds(bounds, { padding: 80, maxZoom: 13 })
+      map.on('load', () => {
+        const allCoords = []
+        for (const s of routeStops) {
+          if (s.polyline) allCoords.push(...decodePolyline(s.polyline))
         }
-      }
 
-      for (const s of routeStops) {
-        if (s.lat == null || s.lng == null) continue
-        const el = document.createElement('div')
-        el.style.cssText = [
-          'width:26px', 'height:26px', 'border-radius:50%',
-          'background:#3b82f6', 'border:2px solid white',
-          'display:flex', 'align-items:center', 'justify-content:center',
-          'color:white', 'font-size:11px', 'font-weight:700',
-          'box-shadow:0 2px 8px rgba(0,0,0,0.6)', 'cursor:default'
+        if (allCoords.length > 0) {
+          map.addSource('route', {
+            type: 'geojson',
+            data: { type: 'Feature', geometry: { type: 'LineString', coordinates: allCoords } }
+          })
+          map.addLayer({
+            id: 'route-line-outline',
+            type: 'line', source: 'route',
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: { 'line-color': 'rgba(255,255,255,0.25)', 'line-width': 9 }
+          })
+          map.addLayer({
+            id: 'route-line',
+            type: 'line', source: 'route',
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: { 'line-color': '#3b82f6', 'line-width': 5, 'line-opacity': 1 }
+          })
+
+          const bounds = allCoords.reduce(
+            (b, c) => b.extend(c),
+            new mgl.LngLatBounds(allCoords[0], allCoords[0])
+          )
+          bounds.extend([STORE_LNG, STORE_LAT])
+          if (vehiclePos) bounds.extend([vehiclePos.lng, vehiclePos.lat])
+          map.fitBounds(bounds, { padding: 60, maxZoom: 13 })
+        } else {
+          const pts = [[STORE_LNG, STORE_LAT]]
+          if (vehiclePos) pts.push([vehiclePos.lng, vehiclePos.lat])
+          routeStops.forEach(s => { if (s.lat != null) pts.push([s.lng, s.lat]) })
+          if (pts.length > 1) {
+            const bounds = pts.reduce((b, c) => b.extend(c), new mgl.LngLatBounds(pts[0], pts[0]))
+            map.fitBounds(bounds, { padding: 80, maxZoom: 13 })
+          }
+        }
+
+        for (const s of routeStops) {
+          if (s.lat == null || s.lng == null) continue
+          const el = document.createElement('div')
+          el.style.cssText = [
+            'width:26px', 'height:26px', 'border-radius:50%',
+            'background:#3b82f6', 'border:2px solid white',
+            'display:flex', 'align-items:center', 'justify-content:center',
+            'color:white', 'font-size:11px', 'font-weight:700',
+            'box-shadow:0 2px 8px rgba(0,0,0,0.6)', 'cursor:default'
+          ].join(';')
+          el.textContent = s.stopNumber != null ? String(s.stopNumber) : ''
+          new mgl.Marker({ element: el }).setLngLat([s.lng, s.lat]).addTo(map)
+        }
+
+        if (vehiclePos?.lat != null && vehiclePos?.lng != null) {
+          const el = document.createElement('div')
+          el.style.cssText = [
+            'width:34px', 'height:34px', 'border-radius:50%',
+            'background:#f97316', 'border:2px solid white',
+            'display:flex', 'align-items:center', 'justify-content:center',
+            'box-shadow:0 0 16px rgba(249,115,22,0.8)', 'cursor:default', 'font-size:18px'
+          ].join(';')
+          el.textContent = '🚛'
+          new mgl.Marker({ element: el }).setLngLat([vehiclePos.lng, vehiclePos.lat]).addTo(map)
+        }
+
+        const storeEl = document.createElement('div')
+        storeEl.style.cssText = [
+          'width:16px', 'height:16px', 'border-radius:50%',
+          'background:#3b82f6', 'border:3px solid white',
+          'box-shadow:0 0 12px rgba(59,130,246,0.8)'
         ].join(';')
-        el.textContent = s.stopNumber != null ? String(s.stopNumber) : ''
-        new maplibregl.Marker({ element: el }).setLngLat([s.lng, s.lat]).addTo(map)
-      }
+        new mgl.Marker({ element: storeEl }).setLngLat([STORE_LNG, STORE_LAT]).addTo(map)
+      })
+    }).catch(e => console.warn('MapLibre laden mislukt:', e))
 
-      if (vehiclePos?.lat != null && vehiclePos?.lng != null) {
-        const el = document.createElement('div')
-        el.style.cssText = [
-          'width:34px', 'height:34px', 'border-radius:50%',
-          'background:#f97316', 'border:2px solid white',
-          'display:flex', 'align-items:center', 'justify-content:center',
-          'box-shadow:0 0 16px rgba(249,115,22,0.8)', 'cursor:default', 'font-size:18px'
-        ].join(';')
-        el.textContent = '🚛'
-        new maplibregl.Marker({ element: el }).setLngLat([vehiclePos.lng, vehiclePos.lat]).addTo(map)
-      }
-
-      const storeEl = document.createElement('div')
-      storeEl.style.cssText = [
-        'width:16px', 'height:16px', 'border-radius:50%',
-        'background:#3b82f6', 'border:3px solid white',
-        'box-shadow:0 0 12px rgba(59,130,246,0.8)'
-      ].join(';')
-      new maplibregl.Marker({ element: storeEl }).setLngLat([STORE_LNG, STORE_LAT]).addTo(map)
-    })
-
-    return () => map.remove()
+    return () => { cancelled = true; if (map) map.remove() }
   }, [routeStops])
 
   return (
