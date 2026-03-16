@@ -250,11 +250,10 @@ export default function VrachttijdenWidget() {
     const stopId   = stop.id
     const tripUuid = stop.tripStatus?.uuid   // correcte UUID zit in tripStatus.uuid
     const lkp      = stop.tripStatus?.lastKnownPosition
-    console.log('[fetchRoute] lastKnownPosition:', JSON.stringify(lkp))
-    const vehiclePos = lkp?.latitude != null
-      ? { lat: lkp.latitude, lng: lkp.longitude }
+    const vehiclePos = Array.isArray(lkp) && lkp.length >= 2
+      ? { lng: lkp[0], lat: lkp[1] }
+      : lkp?.latitude != null ? { lat: lkp.latitude, lng: lkp.longitude }
       : lkp?.lat != null ? { lat: lkp.lat, lng: lkp.lng }
-      : lkp?.y != null ? { lat: lkp.y, lng: lkp.x }
       : null
 
     if (!tripUuid) {
