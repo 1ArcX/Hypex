@@ -80,12 +80,20 @@ function RouteMap({ routeStops, vehiclePos }) {
           type: 'geojson',
           data: { type: 'Feature', geometry: { type: 'LineString', coordinates: allCoords } }
         })
+        // Witte outline (rand) onder de blauwe lijn — geeft "wegmarkering" effect
+        map.addLayer({
+          id: 'route-line-outline',
+          type: 'line',
+          source: 'route',
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: { 'line-color': '#ffffff', 'line-width': 8, 'line-opacity': 0.9 }
+        })
         map.addLayer({
           id: 'route-line',
           type: 'line',
           source: 'route',
           layout: { 'line-cap': 'round', 'line-join': 'round' },
-          paint: { 'line-color': '#3b82f6', 'line-width': 4, 'line-opacity': 0.9 }
+          paint: { 'line-color': '#3b82f6', 'line-width': 5, 'line-opacity': 1 }
         })
 
         // Fit map to route + store + vehicle
