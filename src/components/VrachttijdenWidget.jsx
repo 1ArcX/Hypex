@@ -224,8 +224,16 @@ export default function VrachttijdenWidget() {
   const fetchRoute = useCallback(async (stop) => {
     const stopId  = stop.id
     const tripUuid = stop.trip?.uuid || stop.uuid || stop.tripStatus?.tripUuid
+      || stop.trip?.id || stop.tripStatus?.id || stop.tripId
     if (!tripUuid) {
-      setRouteData(p => ({ ...p, [stopId]: { stops: [], error: 'Geen route-UUID beschikbaar' } }))
+      // Debug: toon beschikbare velden zodat we de juiste UUID-key kunnen vinden
+      const debugInfo = {
+        topKeys: Object.keys(stop),
+        trip: stop.trip ? Object.entries(stop.trip) : null,
+        tripStatus: stop.tripStatus ? Object.keys(stop.tripStatus) : null,
+      }
+      console.log('[VrachttijdenWidget] stop object:', stop)
+      setRouteData(p => ({ ...p, [stopId]: { stops: [], error: `Geen UUID gevonden. Keys: ${debugInfo.topKeys.join(', ')}` } }))
       return
     }
     setRouteData(p => ({ ...p, [stopId]: { stops: [], loading: true } }))
