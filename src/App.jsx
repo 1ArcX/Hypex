@@ -109,6 +109,22 @@ export default function App() {
   const [syncTrigger, setSyncTrigger]         = useState(0)
   const [syncing, setSyncing]                 = useState(false)
   const [syncFlash, setSyncFlash]             = useState(false)
+  const [updateAvailable, setUpdateAvailable] = useState(false)
+
+  // Controleer elke 5 minuten of er een nieuwe deploy beschikbaar is
+  useEffect(() => {
+    const check = async () => {
+      try {
+        const res = await fetch('/version.json?t=' + Date.now())
+        if (!res.ok) return
+        const { t } = await res.json()
+        if (t > __BUILD_TIME__) setUpdateAvailable(true)
+      } catch {}
+    }
+    check()
+    const id = setInterval(check, 5 * 60 * 1000)
+    return () => clearInterval(id)
+  }, [])
 
   // Reset skip counter when switching to home tab
   useEffect(() => { if (mobileTab === 'home') setNextEventSkip(0) }, [mobileTab])
@@ -557,6 +573,22 @@ export default function App() {
           )}
 
           <div className="flex items-center gap-2">
+            {/* Nieuwe deploy beschikbaar */}
+            {updateAvailable && (
+              <button
+                onClick={() => window.location.reload()}
+                title="Nieuwe versie beschikbaar — klik om te vernieuwen"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '5px',
+                  padding: '4px 10px', borderRadius: '8px', cursor: 'pointer',
+                  background: 'color-mix(in srgb, var(--accent) 15%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--accent) 40%, transparent)',
+                  color: 'var(--accent)', fontSize: '11px', fontWeight: 600,
+                  animation: 'pulse 2s ease-in-out infinite',
+                }}>
+                <RefreshCw size={11} /> Vernieuwen
+              </button>
+            )}
             {/* Sync indicator */}
             <span
               title="Taken, notities en gewoontes worden elke 30 seconden automatisch gesynchroniseerd"
