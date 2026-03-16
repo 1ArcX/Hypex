@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { Truck, RefreshCw, AlertCircle, ChevronDown, ChevronUp, LogIn, LogOut, Map } from 'lucide-react'
+import { Truck, RefreshCw, AlertCircle, ChevronDown, ChevronUp, LogIn, LogOut, Map, Bell, BellOff } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 
 // Jumbo 7044 — Dronten
@@ -52,6 +52,22 @@ function decodePolyline(encoded) {
   return coords
 }
 
+// Dark raster style — vermijdt MapLibre 5.x worker-compatibiliteitsproblemen met vector dark styles
+const DARK_MAP_STYLE = {
+  version: 8,
+  glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+  sources: {
+    'carto-dark': {
+      type: 'raster',
+      tiles: ['https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'],
+      tileSize: 256,
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
+      maxzoom: 19,
+    }
+  },
+  layers: [{ id: 'carto-dark-tiles', type: 'raster', source: 'carto-dark' }]
+}
+
 // ─── Route map component (fullscreen popup, dark style) ───────────────────────
 function RouteMap({ routeStops, vehiclePos, onClose, tripLabel }) {
   const containerRef = useRef(null)
@@ -61,7 +77,7 @@ function RouteMap({ routeStops, vehiclePos, onClose, tripLabel }) {
 
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: 'https://tiles.openfreemap.org/styles/dark',
+      style: DARK_MAP_STYLE,
       center: [STORE_LNG, STORE_LAT],
       zoom: 8,
       attributionControl: false,
@@ -231,12 +247,20 @@ export default function VrachttijdenWidget() {
   const [lastUpdate,  setLastUpdate]  = useState(null)
   const [selectedStop,setSelectedStop]= useState(null)
   const [selectedDate,setSelectedDate]= useState(() => new Date().toISOString().slice(0,10))
-  const [routeData,   setRouteData]   = useState({})   // { [stopId]: { stops, loading, error } }
-  const [showMap,     setShowMap]     = useState({})   // { [stopId]: bool }
+  const [routeData,    setRouteData]   = useState({})
+  const [showMap,      setShowMap]     = useState({})
+  const [notifyStops,  setNotifyStops] = useState(() => { try { return new Set(JSON.parse(localStorage.getItem('simacan_notify') || '[]')) } catch { return new Set() } })
 
-  const tokensRef       = useRef(tokens)
-  const selectedDateRef = useRef(selectedDate)
+  const tokensRef        = useRef(tokens)
+  const selectedDateRef  = useRef(selectedDate)
+  const notifyStopsRef   = useRef(notifyStops)
+  const prevStopStates   = useRef(new Map()) // stopId → { delay, activity, eta }
+
   useEffect(() => { selectedDateRef.current = selectedDate }, [selectedDate])
+  useEffect(() => {
+    notifyStopsRef.current = notifyStops
+    localStorage.setItem('simacan_notify', JSON.stringify([...notifyStops]))
+  }, [notifyStops])
 
   const accentBg     = p => `color-mix(in srgb, var(--accent) ${p}%, transparent)`
   const accentBorder = p => `1px solid color-mix(in srgb, var(--accent) ${p}%, transparent)`
@@ -269,6 +293,40 @@ export default function VrachttijdenWidget() {
       const arr = Array.isArray(raw) ? raw : Object.values(raw)
       setStops(arr)
       setLastUpdate(new Date())
+
+      // ── Notificaties controleren ──────────────────────────────────────────
+      if (Notification.permission === 'granted') {
+        for (const stop of arr) {
+          if (!notifyStopsRef.current.has(stop.id)) continue
+          const eta    = stop.actualStartTime || stop.eta || stop.plannedStartTime
+          const etaFmt = eta ? new Date(eta).toLocaleTimeString('nl-NL', { hour:'2-digit', minute:'2-digit' }) : '?'
+          const act    = stop.tripStatus?.activity
+          const delay  = stop.delay
+          const tripId = stop.trip?.tripId || `Rit`
+          const prev   = prevStopStates.current.get(stop.id)
+
+          if (prev) {
+            // Vertraging veranderd (≥ 3 min verschil)
+            if (prev.delay != null && delay != null && Math.abs(delay - prev.delay) >= 3) {
+              const more = delay > prev.delay
+              new Notification('🚛 Vrachttijden', {
+                body: more
+                  ? `${tripId} loopt meer uit (+${delay} min) — komt nu om ${etaFmt}`
+                  : `${tripId} loopt in (${delay > 0 ? '+' : ''}${delay} min) — komt om ${etaFmt}`,
+                icon: '/favicon.ico', tag: `delay-${stop.id}`
+              })
+            }
+            // Aangekomen
+            if (prev.activity !== 'AFGEROND' && act === 'AFGEROND') {
+              new Notification('✅ Vracht aangekomen', {
+                body: `${tripId} is aangekomen${stop.actualStartTime ? ' om ' + new Date(stop.actualStartTime).toLocaleTimeString('nl-NL', { hour:'2-digit', minute:'2-digit' }) : ''}`,
+                icon: '/favicon.ico', tag: `arrived-${stop.id}`
+              })
+            }
+          }
+          prevStopStates.current.set(stop.id, { delay, activity: act, eta })
+        }
+      }
     } catch (e) { setError(e.message) }
     setLoading(false)
   }, [saveTokens])
@@ -303,6 +361,19 @@ export default function VrachttijdenWidget() {
       setRouteData(p => ({ ...p, [stopId]: { stops: [], loading: false, error: e.message } }))
     }
   }, [saveTokens])
+
+  const toggleNotify = useCallback(async (stopId) => {
+    if (notifyStopsRef.current.has(stopId)) {
+      setNotifyStops(p => { const n = new Set(p); n.delete(stopId); return n })
+    } else {
+      if (Notification.permission !== 'granted') {
+        const perm = await Notification.requestPermission()
+        if (perm !== 'granted') return
+      }
+      setNotifyStops(p => new Set([...p, stopId]))
+      new Notification('🔔 Meldingen ingeschakeld', { body: 'Je krijgt een melding bij vertraging of aankomst.', icon: '/favicon.ico', tag: 'notify-on' })
+    }
+  }, [])
 
   const toggleMap = useCallback((stop) => {
     const id = stop.id
@@ -447,8 +518,9 @@ export default function VrachttijdenWidget() {
                     const dc       = stop.tripStatus?.startLocation?.name || ''
                     const pallets  = palletSummary(stop.drops)
                     const palletStr = Object.entries(pallets).map(([t,n]) => `${n}× ${PALLET_LABELS[t]||t}`).join('  ')
-                    const rd       = routeData[stop.id]
-                    const mapShown = showMap[stop.id]
+                    const rd        = routeData[stop.id]
+                    const mapShown  = showMap[stop.id]
+                    const notifyOn  = notifyStops.has(stop.id)
 
                     return (
                       <div key={stop.id || i} onClick={() => { setSelectedStop(isSel ? null : stop) }}
@@ -468,6 +540,12 @@ export default function VrachttijdenWidget() {
                           <div style={{ display:'flex', alignItems:'center', gap:'6px', flexShrink:0 }}>
                             {badge && <span style={{ fontSize:'10px', color:badge.color, fontWeight:600 }}>{badge.text}</span>}
                             <span style={{ fontSize:'13px', color:'var(--accent)', fontWeight:700 }}>{fmt(arrival)}</span>
+                            <button
+                              onClick={e => { e.stopPropagation(); toggleNotify(stop.id) }}
+                              title={notifyOn ? 'Meldingen uitschakelen' : 'Meldingen inschakelen'}
+                              style={{ background:'none', border:'none', cursor:'pointer', padding:'2px', display:'flex', color: notifyOn ? 'var(--accent)' : 'rgba(255,255,255,0.2)' }}>
+                              {notifyOn ? <Bell size={12} /> : <BellOff size={12} />}
+                            </button>
                             {isSel ? <ChevronUp size={11} style={{ color:'var(--accent)' }} /> : <ChevronDown size={11} style={{ color:'rgba(255,255,255,0.2)' }} />}
                           </div>
                         </div>
