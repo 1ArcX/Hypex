@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Truck, RefreshCw, AlertCircle, ChevronDown, ChevronUp, LogIn, LogOut } from 'lucide-react'
+import maplibregl from 'maplibre-gl'
+import 'maplibre-gl/dist/maplibre-gl.css'
+import { Truck, RefreshCw, AlertCircle, ChevronDown, ChevronUp, LogIn, LogOut, Map } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 
 // Jumbo 7044 — Dronten
@@ -33,6 +35,100 @@ async function exchangeCode(code, verifier, redirectUri) {
   return data
 }
 
+// ─── Polyline decoder (Google encoded polyline format) ────────────────────────
+function decodePolyline(encoded) {
+  if (!encoded) return []
+  const coords = []
+  let index = 0, lat = 0, lng = 0
+  while (index < encoded.length) {
+    let b, shift = 0, result = 0
+    do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5 } while (b >= 0x20)
+    lat += (result & 1) ? ~(result >> 1) : (result >> 1)
+    shift = 0; result = 0
+    do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5 } while (b >= 0x20)
+    lng += (result & 1) ? ~(result >> 1) : (result >> 1)
+    coords.push([lng / 1e5, lat / 1e5])
+  }
+  return coords
+}
+
+// ─── Route map component ───────────────────────────────────────────────────────
+function RouteMap({ routeStops }) {
+  const containerRef = useRef(null)
+
+  useEffect(() => {
+    if (!containerRef.current) return
+
+    const map = new maplibregl.Map({
+      container: containerRef.current,
+      style: 'https://tiles.openfreemap.org/styles/bright',
+      center: [STORE_LNG, STORE_LAT],
+      zoom: 8,
+      attributionControl: false,
+    })
+    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
+
+    map.on('load', () => {
+      // Collect all polyline coordinates for full route line
+      const allCoords = []
+      for (const s of routeStops) {
+        if (s.polyline) allCoords.push(...decodePolyline(s.polyline))
+      }
+
+      if (allCoords.length > 0) {
+        map.addSource('route', {
+          type: 'geojson',
+          data: { type: 'Feature', geometry: { type: 'LineString', coordinates: allCoords } }
+        })
+        map.addLayer({
+          id: 'route-line',
+          type: 'line',
+          source: 'route',
+          paint: { 'line-color': '#3b82f6', 'line-width': 4, 'line-opacity': 0.9, 'line-cap': 'round', 'line-join': 'round' }
+        })
+
+        // Fit map to route + store
+        const bounds = allCoords.reduce(
+          (b, c) => b.extend(c),
+          new maplibregl.LngLatBounds(allCoords[0], allCoords[0])
+        )
+        bounds.extend([STORE_LNG, STORE_LAT])
+        map.fitBounds(bounds, { padding: 40, maxZoom: 13 })
+      }
+
+      // Numbered stop markers
+      for (const s of routeStops) {
+        if (s.lat == null || s.lng == null) continue
+        const el = document.createElement('div')
+        el.style.cssText = [
+          'width:26px', 'height:26px', 'border-radius:50%',
+          'background:#3b82f6', 'border:2px solid white',
+          'display:flex', 'align-items:center', 'justify-content:center',
+          'color:white', 'font-size:11px', 'font-weight:700',
+          'box-shadow:0 2px 6px rgba(0,0,0,0.45)', 'cursor:default'
+        ].join(';')
+        el.textContent = s.stopNumber != null ? String(s.stopNumber) : ''
+        new maplibregl.Marker({ element: el }).setLngLat([s.lng, s.lat]).addTo(map)
+      }
+
+      // Our store — solid blue dot (active stop)
+      const storeEl = document.createElement('div')
+      storeEl.style.cssText = [
+        'width:16px', 'height:16px', 'border-radius:50%',
+        'background:#3b82f6', 'border:3px solid white',
+        'box-shadow:0 2px 10px rgba(59,130,246,0.7)'
+      ].join(';')
+      new maplibregl.Marker({ element: storeEl }).setLngLat([STORE_LNG, STORE_LAT]).addTo(map)
+    })
+
+    return () => map.remove()
+  }, [routeStops])
+
+  return (
+    <div ref={containerRef} style={{ width: '100%', height: '260px', borderRadius: '10px', overflow: 'hidden', marginTop: '10px' }} />
+  )
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmt(iso) {
   if (!iso) return '—'
@@ -52,7 +148,7 @@ function activityColor(a) {
   if (a === 'AFGEROND')   return '#4ade80'
   if (a === 'GEANNULEERD') return 'rgba(255,255,255,0.2)'
   if (a === 'GEPLAND')    return 'rgba(255,255,255,0.35)'
-  return '#60a5fa' // ONDERWEG, ACTIEF, etc.
+  return '#60a5fa'
 }
 function activityLabel(a) {
   const map = { AFGEROND:'Afgerond', GEPLAND:'Gepland', ONDERWEG:'Onderweg', ACTIEF:'Bezig', GEANNULEERD:'Geannuleerd' }
@@ -82,11 +178,12 @@ export default function VrachttijdenWidget() {
   const [lastUpdate,  setLastUpdate]  = useState(null)
   const [selectedStop,setSelectedStop]= useState(null)
   const [selectedDate,setSelectedDate]= useState(() => new Date().toISOString().slice(0,10))
+  const [routeData,   setRouteData]   = useState({})   // { [stopId]: { stops, loading, error } }
+  const [showMap,     setShowMap]     = useState({})   // { [stopId]: bool }
 
   const tokensRef       = useRef(tokens)
   const selectedDateRef = useRef(selectedDate)
   useEffect(() => { selectedDateRef.current = selectedDate }, [selectedDate])
-
 
   const accentBg     = p => `color-mix(in srgb, var(--accent) ${p}%, transparent)`
   const accentBorder = p => `1px solid color-mix(in srgb, var(--accent) ${p}%, transparent)`
@@ -99,7 +196,7 @@ export default function VrachttijdenWidget() {
     supabase.auth.updateUser({ data: { simacan_tokens: t || null } }).catch(() => {})
   }, [])
 
-  // ─── Ophalen ──────────────────────────────────────────────────────────────
+  // ─── Ritten ophalen ───────────────────────────────────────────────────────
   const fetchStops = useCallback(async (t = tokensRef.current, date = selectedDateRef.current) => {
     if (!t?.accessToken) return
     setLoading(true); setError(null)
@@ -123,6 +220,39 @@ export default function VrachttijdenWidget() {
     setLoading(false)
   }, [saveTokens])
 
+  // ─── Route ophalen voor kaart ─────────────────────────────────────────────
+  const fetchRoute = useCallback(async (stop) => {
+    const stopId  = stop.id
+    const tripUuid = stop.trip?.uuid || stop.uuid || stop.tripStatus?.tripUuid
+    if (!tripUuid) {
+      setRouteData(p => ({ ...p, [stopId]: { stops: [], error: 'Geen route-UUID beschikbaar' } }))
+      return
+    }
+    setRouteData(p => ({ ...p, [stopId]: { stops: [], loading: true } }))
+    try {
+      const res = await fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action:'tripRoute', token:tokensRef.current.accessToken, refreshToken:tokensRef.current.refreshToken, tripUuid })
+      })
+      const data = await res.json()
+      if (data._newTokens) saveTokens({ accessToken:data._newTokens.accessToken, refreshToken:data._newTokens.refreshToken || tokensRef.current.refreshToken })
+      if (!res.ok) throw new Error(data.error || 'Route ophalen mislukt')
+      setRouteData(p => ({ ...p, [stopId]: { stops: data.stops || [], loading: false } }))
+    } catch (e) {
+      setRouteData(p => ({ ...p, [stopId]: { stops: [], loading: false, error: e.message } }))
+    }
+  }, [saveTokens])
+
+  const toggleMap = useCallback((stop) => {
+    const id = stop.id
+    setShowMap(p => {
+      const next = !p[id]
+      if (next && !routeData[id]) fetchRoute(stop)
+      return { ...p, [id]: next }
+    })
+  }, [routeData, fetchRoute])
+
   // ─── Start ────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (tokens) { fetchStops(tokens); return }
@@ -138,7 +268,7 @@ export default function VrachttijdenWidget() {
     return () => clearInterval(t)
   }, [!!tokens, selectedDate, fetchStops])
 
-  // ─── Login (alleen localhost:3000) ────────────────────────────────────────
+  // ─── Login ────────────────────────────────────────────────────────────────
   const isLocalhost = window.location.hostname === 'localhost'
   const REDIRECT_URI = 'http://localhost:3000/simacan-callback.html'
 
@@ -167,10 +297,9 @@ export default function VrachttijdenWidget() {
     setLoginLoading(false)
   }, [saveTokens, fetchStops])
 
-
   // ─── Datum helpers ────────────────────────────────────────────────────────
   const today = new Date().toISOString().slice(0,10)
-  const changeDate = (nd) => { setSelectedDate(nd); setStops(null); setSelectedStop(null); fetchStops(tokensRef.current, nd) }
+  const changeDate = (nd) => { setSelectedDate(nd); setStops(null); setSelectedStop(null); setRouteData({}); setShowMap({}); fetchStops(tokensRef.current, nd) }
 
   // ─── Gesorteerde stops ────────────────────────────────────────────────────
   const sorted = stops ? [...stops]
@@ -242,7 +371,6 @@ export default function VrachttijdenWidget() {
             </div>
           )}
 
-
           {stops && (
             <>
               {sorted.length === 0 ? (
@@ -259,6 +387,8 @@ export default function VrachttijdenWidget() {
                     const dc       = stop.tripStatus?.startLocation?.name || ''
                     const pallets  = palletSummary(stop.drops)
                     const palletStr = Object.entries(pallets).map(([t,n]) => `${n}× ${PALLET_LABELS[t]||t}`).join('  ')
+                    const rd       = routeData[stop.id]
+                    const mapShown = showMap[stop.id]
 
                     return (
                       <div key={stop.id || i} onClick={() => { setSelectedStop(isSel ? null : stop) }}
@@ -300,25 +430,57 @@ export default function VrachttijdenWidget() {
 
                         {/* Detail panel */}
                         {isSel && (
-                          <div style={{ marginTop:'8px', paddingTop:'8px', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', flexDirection:'column', gap:'3px' }}>
-                            {[
-                              ['Route',      stop.trip?.tripId],
-                              ['Van DC',     stop.tripStatus?.startLocation?.name],
-                              ['Vervoerder', stop.tripStatus?.carrierName],
-                              ['Voertuig',   stop.tripStatus?.vehicleType],
-                              ['Gepland',    fmt(stop.plannedStartTime)],
-                              ['Tijdvenster',stop.timeWindowStart ? `${fmt(stop.timeWindowStart)} – ${fmt(stop.timeWindowEnd)}` : null],
-                              ['ETA',        stop.eta && stop.eta !== stop.plannedStartTime ? fmt(stop.eta) : null],
-                              ['Werkelijk',  fmt(stop.actualStartTime)],
-                              ['Vertrek',    fmt(stop.actualEndTime || stop.plannedEndTime)],
-                              ['Vertraging', stop.delay != null ? (stop.delay === 0 ? 'Op tijd' : stop.delay > 0 ? `+${stop.delay} min` : `${stop.delay} min (vroeg)`) : null],
-                              ...Object.entries(pallets).map(([t,n]) => [PALLET_LABELS[t]||t, `${n} pallets`])
-                            ].filter(([,v]) => v && v !== '—').map(([label, value]) => (
-                              <div key={label} style={{ display:'flex', justifyContent:'space-between', fontSize:'11px' }}>
-                                <span style={{ color:'rgba(255,255,255,0.35)' }}>{label}</span>
-                                <span style={{ color:'rgba(255,255,255,0.8)' }}>{value}</span>
+                          <div style={{ marginTop:'8px', paddingTop:'8px', borderTop:'1px solid rgba(255,255,255,0.08)' }} onClick={e => e.stopPropagation()}>
+                            <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
+                              {[
+                                ['Route',      stop.trip?.tripId],
+                                ['Van DC',     stop.tripStatus?.startLocation?.name],
+                                ['Vervoerder', stop.tripStatus?.carrierName],
+                                ['Voertuig',   stop.tripStatus?.vehicleType],
+                                ['Gepland',    fmt(stop.plannedStartTime)],
+                                ['Tijdvenster',stop.timeWindowStart ? `${fmt(stop.timeWindowStart)} – ${fmt(stop.timeWindowEnd)}` : null],
+                                ['ETA',        stop.eta && stop.eta !== stop.plannedStartTime ? fmt(stop.eta) : null],
+                                ['Werkelijk',  fmt(stop.actualStartTime)],
+                                ['Vertrek',    fmt(stop.actualEndTime || stop.plannedEndTime)],
+                                ['Vertraging', stop.delay != null ? (stop.delay === 0 ? 'Op tijd' : stop.delay > 0 ? `+${stop.delay} min` : `${stop.delay} min (vroeg)`) : null],
+                                ...Object.entries(pallets).map(([t,n]) => [PALLET_LABELS[t]||t, `${n} pallets`])
+                              ].filter(([,v]) => v && v !== '—').map(([label, value]) => (
+                                <div key={label} style={{ display:'flex', justifyContent:'space-between', fontSize:'11px' }}>
+                                  <span style={{ color:'rgba(255,255,255,0.35)' }}>{label}</span>
+                                  <span style={{ color:'rgba(255,255,255,0.8)' }}>{value}</span>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Kaart knop */}
+                            <button
+                              onClick={() => toggleMap(stop)}
+                              style={{
+                                marginTop: '10px', width: '100%',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                                padding: '7px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', fontWeight: 600,
+                                border: mapShown ? accentBorder(40) : '1px solid rgba(255,255,255,0.12)',
+                                background: mapShown ? accentBg(12) : 'rgba(255,255,255,0.05)',
+                                color: mapShown ? 'var(--accent)' : 'rgba(255,255,255,0.6)',
+                                transition: 'all 0.15s'
+                              }}>
+                              {rd?.loading
+                                ? <><RefreshCw size={12} style={{ animation:'spin 1s linear infinite' }} /> Route laden...</>
+                                : <><Map size={12} /> {mapShown ? 'Kaart verbergen' : 'Toon route op kaart'}</>
+                              }
+                            </button>
+
+                            {/* Route fout */}
+                            {rd?.error && (
+                              <div style={{ marginTop:'6px', fontSize:'10px', color:'#f87171', display:'flex', alignItems:'center', gap:'4px' }}>
+                                <AlertCircle size={10} /> {rd.error}
                               </div>
-                            ))}
+                            )}
+
+                            {/* Kaart */}
+                            {mapShown && rd?.stops && !rd.loading && (
+                              <RouteMap routeStops={rd.stops} />
+                            )}
                           </div>
                         )}
                       </div>
