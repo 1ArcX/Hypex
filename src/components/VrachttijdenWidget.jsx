@@ -69,11 +69,15 @@ function RouteMap({ routeStops }) {
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
 
     map.on('load', () => {
+      console.log('[RouteMap] routeStops:', routeStops)
+      console.log('[RouteMap] voorbeeld stop:', routeStops[0])
+
       // Collect all polyline coordinates for full route line
       const allCoords = []
       for (const s of routeStops) {
         if (s.polyline) allCoords.push(...decodePolyline(s.polyline))
       }
+      console.log('[RouteMap] allCoords length:', allCoords.length)
 
       if (allCoords.length > 0) {
         map.addSource('route', {
