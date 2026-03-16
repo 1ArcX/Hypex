@@ -84,7 +84,8 @@ function RouteMap({ routeStops, vehiclePos }) {
           id: 'route-line',
           type: 'line',
           source: 'route',
-          paint: { 'line-color': '#3b82f6', 'line-width': 4, 'line-opacity': 0.9, 'line-cap': 'round', 'line-join': 'round' }
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: { 'line-color': '#3b82f6', 'line-width': 4, 'line-opacity': 0.9 }
         })
 
         // Fit map to route + store + vehicle
@@ -249,9 +250,12 @@ export default function VrachttijdenWidget() {
     const stopId   = stop.id
     const tripUuid = stop.tripStatus?.uuid   // correcte UUID zit in tripStatus.uuid
     const lkp      = stop.tripStatus?.lastKnownPosition
+    console.log('[fetchRoute] lastKnownPosition:', JSON.stringify(lkp))
     const vehiclePos = lkp?.latitude != null
       ? { lat: lkp.latitude, lng: lkp.longitude }
-      : lkp?.lat != null ? { lat: lkp.lat, lng: lkp.lng } : null
+      : lkp?.lat != null ? { lat: lkp.lat, lng: lkp.lng }
+      : lkp?.y != null ? { lat: lkp.y, lng: lkp.x }
+      : null
 
     if (!tripUuid) {
       setRouteData(p => ({ ...p, [stopId]: { stops: [], vehiclePos, error: 'Geen trip-UUID in tripStatus' } }))
