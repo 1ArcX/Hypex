@@ -115,8 +115,11 @@ exports.handler = async (event) => {
     if (!tripUuid) return err('tripUuid is verplicht')
     const result = await callApi(`/api/internal/v3/stopAndRoutes/${tripUuid}`, token, refreshToken)
     if (result.status === 401) return err('Sessie verlopen.', 401)
-    // Normaliseer: object met genummerde keys → array van stops
+    // Debug: stuur raw data terug zodat we de structuur kunnen zien
     const raw = result.data || {}
+    const rawKeys = Object.keys(raw)
+    const firstVal = raw[rawKeys[0]]
+    console.log('[simacan tripRoute] status:', result.status, 'topKeys:', rawKeys, 'firstVal keys:', firstVal ? Object.keys(firstVal) : null)
     const stops = Object.values(raw).filter(s => s && typeof s === 'object' && (s.address || s.stopNumber !== undefined))
     const normalized = stops.map(s => ({
       id:          s.id,
@@ -129,7 +132,7 @@ exports.handler = async (event) => {
       lng:         s.address?.location?.longitude ?? (s.address?.coordinates?.[0]),
       polyline:    s.route?.polyline || null,
     }))
-    return ok({ stops: normalized, _newTokens: result.newAccessToken ? { accessToken: result.newAccessToken, refreshToken: result.newRefreshToken } : undefined })
+    return ok({ stops: normalized, _rawDebug: { topKeys: rawKeys, firstValKeys: firstVal ? Object.keys(firstVal) : null, firstVal }, _newTokens: result.newAccessToken ? { accessToken: result.newAccessToken, refreshToken: result.newRefreshToken } : undefined })
   }
 
   if (action === 'testApis') {

@@ -248,6 +248,7 @@ export default function VrachttijdenWidget() {
         body: JSON.stringify({ action:'tripRoute', token:tokensRef.current.accessToken, refreshToken:tokensRef.current.refreshToken, tripUuid })
       })
       const data = await res.json()
+      console.log('[fetchRoute] raw response:', data)
       if (data._newTokens) saveTokens({ accessToken:data._newTokens.accessToken, refreshToken:data._newTokens.refreshToken || tokensRef.current.refreshToken })
       if (!res.ok) throw new Error(data.error || 'Route ophalen mislukt')
       setRouteData(p => ({ ...p, [stopId]: { stops: data.stops || [], loading: false } }))
