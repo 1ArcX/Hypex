@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useCallback, useReducer, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Play, Pause, RotateCcw, SkipForward, Settings, X, Bell, BellOff, Volume2, VolumeX, Coffee, Zap } from 'lucide-react'
+import { Play, Pause, RotateCcw, SkipForward, Settings, X, Bell, BellOff, Volume2, VolumeX, Coffee, Zap, Maximize2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
+import FocusMode from './FocusMode'
+import useAmbientSound from '../hooks/useAmbientSound'
 
 // ── Persistence ───────────────────────────────────────────────────────────────
 const LS_KEY   = 'pomodoro_v3'
@@ -251,7 +253,7 @@ function CompletionPopup({ prevMode, nextMode, onStart, onSkip }) {
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function PomodoroTimer({ onModeChange, onPomodoroActive, userId }) {
+export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusModeChange, userId }) {
   const [state, dispatch] = useReducer(reducer, INIT)
   const stateRef           = useRef(state)
   const endTimeRef         = useRef(null)
@@ -264,6 +266,13 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, userId }
 
   // Popup state
   const [popup, setPopup] = useState(null)   // { prevMode, nextMode } | null
+
+  // Focus mode + ambient sound state
+  const [focusMode, setFocusMode]   = useState(false)
+  const [soundType, setSoundType]   = useState('off')
+  const [volume, setVolume]         = useState(60)
+
+  useAmbientSound(soundType, volume / 100, state.running)
 
   useEffect(() => { stateRef.current = state }, [state])
 
@@ -359,7 +368,8 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, userId }
         sendNotif(title, body)
       }
 
-      // Show popup before advancing
+      // Close focus mode and show popup before advancing
+      setFocusMode(false); onFocusModeChange?.(false)
       setPopup({ prevMode: s.mode, nextMode })
 
       dispatch({ type: 'COMPLETE', prevMode: s.mode, todayMins })
@@ -490,6 +500,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, userId }
       dispatch({ type: 'SET_RUN', value: true })
       onModeChange?.(state.mode !== 'work')
       broadcastState({ ...state, running: true }, endTime)
+      setFocusMode(true); onFocusModeChange?.(true)
     } else {
       const remaining = endTimeRef.current
         ? Math.max(0, Math.ceil((endTimeRef.current - Date.now()) / 1000))
@@ -530,6 +541,8 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, userId }
   }
 
   const skipPopup = () => setPopup(null)
+
+  const closeFocusMode = () => { setFocusMode(false); onFocusModeChange?.(false) }
 
   const startAfterPopup = () => {
     claimLocalControl()
@@ -575,6 +588,27 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, userId }
           onSkip={skipPopup}
         />,
         document.body
+      )}
+
+      {/* Focus mode overlay */}
+      {focusMode && !popup && (
+        <FocusMode
+          mode={mode}
+          seconds={seconds}
+          totalSecs={totalSecs}
+          running={running}
+          task={task}
+          sessionsInCycle={sessionsInCycle}
+          sessionsPerLong={sessionsPerLong}
+          onToggleRunning={toggleRunning}
+          onReset={reset}
+          onSkip={skip}
+          onClose={closeFocusMode}
+          soundType={soundType}
+          onSoundType={setSoundType}
+          volume={volume}
+          onVolume={setVolume}
+        />
       )}
 
       <div
@@ -777,6 +811,19 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, userId }
 
           <button onClick={skip} style={iconBtn} title="Sla over">
             <SkipForward size={15} />
+          </button>
+
+          <button
+            onClick={() => { setFocusMode(true); onFocusModeChange?.(true) }}
+            title="Focusmodus"
+            style={{
+              ...iconBtn,
+              display: 'flex', alignItems: 'center', gap: 4,
+              width: 'auto', padding: '0 10px', fontSize: 11, fontWeight: 600,
+              color: 'rgba(255,255,255,0.5)',
+            }}
+          >
+            <Maximize2 size={13} /> Focus
           </button>
         </div>
 

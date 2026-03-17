@@ -306,3 +306,158 @@ select {
   background-size: 1em;
   padding-right: 2.5rem;
 }
+
+/* ===== FOCUS MODE OVERLAY ===== */
+.focus-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(4, 6, 20, 0.92);
+  backdrop-filter: blur(24px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.focus-blob {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.focus-blob--1 {
+  width: 600px; height: 600px;
+  top: -150px; left: -150px;
+  animation: float1 18s ease-in-out infinite;
+}
+.focus-blob--2 {
+  width: 500px; height: 500px;
+  bottom: -150px; right: -100px;
+  animation: float2 22s ease-in-out infinite;
+}
+.focus-blob--3 {
+  width: 400px; height: 400px;
+  top: 40%; left: 50%;
+  transform: translate(-50%, -50%);
+  animation: float3 26s ease-in-out infinite;
+}
+
+.focus-close-btn {
+  position: absolute;
+  top: 20px; right: 20px;
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.5);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s, color 0.2s;
+  z-index: 1;
+}
+.focus-close-btn:hover {
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.9);
+}
+
+.focus-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+  padding: 20px;
+}
+
+.focus-ring-wrap {
+  position: relative;
+  width: 280px; height: 280px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 28px;
+}
+
+.focus-time {
+  position: absolute;
+  inset: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.focus-time-digits {
+  font-size: 64px;
+  font-weight: 700;
+  font-family: monospace;
+  line-height: 1;
+  letter-spacing: -2px;
+  transition: color 0.6s ease;
+}
+
+.focus-play-btn {
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+}
+.focus-play-btn:hover {
+  transform: scale(1.08);
+}
+
+.focus-dots {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+.focus-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.12);
+  transition: all 0.3s;
+}
+
+.focus-dot--done {
+  width: 10px; height: 10px;
+}
+
+.focus-sound-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.focus-pill {
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.45);
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.15s;
+}
+.focus-pill:hover {
+  background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.8);
+}
+.focus-pill--active {
+  font-weight: 600;
+}
+
+.focus-volume {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 220px;
+}
+
+@media (max-width: 640px) {
+  .focus-time-digits {
+    font-size: 52px;
+  }
+  .focus-ring-wrap {
+    width: 240px; height: 240px;
+  }
+}

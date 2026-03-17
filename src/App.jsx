@@ -92,6 +92,7 @@ export default function App() {
   const [showThemeSettings, setShowThemeSettings] = useState(false)
   const [theme, setTheme] = useState({ accent: '#00FFD1', bg1: '#0a0a1a', bg2: '#0d1117' })
   const [pomodoroActive, setPomodoroActive] = useState(false)
+  const [focusMode, setFocusMode]           = useState(false)
   const [profiles, setProfiles] = useState([])
   const [showAdmin, setShowAdmin] = useState(false)
   const [mobileTab, setMobileTab] = useState('home')
@@ -438,7 +439,7 @@ export default function App() {
                   onViewDetail={setDetailTask} onNew={() => openNewTask()} />,
       weather:  <WeatherWidget userId={user?.id} onRequestPwaInstall={() => setShowPwaPrompt(true)} />,
       spotify:  <SpotifyWidget />,
-      pomodoro: <PomodoroTimer onModeChange={setIsBreak} userId={user?.id} />,
+      pomodoro: <PomodoroTimer onModeChange={setIsBreak} onFocusModeChange={setFocusMode} userId={user?.id} />,
       work:         isAdmin ? <WorkWidget /> : null,
       vrachttijden: isAdmin ? <VrachttijdenWidget /> : null,
     }[id] ?? null
@@ -648,6 +649,14 @@ export default function App() {
             )}
           </div>
         </nav>
+
+        {/* Blur wrapper — blurs everything except the nav when focus mode is active */}
+        <div style={{
+          flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0,
+          filter: focusMode ? 'blur(4px) brightness(0.4)' : 'none',
+          transition: 'filter 0.4s ease',
+          pointerEvents: focusMode ? 'none' : 'auto',
+        }}>
 
         {/* Desktop: 3-column grid */}
         <div className="hidden md:block" style={{ flex: 1, overflowY: 'auto' }}>
@@ -961,7 +970,7 @@ export default function App() {
                     <div style={{ flex: 1, overflow: 'hidden', padding: '12px 16px 16px' }}>
                       <div style={{ height: '100%', overflowY: 'auto' }}>
                         {toolTab === 'weer'     && <WeatherWidget stacked userId={user?.id} onRequestPwaInstall={() => setShowPwaPrompt(true)} />}
-                        {toolTab === 'pomodoro' && <PomodoroTimer onModeChange={setIsBreak} onPomodoroActive={setPomodoroActive} userId={user?.id} />}
+                        {toolTab === 'pomodoro' && <PomodoroTimer onModeChange={setIsBreak} onPomodoroActive={setPomodoroActive} onFocusModeChange={setFocusMode} userId={user?.id} />}
                         {toolTab === 'spotify'  && <SpotifyWidget />}
                         {toolTab === 'magister' && <MagisterWidget userId={user.id} onSubjectsSync={() => { fetchSubjects(); fetchProfiles(); fetchSubjectLinks() }} />}
                       </div>
@@ -995,6 +1004,7 @@ export default function App() {
             </div>
           )
         })()}
+        </div> {/* end blur wrapper */}
       </div>
 
       {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
