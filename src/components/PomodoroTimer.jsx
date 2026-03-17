@@ -436,6 +436,14 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
     const local = stateRef.current
     // Always accept if remote is running; accept paused state only when local is also paused
     if (!remote.running && local.running) return
+
+    // Fast path: both running same mode → just sync endTime, local tick handles display
+    if (remote.running && local.running && remote.mode === local.mode && remote.endTime) {
+      endTimeRef.current = remote.endTime
+      return
+    }
+
+    // Full sync for start/pause/skip/mode-switch events
     endTimeRef.current = remote.endTime || null
     dispatch({ type: 'RESTORE', payload: {
       mode: remote.mode,
@@ -479,12 +487,12 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
     return () => { supabase.removeChannel(channel) }
   }, [userId, broadcastState])
 
-  // Periodically broadcast while running (catches devices that connect mid-session)
+  // Broadcast every second while running so other devices stay frame-accurate
   useEffect(() => {
     if (!state.running || !userId) return
     const iv = setInterval(() => {
       broadcastState(stateRef.current, endTimeRef.current)
-    }, 5000)
+    }, 1000)
     return () => clearInterval(iv)
   }, [state.running, userId, broadcastState])
 
