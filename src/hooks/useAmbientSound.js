@@ -122,13 +122,15 @@ export default function useAmbientSound(type, volume, active) {
     if (typeRef.current === type) return
     typeRef.current = type
 
-    // Tear down old nodes
+    // Tear down old nodes — capture reference before nulling so the timeout
+    // doesn't accidentally stop the newly created nodes 300ms later
     if (nodesRef.current) {
-      try {
-        nodesRef.current.master.gain.setTargetAtTime(0, getCtx().currentTime, 0.1)
-        setTimeout(() => { nodesRef.current?.stop() }, 300)
-      } catch {}
+      const old = nodesRef.current
       nodesRef.current = null
+      try {
+        old.master.gain.setTargetAtTime(0, getCtx().currentTime, 0.1)
+        setTimeout(() => old.stop(), 300)
+      } catch {}
     }
 
     if (type === 'off') return
@@ -155,9 +157,10 @@ export default function useAmbientSound(type, volume, active) {
   useEffect(() => {
     return () => {
       if (nodesRef.current) {
-        try { nodesRef.current.master.gain.setTargetAtTime(0, getCtx().currentTime, 0.1) } catch {}
-        setTimeout(() => { nodesRef.current?.stop() }, 300)
+        const old = nodesRef.current
         nodesRef.current = null
+        try { old.master.gain.setTargetAtTime(0, getCtx().currentTime, 0.1) } catch {}
+        setTimeout(() => old.stop(), 300)
       }
     }
   }, [])
