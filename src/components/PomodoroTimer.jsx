@@ -368,6 +368,19 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
         sendNotif(title, body)
       }
 
+      // Compute next state values for broadcast (reducer hasn't run yet)
+      let newSIC = s.sessionsInCycle
+      if (s.mode === 'work')      newSIC = s.sessionsInCycle + 1
+      else if (s.mode === 'longBreak') newSIC = 0
+      const nextMins = nextMode === 'work' ? s.workMins : nextMode === 'break' ? s.breakMins : s.longBreakMins
+
+      // Force-broadcast the completed transition so all devices advance together
+      broadcastStateRef.current?.({
+        ...s,
+        mode: nextMode, seconds: nextMins * 60, running: false,
+        sessionsInCycle: newSIC, totalSessions: newTotal,
+      }, null, true)
+
       // Close focus mode and show popup before advancing
       setFocusMode(false); onFocusModeChange?.(false)
       setPopup({ prevMode: s.mode, nextMode })
@@ -416,6 +429,9 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
   ])
 
   // ── Cross-device sync via Supabase Realtime ───────────────────────────────
+  // Keep a ref so tick (and other stable callbacks) can always call the latest version
+  const broadcastStateRef = useRef(null)
+
   const broadcastState = useCallback((s, endTime, forced = false) => {
     if (!channelRef.current || !userId) return
     channelRef.current.send({
@@ -429,6 +445,9 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
       }
     })
   }, [userId])
+
+  // Always keep ref in sync with latest broadcastState
+  useEffect(() => { broadcastStateRef.current = broadcastState }, [broadcastState])
 
   function applyRemoteState(remote) {
     if (!remote) return
@@ -556,9 +575,12 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
   }
 
   const switchMode = (mode) => {
+    claimLocalControl()
     endTimeRef.current = null
     dispatch({ type: 'SWITCH', mode })
     setTimeout(() => onModeChange?.(mode !== 'work'), 0)
+    const mins = mode === 'work' ? state.workMins : mode === 'break' ? state.breakMins : state.longBreakMins
+    broadcastState({ ...state, mode, seconds: mins * 60, running: false }, null, true)
   }
 
   const toggleNotif = async () => {
