@@ -22,11 +22,9 @@ async function registerPushSubscription(userId) {
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC),
     })
-    // Upsert subscription — only update the subscription field to preserve rain settings
-    await supabase.from('push_subscriptions').upsert(
-      { user_id: userId, subscription: sub.toJSON() },
-      { onConflict: 'user_id' }
-    )
+    // Delete old subscriptions first to prevent duplicates, then insert fresh
+    await supabase.from('push_subscriptions').delete().eq('user_id', userId)
+    await supabase.from('push_subscriptions').insert({ user_id: userId, subscription: sub.toJSON() })
   } catch (e) {
     console.error('Push subscribe failed:', e)
   }
@@ -300,6 +298,8 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
   const intervalRef        = useRef(null)
   const channelRef         = useRef(null)
   const localControlUntil  = useRef(0)
+  const userIdRef = useRef(userId)
+  useEffect(() => { userIdRef.current = userId }, [userId])
 
   // Call this whenever the user takes a local action — blocks remote sync for 30s
   const claimLocalControl = () => { localControlUntil.current = Date.now() + 30_000 }
@@ -406,7 +406,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
       const todayMins = s.mode === 'work' ? addFocusMins(s.workMins) : getTodayMins()
       const nextMode  = calcNextMode(s.mode, s.sessionsInCycle, s.sessionsPerLong)
       const newTotal  = s.mode === 'work' ? s.totalSessions + 1 : s.totalSessions
-      saveStatsToCloud(userId, todayMins, newTotal)
+      saveStatsToCloud(userIdRef.current, todayMins, newTotal)
 
       if (s.notifEnabled) {
         const title = s.mode === 'work' ? 'Focus sessie klaar! 🎯' : 'Pauze voorbij!'
@@ -415,7 +415,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
                                                : 'Tijd om te focussen!'
         sendNotif(title, body)
         // Push notification — reaches the device even when the browser is closed
-        sendPushNotif(userId, title, body, 'pomodoro')
+        sendPushNotif(userIdRef.current, title, body, 'pomodoro')
       }
 
       // Compute next state values for broadcast (reducer hasn't run yet)
