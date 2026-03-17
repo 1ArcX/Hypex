@@ -5,6 +5,46 @@ import { supabase } from '../supabaseClient'
 import FocusMode from './FocusMode'
 import useAmbientSound from '../hooks/useAmbientSound'
 
+const VAPID_PUBLIC = 'BCsu1QaHUead0cgQ23qUKIu3_MnSi0s21LaD_c9wBcqdP43A9ojEx-nWZ4_xUDYLVMQn0CqzqdhSuLQr6eOQqh4'
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4)
+  const base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const raw     = atob(base64)
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)))
+}
+
+async function registerPushSubscription(userId) {
+  if (!userId || !('serviceWorker' in navigator) || !('PushManager' in window)) return
+  try {
+    const reg = await navigator.serviceWorker.ready
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC),
+    })
+    // Upsert subscription — only update the subscription field to preserve rain settings
+    await supabase.from('push_subscriptions').upsert(
+      { user_id: userId, subscription: sub.toJSON() },
+      { onConflict: 'user_id' }
+    )
+  } catch (e) {
+    console.error('Push subscribe failed:', e)
+  }
+}
+
+async function sendPushNotif(userId, title, body, tag = 'pomodoro') {
+  if (!userId) return
+  try {
+    await fetch('/.netlify/functions/pomodoro-notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, title, body, tag }),
+    })
+  } catch (e) {
+    console.error('Push notify failed:', e)
+  }
+}
+
 // ── Persistence ───────────────────────────────────────────────────────────────
 const LS_KEY   = 'pomodoro_v3'
 const LS_STATS = 'pomodoro_stats'
@@ -276,6 +316,14 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
 
   useEffect(() => { stateRef.current = state }, [state])
 
+  // ── Re-register push subscription on mount if notifs already enabled ─────
+  useEffect(() => {
+    if (!userId || !state.notifEnabled) return
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      registerPushSubscription(userId)
+    }
+  }, [userId])
+
   // ── Load stats from cloud on mount ────────────────────────────────────────
   useEffect(() => {
     if (!userId) return
@@ -366,6 +414,8 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
                     : nextMode === 'break'     ? 'Neem een pauze.'
                                                : 'Tijd om te focussen!'
         sendNotif(title, body)
+        // Push notification — reaches the device even when the browser is closed
+        sendPushNotif(userId, title, body, 'pomodoro')
       }
 
       // Compute next state values for broadcast (reducer hasn't run yet)
@@ -584,10 +634,20 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
   }
 
   const toggleNotif = async () => {
-    if (!state.notifEnabled && typeof Notification !== 'undefined' && Notification.permission === 'default') {
-      await Notification.requestPermission()
+    if (!state.notifEnabled) {
+      // Enabling — request permission + register push subscription
+      if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+        const perm = await Notification.requestPermission()
+        if (perm !== 'granted') return
+      } else if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
+        alert('Meldingen zijn geblokkeerd. Sta ze toe via de browser-instellingen.')
+        return
+      }
+      dispatch({ type: 'TOGGLE_NOTIF' })
+      await registerPushSubscription(userId)
+    } else {
+      dispatch({ type: 'TOGGLE_NOTIF' })
     }
-    dispatch({ type: 'TOGGLE_NOTIF' })
   }
 
   const skipPopup = () => setPopup(null)
