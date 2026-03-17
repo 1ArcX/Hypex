@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Truck, RefreshCw, AlertCircle, ChevronDown, ChevronUp, LogIn, LogOut, Map, Bell, BellOff } from 'lucide-react'
+import { Truck, RefreshCw, AlertCircle, ChevronDown, ChevronUp, LogIn, LogOut, Map as MapIcon, Bell, BellOff } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 
 // Jumbo 7044 — Dronten
@@ -619,7 +619,7 @@ export default function VrachttijdenWidget() {
                               }}>
                               {rd?.loading
                                 ? <><RefreshCw size={12} style={{ animation:'spin 1s linear infinite' }} /> Route laden...</>
-                                : <><Map size={12} /> {mapShown ? 'Kaart verbergen' : 'Toon route op kaart'}</>
+                                : <><MapIcon size={12} /> {mapShown ? 'Kaart verbergen' : 'Toon route op kaart'}</>
                               }
                             </button>
 
