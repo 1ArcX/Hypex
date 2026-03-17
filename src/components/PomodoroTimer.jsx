@@ -416,7 +416,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
   ])
 
   // ── Cross-device sync via Supabase Realtime ───────────────────────────────
-  const broadcastState = useCallback((s, endTime) => {
+  const broadcastState = useCallback((s, endTime, forced = false) => {
     if (!channelRef.current || !userId) return
     channelRef.current.send({
       type: 'broadcast', event: 'state',
@@ -425,16 +425,36 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
         longBreakMins: s.longBreakMins, sessionsPerLong: s.sessionsPerLong,
         sessionsInCycle: s.sessionsInCycle, totalSessions: s.totalSessions,
         seconds: s.seconds, running: s.running, task: s.task, endTime,
+        forced,
       }
     })
   }, [userId])
 
   function applyRemoteState(remote) {
     if (!remote) return
-    // User recently touched controls locally — ignore remote for 30s
-    if (Date.now() < localControlUntil.current) return
     const local = stateRef.current
-    // Always accept if remote is running; accept paused state only when local is also paused
+
+    if (remote.forced) {
+      // Forced update (user pressed start/pause/skip/reset on another device) —
+      // always apply regardless of localControlUntil
+      endTimeRef.current = remote.endTime || null
+      dispatch({ type: 'RESTORE', payload: {
+        mode: remote.mode,
+        workMins: remote.workMins, breakMins: remote.breakMins,
+        longBreakMins: remote.longBreakMins, sessionsPerLong: remote.sessionsPerLong,
+        sessionsInCycle: remote.sessionsInCycle, totalSessions: remote.totalSessions,
+        seconds: remote.running && remote.endTime
+          ? Math.max(0, Math.ceil((remote.endTime - Date.now()) / 1000))
+          : remote.seconds,
+        running: remote.running,
+        task: remote.task,
+        soundEnabled: local.soundEnabled, notifEnabled: local.notifEnabled,
+      }})
+      return
+    }
+
+    // Non-forced (periodic tick broadcast) — respect local control window
+    if (Date.now() < localControlUntil.current) return
     if (!remote.running && local.running) return
 
     // Fast path: both running same mode → just sync endTime, local tick handles display
@@ -507,7 +527,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
       endTimeRef.current = endTime
       dispatch({ type: 'SET_RUN', value: true })
       onModeChange?.(state.mode !== 'work')
-      broadcastState({ ...state, running: true }, endTime)
+      broadcastState({ ...state, running: true }, endTime, true)
       setFocusMode(true); onFocusModeChange?.(true)
     } else {
       const remaining = endTimeRef.current
@@ -515,7 +535,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
         : state.seconds
       endTimeRef.current = null
       dispatch({ type: 'PAUSE', seconds: remaining })
-      broadcastState({ ...state, running: false, seconds: remaining }, null)
+      broadcastState({ ...state, running: false, seconds: remaining }, null, true)
     }
   }
 
@@ -523,7 +543,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
     claimLocalControl()
     endTimeRef.current = null
     dispatch({ type: 'RESET' })
-    broadcastState({ ...state, running: false, seconds: getMins(state) * 60 }, null)
+    broadcastState({ ...state, running: false, seconds: getMins(state) * 60 }, null, true)
   }
 
   const skip = () => {
@@ -532,7 +552,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
     const next = calcNextMode(state.mode, state.sessionsInCycle, state.sessionsPerLong)
     dispatch({ type: 'SKIP' })
     setTimeout(() => onModeChange?.(next !== 'work'), 0)
-    broadcastState({ ...state, running: false }, null)
+    broadcastState({ ...state, running: false }, null, true)
   }
 
   const switchMode = (mode) => {
@@ -561,7 +581,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
     endTimeRef.current = endTime
     dispatch({ type: 'SET_RUN', value: true })
     onModeChange?.(s.mode !== 'work')
-    broadcastState({ ...s, running: true }, endTime)
+    broadcastState({ ...s, running: true }, endTime, true)
   }
 
   // ── Display ───────────────────────────────────────────────────────────────
