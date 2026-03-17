@@ -11,6 +11,9 @@
 [functions."rain-check/rain-check"]
   schedule = "*/15 * * * *"
 
+[functions."pomodoro-cron/pomodoro-cron"]
+  schedule = "* * * * *"
+
 [[headers]]
   for = "/simacan-arrival.html"
   [headers.values]

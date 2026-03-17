@@ -43,6 +43,23 @@ async function sendPushNotif(userId, title, body, tag = 'pomodoro') {
   }
 }
 
+async function saveTimerSession(userId, endTime, state) {
+  if (!userId) return
+  await supabase.from('timer_sessions').upsert({
+    user_id: userId,
+    end_time: new Date(endTime).toISOString(),
+    mode: state.mode,
+    sessions_in_cycle: state.sessionsInCycle,
+    sessions_per_long: state.sessionsPerLong,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'user_id' })
+}
+
+async function clearTimerSession(userId) {
+  if (!userId) return
+  await supabase.from('timer_sessions').delete().eq('user_id', userId)
+}
+
 // ── Persistence ───────────────────────────────────────────────────────────────
 const LS_KEY   = 'pomodoro_v3'
 const LS_STATS = 'pomodoro_stats'
@@ -407,6 +424,8 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
       const nextMode  = calcNextMode(s.mode, s.sessionsInCycle, s.sessionsPerLong)
       const newTotal  = s.mode === 'work' ? s.totalSessions + 1 : s.totalSessions
       saveStatsToCloud(userIdRef.current, todayMins, newTotal)
+      // Remove session so the background cron doesn't double-fire a push
+      clearTimerSession(userIdRef.current)
 
       if (s.notifEnabled) {
         const title = s.mode === 'work' ? 'Focus sessie klaar! 🎯' : 'Pauze voorbij!'
@@ -414,8 +433,6 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
                     : nextMode === 'break'     ? 'Neem een pauze.'
                                                : 'Tijd om te focussen!'
         sendNotif(title, body)
-        // Push notification — reaches the device even when the browser is closed
-        sendPushNotif(userIdRef.current, title, body, 'pomodoro')
       }
 
       // Compute next state values for broadcast (reducer hasn't run yet)
@@ -598,6 +615,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
       onModeChange?.(state.mode !== 'work')
       broadcastState({ ...state, running: true }, endTime, true)
       setFocusMode(true); onFocusModeChange?.(true)
+      if (state.notifEnabled) saveTimerSession(userIdRef.current, endTime, state)
     } else {
       const remaining = endTimeRef.current
         ? Math.max(0, Math.ceil((endTimeRef.current - Date.now()) / 1000))
@@ -605,6 +623,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
       endTimeRef.current = null
       dispatch({ type: 'PAUSE', seconds: remaining })
       broadcastState({ ...state, running: false, seconds: remaining }, null, true)
+      clearTimerSession(userIdRef.current)
     }
   }
 
@@ -613,6 +632,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
     endTimeRef.current = null
     dispatch({ type: 'RESET' })
     broadcastState({ ...state, running: false, seconds: getMins(state) * 60 }, null, true)
+    clearTimerSession(userIdRef.current)
   }
 
   const skip = () => {
@@ -622,6 +642,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
     dispatch({ type: 'SKIP' })
     setTimeout(() => onModeChange?.(next !== 'work'), 0)
     broadcastState({ ...state, running: false }, null, true)
+    clearTimerSession(userIdRef.current)
   }
 
   const switchMode = (mode) => {
@@ -664,6 +685,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
     dispatch({ type: 'SET_RUN', value: true })
     onModeChange?.(s.mode !== 'work')
     broadcastState({ ...s, running: true }, endTime, true)
+    if (s.notifEnabled) saveTimerSession(userIdRef.current, endTime, s)
   }
 
   // ── Display ───────────────────────────────────────────────────────────────
