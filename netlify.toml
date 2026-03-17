@@ -14,6 +14,9 @@
 [functions."pomodoro-cron/pomodoro-cron"]
   schedule = "* * * * *"
 
+[functions."simacan-check/simacan-check"]
+  schedule = "*/5 * * * *"
+
 [[headers]]
   for = "/simacan-arrival.html"
   [headers.values]

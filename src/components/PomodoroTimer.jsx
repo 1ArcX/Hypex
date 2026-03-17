@@ -22,9 +22,10 @@ async function registerPushSubscription(userId) {
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC),
     })
-    // Delete old subscriptions first to prevent duplicates, then insert fresh
+    // Preserve existing fields (rain settings etc.), replace subscription endpoint only
+    const { data: existing } = await supabase.from('push_subscriptions').select('*').eq('user_id', userId).maybeSingle()
     await supabase.from('push_subscriptions').delete().eq('user_id', userId)
-    await supabase.from('push_subscriptions').insert({ user_id: userId, subscription: sub.toJSON() })
+    await supabase.from('push_subscriptions').insert({ ...(existing || {}), user_id: userId, subscription: sub.toJSON() })
   } catch (e) {
     console.error('Push subscribe failed:', e)
   }
@@ -458,7 +459,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
         onPomodoroActive?.(false)
       }, 0)
     } else {
-      dispatch({ type: 'TICK', seconds: Math.round(remainingMs / 1000) })
+      dispatch({ type: 'TICK', seconds: Math.ceil(remainingMs / 1000) })
     }
   }, [onModeChange, onPomodoroActive])
 

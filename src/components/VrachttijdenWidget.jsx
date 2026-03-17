@@ -2,6 +2,46 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Truck, RefreshCw, AlertCircle, ChevronDown, ChevronUp, LogIn, LogOut, Map as MapIcon, Bell, BellOff } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 
+const VAPID_PUBLIC = 'BCsu1QaHUead0cgQ23qUKIu3_MnSi0s21LaD_c9wBcqdP43A9ojEx-nWZ4_xUDYLVMQn0CqzqdhSuLQr6eOQqh4'
+
+function urlBase64ToUint8Array(b64) {
+  const pad = '='.repeat((4 - b64.length % 4) % 4)
+  const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'))
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)))
+}
+
+async function sendVrachtPush(userId, title, body, tag = 'vracht') {
+  if (!userId) return
+  try {
+    await fetch('/.netlify/functions/pomodoro-notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, title, body, tag }),
+    })
+  } catch (e) { console.error('Vracht push failed:', e) }
+}
+
+async function registerVrachtSubscription(userId) {
+  if (!userId || !('serviceWorker' in navigator) || !('PushManager' in window)) return
+  try {
+    const reg = await navigator.serviceWorker.ready
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC) })
+    const { data: existing } = await supabase.from('push_subscriptions').select('*').eq('user_id', userId).maybeSingle()
+    await supabase.from('push_subscriptions').delete().eq('user_id', userId)
+    await supabase.from('push_subscriptions').insert({ ...(existing || {}), user_id: userId, subscription: sub.toJSON(), vracht_enabled: true })
+  } catch (e) { console.error('Vracht subscribe failed:', e) }
+}
+
+async function saveVrachtNotifyStops(userId, stopIds) {
+  if (!userId) return
+  await supabase.from('push_subscriptions').update({ vracht_notify_stops: stopIds }).eq('user_id', userId)
+}
+
+async function saveSimacanState(userId, stopStates) {
+  if (!userId) return
+  await supabase.from('simacan_state').upsert({ user_id: userId, stop_states: stopStates, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+}
+
 // Jumbo 7044 — Dronten
 const STORE_LAT = 52.5222
 const STORE_LNG = 5.7178
@@ -253,6 +293,15 @@ const PALLET_LABELS = { DIEPVRIES:'❄ Diepvries', AMBIENT:'Ambient', VERS:'Vers
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function VrachttijdenWidget() {
+  const [userId, setUserId] = useState(null)
+  const userIdRef = useRef(null)
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUserId(user?.id || null)
+      userIdRef.current = user?.id || null
+    })
+  }, [])
+
   const [tokens,      setTokens]      = useState(() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) } catch { return null } })
   const [stops,       setStops]       = useState(null)
   const [loading,     setLoading]     = useState(false)
@@ -308,39 +357,37 @@ export default function VrachttijdenWidget() {
       setStops(arr)
       setLastUpdate(new Date())
 
-      // ── Notificaties controleren ──────────────────────────────────────────
-      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-        for (const stop of arr) {
-          if (!notifyStopsRef.current.has(stop.id)) continue
-          const eta    = stop.actualStartTime || stop.eta || stop.plannedStartTime
-          const etaFmt = eta ? new Date(eta).toLocaleTimeString('nl-NL', { hour:'2-digit', minute:'2-digit' }) : '?'
-          const act    = stop.tripStatus?.activity
-          const delay  = stop.delay
-          const tripId = stop.trip?.tripId || `Rit`
-          const prev   = prevStopStates.current.get(stop.id)
+      // ── Notificaties controleren (push) ───────────────────────────────────
+      for (const stop of arr) {
+        if (!notifyStopsRef.current.has(stop.id)) continue
+        const eta    = stop.actualStartTime || stop.eta || stop.plannedStartTime
+        const etaFmt = eta ? new Date(eta).toLocaleTimeString('nl-NL', { hour:'2-digit', minute:'2-digit' }) : '?'
+        const act    = stop.tripStatus?.activity
+        const delay  = stop.delay
+        const tripId = stop.trip?.tripId || 'Rit'
+        const prev   = prevStopStates.current.get(stop.id)
 
-          if (prev) {
-            // Vertraging veranderd (≥ 3 min verschil)
-            if (prev.delay != null && delay != null && Math.abs(delay - prev.delay) >= 3) {
-              const more = delay > prev.delay
-              new Notification('🚛 Vrachttijden', {
-                body: more
-                  ? `${tripId} loopt meer uit (+${delay} min) — komt nu om ${etaFmt}`
-                  : `${tripId} loopt in (${delay > 0 ? '+' : ''}${delay} min) — komt om ${etaFmt}`,
-                icon: '/favicon.ico', tag: `delay-${stop.id}`
-              })
-            }
-            // Aangekomen
-            if (prev.activity !== 'AFGEROND' && act === 'AFGEROND') {
-              new Notification('✅ Vracht aangekomen', {
-                body: `${tripId} is aangekomen${stop.actualStartTime ? ' om ' + new Date(stop.actualStartTime).toLocaleTimeString('nl-NL', { hour:'2-digit', minute:'2-digit' }) : ''}`,
-                icon: '/favicon.ico', tag: `arrived-${stop.id}`
-              })
-            }
+        if (prev) {
+          if (prev.delay != null && delay != null && Math.abs(delay - prev.delay) >= 3) {
+            const more = delay > prev.delay
+            sendVrachtPush(userIdRef.current, '🚛 Vrachttijden',
+              more ? `${tripId} loopt meer uit (+${delay} min) — komt nu om ${etaFmt}`
+                   : `${tripId} loopt in (${delay > 0 ? '+' : ''}${delay} min) — komt om ${etaFmt}`,
+              `delay-${stop.id}`)
           }
-          prevStopStates.current.set(stop.id, { delay, activity: act, eta })
+          if (prev.activity !== 'AFGEROND' && act === 'AFGEROND') {
+            sendVrachtPush(userIdRef.current, '✅ Vracht aangekomen',
+              `${tripId} is aangekomen${stop.actualStartTime ? ' om ' + new Date(stop.actualStartTime).toLocaleTimeString('nl-NL', { hour:'2-digit', minute:'2-digit' }) : ''}`,
+              `arrived-${stop.id}`)
+          }
         }
+        prevStopStates.current.set(stop.id, { delay, activity: act, eta })
       }
+
+      // Sla huidige staat op zodat de achtergrond-cron geen dubbele meldingen stuurt
+      const stateSnapshot = {}
+      for (const stop of arr) stateSnapshot[stop.id] = { delay: stop.delay, activity: stop.tripStatus?.activity, eta: stop.actualStartTime || stop.eta || stop.plannedStartTime }
+      saveSimacanState(userIdRef.current, stateSnapshot)
     } catch (e) { setError(e.message) }
     setLoading(false)
   }, [saveTokens])
@@ -378,15 +425,20 @@ export default function VrachttijdenWidget() {
 
   const toggleNotify = useCallback(async (stopId) => {
     if (notifyStopsRef.current.has(stopId)) {
-      setNotifyStops(p => { const n = new Set(p); n.delete(stopId); return n })
+      const updated = new Set([...notifyStopsRef.current].filter(id => id !== stopId))
+      setNotifyStops(updated)
+      saveVrachtNotifyStops(userIdRef.current, [...updated])
     } else {
       if (typeof Notification === 'undefined') return
       if (Notification.permission !== 'granted') {
         const perm = await Notification.requestPermission()
         if (perm !== 'granted') return
       }
-      setNotifyStops(p => new Set([...p, stopId]))
-      new Notification('🔔 Meldingen ingeschakeld', { body: 'Je krijgt een melding bij vertraging of aankomst.', icon: '/favicon.ico', tag: 'notify-on' })
+      await registerVrachtSubscription(userIdRef.current)
+      const updated = new Set([...notifyStopsRef.current, stopId])
+      setNotifyStops(updated)
+      saveVrachtNotifyStops(userIdRef.current, [...updated])
+      sendVrachtPush(userIdRef.current, '🔔 Vrachttijden', 'Je krijgt een melding bij vertraging of aankomst.', 'vracht-enabled')
     }
   }, [])
 
