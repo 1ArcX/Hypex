@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
-import { X, Save, Shield, ExternalLink } from 'lucide-react'
+import { X, Save, Shield, Bell } from 'lucide-react'
 
 const ALLE_VAKKEN = [
   'Aardrijkskunde', 'Bedrijfseconomie', 'Bewegen, sport en maatschappij (BSM)',
@@ -15,6 +15,24 @@ export default function AdminPanel({ onClose }) {
   const [links, setLinks] = useState({})
   const [saving, setSaving] = useState(null)
   const [saved, setSaved] = useState(null)
+  const [testStatus, setTestStatus] = useState(null) // null | 'sending' | 'ok' | 'err'
+
+  const sendTestPush = async () => {
+    setTestStatus('sending')
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setTestStatus('err'); return }
+      const res = await fetch('/.netlify/functions/pomodoro-notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, title: 'Test melding', body: 'Push notificaties werken!', tag: 'test' }),
+      })
+      setTestStatus(res.ok ? 'ok' : 'err')
+    } catch {
+      setTestStatus('err')
+    }
+    setTimeout(() => setTestStatus(null), 3000)
+  }
 
   useEffect(() => {
     supabase.from('subject_links').select('*').then(({ data }) => {
@@ -49,6 +67,27 @@ export default function AdminPanel({ onClose }) {
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}>
             <X size={20} />
+          </button>
+        </div>
+
+        {/* ── Push test ── */}
+        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', padding: '12px', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', fontWeight: 600, margin: 0 }}>Push melding testen</p>
+            <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', margin: '2px 0 0' }}>Stuurt een test-notificatie naar dit account</p>
+          </div>
+          <button onClick={sendTestPush} disabled={testStatus === 'sending'}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 14px', borderRadius: '10px', border: '1px solid',
+              cursor: testStatus === 'sending' ? 'default' : 'pointer',
+              fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap',
+              background: testStatus === 'ok' ? 'rgba(0,255,136,0.12)' : testStatus === 'err' ? 'rgba(255,80,80,0.12)' : 'rgba(0,255,209,0.1)',
+              borderColor: testStatus === 'ok' ? 'rgba(0,255,136,0.4)' : testStatus === 'err' ? 'rgba(255,80,80,0.4)' : 'rgba(0,255,209,0.3)',
+              color: testStatus === 'ok' ? '#00ff88' : testStatus === 'err' ? '#ff5050' : '#00FFD1',
+            }}>
+            <Bell size={12} />
+            {testStatus === 'sending' ? 'Versturen...' : testStatus === 'ok' ? 'Verstuurd!' : testStatus === 'err' ? 'Mislukt' : 'Verstuur test'}
           </button>
         </div>
 
