@@ -394,9 +394,9 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
   // ── Tick ──────────────────────────────────────────────────────────────────
   const tick = useCallback(() => {
     if (!endTimeRef.current) return
-    const remaining = Math.ceil((endTimeRef.current - Date.now()) / 1000)
+    const remainingMs = endTimeRef.current - Date.now()
 
-    if (remaining <= 0) {
+    if (remainingMs <= 0) {
       clearInterval(intervalRef.current)
       endTimeRef.current = null
       const s = stateRef.current
@@ -441,7 +441,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
         onPomodoroActive?.(false)
       }, 0)
     } else {
-      dispatch({ type: 'TICK', seconds: remaining })
+      dispatch({ type: 'TICK', seconds: Math.round(remainingMs / 1000) })
     }
   }, [onModeChange, onPomodoroActive])
 
