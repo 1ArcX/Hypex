@@ -45,6 +45,7 @@ export default function SpotifyWidget() {
   const [recentTracks, setRecentTracks] = useState(null)
   const [recentError, setRecentError] = useState(false)
   const [tab, setTab] = useState('nu')
+  const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 768)
   const [needsReconnect, setNeedsReconnect] = useState(() =>
     !!localStorage.getItem('spotify_token') &&
     !(localStorage.getItem('spotify_scopes') || '').includes('user-read-recently-played')
@@ -254,6 +255,26 @@ export default function SpotifyWidget() {
     }
   }
 
+  useEffect(() => {
+    const handler = () => setIsDesktop(window.innerWidth >= 768)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
+
+  // Switch tab away from 'queue' when on desktop
+  useEffect(() => {
+    if (isDesktop && tab === 'queue') setTab('nu')
+  }, [isDesktop, tab])
+
+  const playQueueTrack = async (uri) => {
+    await fetch('https://api.spotify.com/v1/me/player/play', {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uris: [uri] }),
+    })
+    setTimeout(() => { fetchPlayback(); fetchQueue() }, 600)
+  }
+
   const handleLogout = () => {
     localStorage.removeItem('spotify_token')
     localStorage.removeItem('spotify_refresh')
@@ -289,7 +310,7 @@ export default function SpotifyWidget() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
-        {['nu', 'queue', 'recent'].map(t => (
+        {(isDesktop ? ['nu', 'recent'] : ['nu', 'queue', 'recent']).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
             flex: 1, padding: '4px', borderRadius: 6, fontSize: 10, cursor: 'pointer',
             border: '1px solid',
@@ -358,7 +379,12 @@ export default function SpotifyWidget() {
                 <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.22)', letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>Wachtrij</span>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   {queueTracks.map((t, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <div key={i}
+                      onClick={() => t.uri && playQueueTrack(t.uri)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', borderRadius: 6, padding: '2px 4px', margin: '0 -4px', transition: 'background 0.1s' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
                       {t.album?.images?.[2]?.url && (
                         <img src={t.album.images[2].url} style={{ width: 22, height: 22, borderRadius: 3, flexShrink: 0 }} alt="" />
                       )}
@@ -387,7 +413,12 @@ export default function SpotifyWidget() {
               Wachtrij is leeg
             </p>
           ) : queueTracks.map((t, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0' }}>
+            <div key={i}
+              onClick={() => t.uri && playQueueTrack(t.uri)}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', borderRadius: 8, cursor: 'pointer', transition: 'background 0.1s' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
               {t.album?.images?.[2]?.url && (
                 <img src={t.album.images[2].url} style={{ width: 32, height: 32, borderRadius: 4, flexShrink: 0 }} alt="" />
               )}
