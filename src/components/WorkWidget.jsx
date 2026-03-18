@@ -67,8 +67,10 @@ export default function WorkWidget() {
     setLoading(true); setError(null); setApiUnknown(false)
     try {
       const data = await callPmt(c, 'schedule', { week: w, year: y })
-      setShifts(data.shifts || [])
+      const fetchedShifts = data.shifts || []
+      setShifts(fetchedShifts)
       if (data.error === 'api_unknown') setApiUnknown(true)
+      try { localStorage.setItem('pmt_work_shifts', JSON.stringify(fetchedShifts)) } catch {}
     } catch (e) {
       if (e.message === 'api_unknown') setApiUnknown(true)
       else setError(e.message)

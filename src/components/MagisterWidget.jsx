@@ -217,7 +217,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
   const accentBorder = (pct) => `1px solid color-mix(in srgb, var(--accent) ${pct}%, transparent)`
 
   return (
-    <div className="glass-card p-4">
+    <div className={tabless ? '' : 'glass-card p-4'}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: expanded ? '12px' : 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -307,8 +307,15 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
 
               {/* Vakken tab */}
               {(tabless || tab === 'vakken') && (
-                <div style={tabless ? { marginBottom: 20 } : {}}>
-                  {tabless && <p style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.07em', textTransform: 'uppercase', margin: '0 0 8px' }}>Vakken</p>}
+                <div style={tabless ? { marginBottom: 16 } : {}}>
+                  {tabless && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <span style={{ fontSize: 16 }}>📚</span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>Vakken</span>
+                      {klas && <span style={{ background: accentBg(10), border: accentBorder(25), borderRadius: 20, padding: '1px 8px', fontSize: 10, color: 'var(--accent)' }}>{klas}</span>}
+                    </div>
+                  )}
+                  <div className={tabless ? 'card' : ''} style={tabless ? { padding: '14px 16px' } : {}}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       {klas && (
@@ -357,6 +364,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                       )
                     })}
                   </div>
+                  </div>{/* close tabless card */}
                 </div>
               )}
 
@@ -377,8 +385,15 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
 
               {/* Cijfers */}
               {(tabless || tab === 'cijfers') && !loading && data.grades && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', ...(tabless ? { marginBottom: 20 } : {}) }}>
-                  {tabless && <p style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.07em', textTransform: 'uppercase', margin: '0 0 8px' }}>Cijfers</p>}
+                <div style={tabless ? { marginBottom: 16 } : {}}>
+                  {tabless && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <span style={{ fontSize: 16 }}>📊</span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>Cijfers</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-3)' }}>recent</span>
+                    </div>
+                  )}
+                  <div className={tabless ? 'card' : ''} style={{ display: 'flex', flexDirection: 'column', gap: '4px', ...(tabless ? { padding: '14px 16px' } : {}) }}>
                   {data.grades.length === 0 && (
                     <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>Geen cijfers gevonden</p>
                   )}
@@ -399,13 +414,20 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                       </div>
                     )
                   })}
+                  </div>{/* close tabless card */}
                 </div>
               )}
 
-              {/* Huiswerk */}
+              {/* Huiswerk / Studiewijzer */}
               {(tabless || tab === 'huiswerk') && !loading && data.homework && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', ...(tabless ? { marginBottom: 20 } : {}) }}>
-                  {tabless && <p style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.07em', textTransform: 'uppercase', margin: '0 0 8px' }}>Studiewijzer</p>}
+                <div style={tabless ? { marginBottom: 16 } : {}}>
+                  {tabless && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <span style={{ fontSize: 16 }}>📋</span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>Studiewijzer</span>
+                    </div>
+                  )}
+                  <div className={tabless ? 'card' : ''} style={{ display: 'flex', flexDirection: 'column', gap: '4px', ...(tabless ? { padding: '14px 16px' } : {}) }}>
                   {data.homework.length === 0 && (
                     <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>Geen huiswerk gevonden</p>
                   )}
@@ -419,13 +441,20 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                       {hw.datum && <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', margin: '3px 0 0' }}>{formatDate(hw.datum)}</p>}
                     </div>
                   ))}
+                  </div>{/* close tabless card */}
                 </div>
               )}
 
               {/* Opdrachten */}
               {(tabless || tab === 'opdrachten') && !loading && data.assignments && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', ...(tabless ? { marginBottom: 20 } : {}) }}>
-                  {tabless && <p style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.07em', textTransform: 'uppercase', margin: '0 0 8px' }}>Opdrachten</p>}
+                <div style={tabless ? { marginBottom: 16 } : {}}>
+                  {tabless && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <span style={{ fontSize: 16 }}>📝</span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>Opdrachten</span>
+                    </div>
+                  )}
+                  <div className={tabless ? 'card' : ''} style={{ display: 'flex', flexDirection: 'column', gap: '4px', ...(tabless ? { padding: '14px 16px' } : {}) }}>
                   {data.assignments.length === 0 && (
                     <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>Geen opdrachten gevonden</p>
                   )}
@@ -455,6 +484,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                       </div>
                     )
                   })}
+                  </div>{/* close tabless card */}
                 </div>
               )}
 

@@ -266,12 +266,15 @@ export default function SpotifyWidget() {
     if (isDesktop && tab === 'queue') setTab('nu')
   }, [isDesktop, tab])
 
-  const playQueueTrack = async (uri) => {
-    await fetch('https://api.spotify.com/v1/me/player/play', {
-      method: 'PUT',
-      headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uris: [uri] }),
-    })
+  const playQueueTrack = async (index) => {
+    // Skip (index + 1) times to reach the song while keeping queue/playlist context
+    for (let i = 0; i <= index; i++) {
+      await fetch('https://api.spotify.com/v1/me/player/next', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${getToken()}` },
+      })
+      if (i < index) await new Promise(r => setTimeout(r, 250))
+    }
     setTimeout(() => { fetchPlayback(); fetchQueue() }, 600)
   }
 
@@ -378,9 +381,9 @@ export default function SpotifyWidget() {
               <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                 <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.22)', letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>Wachtrij</span>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {queueTracks.map((t, i) => (
+                  {(isDesktop ? queueTracks : queueTracks.slice(0, 1)).map((t, i) => (
                     <div key={i}
-                      onClick={() => t.uri && playQueueTrack(t.uri)}
+                      onClick={() => playQueueTrack(i)}
                       style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', borderRadius: 6, padding: '2px 4px', margin: '0 -4px', transition: 'background 0.1s' }}
                       onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
@@ -414,7 +417,7 @@ export default function SpotifyWidget() {
             </p>
           ) : queueTracks.map((t, i) => (
             <div key={i}
-              onClick={() => t.uri && playQueueTrack(t.uri)}
+              onClick={() => playQueueTrack(i)}
               style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', borderRadius: 8, cursor: 'pointer', transition: 'background 0.1s' }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}

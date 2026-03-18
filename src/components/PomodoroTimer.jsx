@@ -311,10 +311,11 @@ function CompletionPopup({ prevMode, nextMode, onStart, onSkip }) {
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusModeChange, userId }) {
+export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusModeChange, userId, noFocusOverlay = false, onSessionComplete }) {
   const [state, dispatch] = useReducer(reducer, INIT)
   const stateRef           = useRef(state)
   const endTimeRef         = useRef(null)
+  const startTimeRef       = useRef(null)
   const intervalRef        = useRef(null)
   const channelRef         = useRef(null)
   const localControlUntil  = useRef(0)
@@ -429,6 +430,12 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
       saveStatsToCloud(userIdRef.current, todayMins, newTotal)
       // Remove session so the background cron doesn't double-fire a push
       clearTimerSession(userIdRef.current)
+      onSessionComplete?.({
+        mode: s.mode, durationMins: getMins(s), tag: s.task,
+        startedAt: startTimeRef.current, completedAt: Date.now(),
+        date: new Date().toISOString().slice(0, 10),
+      })
+      startTimeRef.current = null
 
       if (s.notifEnabled) {
         const title = s.mode === 'work' ? 'Focus sessie klaar! 🎯' : 'Pauze voorbij!'
@@ -614,10 +621,11 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
     if (!state.running) {
       const endTime = Date.now() + state.seconds * 1000
       endTimeRef.current = endTime
+      startTimeRef.current = Date.now()
       dispatch({ type: 'SET_RUN', value: true })
       onModeChange?.(state.mode !== 'work')
       broadcastState({ ...state, running: true }, endTime, true)
-      setFocusMode(true); onFocusModeChange?.(true)
+      if (!noFocusOverlay) { setFocusMode(true); onFocusModeChange?.(true) }
       if (state.notifEnabled) saveTimerSession(userIdRef.current, endTime, state)
     } else {
       const remaining = endTimeRef.current
@@ -649,6 +657,10 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
   }
 
   const switchMode = (mode) => {
+    if (state.running) {
+      const ok = window.confirm(`Timer loopt nog. Stoppen en wisselen naar ${MODES[mode].label}?`)
+      if (!ok) return
+    }
     claimLocalControl()
     endTimeRef.current = null
     dispatch({ type: 'SWITCH', mode })
@@ -726,7 +738,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
       )}
 
       {/* Focus mode overlay */}
-      {focusMode && !popup && (
+      {focusMode && !popup && !noFocusOverlay && (
         <FocusMode
           mode={mode}
           seconds={seconds}
@@ -948,18 +960,20 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
             <SkipForward size={15} />
           </button>
 
-          <button
-            onClick={() => { setFocusMode(true); onFocusModeChange?.(true) }}
-            title="Focusmodus"
-            style={{
-              ...iconBtn,
-              display: 'flex', alignItems: 'center', gap: 4,
-              width: 'auto', padding: '0 10px', fontSize: 11, fontWeight: 600,
-              color: 'rgba(255,255,255,0.5)',
-            }}
-          >
-            <Maximize2 size={13} /> Focus
-          </button>
+          {!noFocusOverlay && (
+            <button
+              onClick={() => { setFocusMode(true); onFocusModeChange?.(true) }}
+              title="Focusmodus"
+              style={{
+                ...iconBtn,
+                display: 'flex', alignItems: 'center', gap: 4,
+                width: 'auto', padding: '0 10px', fontSize: 11, fontWeight: 600,
+                color: 'rgba(255,255,255,0.5)',
+              }}
+            >
+              <Maximize2 size={13} /> Focus
+            </button>
+          )}
         </div>
 
         {/* ── Daily stats ── */}

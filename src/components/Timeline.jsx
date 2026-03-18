@@ -172,6 +172,13 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, defaultV
     if (data) setEvents(data)
   }
 
+  const getWorkShiftsForDay = (date) => {
+    try {
+      const ds = toDateStr(date)
+      return (JSON.parse(localStorage.getItem('pmt_work_shifts')) || []).filter(s => s.date?.slice(0, 10) === ds)
+    } catch { return [] }
+  }
+
   const getMagisterLessonsForDay = (date) => magisterLessons.filter(les => {
     if (!les.start) return false
     return isSameDay(new Date(les.start), date)
@@ -372,9 +379,15 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, defaultV
               const colEvents = getEventsForDay(d)
               const colTasks = getTasksForDay(d)
               const colLessons = getMagisterLessonsForDay(d)
+              const colWorkShifts = getWorkShiftsForDay(d)
 
               // Build unified item list for overlap computation
               const allItems = [
+                ...colWorkShifts.map((sh, si) => {
+                  const startMins = timeStrToMins(sh.start)
+                  const endMins = Math.max(startMins + 30, timeStrToMins(sh.end))
+                  return { type: 'work', key: `work-${di}-${si}`, startMins, endMins, data: sh }
+                }),
                 ...colLessons.map((les, li) => {
                   const s = new Date(les.start), en = new Date(les.einde || les.start)
                   const startMins = s.getHours()*60 + s.getMinutes()
@@ -410,6 +423,22 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, defaultV
                     const widthPct = subFrac * 100
                     const leftStyle = `calc(${TIME_COL}px + ${leftPct}%)`
                     const widthStyle = `calc(${widthPct}% - 4px)`
+
+                    if (item.type === 'work') {
+                      const sh = item.data
+                      return (
+                        <div key={item.key} style={{ position: 'absolute', top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, background: 'rgba(255,140,0,0.15)', borderLeft: '3px solid #FF8C42', borderRadius: '5px', padding: '3px 7px', overflow: 'hidden', zIndex: 1, boxSizing: 'border-box', marginLeft: '2px' }}>
+                          <div style={{ fontSize: '11px', fontWeight: 600, color: '#FF8C42', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            💼 Jumbo
+                          </div>
+                          {showDetail && (
+                            <div style={{ fontSize: '10px', color: '#FF8C42aa', lineHeight: 1.3, marginTop: '1px' }}>
+                              {sh.start} – {sh.end}{sh.label ? ` · ${sh.label}` : ''}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    }
 
                     if (item.type === 'lesson') {
                       const les = item.data
