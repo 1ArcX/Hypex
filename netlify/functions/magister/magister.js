@@ -39,8 +39,10 @@ async function fetchAuthCode() {
     console.log('scriptMatch:', scriptMatch ? scriptMatch[1] : 'null')
     if (scriptMatch) {
       const bundleUrl = scriptMatch[1].startsWith('http') ? scriptMatch[1] : `https://accounts.magister.net/${scriptMatch[1].replace(/^\//, '')}`
-      const jsRes = await fetch(bundleUrl, { timeout: 20000 })
+      const jsRes = await fetch(bundleUrl, { timeout: 20000, headers: { 'Accept-Encoding': 'identity', 'User-Agent': 'Mozilla/5.0' } })
+      console.log('bundle status:', jsRes.status, 'encoding:', jsRes.headers.get('content-encoding'), 'type:', jsRes.headers.get('content-type'))
       const js = await jsRes.text()
+      console.log('bundle length:', js.length, 'first 100:', js.slice(0, 100))
       // Log all unique 14-char hex strings in bundle
       const hexMatches = [...new Set(js.match(/[0-9a-f]{14}/g) || [])]
       console.log('14-char hex strings in bundle:', hexMatches.slice(0, 10).join(', '))
