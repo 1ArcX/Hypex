@@ -29,43 +29,50 @@ const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,
 // Magister embeds it as [[char_lookup],[indices]] in the bundle:
 //   authCode = z[1].map(x => z[0][parseInt(x)||0]).join("")
 async function extractAuthCode(loginPageUrl, cookieStr) {
-  const res = await fetch(loginPageUrl, {
-    timeout: 10000,
-    headers: { 'User-Agent': UA, 'Accept-Encoding': 'identity', 'Accept': 'text/html', cookie: cookieStr }
-  })
+  const baseH = { 'User-Agent': UA, 'Accept-Encoding': 'identity', cookie: cookieStr }
+
+  const res = await fetch(loginPageUrl, { timeout: 10000, headers: { ...baseH, 'Accept': 'text/html' } })
   const html = await res.text()
   const finalUrl = res.url
 
-  // Find the JS bundle on the login page
-  const scriptMatch = html.match(/src="([^"]*\.js[^"]*)"/)
-  if (!scriptMatch) throw new Error('Geen script op loginpagina')
-
-  const scriptUrl = new URL(scriptMatch[1], finalUrl).href
-  console.log('login script URL:', scriptUrl)
-
-  const jsRes = await fetch(scriptUrl, {
-    timeout: 20000,
-    headers: { 'User-Agent': UA, 'Accept-Encoding': 'identity', 'Referer': loginPageUrl, cookie: cookieStr }
-  })
-  if (!jsRes.ok) throw new Error(`Script fetch mislukt: ${jsRes.status}`)
-  const js = await jsRes.text()
-  console.log('login script length:', js.length)
-
-  // Find [[char_array],[index_array]] patterns and decode
-  for (const m of js.matchAll(/\[(\[[^\]]+\]),(\[\d[^\]]*\])\]/g)) {
-    try {
-      const z0 = JSON.parse(m[1])
-      const z1 = JSON.parse(m[2])
-      if (!Array.isArray(z0) || !Array.isArray(z1)) continue
-      if (!z0.every(s => typeof s === 'string') || !z1.every(n => typeof n === 'number')) continue
-      const code = z1.map(x => z0[parseInt(x) || 0]).join('')
-      if (/^[0-9a-f]{10,20}$/.test(code)) {
-        console.log('authCode decoded:', code)
-        return code
-      }
-    } catch {}
+  // Collect all candidate script URLs using multiple base URL interpretations
+  const srcs = [...html.matchAll(/src="([^"]*\.js[^"]*)"/g)].map(m => m[1])
+  const candidates = []
+  for (const src of srcs) {
+    for (const base of [finalUrl, finalUrl.split('?')[0] + '/', 'https://accounts.magister.net/account/', 'https://accounts.magister.net/']) {
+      try { const u = new URL(src, base).href; if (!candidates.includes(u)) candidates.push(u) } catch {}
+    }
   }
-  throw new Error('AuthCode patroon niet gevonden in loginpagina script')
+  console.log('script candidates:', candidates.join(' | '))
+
+  const decodeFromJs = (js) => {
+    // Pattern 1: [[char_lookup],[indices]]
+    for (const m of js.matchAll(/\[(\[[^\]]+\]),(\[\d[^\]]*\])\]/g)) {
+      try {
+        const z0 = JSON.parse(m[1]), z1 = JSON.parse(m[2])
+        if (!Array.isArray(z0) || !Array.isArray(z1)) continue
+        if (!z0.every(s => typeof s === 'string') || !z1.every(n => typeof n === 'number')) continue
+        const code = z1.map(x => z0[parseInt(x) || 0]).join('')
+        if (/^[0-9a-f]{10,20}$/.test(code)) return code
+      } catch {}
+    }
+    // Pattern 2: literal hex near authCode keyword
+    const lit = js.match(/authCode['":\s,({[]+['"]([0-9a-f]{10,20})['"]/i)
+    if (lit) return lit[1]
+    return null
+  }
+
+  for (const scriptUrl of candidates) {
+    try {
+      const jsRes = await fetch(scriptUrl, { timeout: 15000, headers: { ...baseH, 'Referer': loginPageUrl } })
+      if (!jsRes.ok) { console.log('script', jsRes.status, scriptUrl); continue }
+      const js = await jsRes.text()
+      const code = decodeFromJs(js)
+      if (code) { console.log('authCode:', code, 'from', scriptUrl); return code }
+    } catch (e) { console.log('script error:', e.message) }
+  }
+
+  throw new Error(`AuthCode niet gevonden (finalUrl: ${finalUrl}, ${candidates.length} scripts geprobeerd)`)
 }
 
 async function authenticate(school, username, password) {
