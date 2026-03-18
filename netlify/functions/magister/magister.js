@@ -24,10 +24,40 @@ function joinCookies(setCookieArray) {
   return (setCookieArray || []).map(c => c.split(';')[0]).join('; ')
 }
 
+// Cache authCode — changes with each weekly bundle deploy
+let _authCode = null
+let _authCodeFetched = 0
+
+async function fetchAuthCode() {
+  if (_authCode && Date.now() - _authCodeFetched < 3 * 60 * 60 * 1000) return _authCode
+
+  const htmlRes = await fetch('https://accounts.magister.net/', { timeout: 10000 })
+  const html = await htmlRes.text()
+
+  const scriptMatch = html.match(/src="(main\.[a-f0-9]+\.js)"/)
+  if (!scriptMatch) throw new Error('Magister bundle niet gevonden')
+
+  const jsUrl = `https://accounts.magister.net/${scriptMatch[1]}`
+  const jsRes = await fetch(jsUrl, { timeout: 20000 })
+  const js = await jsRes.text()
+
+  // Patterns ordered by specificity — authCode is always a 12-char hex string
+  const patterns = [
+    /authCode['":\s,({[]+['"]([0-9a-f]{12})['"]/i,
+    /['"]([0-9a-f]{12})['"](?=[^'"]{0,120}sessionId)/,
+    /sessionId(?:[^'"]{0,120})['"]([0-9a-f]{12})['"]/,
+  ]
+  for (const p of patterns) {
+    const m = js.match(p)
+    if (m) { _authCode = m[1]; _authCodeFetched = Date.now(); return _authCode }
+  }
+
+  throw new Error('AuthCode niet gevonden in Magister bundle')
+}
+
 async function authenticate(school, username, password) {
   const issuerUrl = 'https://accounts.magister.net'
-  // Extracted from accounts.magister.net/js/account-*.js  — update when AuthCodeValidation returns
-  const authCode = '4a1e5f4a1e5f'
+  const authCode = await fetchAuthCode()
   const noRedirects = { redirect: 'manual', follow: 0 }
 
   const issuer = await Issuer.discover(issuerUrl)
@@ -135,6 +165,8 @@ exports.handler = async (event) => {
   try {
     tokenSet = await authenticate(school, username, password)
   } catch (e) {
+    // Reset authCode cache so next request re-fetches the bundle
+    _authCode = null
     return err(e.message || 'Inloggen mislukt. Controleer je leerlingnummer en wachtwoord.', 401)
   }
 
