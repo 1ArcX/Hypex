@@ -25,30 +25,58 @@ function joinCookies(setCookieArray) {
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
 
-// Fetch authCode from Magister's session API (the login page JS fetches this at runtime)
-async function fetchAuthCode(sessionId, cookieStr, xsrfToken) {
+// Fetch authCode by scanning the login HTML for inline scripts and the bundle for API endpoint URLs
+async function fetchAuthCode(sessionId, loginPageUrl, cookieStr, xsrfToken) {
   const issuerUrl = 'https://accounts.magister.net'
-  const headers = {
+  const baseH = {
     'User-Agent': UA,
-    'Accept': 'application/json',
-    'Content-Type': 'application/json',
+    'Accept': 'text/html,application/xhtml+xml',
+    'Accept-Encoding': 'identity',
     cookie: cookieStr,
-    'X-XSRF-TOKEN': xsrfToken,
     'Origin': issuerUrl,
-    'Referer': `${issuerUrl}/account/login`
   }
 
-  // The login page JS calls /challenges/session to get the authCode
-  const res = await fetch(`${issuerUrl}/challenges/session?sessionId=${sessionId}`, { timeout: 10000, headers })
-  console.log('session endpoint status:', res.status)
-  const text = await res.text()
-  console.log('session response:', text.slice(0, 300))
+  // Fetch the full login HTML
+  const htmlRes = await fetch(loginPageUrl, { timeout: 10000, headers: baseH })
+  const html = await htmlRes.text()
+  console.log('login HTML (2000):', html.slice(0, 2000))
 
-  if (!res.ok) throw new Error(`Session endpoint ${res.status}: ${text.slice(0, 100)}`)
-  const data = JSON.parse(text)
-  const code = data.authCode || data.AuthCode
-  if (!code) throw new Error(`authCode niet in session response: ${JSON.stringify(Object.keys(data))}`)
-  return code
+  // Pattern 1: authCode in HTML inline script or data attribute
+  const inlineMatch = html.match(/authCode['":\s=]+['"]([0-9a-f]{8,20})['"]/)
+  if (inlineMatch) { console.log('authCode from HTML:', inlineMatch[1]); return inlineMatch[1] }
+
+  // Pattern 2: any data-* attribute with hex value
+  const dataMatch = html.match(/data-auth[^=]*=["']([0-9a-f]{8,20})["']/)
+  if (dataMatch) { console.log('authCode from data attr:', dataMatch[1]); return dataMatch[1] }
+
+  // Fetch the JS bundle and look for fetch() URLs that might give us the authCode
+  const bundleUrl = 'https://accounts.magister.net/js/account-7d007d40090e250ebfe8.js'
+  const bundleRes = await fetch(bundleUrl, { timeout: 15000, headers: { ...baseH, 'Accept': '*/*', 'Referer': loginPageUrl } })
+  const bundle = bundleRes.ok ? await bundleRes.text() : ''
+  console.log('bundle len:', bundle.length)
+
+  // Extract unique path strings from the bundle that look like API endpoints
+  const paths = [...new Set([...bundle.matchAll(/["'`](\/(?:challenges|account|session|api)[/\w-]*(?:\?[^"'`]*)?)["'`]/g)].map(m => m[1]))]
+  console.log('bundle paths:', paths.join(' | '))
+
+  // Try each path as a potential authCode source
+  const apiHeaders = { ...baseH, 'Accept': 'application/json', 'X-XSRF-TOKEN': xsrfToken, 'X-Requested-With': 'XMLHttpRequest' }
+  for (const path of paths) {
+    const url = `${issuerUrl}${path.includes('sessionId') ? path.replace(/sessionId=[^&"']*/, `sessionId=${sessionId}`) : path + (path.includes('?') ? '&' : '?') + `sessionId=${sessionId}`}`
+    try {
+      const r = await fetch(url, { timeout: 5000, headers: apiHeaders })
+      if (!r.ok) continue
+      const text = await r.text()
+      console.log('API hit', url, text.slice(0, 200))
+      try {
+        const d = JSON.parse(text)
+        const code = d.authCode || d.AuthCode || d.code
+        if (code && /^[0-9a-f]{8,20}$/i.test(code)) { console.log('authCode from API:', code, url); return code }
+      } catch {}
+    } catch {}
+  }
+
+  throw new Error(`authCode niet gevonden (${paths.length} bundle-paden geprobeerd)`)
 }
 
 async function authenticate(school, username, password) {
@@ -93,8 +121,9 @@ async function authenticate(school, username, password) {
   const xsrfEntry = rawCookies.find(c => c.split('=')[0] === 'XSRF-TOKEN')
   const xsrfToken = xsrfEntry.split('=')[1].split(';')[0]
 
-  // Step 2: Fetch authCode from Magister session API
-  const authCode = await fetchAuthCode(sessionId, cookieStr, xsrfToken)
+  // Step 2: Fetch authCode from login HTML or bundle API paths
+  const loginPageUrl = location.startsWith('http') ? location : issuerUrl + location
+  const authCode = await fetchAuthCode(sessionId, loginPageUrl, cookieStr, xsrfToken)
 
   const challengeHeaders = {
     'Content-Type': 'application/json',
