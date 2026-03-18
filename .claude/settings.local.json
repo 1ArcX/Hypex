@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "defaultMode": "bypassPermissions",
+    "allow": [
+      "WebFetch(domain:dribbble.com)",
+      "Bash(npm run:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

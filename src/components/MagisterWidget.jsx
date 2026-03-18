@@ -34,7 +34,7 @@ function toBookUrl(url) {
   return m ? `https://apps.noordhoff.nl/se/deeplink?targetEAN=${m[1]}` : url
 }
 
-export default function MagisterWidget({ userId, onSubjectsSync }) {
+export default function MagisterWidget({ userId, onSubjectsSync, tabless = false }) {
   const [creds, setCreds] = useState(() => {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || null } catch { return null }
   })
@@ -286,26 +286,29 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
 
           {!showSettings && (
             <>
-              {/* Tabs */}
-              <div style={{ display: 'flex', gap: '4px', marginBottom: '10px' }}>
-                {[
-                  { id: 'vakken', label: 'Vakken', icon: <BookMarked size={11} /> },
-                  ...(creds ? [
-                    { id: 'cijfers', label: 'Cijfers', icon: <BookOpen size={11} /> },
-                    { id: 'huiswerk', label: 'Huiswerk', icon: <ClipboardList size={11} /> },
-                    { id: 'opdrachten', label: 'Opdrachten', icon: <FileText size={11} /> },
-                  ] : [])
-                ].map(t => (
-                  <button key={t.id} onClick={() => setTab(t.id)}
-                    style={{ flex: 1, padding: '5px 4px', borderRadius: '8px', fontSize: '10px', cursor: 'pointer', border: '1px solid', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', borderColor: tab === t.id ? accentBg(50) : 'rgba(255,255,255,0.08)', background: tab === t.id ? accentBg(12) : 'transparent', color: tab === t.id ? 'var(--accent)' : 'rgba(255,255,255,0.4)' }}>
-                    {t.icon} {t.label}
-                  </button>
-                ))}
-              </div>
+              {/* Tabs (hidden in tabless mode) */}
+              {!tabless && (
+                <div style={{ display: 'flex', gap: '4px', marginBottom: '10px' }}>
+                  {[
+                    { id: 'vakken', label: 'Vakken', icon: <BookMarked size={11} /> },
+                    ...(creds ? [
+                      { id: 'cijfers', label: 'Cijfers', icon: <BookOpen size={11} /> },
+                      { id: 'huiswerk', label: 'Huiswerk', icon: <ClipboardList size={11} /> },
+                      { id: 'opdrachten', label: 'Opdrachten', icon: <FileText size={11} /> },
+                    ] : [])
+                  ].map(t => (
+                    <button key={t.id} onClick={() => setTab(t.id)}
+                      style={{ flex: 1, padding: '5px 4px', borderRadius: '8px', fontSize: '10px', cursor: 'pointer', border: '1px solid', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', borderColor: tab === t.id ? accentBg(50) : 'rgba(255,255,255,0.08)', background: tab === t.id ? accentBg(12) : 'transparent', color: tab === t.id ? 'var(--accent)' : 'rgba(255,255,255,0.4)' }}>
+                      {t.icon} {t.label}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {/* Vakken tab */}
-              {tab === 'vakken' && (
-                <div>
+              {(tabless || tab === 'vakken') && (
+                <div style={tabless ? { marginBottom: 20 } : {}}>
+                  {tabless && <p style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.07em', textTransform: 'uppercase', margin: '0 0 8px' }}>Vakken</p>}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       {klas && (
@@ -358,7 +361,7 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
               )}
 
               {/* Loading */}
-              {loading && tab !== 'vakken' && (
+              {loading && (tab !== 'vakken' || tabless) && (
                 <div style={{ textAlign: 'center', padding: '20px', color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>
                   <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite', display: 'block', margin: '0 auto 6px' }} />
                   Laden...
@@ -366,15 +369,16 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
               )}
 
               {/* Error */}
-              {error && !loading && tab !== 'vakken' && (
+              {error && !loading && (tab !== 'vakken' || tabless) && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ff6b6b', fontSize: '12px', padding: '8px', borderRadius: '8px', background: 'rgba(255,80,80,0.08)' }}>
                   <AlertCircle size={13} /> {error}
                 </div>
               )}
 
               {/* Cijfers */}
-              {tab === 'cijfers' && !loading && data.grades && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {(tabless || tab === 'cijfers') && !loading && data.grades && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', ...(tabless ? { marginBottom: 20 } : {}) }}>
+                  {tabless && <p style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.07em', textTransform: 'uppercase', margin: '0 0 8px' }}>Cijfers</p>}
                   {data.grades.length === 0 && (
                     <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>Geen cijfers gevonden</p>
                   )}
@@ -399,8 +403,9 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
               )}
 
               {/* Huiswerk */}
-              {tab === 'huiswerk' && !loading && data.homework && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {(tabless || tab === 'huiswerk') && !loading && data.homework && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', ...(tabless ? { marginBottom: 20 } : {}) }}>
+                  {tabless && <p style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.07em', textTransform: 'uppercase', margin: '0 0 8px' }}>Studiewijzer</p>}
                   {data.homework.length === 0 && (
                     <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>Geen huiswerk gevonden</p>
                   )}
@@ -418,8 +423,9 @@ export default function MagisterWidget({ userId, onSubjectsSync }) {
               )}
 
               {/* Opdrachten */}
-              {tab === 'opdrachten' && !loading && data.assignments && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {(tabless || tab === 'opdrachten') && !loading && data.assignments && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', ...(tabless ? { marginBottom: 20 } : {}) }}>
+                  {tabless && <p style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.07em', textTransform: 'uppercase', margin: '0 0 8px' }}>Opdrachten</p>}
                   {data.assignments.length === 0 && (
                     <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>Geen opdrachten gevonden</p>
                   )}

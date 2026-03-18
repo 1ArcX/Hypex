@@ -243,6 +243,7 @@ export default function AgendaPage({
                 defaultView="day"
                 initialDate={selectedDay}
                 isMobile
+                hideToolbar
               />
             </div>
           </>

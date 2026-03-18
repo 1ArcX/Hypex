@@ -41,7 +41,7 @@ export default function SpotifyWidget() {
   const [durationMs, setDurationMs] = useState(0)
   const [shuffleState, setShuffleState] = useState(false)
   const [repeatState, setRepeatState] = useState('off')
-  const [nextTrack, setNextTrack] = useState(null)
+  const [queueTracks, setQueueTracks] = useState([])
   const [recentTracks, setRecentTracks] = useState(null)
   const [recentError, setRecentError] = useState(false)
   const [tab, setTab] = useState('nu')
@@ -142,7 +142,7 @@ export default function SpotifyWidget() {
       { headers: { Authorization: `Bearer ${getToken()}` } })
     if (!res.ok) return
     const data = await res.json()
-    setNextTrack(data.queue?.[0] || null)
+    setQueueTracks(data.queue?.slice(0, 10) || [])
   }, [])
 
   // --- Fetch playback (vervangt fetchTrack) ---
@@ -352,16 +352,23 @@ export default function SpotifyWidget() {
               </button>
             </div>
 
-            {/* Volgend nummer */}
-            {nextTrack && (
-              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', whiteSpace: 'nowrap' }}>Volgend</span>
-                {nextTrack.album?.images?.[2]?.url && (
-                  <img src={nextTrack.album.images[2].url} style={{ width: 20, height: 20, borderRadius: 3 }} alt="" />
-                )}
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }} className="truncate">
-                  {nextTrack.name}
-                </span>
+            {/* Wachtrij inline */}
+            {queueTracks.length > 0 && (
+              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.22)', letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>Wachtrij</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {queueTracks.map((t, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                      {t.album?.images?.[2]?.url && (
+                        <img src={t.album.images[2].url} style={{ width: 22, height: 22, borderRadius: 3, flexShrink: 0 }} alt="" />
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</p>
+                        <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.artists?.map(a => a.name).join(', ')}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </>
@@ -374,24 +381,25 @@ export default function SpotifyWidget() {
 
       {/* Tab: Queue */}
       {tab === 'queue' && (
-        <div>
-          {nextTrack ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0' }}>
-              {nextTrack.album?.images?.[2]?.url && (
-                <img src={nextTrack.album.images[2].url} style={{ width: 32, height: 32, borderRadius: 4 }} alt="" />
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium truncate text-white">{nextTrack.name}</p>
-                <p className="text-xs truncate" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                  {nextTrack.artists?.map(a => a.name).join(', ')}
-                </p>
-              </div>
-            </div>
-          ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {queueTracks.length === 0 ? (
             <p className="text-xs text-center py-4" style={{ color: 'rgba(255,255,255,0.3)' }}>
               Wachtrij is leeg
             </p>
-          )}
+          ) : queueTracks.map((t, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0' }}>
+              {t.album?.images?.[2]?.url && (
+                <img src={t.album.images[2].url} style={{ width: 32, height: 32, borderRadius: 4, flexShrink: 0 }} alt="" />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium truncate text-white">{t.name}</p>
+                <p className="text-xs truncate" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                  {t.artists?.map(a => a.name).join(', ')}
+                </p>
+              </div>
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', flexShrink: 0 }}>{i + 1}</span>
+            </div>
+          ))}
         </div>
       )}
 

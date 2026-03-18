@@ -78,7 +78,7 @@ const emptyForm = (date, hour) => ({
   color: '#818CF8', recurrence: '', recurrence_days: []
 })
 
-export default function Timeline({ userId, tasks, subjects, onEditTask, defaultView = 'week', initialDate, isMobile = false, onLessonsChange, onEventsChange, onMagisterError }) {
+export default function Timeline({ userId, tasks, subjects, onEditTask, defaultView = 'week', initialDate, isMobile = false, hideToolbar = false, onLessonsChange, onEventsChange, onMagisterError }) {
   const [view, setView] = useState(defaultView)
   const [current, setCurrent] = useState(initialDate || new Date())
   const [events, setEvents] = useState([])
@@ -327,6 +327,19 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, defaultV
               </div>
             ))}
 
+            {/* Today column highlight */}
+            {days.map((d, di) => isSameDay(d, now) && N > 1 && (
+              <div key={`today-col-${di}`} style={{
+                position: 'absolute', top: 0, height: '100%',
+                left: `calc(${TIME_COL}px + ${di} * (100% - ${TIME_COL}px) / ${N})`,
+                width: `calc((100% - ${TIME_COL}px) / ${N})`,
+                background: 'rgba(0,255,209,0.04)',
+                borderLeft: '1px solid rgba(0,255,209,0.1)',
+                borderRight: '1px solid rgba(0,255,209,0.1)',
+                pointerEvents: 'none', zIndex: 0,
+              }} />
+            ))}
+
             {/* Hour lines + labels */}
             {Array.from({ length: 24 }, (_, h) => (
               <React.Fragment key={h}>
@@ -565,7 +578,7 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, defaultV
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderRadius: '16px', background: 'rgba(255,255,255,0.015)' }}>
       {/* Toolbar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0, gap: '8px', flexWrap: 'wrap' }}>
+      {!hideToolbar && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0, gap: '8px', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <button onClick={() => setCurrent(new Date())}
             style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)', fontSize: '11px', cursor: 'pointer', fontWeight: 500 }}>
@@ -606,7 +619,7 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, defaultV
             <Plus size={13} /> Nieuw
           </button>
         </div>
-      </div>
+      </div>}
 
       {/* View content — call as functions to prevent remount on re-render */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
