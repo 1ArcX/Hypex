@@ -85,10 +85,17 @@ async function extractAuthCode(loginPageUrl, cookieStr) {
       const jsRes = await fetch(scriptUrl, { timeout: 15000, headers: { ...baseH, 'Referer': loginPageUrl, 'Origin': 'https://accounts.magister.net' } })
       if (!jsRes.ok) { console.log('script', jsRes.status, scriptUrl); continue }
       const js = await jsRes.text()
-      console.log('script OK', scriptUrl, 'len:', js.length, 'preview:', js.slice(0, 100))
+      console.log('script OK', scriptUrl, 'len:', js.length)
+      // Log all occurrences of 'authCode' with surrounding context
+      let idx = 0, authHits = 0
+      while ((idx = js.indexOf('authCode', idx)) !== -1 && authHits < 5) {
+        console.log(`authCode hit @${idx}:`, JSON.stringify(js.slice(Math.max(0, idx - 20), idx + 80)))
+        authHits++; idx++
+      }
+      if (!authHits) console.log('no authCode string found in bundle, trying hex scan')
       const code = decodeFromJs(js)
       if (code) { console.log('authCode:', code, 'from', scriptUrl); return code }
-      console.log('authCode not found in script, first 500:', js.slice(0, 500))
+      console.log('decodeFromJs returned null')
     } catch (e) { console.log('script error:', scriptUrl, e.message) }
   }
 
