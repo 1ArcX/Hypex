@@ -22,10 +22,12 @@ async function registerPushSubscription(userId) {
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC),
     })
-    // Preserve existing fields (rain settings etc.), replace subscription endpoint only
-    const { data: existing } = await supabase.from('push_subscriptions').select('*').eq('user_id', userId).maybeSingle()
-    await supabase.from('push_subscriptions').delete().eq('user_id', userId)
-    await supabase.from('push_subscriptions').insert({ ...(existing || {}), user_id: userId, subscription: sub.toJSON() })
+    const { data: existing } = await supabase.from('push_subscriptions').select('id').eq('user_id', userId).maybeSingle()
+    if (existing) {
+      await supabase.from('push_subscriptions').update({ subscription: sub.toJSON() }).eq('user_id', userId)
+    } else {
+      await supabase.from('push_subscriptions').insert({ user_id: userId, subscription: sub.toJSON() })
+    }
   } catch (e) {
     console.error('Push subscribe failed:', e)
   }

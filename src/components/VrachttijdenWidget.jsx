@@ -26,9 +26,12 @@ async function registerVrachtSubscription(userId) {
   try {
     const reg = await navigator.serviceWorker.ready
     const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC) })
-    const { data: existing } = await supabase.from('push_subscriptions').select('*').eq('user_id', userId).maybeSingle()
-    await supabase.from('push_subscriptions').delete().eq('user_id', userId)
-    await supabase.from('push_subscriptions').insert({ ...(existing || {}), user_id: userId, subscription: sub.toJSON(), vracht_enabled: true })
+    const { data: existing } = await supabase.from('push_subscriptions').select('id').eq('user_id', userId).maybeSingle()
+    if (existing) {
+      await supabase.from('push_subscriptions').update({ subscription: sub.toJSON(), vracht_enabled: true }).eq('user_id', userId)
+    } else {
+      await supabase.from('push_subscriptions').insert({ user_id: userId, subscription: sub.toJSON(), vracht_enabled: true })
+    }
   } catch (e) { console.error('Vracht subscribe failed:', e) }
 }
 

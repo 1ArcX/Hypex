@@ -261,14 +261,26 @@ export default function WeatherWidget({ stacked = false, userId, onRequestPwaIns
           applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC),
         })
 
-        const { error } = await supabase.from('push_subscriptions').upsert({
-          user_id: userId,
-          subscription: sub.toJSON(),
-          lat: coords?.lat ?? 52.5,
-          lon: coords?.lon ?? 5.6,
-          rain_enabled: true,
-          rain_interval_minutes: 60,
-        }, { onConflict: 'user_id' })
+        const { data: existingRow } = await supabase.from('push_subscriptions').select('id').eq('user_id', userId).maybeSingle()
+        let error
+        if (existingRow) {
+          ;({ error } = await supabase.from('push_subscriptions').update({
+            subscription: sub.toJSON(),
+            lat: coords?.lat ?? 52.5,
+            lon: coords?.lon ?? 5.6,
+            rain_enabled: true,
+            rain_interval_minutes: 60,
+          }).eq('user_id', userId))
+        } else {
+          ;({ error } = await supabase.from('push_subscriptions').insert({
+            user_id: userId,
+            subscription: sub.toJSON(),
+            lat: coords?.lat ?? 52.5,
+            lon: coords?.lon ?? 5.6,
+            rain_enabled: true,
+            rain_interval_minutes: 60,
+          }))
+        }
 
         if (error) throw error
         setNotifEnabled(true)
