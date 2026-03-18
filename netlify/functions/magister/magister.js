@@ -138,7 +138,7 @@ async function authenticate(school, username, password) {
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: HEADERS, body: '' }
-  if (event.httpMethod !== 'POST') return err('Method not allowed', 405)
+  if (event.httpMethod !== 'POST') { console.log('Non-POST request:', event.httpMethod); return err('Method not allowed', 405) }
 
   let body
   try { body = JSON.parse(event.body || '{}') } catch { return err('Invalid JSON') }
@@ -151,8 +151,9 @@ exports.handler = async (event) => {
   let tokenSet
   try {
     tokenSet = await authenticate(school, username, password)
+    console.log('Auth OK voor', username)
   } catch (e) {
-    // Reset authCode cache so next request re-fetches the bundle
+    console.error('Auth FOUT:', e.message)
     _authCode = null
     return err(e.message || 'Inloggen mislukt. Controleer je leerlingnummer en wachtwoord.', 401)
   }
