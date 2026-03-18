@@ -24,35 +24,22 @@ function joinCookies(setCookieArray) {
   return (setCookieArray || []).map(c => c.split(';')[0]).join('; ')
 }
 
-// Cache authCode — changes with each weekly bundle deploy
+// Cache authCode — Gist wordt elke 15 min bijgewerkt door robbertkl/magister-authcode
 let _authCode = null
 let _authCodeFetched = 0
 
 async function fetchAuthCode() {
-  if (_authCode && Date.now() - _authCodeFetched < 3 * 60 * 60 * 1000) return _authCode
+  if (_authCode && Date.now() - _authCodeFetched < 10 * 60 * 1000) return _authCode
 
-  const htmlRes = await fetch('https://accounts.magister.net/', { timeout: 10000 })
-  const html = await htmlRes.text()
-
-  const scriptMatch = html.match(/src="(main\.[a-f0-9]+\.js)"/)
-  if (!scriptMatch) throw new Error('Magister bundle niet gevonden')
-
-  const jsUrl = `https://accounts.magister.net/${scriptMatch[1]}`
-  const jsRes = await fetch(jsUrl, { timeout: 20000 })
-  const js = await jsRes.text()
-
-  // Patterns ordered by specificity — authCode is always a 12-char hex string
-  const patterns = [
-    /authCode['":\s,({[]+['"]([0-9a-f]{12})['"]/i,
-    /['"]([0-9a-f]{12})['"](?=[^'"]{0,120}sessionId)/,
-    /sessionId(?:[^'"]{0,120})['"]([0-9a-f]{12})['"]/,
-  ]
-  for (const p of patterns) {
-    const m = js.match(p)
-    if (m) { _authCode = m[1]; _authCodeFetched = Date.now(); return _authCode }
-  }
-
-  throw new Error('AuthCode niet gevonden in Magister bundle')
+  const res = await fetch(
+    'https://gist.githubusercontent.com/robbertkl/995a359d1c9641892e3de1ed9af18b15/raw/authcode.json',
+    { timeout: 10000 }
+  )
+  if (!res.ok) throw new Error('AuthCode ophalen mislukt')
+  const text = await res.text()
+  _authCode = JSON.parse(text)  // plain JSON string, e.g. "32f895a62ca049"
+  _authCodeFetched = Date.now()
+  return _authCode
 }
 
 async function authenticate(school, username, password) {
