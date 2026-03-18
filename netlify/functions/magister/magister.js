@@ -31,12 +31,19 @@ const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,
 async function extractAuthCode(loginPageUrl, cookieStr) {
   const baseH = { 'User-Agent': UA, 'Accept-Encoding': 'identity', cookie: cookieStr }
 
-  const res = await fetch(loginPageUrl, { timeout: 10000, headers: { ...baseH, 'Accept': 'text/html' } })
+  const res = await fetch(loginPageUrl, { timeout: 10000, headers: { ...baseH, 'Accept': 'text/html', 'Origin': 'https://accounts.magister.net' } })
   const html = await res.text()
   const finalUrl = res.url
+  // Merge cookies from login page response itself
+  const loginSetCookies = (res.headers.raw?.()?.['set-cookie'] || [])
+  const mergedCookies = [...new Set([...(cookieStr||'').split('; '), ...loginSetCookies.map(c => c.split(';')[0])])].filter(Boolean).join('; ')
+  baseH.cookie = mergedCookies
+
+  console.log('login HTML (500):', html.slice(0, 500))
 
   // Collect all candidate script URLs using multiple base URL interpretations
-  const srcs = [...html.matchAll(/src="([^"]*\.js[^"]*)"/g)].map(m => m[1])
+  const srcs = [...html.matchAll(/(?:src|href)="([^"]*\.js[^"]*)"/g)].map(m => m[1])
+  console.log('raw srcs:', srcs.join(' | '))
   const candidates = []
   for (const src of srcs) {
     for (const base of [finalUrl, finalUrl.split('?')[0] + '/', 'https://accounts.magister.net/account/', 'https://accounts.magister.net/']) {
@@ -64,7 +71,7 @@ async function extractAuthCode(loginPageUrl, cookieStr) {
 
   for (const scriptUrl of candidates) {
     try {
-      const jsRes = await fetch(scriptUrl, { timeout: 15000, headers: { ...baseH, 'Referer': loginPageUrl } })
+      const jsRes = await fetch(scriptUrl, { timeout: 15000, headers: { ...baseH, 'Referer': loginPageUrl, 'Origin': 'https://accounts.magister.net' } })
       if (!jsRes.ok) { console.log('script', jsRes.status, scriptUrl); continue }
       const js = await jsRes.text()
       const code = decodeFromJs(js)
