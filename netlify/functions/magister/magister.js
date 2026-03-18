@@ -26,34 +26,42 @@ function joinCookies(setCookieArray) {
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
 
 // Extract authCode from the Magister login page script.
-// Magister embeds it as [[char_lookup],[indices]] in the bundle:
-//   authCode = z[1].map(x => z[0][parseInt(x)||0]).join("")
 async function extractAuthCode(loginPageUrl, cookieStr) {
   const baseH = { 'User-Agent': UA, 'Accept-Encoding': 'identity', cookie: cookieStr }
 
   const res = await fetch(loginPageUrl, { timeout: 10000, headers: { ...baseH, 'Accept': 'text/html', 'Origin': 'https://accounts.magister.net' } })
   const html = await res.text()
   const finalUrl = res.url
-  // Merge cookies from login page response itself
   const loginSetCookies = (res.headers.raw?.()?.['set-cookie'] || [])
   const mergedCookies = [...new Set([...(cookieStr||'').split('; '), ...loginSetCookies.map(c => c.split(';')[0])])].filter(Boolean).join('; ')
   baseH.cookie = mergedCookies
 
   console.log('login HTML (500):', html.slice(0, 500))
 
-  // Collect all candidate script URLs using multiple base URL interpretations
+  // Parse <base href> from HTML — Magister sets <base href="/"> which changes relative URL resolution
+  const baseHrefMatch = html.match(/<base[^>]+href=["']([^"']+)["']/i)
+  const baseHref = baseHrefMatch ? new URL(baseHrefMatch[1], 'https://accounts.magister.net').href : null
+  console.log('base href:', baseHref)
+
+  // Collect candidate script URLs — prioritise <base href> resolution, then fallbacks
   const srcs = [...html.matchAll(/(?:src|href)="([^"]*\.js[^"]*)"/g)].map(m => m[1])
   console.log('raw srcs:', srcs.join(' | '))
   const candidates = []
   for (const src of srcs) {
-    for (const base of [finalUrl, finalUrl.split('?')[0] + '/', 'https://accounts.magister.net/account/', 'https://accounts.magister.net/']) {
+    const bases = [
+      ...(baseHref ? [baseHref] : []),
+      'https://accounts.magister.net/',
+      finalUrl,
+      'https://accounts.magister.net/account/',
+    ]
+    for (const base of bases) {
       try { const u = new URL(src, base).href; if (!candidates.includes(u)) candidates.push(u) } catch {}
     }
   }
   console.log('script candidates:', candidates.join(' | '))
 
   const decodeFromJs = (js) => {
-    // Pattern 1: [[char_lookup],[indices]]
+    // Pattern 1: [[char_lookup],[indices]] — obfuscated array encoding
     for (const m of js.matchAll(/\[(\[[^\]]+\]),(\[\d[^\]]*\])\]/g)) {
       try {
         const z0 = JSON.parse(m[1]), z1 = JSON.parse(m[2])
@@ -63,9 +71,12 @@ async function extractAuthCode(loginPageUrl, cookieStr) {
         if (/^[0-9a-f]{10,20}$/.test(code)) return code
       } catch {}
     }
-    // Pattern 2: literal hex near authCode keyword
+    // Pattern 2: literal hex string near authCode keyword
     const lit = js.match(/authCode['":\s,({[]+['"]([0-9a-f]{10,20})['"]/i)
     if (lit) return lit[1]
+    // Pattern 3: any standalone hex string of the right length (10-20 chars)
+    const hex = js.match(/["']([0-9a-f]{12,16})["']/)
+    if (hex) return hex[1]
     return null
   }
 
@@ -74,9 +85,11 @@ async function extractAuthCode(loginPageUrl, cookieStr) {
       const jsRes = await fetch(scriptUrl, { timeout: 15000, headers: { ...baseH, 'Referer': loginPageUrl, 'Origin': 'https://accounts.magister.net' } })
       if (!jsRes.ok) { console.log('script', jsRes.status, scriptUrl); continue }
       const js = await jsRes.text()
+      console.log('script OK', scriptUrl, 'len:', js.length, 'preview:', js.slice(0, 100))
       const code = decodeFromJs(js)
       if (code) { console.log('authCode:', code, 'from', scriptUrl); return code }
-    } catch (e) { console.log('script error:', e.message) }
+      console.log('authCode not found in script, first 500:', js.slice(0, 500))
+    } catch (e) { console.log('script error:', scriptUrl, e.message) }
   }
 
   throw new Error(`AuthCode niet gevonden (finalUrl: ${finalUrl}, ${candidates.length} scripts geprobeerd)`)
