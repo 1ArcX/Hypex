@@ -35,10 +35,14 @@ async function fetchAuthCode() {
   try {
     const htmlRes = await fetch('https://accounts.magister.net/', { timeout: 10000 })
     const html = await htmlRes.text()
-    const scriptMatch = html.match(/src="(main\.[a-f0-9]+\.js)"/)
+    const scriptMatch = html.match(/src="([^"]*main[^"]*\.js)"/)
+    console.log('scriptMatch:', scriptMatch ? scriptMatch[1] : 'null')
     if (scriptMatch) {
-      const jsRes = await fetch(`https://accounts.magister.net/${scriptMatch[1]}`, { timeout: 20000 })
+      const bundleUrl = scriptMatch[1].startsWith('http') ? scriptMatch[1] : `https://accounts.magister.net/${scriptMatch[1].replace(/^\//, '')}`
+      const jsRes = await fetch(bundleUrl, { timeout: 20000 })
       const js = await jsRes.text()
+      const ctxMatch = js.match(/.{0,80}authCode.{0,80}/i)
+      console.log('bundle authCode context:', ctxMatch ? ctxMatch[0] : 'niet gevonden')
       const patterns = [
         /authCode['":\s,({[]+['"]([0-9a-f]{10,20})['"]/i,
         /['"]([0-9a-f]{10,20})['"](?=[^'"]{0,120}sessionId)/,
