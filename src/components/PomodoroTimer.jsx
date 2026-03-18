@@ -208,7 +208,8 @@ function reducer(state, action) {
     case 'SKIP': {
       const next = calcNextMode(state.mode, state.sessionsInCycle, state.sessionsPerLong)
       const mins = next === 'work' ? state.workMins : next === 'break' ? state.breakMins : state.longBreakMins
-      return { ...state, mode: next, seconds: mins * 60, running: false }
+      const newSIC = state.mode === 'longBreak' ? 0 : state.sessionsInCycle
+      return { ...state, mode: next, seconds: mins * 60, running: false, sessionsInCycle: newSIC }
     }
     case 'COMPLETE': {
       const { prevMode, todayMins } = action
@@ -658,9 +659,10 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
     claimLocalControl()
     endTimeRef.current = null
     const next = calcNextMode(state.mode, state.sessionsInCycle, state.sessionsPerLong)
+    const newSIC = state.mode === 'longBreak' ? 0 : state.sessionsInCycle
     dispatch({ type: 'SKIP' })
     setTimeout(() => onModeChange?.(next !== 'work'), 0)
-    broadcastState({ ...state, running: false }, null, true)
+    broadcastState({ ...state, running: false, sessionsInCycle: newSIC }, null, true)
     clearTimerSession(userIdRef.current)
   }
 
