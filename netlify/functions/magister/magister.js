@@ -24,20 +24,50 @@ function joinCookies(setCookieArray) {
   return (setCookieArray || []).map(c => c.split(';')[0]).join('; ')
 }
 
-// Cache authCode — Gist wordt elke 15 min bijgewerkt door robbertkl/magister-authcode
+// Cache authCode — extracted from Magister bundle, fallback to Gist
 let _authCode = null
 let _authCodeFetched = 0
 
 async function fetchAuthCode() {
-  if (_authCode && Date.now() - _authCodeFetched < 10 * 60 * 1000) return _authCode
+  if (_authCode && Date.now() - _authCodeFetched < 30 * 60 * 1000) return _authCode
 
+  // Primary: scrape from bundle (most up-to-date)
+  try {
+    const htmlRes = await fetch('https://accounts.magister.net/', { timeout: 10000 })
+    const html = await htmlRes.text()
+    const scriptMatch = html.match(/src="(main\.[a-f0-9]+\.js)"/)
+    if (scriptMatch) {
+      const jsRes = await fetch(`https://accounts.magister.net/${scriptMatch[1]}`, { timeout: 20000 })
+      const js = await jsRes.text()
+      const patterns = [
+        /authCode['":\s,({[]+['"]([0-9a-f]{10,20})['"]/i,
+        /['"]([0-9a-f]{10,20})['"](?=[^'"]{0,120}sessionId)/,
+        /sessionId(?:[^'"]{0,120})['"]([0-9a-f]{10,20})['"]/,
+      ]
+      for (const p of patterns) {
+        const m = js.match(p)
+        if (m) {
+          console.log('authCode via bundle:', m[1])
+          _authCode = m[1]
+          _authCodeFetched = Date.now()
+          return _authCode
+        }
+      }
+      console.log('authCode niet gevonden in bundle, probeer Gist')
+    }
+  } catch (e) {
+    console.log('Bundle fetch fout:', e.message)
+  }
+
+  // Fallback: public Gist (updated every 15 min by robbertkl/magister-authcode)
   const res = await fetch(
     'https://gist.githubusercontent.com/robbertkl/995a359d1c9641892e3de1ed9af18b15/raw/authcode.json',
     { timeout: 10000 }
   )
   if (!res.ok) throw new Error('AuthCode ophalen mislukt')
   const text = await res.text()
-  _authCode = JSON.parse(text)  // plain JSON string, e.g. "32f895a62ca049"
+  _authCode = JSON.parse(text)
+  console.log('authCode via Gist:', _authCode)
   _authCodeFetched = Date.now()
   return _authCode
 }
