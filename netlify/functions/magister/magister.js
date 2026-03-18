@@ -54,28 +54,28 @@ async function fetchAuthCode(sessionId, loginPageUrl, cookieStr, xsrfToken) {
     'Referer': loginPageUrl
   }
 
-  // Try /challenges/current — this is what the login page JS calls to get current challenge state
+  const postHeaders = { ...apiHeaders, 'Content-Type': 'application/json' }
+
+  // /challenges/current requires POST (GET returns 405)
   const candidates = [
-    `${issuerUrl}/challenges/current?sessionId=${sessionId}`,
-    `${issuerUrl}/challenges/current`,
-    `${issuerUrl}/account/api/challenges/current?sessionId=${sessionId}`,
+    { url: `${issuerUrl}/challenges/current`, body: JSON.stringify({ sessionId }) },
+    { url: `${issuerUrl}/challenges/current?sessionId=${sessionId}`, body: JSON.stringify({}) },
   ]
 
-  for (const url of candidates) {
+  for (const { url, body } of candidates) {
     try {
-      const r = await fetch(url, { timeout: 8000, headers: apiHeaders })
+      const r = await fetch(url, { method: 'POST', timeout: 8000, headers: postHeaders, body })
       const text = await r.text()
-      console.log('challenges/current', url, 'status:', r.status, 'body:', text.slice(0, 400))
+      console.log('POST challenges/current', url, 'status:', r.status, 'body:', text.slice(0, 400))
       if (!r.ok) continue
       const d = JSON.parse(text)
-      // Log all keys so we can see the response shape
       console.log('response keys:', JSON.stringify(Object.keys(d)))
       const code = d.authCode || d.AuthCode || d.authcode || d.token || d.code
       if (code) { console.log('authCode found:', code); return String(code) }
     } catch (e) { console.log('fetch error', url, e.message) }
   }
 
-  throw new Error(`authCode niet gevonden via /challenges/current`)
+  throw new Error(`authCode niet gevonden via POST /challenges/current`)
 }
 
 async function authenticate(school, username, password) {
