@@ -19,71 +19,57 @@ function dateStr(d) {
   try { return new Date(d).toISOString() } catch { return String(d) }
 }
 
-// Parse Set-Cookie array into a Cookie request header string
 function joinCookies(setCookieArray) {
   return (setCookieArray || []).map(c => c.split(';')[0]).join('; ')
 }
 
-// Cache authCode — extracted from Magister bundle, fallback to Gist
-let _authCode = null
-let _authCodeFetched = 0
+const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
 
-async function fetchAuthCode() {
-  if (_authCode && Date.now() - _authCodeFetched < 10 * 60 * 1000) return _authCode
+// Extract authCode from the Magister login page script.
+// Magister embeds it as [[char_lookup],[indices]] in the bundle:
+//   authCode = z[1].map(x => z[0][parseInt(x)||0]).join("")
+async function extractAuthCode(loginPageUrl) {
+  const res = await fetch(loginPageUrl, {
+    timeout: 10000,
+    headers: { 'User-Agent': UA, 'Accept-Encoding': 'identity', 'Accept': 'text/html' }
+  })
+  const html = await res.text()
+  const finalUrl = res.url
 
-  const browserHeaders = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    'Accept-Language': 'nl-NL,nl;q=0.9,en;q=0.8',
-    'Accept-Encoding': 'identity',
-  }
+  // Find the JS bundle on the login page
+  const scriptMatch = html.match(/src="([^"]*\.js[^"]*)"/)
+  if (!scriptMatch) throw new Error('Geen script op loginpagina')
 
-  // Primary: scrape from Magister bundle
-  try {
-    const htmlRes = await fetch('https://accounts.magister.net/', { timeout: 10000, headers: browserHeaders })
-    const finalUrl = htmlRes.url  // resolve relative URLs against the final URL after redirects
-    const html = await htmlRes.text()
-    const scriptMatch = html.match(/src="([^"]*main[^"]*\.js)"/)
-    if (scriptMatch) {
-      const bundleUrl = new URL(scriptMatch[1], finalUrl).href
-      const jsRes = await fetch(bundleUrl, { timeout: 20000, headers: { ...browserHeaders, 'Accept': '*/*' } })
-      if (jsRes.ok) {
-        const js = await jsRes.text()
-        const patterns = [
-          /authCode['":\s,({[]+['"]([0-9a-f]{10,20})['"]/i,
-          /['"]([0-9a-f]{10,20})['"](?=[^'"]{0,120}sessionId)/,
-          /sessionId(?:[^'"]{0,120})['"]([0-9a-f]{10,20})['"]/,
-        ]
-        for (const p of patterns) {
-          const m = js.match(p)
-          if (m) {
-            console.log('authCode via bundle:', m[1])
-            _authCode = m[1]
-            _authCodeFetched = Date.now()
-            return _authCode
-          }
-        }
+  const scriptUrl = new URL(scriptMatch[1], finalUrl).href
+  console.log('login script URL:', scriptUrl)
+
+  const jsRes = await fetch(scriptUrl, {
+    timeout: 20000,
+    headers: { 'User-Agent': UA, 'Accept-Encoding': 'identity' }
+  })
+  if (!jsRes.ok) throw new Error(`Script fetch mislukt: ${jsRes.status}`)
+  const js = await jsRes.text()
+  console.log('login script length:', js.length)
+
+  // Find [[char_array],[index_array]] patterns and decode
+  for (const m of js.matchAll(/\[(\[[^\]]+\]),(\[\d[^\]]*\])\]/g)) {
+    try {
+      const z0 = JSON.parse(m[1])
+      const z1 = JSON.parse(m[2])
+      if (!Array.isArray(z0) || !Array.isArray(z1)) continue
+      if (!z0.every(s => typeof s === 'string') || !z1.every(n => typeof n === 'number')) continue
+      const code = z1.map(x => z0[parseInt(x) || 0]).join('')
+      if (/^[0-9a-f]{10,20}$/.test(code)) {
+        console.log('authCode decoded:', code)
+        return code
       }
-    }
-  } catch (e) {
-    console.log('Bundle fetch fout:', e.message)
+    } catch {}
   }
-
-  // Fallback: Gist met cache-busting
-  const res = await fetch(
-    `https://gist.githubusercontent.com/robbertkl/995a359d1c9641892e3de1ed9af18b15/raw/authcode.json?_=${Date.now()}`,
-    { timeout: 10000, headers: { 'Cache-Control': 'no-cache' } }
-  )
-  if (!res.ok) throw new Error('AuthCode ophalen mislukt')
-  _authCode = JSON.parse(await res.text())
-  console.log('authCode via Gist:', _authCode)
-  _authCodeFetched = Date.now()
-  return _authCode
+  throw new Error('AuthCode patroon niet gevonden in loginpagina script')
 }
 
 async function authenticate(school, username, password) {
   const issuerUrl = 'https://accounts.magister.net'
-  const authCode = await fetchAuthCode()
   const noRedirects = { redirect: 'manual', follow: 0 }
 
   const issuer = await Issuer.discover(issuerUrl)
@@ -115,7 +101,6 @@ async function authenticate(school, username, password) {
   const r2 = await fetch(r1.headers.get('location'), noRedirects)
   const location = r2.headers.get('location')
 
-  // Extract sessionId and returnUrl (handle both relative and absolute URLs)
   const locationUrl = new URL(location.startsWith('http') ? location : issuerUrl + location)
   const sessionId = locationUrl.searchParams.get('sessionId')
   const returnUrl = locationUrl.searchParams.get('returnUrl')
@@ -125,59 +110,55 @@ async function authenticate(school, username, password) {
   const xsrfEntry = rawCookies.find(c => c.split('=')[0] === 'XSRF-TOKEN')
   const xsrfToken = xsrfEntry.split('=')[1].split(';')[0]
 
+  // Step 2: Extract authCode from the login page script (encoded array pattern)
+  const loginPageUrl = location.startsWith('http') ? location : issuerUrl + location
+  const authCode = await extractAuthCode(loginPageUrl)
+
   const challengeHeaders = {
     'Content-Type': 'application/json',
     cookie: cookieStr,
     'X-XSRF-TOKEN': xsrfToken
   }
 
-  console.log('authCode:', authCode, 'sessionId:', sessionId, 'returnUrl:', returnUrl, 'xsrfToken:', xsrfToken)
-
-  // Step 2: Username challenge
+  // Step 3: Username challenge
   const uResp = await fetch(`${issuerUrl}/challenges/username`, {
     method: 'POST',
     body: JSON.stringify({ authCode, sessionId, returnUrl, username }),
     headers: challengeHeaders
   })
-  console.log('username challenge status:', uResp.status)
   if (uResp.status !== 200) {
     const errText = await uResp.text().catch(() => '')
     throw new Error(`Inloggen mislukt (username ${uResp.status}: ${errText})`)
   }
   const uBody = await uResp.json()
-  console.log('username body:', JSON.stringify(uBody))
-  if (uBody.error && uBody.error !== 'Unable to load session') throw new Error(`Inloggen mislukt (uBody.error: ${uBody.error})`)
-  if (uBody.action !== 'password') throw new Error(`Onbekende gebruikersnaam (action: ${uBody.action})`)
+  if (uBody.error && uBody.error !== 'Unable to load session') throw new Error('Inloggen mislukt')
+  if (uBody.action !== 'password') throw new Error('Onbekende gebruikersnaam')
 
-  // Step 3: Password challenge
+  // Step 4: Password challenge
   const pResp = await fetch(`${issuerUrl}/challenges/password`, {
     method: 'POST',
     body: JSON.stringify({ authCode, sessionId, returnUrl, password }),
     headers: challengeHeaders
   })
-  console.log('password challenge status:', pResp.status)
-  if (pResp.status !== 200) throw new Error(`Inloggen mislukt (password ${pResp.status})`)
+  if (pResp.status !== 200) throw new Error('Inloggen mislukt')
   const pBody = await pResp.json()
-  console.log('password body:', JSON.stringify(pBody))
-  if (pBody.error) throw new Error(`Wachtwoord onjuist (${pBody.error})`)
+  if (pBody.error) throw new Error('Wachtwoord onjuist')
 
   const authCookies = joinCookies(pResp.headers.raw()['set-cookie'])
 
-  // Step 4: Get auth code from redirect
+  // Step 5: Get auth code from redirect
   const finalResp = await fetch(`${issuerUrl}${returnUrl}`, {
     redirect: 'manual', follow: 0,
     headers: { cookie: authCookies }
   })
   const finalLoc = finalResp.headers.get('location')
-  console.log('finalLoc:', finalLoc)
-  if (!finalLoc || !finalLoc.includes('code=')) throw new Error(`Inloggen mislukt (finalLoc: ${finalLoc})`)
+  if (!finalLoc || !finalLoc.includes('code=')) throw new Error('Inloggen mislukt')
 
-  // Parse fragment params (code is returned in URL fragment #code=...&state=...&...)
   const fragment = finalLoc.includes('#') ? finalLoc.split('#')[1] : finalLoc.split('?')[1]
   const params = Object.fromEntries(new URLSearchParams(fragment))
   if (!params.code) throw new Error('Inloggen mislukt')
 
-  // Step 5: Exchange code for token
+  // Step 6: Exchange code for token
   const tokenSet = await client.callback('m6loapp://oauth2redirect/', params, {
     code_verifier: codeVerifier, state, nonce
   })
@@ -187,7 +168,7 @@ async function authenticate(school, username, password) {
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: HEADERS, body: '' }
-  if (event.httpMethod !== 'POST') { console.log('Non-POST request:', event.httpMethod); return err('Method not allowed', 405) }
+  if (event.httpMethod !== 'POST') return err('Method not allowed', 405)
 
   let body
   try { body = JSON.parse(event.body || '{}') } catch { return err('Invalid JSON') }
@@ -203,7 +184,6 @@ exports.handler = async (event) => {
     console.log('Auth OK voor', username)
   } catch (e) {
     console.error('Auth FOUT:', e.message)
-    _authCode = null
     return err(e.message || 'Inloggen mislukt. Controleer je leerlingnummer en wachtwoord.', 401)
   }
 
@@ -229,7 +209,6 @@ exports.handler = async (event) => {
       const courses = await m.courses()
       const current = courses.find(c => c.isCurrent) || courses[courses.length - 1]
       if (!current) return ok([])
-      // Try without latest:true first so we get all grades, not just one per subject
       let grades = []
       try { grades = await current.grades({ fillGrades: true }) } catch (_) {}
       if (!grades.length) {
@@ -269,7 +248,6 @@ exports.handler = async (event) => {
 
     if (action === 'opdrachten') {
       const count = body.count || 50
-      // Use raw HTTP to avoid magister.js Assignment constructor crash on null Bijlagen
       const listResp = await m.http.get(`${m._personUrl}/opdrachten?top=${count}&skip=0&status=alle`)
       const listData = await listResp.json()
       const ids = (listData.Items || []).map(i => i.Id)
