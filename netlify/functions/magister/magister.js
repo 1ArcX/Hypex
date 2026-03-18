@@ -45,7 +45,7 @@ async function extractAuthCode(loginPageUrl) {
 
   const jsRes = await fetch(scriptUrl, {
     timeout: 20000,
-    headers: { 'User-Agent': UA, 'Accept-Encoding': 'identity' }
+    headers: { 'User-Agent': UA, 'Accept-Encoding': 'identity', 'Referer': loginPageUrl }
   })
   if (!jsRes.ok) throw new Error(`Script fetch mislukt: ${jsRes.status}`)
   const js = await jsRes.text()
