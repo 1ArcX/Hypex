@@ -41,22 +41,12 @@ async function fetchAuthCode() {
       const bundleUrl = scriptMatch[1].startsWith('http') ? scriptMatch[1] : `https://accounts.magister.net/${scriptMatch[1].replace(/^\//, '')}`
       const jsRes = await fetch(bundleUrl, { timeout: 20000 })
       const js = await jsRes.text()
-      const ctxMatch = js.match(/.{0,80}authCode.{0,80}/i)
-      console.log('bundle authCode context:', ctxMatch ? ctxMatch[0] : 'niet gevonden')
-      const patterns = [
-        /authCode['":\s,({[]+['"]([0-9a-f]{10,20})['"]/i,
-        /['"]([0-9a-f]{10,20})['"](?=[^'"]{0,120}sessionId)/,
-        /sessionId(?:[^'"]{0,120})['"]([0-9a-f]{10,20})['"]/,
-      ]
-      for (const p of patterns) {
-        const m = js.match(p)
-        if (m) {
-          console.log('authCode via bundle:', m[1])
-          _authCode = m[1]
-          _authCodeFetched = Date.now()
-          return _authCode
-        }
-      }
+      // Log all unique 14-char hex strings in bundle
+      const hexMatches = [...new Set(js.match(/[0-9a-f]{14}/g) || [])]
+      console.log('14-char hex strings in bundle:', hexMatches.slice(0, 10).join(', '))
+      // Log context around sessionId
+      const sessCtx = js.match(/.{0,100}sessionId.{0,100}/i)
+      console.log('sessionId context:', sessCtx ? sessCtx[0] : 'niet gevonden')
       console.log('authCode niet gevonden in bundle, probeer Gist')
     }
   } catch (e) {
