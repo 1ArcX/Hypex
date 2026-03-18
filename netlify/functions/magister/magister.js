@@ -92,7 +92,7 @@ async function authenticate(school, username, password) {
     'X-XSRF-TOKEN': xsrfToken
   }
 
-  console.log('authCode:', authCode, 'sessionId:', sessionId)
+  console.log('authCode:', authCode, 'sessionId:', sessionId, 'returnUrl:', returnUrl, 'xsrfToken:', xsrfToken)
 
   // Step 2: Username challenge
   const uResp = await fetch(`${issuerUrl}/challenges/username`, {
@@ -101,7 +101,10 @@ async function authenticate(school, username, password) {
     headers: challengeHeaders
   })
   console.log('username challenge status:', uResp.status)
-  if (uResp.status !== 200) throw new Error(`Inloggen mislukt (username ${uResp.status})`)
+  if (uResp.status !== 200) {
+    const errText = await uResp.text().catch(() => '')
+    throw new Error(`Inloggen mislukt (username ${uResp.status}: ${errText})`)
+  }
   const uBody = await uResp.json()
   console.log('username body:', JSON.stringify(uBody))
   if (uBody.error && uBody.error !== 'Unable to load session') throw new Error(`Inloggen mislukt (uBody.error: ${uBody.error})`)
