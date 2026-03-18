@@ -29,43 +29,53 @@ let _authCode = null
 let _authCodeFetched = 0
 
 async function fetchAuthCode() {
-  if (_authCode && Date.now() - _authCodeFetched < 30 * 60 * 1000) return _authCode
+  if (_authCode && Date.now() - _authCodeFetched < 10 * 60 * 1000) return _authCode
 
-  // Primary: scrape from bundle (most up-to-date)
+  const browserHeaders = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'nl-NL,nl;q=0.9,en;q=0.8',
+    'Accept-Encoding': 'identity',
+  }
+
+  // Primary: scrape from Magister bundle
   try {
-    const htmlRes = await fetch('https://accounts.magister.net/', { timeout: 10000 })
+    const htmlRes = await fetch('https://accounts.magister.net/', { timeout: 10000, headers: browserHeaders })
+    const finalUrl = htmlRes.url  // resolve relative URLs against the final URL after redirects
     const html = await htmlRes.text()
     const scriptMatch = html.match(/src="([^"]*main[^"]*\.js)"/)
-    console.log('scriptMatch:', scriptMatch ? scriptMatch[1] : 'null')
-    // Log all script src attributes to find correct bundle path
-    const allScripts = html.match(/src="[^"]+\.js"/g) || []
-    console.log('all scripts:', allScripts.join(' | '))
     if (scriptMatch) {
-      const bundleUrl = scriptMatch[1].startsWith('http') ? scriptMatch[1] : `https://accounts.magister.net/${scriptMatch[1].replace(/^\//, '')}`
-      const jsRes = await fetch(bundleUrl, { timeout: 20000, headers: { 'Accept-Encoding': 'identity', 'User-Agent': 'Mozilla/5.0' } })
-      console.log('bundle status:', jsRes.status, 'encoding:', jsRes.headers.get('content-encoding'), 'type:', jsRes.headers.get('content-type'))
-      const js = await jsRes.text()
-      console.log('bundle length:', js.length, 'first 100:', js.slice(0, 100))
-      // Log all unique 14-char hex strings in bundle
-      const hexMatches = [...new Set(js.match(/[0-9a-f]{14}/g) || [])]
-      console.log('14-char hex strings in bundle:', hexMatches.slice(0, 10).join(', '))
-      // Log context around sessionId
-      const sessCtx = js.match(/.{0,100}sessionId.{0,100}/i)
-      console.log('sessionId context:', sessCtx ? sessCtx[0] : 'niet gevonden')
-      console.log('authCode niet gevonden in bundle, probeer Gist')
+      const bundleUrl = new URL(scriptMatch[1], finalUrl).href
+      const jsRes = await fetch(bundleUrl, { timeout: 20000, headers: { ...browserHeaders, 'Accept': '*/*' } })
+      if (jsRes.ok) {
+        const js = await jsRes.text()
+        const patterns = [
+          /authCode['":\s,({[]+['"]([0-9a-f]{10,20})['"]/i,
+          /['"]([0-9a-f]{10,20})['"](?=[^'"]{0,120}sessionId)/,
+          /sessionId(?:[^'"]{0,120})['"]([0-9a-f]{10,20})['"]/,
+        ]
+        for (const p of patterns) {
+          const m = js.match(p)
+          if (m) {
+            console.log('authCode via bundle:', m[1])
+            _authCode = m[1]
+            _authCodeFetched = Date.now()
+            return _authCode
+          }
+        }
+      }
     }
   } catch (e) {
     console.log('Bundle fetch fout:', e.message)
   }
 
-  // Fallback: public Gist (updated every 15 min by robbertkl/magister-authcode)
+  // Fallback: Gist met cache-busting
   const res = await fetch(
-    'https://gist.githubusercontent.com/robbertkl/995a359d1c9641892e3de1ed9af18b15/raw/authcode.json',
-    { timeout: 10000 }
+    `https://gist.githubusercontent.com/robbertkl/995a359d1c9641892e3de1ed9af18b15/raw/authcode.json?_=${Date.now()}`,
+    { timeout: 10000, headers: { 'Cache-Control': 'no-cache' } }
   )
   if (!res.ok) throw new Error('AuthCode ophalen mislukt')
-  const text = await res.text()
-  _authCode = JSON.parse(text)
+  _authCode = JSON.parse(await res.text())
   console.log('authCode via Gist:', _authCode)
   _authCodeFetched = Date.now()
   return _authCode
