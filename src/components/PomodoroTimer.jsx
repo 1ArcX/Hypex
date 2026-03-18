@@ -311,7 +311,7 @@ function CompletionPopup({ prevMode, nextMode, onStart, onSkip }) {
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusModeChange, userId, noFocusOverlay = false, onSessionComplete }) {
+export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusModeChange, userId, noFocusOverlay = false, fullPage = false, onSessionComplete }) {
   const [state, dispatch] = useReducer(reducer, INIT)
   const stateRef           = useRef(state)
   const endTimeRef         = useRef(null)
@@ -723,6 +723,179 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
   const todayH        = Math.floor(todayMins / 60)
   const todayM        = todayMins % 60
   const todayStr      = todayH > 0 ? `${todayH}u ${todayM}m` : `${todayMins}m`
+
+  // ── Full-page render ──────────────────────────────────────────────────────
+  if (fullPage) {
+    const bigR    = 100
+    const bigCirc = 2 * Math.PI * bigR
+    const bigDash = bigCirc * (1 - progress)
+
+    return (
+      <>
+        {popup && createPortal(
+          <CompletionPopup prevMode={popup.prevMode} nextMode={popup.nextMode} onStart={startAfterPopup} onSkip={skipPopup} />,
+          document.body
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '28px 20px 32px', gap: 18, boxSizing: 'border-box' }}>
+
+          {/* Sound + notif row */}
+          <div style={{ display: 'flex', gap: 8, alignSelf: 'stretch', justifyContent: 'flex-end' }}>
+            <button onClick={() => dispatch({ type: 'TOGGLE_SOUND' })} style={iconBtn} title={soundEnabled ? 'Geluid uit' : 'Geluid aan'}>
+              {soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
+            </button>
+            <button onClick={toggleNotif} style={iconBtn} title={notifEnabled ? 'Meldingen uit' : 'Meldingen aan'}>
+              {notifEnabled ? <Bell size={14} /> : <BellOff size={14} />}
+            </button>
+          </div>
+
+          {/* Mode selector — hidden when running, label shown instead */}
+          {!running ? (
+            <div style={{ display: 'flex', gap: 3, background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 4, border: '1px solid rgba(255,255,255,0.07)' }}>
+              {Object.entries(MODES).map(([key, { label, color, rgb }]) => (
+                <button key={key} onClick={() => switchMode(key)} style={{
+                  padding: '8px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                  fontSize: 13, fontWeight: 600, transition: 'all 0.2s',
+                  background: mode === key ? `rgba(${rgb},0.15)` : 'transparent',
+                  color: mode === key ? color : 'rgba(255,255,255,0.3)',
+                }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)' }}>
+              {MODES[mode].label}
+            </span>
+          )}
+
+          {/* Large ring */}
+          <div style={{ position: 'relative', width: 240, height: 240 }}>
+            <svg width="240" height="240" style={{ transform: 'rotate(-90deg)' }}>
+              <circle cx="120" cy="120" r={bigR} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="10" />
+              <circle cx="120" cy="120" r={bigR} fill="none" stroke={modeColor} strokeWidth="10"
+                strokeLinecap="round" strokeDasharray={bigCirc} strokeDashoffset={bigDash}
+                style={{ filter: `drop-shadow(0 0 14px ${modeColor}60)`, transition: 'stroke-dashoffset 0.5s ease, stroke 0.6s ease' }}
+              />
+            </svg>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+              <span style={{ fontSize: 54, fontWeight: 700, fontFamily: 'monospace', color: modeColor, lineHeight: 1, letterSpacing: -2, textShadow: `0 0 30px ${modeColor}50`, transition: 'color 0.6s' }}>
+                {mm}:{ss}
+              </span>
+            </div>
+          </div>
+
+          {/* Cycle dots */}
+          <div style={{ display: 'flex', gap: 8 }}>
+            {Array.from({ length: sessionsPerLong }, (_, i) => {
+              const done = i < sessionsInCycle
+              return (
+                <div key={i} style={{
+                  width: done ? 10 : 7, height: done ? 10 : 7,
+                  borderRadius: '50%', marginTop: done ? 0 : 1.5,
+                  background: done ? 'var(--accent)' : 'rgba(255,255,255,0.1)',
+                  boxShadow: done ? '0 0 8px rgba(0,255,209,0.5)' : 'none',
+                  transition: 'all 0.3s',
+                }} />
+              )
+            })}
+          </div>
+
+          {/* Tag input */}
+          <input
+            type="text"
+            placeholder="Waar werk je aan? (optioneel)"
+            value={task}
+            onChange={e => dispatch({ type: 'SET_TASK', v: e.target.value })}
+            style={{
+              width: '100%', maxWidth: 380, boxSizing: 'border-box',
+              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: 12, padding: '11px 16px',
+              color: 'rgba(255,255,255,0.8)', fontSize: 14, outline: 'none', textAlign: 'center',
+              transition: 'border-color 0.2s',
+            }}
+            onFocus={e => { e.target.style.borderColor = `rgba(${modeRgb},0.35)` }}
+            onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.08)' }}
+          />
+
+          {/* Setup pills — visible only when not running */}
+          {!running && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 380 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', width: 46, textAlign: 'right', flexShrink: 0 }}>Focus</span>
+                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                  {[15, 20, 25, 30, 45, 60].map(n => (
+                    <button key={n} onClick={() => dispatch({ type: 'SET_WORK_MINS', v: n })} style={{
+                      padding: '5px 11px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, transition: 'all 0.15s',
+                      background: workMins === n ? 'rgba(0,255,209,0.15)' : 'rgba(255,255,255,0.06)',
+                      color: workMins === n ? '#00FFD1' : 'rgba(255,255,255,0.4)',
+                    }}>{n}m</button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', width: 46, textAlign: 'right', flexShrink: 0 }}>Pauze</span>
+                <div style={{ display: 'flex', gap: 5 }}>
+                  {[5, 10, 15, 20].map(n => (
+                    <button key={n} onClick={() => dispatch({ type: 'SET_BREAK_MINS', v: n })} style={{
+                      padding: '5px 11px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, transition: 'all 0.15s',
+                      background: breakMins === n ? 'rgba(255,140,66,0.15)' : 'rgba(255,255,255,0.06)',
+                      color: breakMins === n ? '#FF8C42' : 'rgba(255,255,255,0.4)',
+                    }}>{n}m</button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', width: 46, textAlign: 'right', flexShrink: 0 }}>Lang</span>
+                <div style={{ display: 'flex', gap: 5 }}>
+                  {[10, 15, 20, 30].map(n => (
+                    <button key={n} onClick={() => dispatch({ type: 'SET_LBRK_MINS', v: n })} style={{
+                      padding: '5px 11px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, transition: 'all 0.15s',
+                      background: longBreakMins === n ? 'rgba(167,139,250,0.15)' : 'rgba(255,255,255,0.06)',
+                      color: longBreakMins === n ? '#A78BFA' : 'rgba(255,255,255,0.4)',
+                    }}>{n}m</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Controls */}
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            {!running && (
+              <button onClick={reset} title="Reset" style={{ width: 46, height: 46, borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <RotateCcw size={16} />
+              </button>
+            )}
+            <button onClick={toggleRunning} style={{
+              height: 52, padding: '0 44px', borderRadius: 16,
+              border: `1px solid rgba(${modeRgb},0.45)`,
+              background: `rgba(${modeRgb},0.12)`,
+              color: modeColor, cursor: 'pointer', fontSize: 16, fontWeight: 700,
+              display: 'flex', alignItems: 'center', gap: 10,
+              boxShadow: running ? `0 0 40px rgba(${modeRgb},0.2)` : 'none',
+              transition: 'all 0.2s',
+            }}>
+              {running ? <><Pause size={18} /> Pauzeer</> : <><Play size={18} /> {seconds === totalSecs ? 'Start' : 'Hervat'}</>}
+            </button>
+            {running && (
+              <button onClick={skip} title="Sla over" style={{ width: 46, height: 46, borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <SkipForward size={16} />
+              </button>
+            )}
+          </div>
+
+          {/* Today stats */}
+          {(todayMins > 0 || totalSessions > 0) && (
+            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.22)', textAlign: 'center' }}>
+              {todayMins > 0 ? `Vandaag ${todayStr} gefocust` : ''}
+              {totalSessions > 0 ? `${todayMins > 0 ? ' · ' : ''}${totalSessions} sessie${totalSessions !== 1 ? 's' : ''}` : ''}
+            </span>
+          )}
+        </div>
+      </>
+    )
+  }
 
   return (
     <>

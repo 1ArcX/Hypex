@@ -20,28 +20,73 @@ function fmtTime(ts) {
 function fmtDate(dateStr) {
   if (!dateStr) return ''
   const d = new Date(dateStr + 'T12:00:00')
+  const today = new Date().toISOString().slice(0, 10)
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+  if (dateStr === today) return 'Vandaag'
+  if (dateStr === yesterday) return 'Gisteren'
   return `${d.getDate()} ${MONTHS[d.getMonth()]}`
 }
 
 function SessionRow({ session }) {
   const m = MODE_META[session.mode] || MODE_META.work
+  const durationMins = session.durationMins
+  const h = Math.floor(durationMins / 60)
+  const min = durationMins % 60
+  const durStr = h > 0 ? `${h}u ${min}m` : `${min}m`
+
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0' }}>
-      <span style={{ fontSize: 18, flexShrink: 0, width: 24, textAlign: 'center' }}>{m.icon}</span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0' }}>
+      <div style={{
+        width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+        background: m.color + '18', border: `1px solid ${m.color}33`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+      }}>
+        {m.icon}
+      </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{ fontSize: 13, color: 'var(--text-1)', margin: 0, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {session.tag || m.label}
         </p>
         <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>
-          {session.durationMins} min
-          {session.completedAt ? ` · ${fmtTime(session.completedAt)}` : ''}
+          {durStr}{session.completedAt ? ` · klaar ${fmtTime(session.completedAt)}` : ''}
         </p>
       </div>
-      <span style={{ fontSize: 11, color: m.color, fontWeight: 600, flexShrink: 0,
-        background: m.color + '18', border: `1px solid ${m.color}33`,
-        borderRadius: 6, padding: '2px 7px' }}>
+      <span style={{
+        fontSize: 11, color: m.color, fontWeight: 600, flexShrink: 0,
+        background: m.color + '15', border: `1px solid ${m.color}30`,
+        borderRadius: 6, padding: '2px 8px',
+      }}>
         {m.label}
       </span>
+    </div>
+  )
+}
+
+function DayLog({ label, sessions }) {
+  const focusSessions = sessions.filter(s => s.mode === 'work')
+  const totalMins = focusSessions.reduce((sum, s) => sum + (s.durationMins || 0), 0)
+  const h = Math.floor(totalMins / 60)
+  const m = totalMins % 60
+  const totalStr = h > 0 ? `${h}u ${m}m` : `${totalMins}m`
+
+  return (
+    <div className="card" style={{ padding: '14px 16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <p style={{ fontSize: 10, color: 'var(--text-3)', margin: 0, letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 600 }}>
+          {label}
+        </p>
+        {totalMins > 0 && (
+          <span style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600 }}>
+            {totalStr} focus
+          </span>
+        )}
+      </div>
+      {sessions.map((s, i) => (
+        <React.Fragment key={i}>
+          {i > 0 && <div style={{ height: 1, background: 'var(--border)', margin: '1px 0' }} />}
+          <SessionRow session={s} />
+        </React.Fragment>
+      ))}
     </div>
   )
 }
@@ -58,60 +103,38 @@ export default function PomodoroPage({ onModeChange, onFocusModeChange, userId }
   }
 
   const today = new Date().toISOString().slice(0, 10)
-  const todaySessions = sessions.filter(s => s.date === today)
-  const pastByDate = {}
-  for (const s of sessions.filter(s => s.date !== today)) {
-    if (!pastByDate[s.date]) pastByDate[s.date] = []
-    pastByDate[s.date].push(s)
+  const byDate = {}
+  for (const s of sessions) {
+    if (!byDate[s.date]) byDate[s.date] = []
+    byDate[s.date].push(s)
   }
-  const pastDates = Object.keys(pastByDate).sort((a, b) => b.localeCompare(a)).slice(0, 7)
+  const sortedDates = Object.keys(byDate).sort((a, b) => b.localeCompare(a)).slice(0, 14)
 
   return (
-    <div style={{
-      height: '100%', overflowY: 'auto',
-      display: 'flex', flexDirection: 'column', alignItems: 'center',
-      background: 'var(--bg-base)', padding: '32px 20px 48px', gap: 20,
-    }}>
-      {/* Timer widget, centered */}
-      <div style={{ width: '100%', maxWidth: 400 }}>
+    <div style={{ height: '100%', overflowY: 'auto', background: 'var(--bg-base)' }}>
+      {/* Full-page timer */}
+      <div style={{ maxWidth: 480, margin: '0 auto' }}>
         <PomodoroTimer
           onModeChange={onModeChange}
           onFocusModeChange={onFocusModeChange}
           userId={userId}
           noFocusOverlay
+          fullPage
           onSessionComplete={handleSessionComplete}
         />
       </div>
 
       {/* Session log */}
       {sessions.length > 0 && (
-        <div style={{ width: '100%', maxWidth: 400, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>
-            Sessie log
-          </p>
+        <div style={{ maxWidth: 480, margin: '0 auto', padding: '0 20px 48px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+            <span style={{ fontSize: 10, color: 'var(--text-3)', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 600 }}>Sessie log</span>
+            <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+          </div>
 
-          {todaySessions.length > 0 && (
-            <div className="card" style={{ padding: '14px 16px' }}>
-              <p style={{ fontSize: 10, color: 'var(--text-3)', margin: '0 0 8px', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 600 }}>Vandaag</p>
-              {todaySessions.map((s, i) => (
-                <React.Fragment key={i}>
-                  {i > 0 && <div style={{ height: 1, background: 'var(--border)', margin: '2px 0' }} />}
-                  <SessionRow session={s} />
-                </React.Fragment>
-              ))}
-            </div>
-          )}
-
-          {pastDates.map(date => (
-            <div key={date} className="card" style={{ padding: '14px 16px' }}>
-              <p style={{ fontSize: 10, color: 'var(--text-3)', margin: '0 0 8px', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 600 }}>{fmtDate(date)}</p>
-              {pastByDate[date].map((s, i) => (
-                <React.Fragment key={i}>
-                  {i > 0 && <div style={{ height: 1, background: 'var(--border)', margin: '2px 0' }} />}
-                  <SessionRow session={s} />
-                </React.Fragment>
-              ))}
-            </div>
+          {sortedDates.map(date => (
+            <DayLog key={date} label={fmtDate(date)} sessions={byDate[date]} />
           ))}
         </div>
       )}
