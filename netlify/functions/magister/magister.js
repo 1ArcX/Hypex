@@ -37,6 +37,9 @@ async function fetchAuthCode() {
     const html = await htmlRes.text()
     const scriptMatch = html.match(/src="([^"]*main[^"]*\.js)"/)
     console.log('scriptMatch:', scriptMatch ? scriptMatch[1] : 'null')
+    // Log all script src attributes to find correct bundle path
+    const allScripts = html.match(/src="[^"]+\.js"/g) || []
+    console.log('all scripts:', allScripts.join(' | '))
     if (scriptMatch) {
       const bundleUrl = scriptMatch[1].startsWith('http') ? scriptMatch[1] : `https://accounts.magister.net/${scriptMatch[1].replace(/^\//, '')}`
       const jsRes = await fetch(bundleUrl, { timeout: 20000, headers: { 'Accept-Encoding': 'identity', 'User-Agent': 'Mozilla/5.0' } })
