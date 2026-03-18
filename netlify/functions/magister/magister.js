@@ -25,58 +25,57 @@ function joinCookies(setCookieArray) {
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
 
-// Fetch authCode by scanning the login HTML for inline scripts and the bundle for API endpoint URLs
+// Fetch authCode from GET /challenges/current?sessionId=... (called by the login page JS)
 async function fetchAuthCode(sessionId, loginPageUrl, cookieStr, xsrfToken) {
   const issuerUrl = 'https://accounts.magister.net'
-  const baseH = {
+
+  // Fetch the login page to get any additional cookies it sets
+  const htmlRes = await fetch(loginPageUrl, {
+    timeout: 10000,
+    headers: { 'User-Agent': UA, 'Accept': 'text/html', 'Accept-Encoding': 'identity', cookie: cookieStr }
+  })
+  const loginSetCookies = htmlRes.headers.raw?.()?.['set-cookie'] || []
+  const allCookies = [...new Set([
+    ...(cookieStr || '').split('; '),
+    ...loginSetCookies.map(c => c.split(';')[0])
+  ])].filter(Boolean).join('; ')
+
+  // Update xsrf from new cookies if present
+  const newXsrf = loginSetCookies.find(c => c.startsWith('XSRF-TOKEN='))
+  const effectiveXsrf = newXsrf ? newXsrf.split('=')[1].split(';')[0] : xsrfToken
+
+  const apiHeaders = {
     'User-Agent': UA,
-    'Accept': 'text/html,application/xhtml+xml',
+    'Accept': 'application/json, text/plain, */*',
     'Accept-Encoding': 'identity',
-    cookie: cookieStr,
+    cookie: allCookies,
+    'X-XSRF-TOKEN': effectiveXsrf,
     'Origin': issuerUrl,
+    'Referer': loginPageUrl
   }
 
-  // Fetch the full login HTML
-  const htmlRes = await fetch(loginPageUrl, { timeout: 10000, headers: baseH })
-  const html = await htmlRes.text()
-  console.log('login HTML (2000):', html.slice(0, 2000))
+  // Try /challenges/current — this is what the login page JS calls to get current challenge state
+  const candidates = [
+    `${issuerUrl}/challenges/current?sessionId=${sessionId}`,
+    `${issuerUrl}/challenges/current`,
+    `${issuerUrl}/account/api/challenges/current?sessionId=${sessionId}`,
+  ]
 
-  // Pattern 1: authCode in HTML inline script or data attribute
-  const inlineMatch = html.match(/authCode['":\s=]+['"]([0-9a-f]{8,20})['"]/)
-  if (inlineMatch) { console.log('authCode from HTML:', inlineMatch[1]); return inlineMatch[1] }
-
-  // Pattern 2: any data-* attribute with hex value
-  const dataMatch = html.match(/data-auth[^=]*=["']([0-9a-f]{8,20})["']/)
-  if (dataMatch) { console.log('authCode from data attr:', dataMatch[1]); return dataMatch[1] }
-
-  // Fetch the JS bundle and look for fetch() URLs that might give us the authCode
-  const bundleUrl = 'https://accounts.magister.net/js/account-7d007d40090e250ebfe8.js'
-  const bundleRes = await fetch(bundleUrl, { timeout: 15000, headers: { ...baseH, 'Accept': '*/*', 'Referer': loginPageUrl } })
-  const bundle = bundleRes.ok ? await bundleRes.text() : ''
-  console.log('bundle len:', bundle.length)
-
-  // Extract unique path strings from the bundle that look like API endpoints
-  const paths = [...new Set([...bundle.matchAll(/["'`](\/(?:challenges|account|session|api)[/\w-]*(?:\?[^"'`]*)?)["'`]/g)].map(m => m[1]))]
-  console.log('bundle paths:', paths.join(' | '))
-
-  // Try each path as a potential authCode source
-  const apiHeaders = { ...baseH, 'Accept': 'application/json', 'X-XSRF-TOKEN': xsrfToken, 'X-Requested-With': 'XMLHttpRequest' }
-  for (const path of paths) {
-    const url = `${issuerUrl}${path.includes('sessionId') ? path.replace(/sessionId=[^&"']*/, `sessionId=${sessionId}`) : path + (path.includes('?') ? '&' : '?') + `sessionId=${sessionId}`}`
+  for (const url of candidates) {
     try {
-      const r = await fetch(url, { timeout: 5000, headers: apiHeaders })
-      if (!r.ok) continue
+      const r = await fetch(url, { timeout: 8000, headers: apiHeaders })
       const text = await r.text()
-      console.log('API hit', url, text.slice(0, 200))
-      try {
-        const d = JSON.parse(text)
-        const code = d.authCode || d.AuthCode || d.code
-        if (code && /^[0-9a-f]{8,20}$/i.test(code)) { console.log('authCode from API:', code, url); return code }
-      } catch {}
-    } catch {}
+      console.log('challenges/current', url, 'status:', r.status, 'body:', text.slice(0, 400))
+      if (!r.ok) continue
+      const d = JSON.parse(text)
+      // Log all keys so we can see the response shape
+      console.log('response keys:', JSON.stringify(Object.keys(d)))
+      const code = d.authCode || d.AuthCode || d.authcode || d.token || d.code
+      if (code) { console.log('authCode found:', code); return String(code) }
+    } catch (e) { console.log('fetch error', url, e.message) }
   }
 
-  throw new Error(`authCode niet gevonden (${paths.length} bundle-paden geprobeerd)`)
+  throw new Error(`authCode niet gevonden via /challenges/current`)
 }
 
 async function authenticate(school, username, password) {
