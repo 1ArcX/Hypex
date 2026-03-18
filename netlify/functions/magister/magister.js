@@ -92,16 +92,20 @@ async function authenticate(school, username, password) {
     'X-XSRF-TOKEN': xsrfToken
   }
 
+  console.log('authCode:', authCode, 'sessionId:', sessionId)
+
   // Step 2: Username challenge
   const uResp = await fetch(`${issuerUrl}/challenges/username`, {
     method: 'POST',
     body: JSON.stringify({ authCode, sessionId, returnUrl, username }),
     headers: challengeHeaders
   })
-  if (uResp.status !== 200) throw new Error('Inloggen mislukt')
+  console.log('username challenge status:', uResp.status)
+  if (uResp.status !== 200) throw new Error(`Inloggen mislukt (username ${uResp.status})`)
   const uBody = await uResp.json()
-  if (uBody.error && uBody.error !== 'Unable to load session') throw new Error('Inloggen mislukt')
-  if (uBody.action !== 'password') throw new Error('Onbekende gebruikersnaam')
+  console.log('username body:', JSON.stringify(uBody))
+  if (uBody.error && uBody.error !== 'Unable to load session') throw new Error(`Inloggen mislukt (uBody.error: ${uBody.error})`)
+  if (uBody.action !== 'password') throw new Error(`Onbekende gebruikersnaam (action: ${uBody.action})`)
 
   // Step 3: Password challenge
   const pResp = await fetch(`${issuerUrl}/challenges/password`, {
@@ -109,9 +113,11 @@ async function authenticate(school, username, password) {
     body: JSON.stringify({ authCode, sessionId, returnUrl, password }),
     headers: challengeHeaders
   })
-  if (pResp.status !== 200) throw new Error('Inloggen mislukt')
+  console.log('password challenge status:', pResp.status)
+  if (pResp.status !== 200) throw new Error(`Inloggen mislukt (password ${pResp.status})`)
   const pBody = await pResp.json()
-  if (pBody.error) throw new Error('Wachtwoord onjuist')
+  console.log('password body:', JSON.stringify(pBody))
+  if (pBody.error) throw new Error(`Wachtwoord onjuist (${pBody.error})`)
 
   const authCookies = joinCookies(pResp.headers.raw()['set-cookie'])
 
@@ -121,7 +127,8 @@ async function authenticate(school, username, password) {
     headers: { cookie: authCookies }
   })
   const finalLoc = finalResp.headers.get('location')
-  if (!finalLoc || !finalLoc.includes('code=')) throw new Error('Inloggen mislukt')
+  console.log('finalLoc:', finalLoc)
+  if (!finalLoc || !finalLoc.includes('code=')) throw new Error(`Inloggen mislukt (finalLoc: ${finalLoc})`)
 
   // Parse fragment params (code is returned in URL fragment #code=...&state=...&...)
   const fragment = finalLoc.includes('#') ? finalLoc.split('#')[1] : finalLoc.split('?')[1]
