@@ -25,81 +25,30 @@ function joinCookies(setCookieArray) {
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
 
-// Extract authCode from the Magister login page script.
-async function extractAuthCode(loginPageUrl, cookieStr) {
-  const baseH = { 'User-Agent': UA, 'Accept-Encoding': 'identity', cookie: cookieStr }
-
-  const res = await fetch(loginPageUrl, { timeout: 10000, headers: { ...baseH, 'Accept': 'text/html', 'Origin': 'https://accounts.magister.net' } })
-  const html = await res.text()
-  const finalUrl = res.url
-  const loginSetCookies = (res.headers.raw?.()?.['set-cookie'] || [])
-  const mergedCookies = [...new Set([...(cookieStr||'').split('; '), ...loginSetCookies.map(c => c.split(';')[0])])].filter(Boolean).join('; ')
-  baseH.cookie = mergedCookies
-
-  console.log('login HTML (500):', html.slice(0, 500))
-
-  // Parse <base href> from HTML — Magister sets <base href="/"> which changes relative URL resolution
-  const baseHrefMatch = html.match(/<base[^>]+href=["']([^"']+)["']/i)
-  const baseHref = baseHrefMatch ? new URL(baseHrefMatch[1], 'https://accounts.magister.net').href : null
-  console.log('base href:', baseHref)
-
-  // Collect candidate script URLs — prioritise <base href> resolution, then fallbacks
-  const srcs = [...html.matchAll(/(?:src|href)="([^"]*\.js[^"]*)"/g)].map(m => m[1])
-  console.log('raw srcs:', srcs.join(' | '))
-  const candidates = []
-  for (const src of srcs) {
-    const bases = [
-      ...(baseHref ? [baseHref] : []),
-      'https://accounts.magister.net/',
-      finalUrl,
-      'https://accounts.magister.net/account/',
-    ]
-    for (const base of bases) {
-      try { const u = new URL(src, base).href; if (!candidates.includes(u)) candidates.push(u) } catch {}
-    }
-  }
-  console.log('script candidates:', candidates.join(' | '))
-
-  const decodeFromJs = (js) => {
-    // Pattern 1: [[char_lookup],[indices]] — obfuscated array encoding
-    for (const m of js.matchAll(/\[(\[[^\]]+\]),(\[\d[^\]]*\])\]/g)) {
-      try {
-        const z0 = JSON.parse(m[1]), z1 = JSON.parse(m[2])
-        if (!Array.isArray(z0) || !Array.isArray(z1)) continue
-        if (!z0.every(s => typeof s === 'string') || !z1.every(n => typeof n === 'number')) continue
-        const code = z1.map(x => z0[parseInt(x) || 0]).join('')
-        if (/^[0-9a-f]{10,20}$/.test(code)) return code
-      } catch {}
-    }
-    // Pattern 2: literal hex string near authCode keyword
-    const lit = js.match(/authCode['":\s,({[]+['"]([0-9a-f]{10,20})['"]/i)
-    if (lit) return lit[1]
-    // Pattern 3: any standalone hex string of the right length (10-20 chars)
-    const hex = js.match(/["']([0-9a-f]{12,16})["']/)
-    if (hex) return hex[1]
-    return null
+// Fetch authCode from Magister's session API (the login page JS fetches this at runtime)
+async function fetchAuthCode(sessionId, cookieStr, xsrfToken) {
+  const issuerUrl = 'https://accounts.magister.net'
+  const headers = {
+    'User-Agent': UA,
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+    cookie: cookieStr,
+    'X-XSRF-TOKEN': xsrfToken,
+    'Origin': issuerUrl,
+    'Referer': `${issuerUrl}/account/login`
   }
 
-  for (const scriptUrl of candidates) {
-    try {
-      const jsRes = await fetch(scriptUrl, { timeout: 15000, headers: { ...baseH, 'Referer': loginPageUrl, 'Origin': 'https://accounts.magister.net' } })
-      if (!jsRes.ok) { console.log('script', jsRes.status, scriptUrl); continue }
-      const js = await jsRes.text()
-      console.log('script OK', scriptUrl, 'len:', js.length)
-      // Log all occurrences of 'authCode' with surrounding context
-      let idx = 0, authHits = 0
-      while ((idx = js.indexOf('authCode', idx)) !== -1 && authHits < 5) {
-        console.log(`authCode hit @${idx}:`, JSON.stringify(js.slice(Math.max(0, idx - 20), idx + 80)))
-        authHits++; idx++
-      }
-      if (!authHits) console.log('no authCode string found in bundle, trying hex scan')
-      const code = decodeFromJs(js)
-      if (code) { console.log('authCode:', code, 'from', scriptUrl); return code }
-      console.log('decodeFromJs returned null')
-    } catch (e) { console.log('script error:', scriptUrl, e.message) }
-  }
+  // The login page JS calls /challenges/session to get the authCode
+  const res = await fetch(`${issuerUrl}/challenges/session?sessionId=${sessionId}`, { timeout: 10000, headers })
+  console.log('session endpoint status:', res.status)
+  const text = await res.text()
+  console.log('session response:', text.slice(0, 300))
 
-  throw new Error(`AuthCode niet gevonden (finalUrl: ${finalUrl}, ${candidates.length} scripts geprobeerd)`)
+  if (!res.ok) throw new Error(`Session endpoint ${res.status}: ${text.slice(0, 100)}`)
+  const data = JSON.parse(text)
+  const code = data.authCode || data.AuthCode
+  if (!code) throw new Error(`authCode niet in session response: ${JSON.stringify(Object.keys(data))}`)
+  return code
 }
 
 async function authenticate(school, username, password) {
@@ -144,9 +93,8 @@ async function authenticate(school, username, password) {
   const xsrfEntry = rawCookies.find(c => c.split('=')[0] === 'XSRF-TOKEN')
   const xsrfToken = xsrfEntry.split('=')[1].split(';')[0]
 
-  // Step 2: Extract authCode from the login page script (encoded array pattern)
-  const loginPageUrl = location.startsWith('http') ? location : issuerUrl + location
-  const authCode = await extractAuthCode(loginPageUrl, cookieStr)
+  // Step 2: Fetch authCode from Magister session API
+  const authCode = await fetchAuthCode(sessionId, cookieStr, xsrfToken)
 
   const challengeHeaders = {
     'Content-Type': 'application/json',
