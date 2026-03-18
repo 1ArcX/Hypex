@@ -28,10 +28,10 @@ const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,
 // Extract authCode from the Magister login page script.
 // Magister embeds it as [[char_lookup],[indices]] in the bundle:
 //   authCode = z[1].map(x => z[0][parseInt(x)||0]).join("")
-async function extractAuthCode(loginPageUrl) {
+async function extractAuthCode(loginPageUrl, cookieStr) {
   const res = await fetch(loginPageUrl, {
     timeout: 10000,
-    headers: { 'User-Agent': UA, 'Accept-Encoding': 'identity', 'Accept': 'text/html' }
+    headers: { 'User-Agent': UA, 'Accept-Encoding': 'identity', 'Accept': 'text/html', cookie: cookieStr }
   })
   const html = await res.text()
   const finalUrl = res.url
@@ -45,7 +45,7 @@ async function extractAuthCode(loginPageUrl) {
 
   const jsRes = await fetch(scriptUrl, {
     timeout: 20000,
-    headers: { 'User-Agent': UA, 'Accept-Encoding': 'identity', 'Referer': loginPageUrl }
+    headers: { 'User-Agent': UA, 'Accept-Encoding': 'identity', 'Referer': loginPageUrl, cookie: cookieStr }
   })
   if (!jsRes.ok) throw new Error(`Script fetch mislukt: ${jsRes.status}`)
   const js = await jsRes.text()
@@ -112,7 +112,7 @@ async function authenticate(school, username, password) {
 
   // Step 2: Extract authCode from the login page script (encoded array pattern)
   const loginPageUrl = location.startsWith('http') ? location : issuerUrl + location
-  const authCode = await extractAuthCode(loginPageUrl)
+  const authCode = await extractAuthCode(loginPageUrl, cookieStr)
 
   const challengeHeaders = {
     'Content-Type': 'application/json',
