@@ -214,7 +214,7 @@ exports.handler = async (event) => {
 
     if (action === 'opdrachten') {
       const count = body.count || 50
-      const listResp = await m.http.get(`${m._personUrl}/opdrachten?top=${count}&skip=0&status=alle`)
+      const listResp = await m.http.get(`${m._personUrl}/opdrachten?top=${count}&skip=0`)
       const listData = await listResp.json()
       const ids = (listData.Items || []).map(i => i.Id)
       const results = []

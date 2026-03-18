@@ -84,6 +84,14 @@ function addFocusMins(mins) {
   } catch { return 0 }
 }
 
+const SOUND_TYPES = [
+  { id: 'off',   emoji: '🔇', label: 'Uit'    },
+  { id: 'focus', emoji: '🧠', label: 'Focus'  },
+  { id: 'brown', emoji: '🌫️', label: 'Brown'  },
+  { id: 'rain',  emoji: '🌧️', label: 'Regen'  },
+  { id: 'ocean', emoji: '🌊', label: 'Oceaan' },
+]
+
 // ── Supabase stats storage (per account) ─────────────────────────────────────
 const STATS_BUCKET = 'user-data'
 
@@ -859,6 +867,28 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
               </div>
             </div>
           )}
+
+          {/* Ambient sound picker */}
+          <div style={{ width: '100%', maxWidth: 380, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+              {SOUND_TYPES.map(({ id, emoji, label: lbl }) => (
+                <button key={id} onClick={() => setSoundType(id)} style={{
+                  padding: '5px 11px', borderRadius: 8, border: '1px solid', cursor: 'pointer', fontSize: 12, fontWeight: 600, transition: 'all 0.15s',
+                  background: soundType === id ? `rgba(${modeRgb},0.15)` : 'rgba(255,255,255,0.06)',
+                  color: soundType === id ? modeColor : 'rgba(255,255,255,0.4)',
+                  borderColor: soundType === id ? `rgba(${modeRgb},0.4)` : 'rgba(255,255,255,0.08)',
+                }}>{emoji} {lbl}</button>
+              ))}
+            </div>
+            {soundType !== 'off' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <VolumeX size={13} style={{ color: 'rgba(255,255,255,0.3)', flexShrink: 0 }} />
+                <input type="range" min="0" max="100" value={volume} onChange={e => setVolume(+e.target.value)}
+                  style={{ flex: 1, accentColor: modeColor }} />
+                <Volume2 size={13} style={{ color: 'rgba(255,255,255,0.3)', flexShrink: 0 }} />
+              </div>
+            )}
+          </div>
 
           {/* Controls */}
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
