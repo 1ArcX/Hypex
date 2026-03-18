@@ -203,10 +203,10 @@ export default function DashboardPage({
         )
       })()}
 
-      {/* Bottom grid: Weather + Spotify */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        <WeatherWidget userId={null} onRequestPwaInstall={onRequestPwaInstall} stacked />
+      {/* Spotify + Weather: Spotify boven op mobiel, naast elkaar op desktop */}
+      <div className="grid gap-4 md:grid-cols-2">
         <SpotifyWidget />
+        <WeatherWidget userId={null} onRequestPwaInstall={onRequestPwaInstall} stacked />
       </div>
 
       {/* Oningeplande taken */}

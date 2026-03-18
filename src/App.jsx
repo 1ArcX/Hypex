@@ -421,8 +421,6 @@ export default function App() {
               <TakenPage
                 tasks={tasks}
                 subjects={subjects}
-                userId={user.id}
-                syncTrigger={syncTrigger}
                 onAdd={handleTaskAdd}
                 onEdit={openEditTask}
                 onDelete={handleDeleteTask}

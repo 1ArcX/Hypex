@@ -78,9 +78,9 @@ const emptyForm = (date, hour) => ({
   color: '#818CF8', recurrence: '', recurrence_days: []
 })
 
-export default function Timeline({ userId, tasks, subjects, onEditTask, defaultView = 'week', isMobile = false, onLessonsChange, onEventsChange, onMagisterError }) {
+export default function Timeline({ userId, tasks, subjects, onEditTask, defaultView = 'week', initialDate, isMobile = false, onLessonsChange, onEventsChange, onMagisterError }) {
   const [view, setView] = useState(defaultView)
-  const [current, setCurrent] = useState(new Date())
+  const [current, setCurrent] = useState(initialDate || new Date())
   const [events, setEvents] = useState([])
   const [modal, setModal] = useState(null)
   const [form, setForm] = useState(emptyForm(new Date()))
