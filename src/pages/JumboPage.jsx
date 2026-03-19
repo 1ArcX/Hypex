@@ -2,7 +2,7 @@ import React from 'react'
 import WorkWidget from '../components/WorkWidget'
 import VrachttijdenWidget from '../components/VrachttijdenWidget'
 
-export default function JumboPage({ isAdmin }) {
+export default function JumboPage({ isAdmin, userId }) {
   if (!isAdmin) return (
     <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <p style={{ color: 'var(--text-3)' }}>Geen toegang</p>
@@ -18,7 +18,7 @@ export default function JumboPage({ isAdmin }) {
         gap: 16,
         alignItems: 'start',
       }}>
-        <WorkWidget />
+        <WorkWidget userId={userId} />
         <VrachttijdenWidget />
       </div>
     </div>

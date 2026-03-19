@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Briefcase, ChevronLeft, ChevronRight, RefreshCw, ExternalLink, AlertCircle, Settings, ChevronDown, ChevronUp } from 'lucide-react'
+import { supabase } from '../supabaseClient'
 
 const API = '/.netlify/functions/pmt'
 const STORAGE_KEY = 'pmt_credentials'
@@ -41,7 +42,37 @@ function formatShiftDate(dateStr) {
   return `${DAYS_NL[d.getDay()]} ${d.getDate()} ${MONTHS_NL[d.getMonth()]}`
 }
 
-export default function WorkWidget() {
+async function syncShiftsToCalendar(userId, shifts) {
+  if (!userId || !shifts.length) return
+  const dates = shifts.map(s => s.date).filter(Boolean).sort()
+  if (!dates.length) return
+  const rangeStart = dates[0] + 'T00:00:00'
+  const rangeEnd = dates[dates.length - 1] + 'T23:59:59'
+  await supabase.from('calendar_events')
+    .delete()
+    .eq('user_id', userId)
+    .gte('start_time', rangeStart)
+    .lte('start_time', rangeEnd)
+    .like('description', 'pmt:%')
+  const events = shifts.filter(s => s.date && s.start && s.end).map(s => {
+    const [sh, sm] = s.start.split(':').map(Number)
+    const [eh, em] = s.end.split(':').map(Number)
+    const startDt = new Date(s.date + 'T' + s.start + ':00')
+    const endDt = new Date(s.date + 'T' + s.end + ':00')
+    if (endDt <= startDt) endDt.setDate(endDt.getDate() + 1)
+    return {
+      user_id: userId,
+      title: `Werk ${s.start}–${s.end}`,
+      description: `pmt:${s.date}`,
+      start_time: startDt.toISOString(),
+      end_time: endDt.toISOString(),
+      color: '#F59E0B',
+    }
+  })
+  if (events.length) await supabase.from('calendar_events').insert(events)
+}
+
+export default function WorkWidget({ userId = null }) {
   const [creds, setCreds] = useState(() => {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || null } catch { return null }
   })
@@ -59,8 +90,30 @@ export default function WorkWidget() {
   const [dayLoading, setDayLoading] = useState(false)
 
   useEffect(() => {
-    if (creds) fetchSchedule(creds, week, year)
+    if (creds) {
+      fetchSchedule(creds, week, year)
+      if (!sessionStorage.getItem('pmt_synced')) {
+        sessionStorage.setItem('pmt_synced', '1')
+        autoSyncUpcoming(creds)
+      }
+    }
   }, [])
+
+  const autoSyncUpcoming = async (c) => {
+    if (!userId || !c) return
+    const allShifts = []
+    let w = currentISOWeek(), y = new Date().getFullYear()
+    for (let i = 0; i < 3; i++) {
+      try {
+        const data = await callPmt(c, 'schedule', { week: w, year: y })
+        if (data.shifts) allShifts.push(...data.shifts)
+      } catch {}
+      w++
+      if (w > isoWeeksInYear(y)) { y++; w = 1 }
+    }
+    await syncShiftsToCalendar(userId, allShifts)
+    window.dispatchEvent(new Event('refreshCalendarEvents'))
+  }
 
   const fetchSchedule = async (c, w, y) => {
     if (!c) return
@@ -97,6 +150,8 @@ export default function WorkWidget() {
       setCreds(formCreds)
       setShifts(data.shifts || [])
       setShowSettings(false)
+      sessionStorage.removeItem('pmt_synced')
+      autoSyncUpcoming(formCreds)
     } catch (e) {
       setError(e.message)
     }

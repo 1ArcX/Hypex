@@ -168,6 +168,14 @@ export default function App() {
     return () => window.removeEventListener('refreshTasks', handler)
   }, [user?.id])
 
+  useEffect(() => {
+    const handler = () => {
+      if (user?.id) supabase.from('calendar_events').select('*').eq('user_id', user.id).then(({ data }) => { if (data) setCalendarEvents(data) })
+    }
+    window.addEventListener('refreshCalendarEvents', handler)
+    return () => window.removeEventListener('refreshCalendarEvents', handler)
+  }, [user?.id])
+
   // Auto-sync elke 30 seconden
   const doSync = useCallback(async () => {
     if (!user?.id) return
@@ -439,7 +447,7 @@ export default function App() {
             )}
 
             {activePage === 'jumbo' && isAdmin && (
-              <JumboPage isAdmin={isAdmin} />
+              <JumboPage isAdmin={isAdmin} userId={user?.id} />
             )}
 
           </div>
