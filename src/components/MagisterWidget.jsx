@@ -34,7 +34,7 @@ function toBookUrl(url) {
   return m ? `https://apps.noordhoff.nl/se/deeplink?targetEAN=${m[1]}` : url
 }
 
-export default function MagisterWidget({ userId, onSubjectsSync, tabless = false }) {
+export default function MagisterWidget({ userId, onSubjectsSync, tabless = false, gridLayout = false }) {
   const [creds, setCreds] = useState(() => {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || null } catch { return null }
   })
@@ -216,8 +216,12 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
   const accentBg = (pct) => `color-mix(in srgb, var(--accent) ${pct}%, transparent)`
   const accentBorder = (pct) => `1px solid color-mix(in srgb, var(--accent) ${pct}%, transparent)`
 
+  const secWrap = gridLayout
+    ? { display: 'flex', flexDirection: 'column', overflow: 'hidden' }
+    : { marginBottom: 16 }
+
   return (
-    <div className={tabless ? '' : 'glass-card p-4'}>
+    <div className={tabless ? '' : 'glass-card p-4'} style={gridLayout ? { height: '100%', display: 'flex', flexDirection: 'column' } : {}}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: expanded ? '12px' : 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -286,7 +290,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
 
           {!showSettings && (
             <>
-              {/* Tabs (hidden in tabless mode) */}
+              {/* Tabs (alleen op mobiel, niet in tabless/grid mode) */}
               {!tabless && (
                 <div style={{ display: 'flex', gap: '4px', marginBottom: '10px' }}>
                   {[
@@ -305,212 +309,220 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                 </div>
               )}
 
-              {/* Vakken tab */}
-              {(tabless || tab === 'vakken') && (
-                <div style={tabless ? { marginBottom: 16 } : {}}>
-                  {tabless && (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 16 }}>📚</span>
-                        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>Vakken</span>
-                        {klas && <span style={{ background: accentBg(10), border: accentBorder(25), borderRadius: 20, padding: '1px 8px', fontSize: 10, color: 'var(--accent)' }}>{klas}</span>}
-                      </div>
-                      {creds && (
-                        <button onClick={syncAll} disabled={syncing}
-                          style={{ background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.25)', borderRadius: 8, padding: '3px 8px', cursor: 'pointer', color: '#FACC15', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, opacity: syncing ? 0.5 : 1 }}>
-                          <RefreshCw size={11} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} /> Sync
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  {!tabless && (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        {klas && <span style={{ background: accentBg(10), border: accentBorder(25), borderRadius: '20px', padding: '1px 8px', fontSize: '10px', color: 'var(--accent)' }}>{klas}</span>}
-                      </div>
-                      {creds && (
-                        <button onClick={syncAll} disabled={syncing}
-                          style={{ background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.25)', borderRadius: '8px', padding: '3px 8px', cursor: 'pointer', color: '#FACC15', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', opacity: syncing ? 0.5 : 1 }}>
-                          <RefreshCw size={11} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} /> Sync
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  {syncMsg && (
-                    <div style={{ fontSize: '11px', color: syncMsg.includes('✓') ? '#4ADE80' : '#FACC15', marginBottom: '8px', padding: '4px 8px', background: 'rgba(255,255,255,0.04)', borderRadius: '6px' }}>
-                      {syncMsg}
-                    </div>
-                  )}
-                  <div className={tabless ? 'card' : ''} style={tabless ? { padding: '14px 16px' } : {}}>
-                    {vakken.length === 0 ? (
-                      <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '12px 0', margin: 0 }}>
-                        {creds ? 'Klik op "Sync" om vakken te laden' : 'Log in bij Magister om vakken te laden'}
-                      </p>
-                    ) : (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {vakken.map(vak => {
-                          const link = subjectLinks[vak]
-                          return link ? (
-                            <a key={vak} href={link} target="_blank" rel="noopener noreferrer"
-                              style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 12px', borderRadius: 20, background: accentBg(8), border: accentBorder(20), color: 'var(--accent)', fontSize: 12, fontWeight: 500, textDecoration: 'none' }}>
-                              {vak} <ExternalLink size={10} />
-                            </a>
-                          ) : (
-                            <span key={vak} style={{ padding: '4px 12px', borderRadius: 20, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-2)', fontSize: 12 }}>
-                              {vak}
-                            </span>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+              {/* Grid wrapper op desktop, gewone kolom op mobiel */}
+              <div style={gridLayout
+                ? { flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, overflow: 'hidden' }
+                : {}
+              }>
 
-              {/* Loading */}
-              {loading && (tab !== 'vakken' || tabless) && (
-                <div style={{ textAlign: 'center', padding: '20px', color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>
-                  <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite', display: 'block', margin: '0 auto 6px' }} />
-                  Laden...
-                </div>
-              )}
-
-              {/* Error */}
-              {error && !loading && (tab !== 'vakken' || tabless) && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ff6b6b', fontSize: '12px', padding: '8px', borderRadius: '8px', background: 'rgba(255,80,80,0.08)' }}>
-                  <AlertCircle size={13} /> {error}
-                </div>
-              )}
-
-              {/* Cijfers */}
-              {(tabless || tab === 'cijfers') && !loading && data.grades && (
-                <div style={tabless ? { marginBottom: 16 } : {}}>
-                  {tabless && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                      <span style={{ fontSize: 16 }}>📊</span>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>Laatste cijfers</span>
-                    </div>
-                  )}
-                  <div className={tabless ? 'card' : ''} style={tabless ? { padding: '0' } : { display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {data.grades.length === 0 && (
-                      <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '20px 0', margin: 0 }}>Geen cijfers gevonden</p>
-                    )}
-                    {data.grades.map((g, i) => {
-                      const cijfer = parseFloat(g.cijfer)
-                      const color = isNaN(cijfer) ? '#818CF8' : cijfer >= 5.5 ? '#4ADE80' : '#FF6B6B'
-                      return (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: i < data.grades.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                          <div style={{ width: 38, height: 38, borderRadius: 10, background: color + '18', border: `1px solid ${color}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            <span style={{ fontSize: 14, fontWeight: 700, color }}>{g.cijfer ?? '–'}</span>
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <p style={{ fontSize: 13, color: 'var(--text-1)', fontWeight: 500, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.vak || 'Onbekend vak'}</p>
-                            <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '2px 0 0' }}>
-                              {[g.omschrijving, g.weging ? `weging ${g.weging}` : null, g.datum ? formatDate(g.datum) : null].filter(Boolean).join(' · ')}
-                            </p>
-                          </div>
+                {/* Vakken */}
+                {(tabless || tab === 'vakken') && (
+                  <div style={tabless ? secWrap : {}}>
+                    {tabless && (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexShrink: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 16 }}>📚</span>
+                          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>Vakken</span>
+                          {klas && <span style={{ background: accentBg(10), border: accentBorder(25), borderRadius: 20, padding: '1px 8px', fontSize: 10, color: 'var(--accent)' }}>{klas}</span>}
                         </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Huiswerk / Studiewijzer */}
-              {(tabless || tab === 'huiswerk') && !loading && data.homework && (
-                <div style={tabless ? { marginBottom: 16 } : {}}>
-                  {tabless && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                      <span style={{ fontSize: 16 }}>📋</span>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>Studiewijzer</span>
-                    </div>
-                  )}
-                  <div className={tabless ? 'card' : ''} style={tabless ? { padding: 0 } : { display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {data.homework.length === 0 && (
-                      <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '20px 0', margin: 0 }}>Geen huiswerk gevonden</p>
-                    )}
-                    {data.homework.map((hw, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 16px', borderBottom: i < data.homework.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: hw.omschrijving ? 3 : 0 }}>
-                            <span style={{ fontSize: 11, color: 'var(--accent)', background: accentBg(8), border: accentBorder(20), borderRadius: 20, padding: '1px 7px', flexShrink: 0 }}>{hw.vak || '?'}</span>
-                            {hw.klaar && <span style={{ fontSize: 10, color: '#4ADE80' }}>✓ Klaar</span>}
-                          </div>
-                          {hw.omschrijving && (
-                            <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '4px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                              {stripHtml(hw.omschrijving)}
-                            </p>
-                          )}
-                        </div>
-                        {hw.datum && (
-                          <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0, marginTop: 2 }}>{formatDate(hw.datum)}</span>
+                        {creds && (
+                          <button onClick={syncAll} disabled={syncing}
+                            style={{ background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.25)', borderRadius: 8, padding: '3px 8px', cursor: 'pointer', color: '#FACC15', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, opacity: syncing ? 0.5 : 1 }}>
+                            <RefreshCw size={11} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} /> Sync
+                          </button>
                         )}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Opdrachten */}
-              {(tabless || tab === 'opdrachten') && !loading && data.assignments && (
-                <div style={tabless ? { marginBottom: 16 } : {}}>
-                  {tabless && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                      <span style={{ fontSize: 16 }}>📝</span>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>Opdrachten</span>
-                      {data.assignments.length > 0 && (
-                        <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{data.assignments.length}</span>
-                      )}
-                    </div>
-                  )}
-                  <div className={tabless ? 'card' : ''} style={tabless ? { padding: 0 } : { display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {data.assignments.length === 0 && (
-                      <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '20px 0', margin: 0 }}>Geen opdrachten gevonden</p>
                     )}
-                    {tabless && data.assignments.length > 0 && (
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr auto', gap: '0 12px', padding: '6px 16px', borderBottom: '1px solid var(--border)' }}>
-                        {['Vak', 'Opdracht', 'Inleveren', 'Status'].map(h => (
-                          <span key={h} style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{h}</span>
-                        ))}
+                    {!tabless && (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          {klas && <span style={{ background: accentBg(10), border: accentBorder(25), borderRadius: '20px', padding: '1px 8px', fontSize: '10px', color: 'var(--accent)' }}>{klas}</span>}
+                        </div>
+                        {creds && (
+                          <button onClick={syncAll} disabled={syncing}
+                            style={{ background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.25)', borderRadius: '8px', padding: '3px 8px', cursor: 'pointer', color: '#FACC15', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', opacity: syncing ? 0.5 : 1 }}>
+                            <RefreshCw size={11} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} /> Sync
+                          </button>
+                        )}
                       </div>
                     )}
-                    {data.assignments.map((a, i) => {
-                      const overdue = !a.afgesloten && !a.ingeleverdOp && isOverdue(a.deadline)
-                      const statusColor = a.afgesloten ? '#555' : a.ingeleverdOp ? 'var(--accent)' : overdue ? '#FF6B6B' : a.magInleveren ? '#FACC15' : 'rgba(255,255,255,0.3)'
-                      const statusLabel = a.afgesloten ? 'Afgesloten' : a.opnieuwInleveren ? 'Opnieuw' : a.ingeleverdOp ? 'Ingeleverd' : overdue ? 'Te laat' : a.magInleveren ? 'Openstaand' : '–'
-                      return tabless ? (
-                        <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr auto', gap: '0 12px', alignItems: 'center', padding: '10px 16px', borderBottom: i < data.assignments.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                          <span style={{ fontSize: 11, color: 'var(--accent)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.vak || '–'}</span>
-                          <span style={{ fontSize: 12, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.naam || 'Onbekend'}</span>
-                          <span style={{ fontSize: 11, color: overdue ? '#FF6B6B' : 'var(--text-3)' }}>{a.deadline ? formatDate(a.deadline) : '–'}</span>
-                          <span style={{ fontSize: 10, color: statusColor, background: statusColor + '18', border: `1px solid ${statusColor}44`, borderRadius: 20, padding: '2px 8px', whiteSpace: 'nowrap' }}>
-                            {statusLabel}
-                          </span>
-                        </div>
+                    {syncMsg && (
+                      <div style={{ fontSize: '11px', color: syncMsg.includes('✓') ? '#4ADE80' : '#FACC15', marginBottom: '8px', padding: '4px 8px', background: 'rgba(255,255,255,0.04)', borderRadius: '6px', flexShrink: 0 }}>
+                        {syncMsg}
+                      </div>
+                    )}
+                    <div className={tabless ? 'card' : ''} style={tabless ? { padding: '14px 16px', ...(gridLayout ? { flex: 1, overflowY: 'auto' } : {}) } : {}}>
+                      {vakken.length === 0 ? (
+                        <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '12px 0', margin: 0 }}>
+                          {creds ? 'Klik op "Sync" om vakken te laden' : 'Log in bij Magister om vakken te laden'}
+                        </p>
                       ) : (
-                        <div key={i} style={{ padding: '8px 10px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${overdue ? 'rgba(255,80,80,0.2)' : 'rgba(255,255,255,0.06)'}` }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', fontWeight: 500, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.naam || 'Onbekend'}</p>
-                              {a.vak && <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', margin: '2px 0 0' }}>{a.vak}</p>}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          {vakken.map(vak => {
+                            const link = subjectLinks[vak]
+                            return link ? (
+                              <a key={vak} href={link} target="_blank" rel="noopener noreferrer"
+                                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 12px', borderRadius: 20, background: accentBg(8), border: accentBorder(20), color: 'var(--accent)', fontSize: 12, fontWeight: 500, textDecoration: 'none' }}>
+                                {vak} <ExternalLink size={10} />
+                              </a>
+                            ) : (
+                              <span key={vak} style={{ padding: '4px 12px', borderRadius: 20, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-2)', fontSize: 12 }}>
+                                {vak}
+                              </span>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Loading */}
+                {loading && (tab !== 'vakken' || tabless) && (
+                  <div style={{ textAlign: 'center', padding: '20px', color: 'rgba(255,255,255,0.3)', fontSize: '12px', ...(gridLayout ? { gridColumn: '1/-1' } : {}) }}>
+                    <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite', display: 'block', margin: '0 auto 6px' }} />
+                    Laden...
+                  </div>
+                )}
+
+                {/* Error */}
+                {error && !loading && (tab !== 'vakken' || tabless) && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ff6b6b', fontSize: '12px', padding: '8px', borderRadius: '8px', background: 'rgba(255,80,80,0.08)', ...(gridLayout ? { gridColumn: '1/-1' } : {}) }}>
+                    <AlertCircle size={13} /> {error}
+                  </div>
+                )}
+
+                {/* Cijfers */}
+                {(tabless || tab === 'cijfers') && !loading && data.grades && (
+                  <div style={tabless ? secWrap : {}}>
+                    {tabless && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexShrink: 0 }}>
+                        <span style={{ fontSize: 16 }}>📊</span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>Laatste cijfers</span>
+                      </div>
+                    )}
+                    <div className={tabless ? 'card' : ''} style={tabless ? { padding: '0', ...(gridLayout ? { flex: 1, overflowY: 'auto' } : {}) } : { display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {data.grades.length === 0 && (
+                        <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '20px 0', margin: 0 }}>Geen cijfers gevonden</p>
+                      )}
+                      {data.grades.map((g, i) => {
+                        const cijfer = parseFloat(g.cijfer)
+                        const color = isNaN(cijfer) ? '#818CF8' : cijfer >= 5.5 ? '#4ADE80' : '#FF6B6B'
+                        return (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: i < data.grades.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                            <div style={{ width: 38, height: 38, borderRadius: 10, background: color + '18', border: `1px solid ${color}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <span style={{ fontSize: 14, fontWeight: 700, color }}>{g.cijfer ?? '–'}</span>
                             </div>
-                            <span style={{ fontSize: 10, color: statusColor, background: statusColor + '18', border: `1px solid ${statusColor}44`, borderRadius: 6, padding: '1px 6px', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p style={{ fontSize: 13, color: 'var(--text-1)', fontWeight: 500, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.vak || 'Onbekend vak'}</p>
+                              <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '2px 0 0' }}>
+                                {[g.omschrijving, g.weging ? `weging ${g.weging}` : null, g.datum ? formatDate(g.datum) : null].filter(Boolean).join(' · ')}
+                              </p>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Huiswerk / Studiewijzer */}
+                {(tabless || tab === 'huiswerk') && !loading && data.homework && (
+                  <div style={tabless ? secWrap : {}}>
+                    {tabless && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexShrink: 0 }}>
+                        <span style={{ fontSize: 16 }}>📋</span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>Studiewijzer</span>
+                      </div>
+                    )}
+                    <div className={tabless ? 'card' : ''} style={tabless ? { padding: 0, ...(gridLayout ? { flex: 1, overflowY: 'auto' } : {}) } : { display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {data.homework.length === 0 && (
+                        <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '20px 0', margin: 0 }}>Geen huiswerk gevonden</p>
+                      )}
+                      {data.homework.map((hw, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 16px', borderBottom: i < data.homework.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: hw.omschrijving ? 3 : 0 }}>
+                              <span style={{ fontSize: 11, color: 'var(--accent)', background: accentBg(8), border: accentBorder(20), borderRadius: 20, padding: '1px 7px', flexShrink: 0 }}>{hw.vak || '?'}</span>
+                              {hw.klaar && <span style={{ fontSize: 10, color: '#4ADE80' }}>✓ Klaar</span>}
+                            </div>
+                            {hw.omschrijving && (
+                              <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '4px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                                {stripHtml(hw.omschrijving)}
+                              </p>
+                            )}
+                          </div>
+                          {hw.datum && (
+                            <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0, marginTop: 2 }}>{formatDate(hw.datum)}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Opdrachten */}
+                {(tabless || tab === 'opdrachten') && !loading && data.assignments && (
+                  <div style={tabless ? secWrap : {}}>
+                    {tabless && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexShrink: 0 }}>
+                        <span style={{ fontSize: 16 }}>📝</span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>Opdrachten</span>
+                        {data.assignments.length > 0 && (
+                          <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{data.assignments.length}</span>
+                        )}
+                      </div>
+                    )}
+                    <div className={tabless ? 'card' : ''} style={tabless ? { padding: 0, ...(gridLayout ? { flex: 1, overflowY: 'auto' } : {}) } : { display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {data.assignments.length === 0 && (
+                        <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '20px 0', margin: 0 }}>Geen opdrachten gevonden</p>
+                      )}
+                      {tabless && data.assignments.length > 0 && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr auto', gap: '0 12px', padding: '6px 16px', borderBottom: '1px solid var(--border)' }}>
+                          {['Vak', 'Opdracht', 'Inleveren', 'Status'].map(h => (
+                            <span key={h} style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{h}</span>
+                          ))}
+                        </div>
+                      )}
+                      {data.assignments.map((a, i) => {
+                        const overdue = !a.afgesloten && !a.ingeleverdOp && isOverdue(a.deadline)
+                        const statusColor = a.afgesloten ? '#555' : a.ingeleverdOp ? 'var(--accent)' : overdue ? '#FF6B6B' : a.magInleveren ? '#FACC15' : 'rgba(255,255,255,0.3)'
+                        const statusLabel = a.afgesloten ? 'Afgesloten' : a.opnieuwInleveren ? 'Opnieuw' : a.ingeleverdOp ? 'Ingeleverd' : overdue ? 'Te laat' : a.magInleveren ? 'Openstaand' : '–'
+                        return tabless ? (
+                          <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr auto', gap: '0 12px', alignItems: 'center', padding: '10px 16px', borderBottom: i < data.assignments.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                            <span style={{ fontSize: 11, color: 'var(--accent)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.vak || '–'}</span>
+                            <span style={{ fontSize: 12, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.naam || 'Onbekend'}</span>
+                            <span style={{ fontSize: 11, color: overdue ? '#FF6B6B' : 'var(--text-3)' }}>{a.deadline ? formatDate(a.deadline) : '–'}</span>
+                            <span style={{ fontSize: 10, color: statusColor, background: statusColor + '18', border: `1px solid ${statusColor}44`, borderRadius: 20, padding: '2px 8px', whiteSpace: 'nowrap' }}>
                               {statusLabel}
                             </span>
                           </div>
-                          {a.deadline && <p style={{ fontSize: 10, color: overdue ? '#FF6B6B' : 'rgba(255,255,255,0.25)', margin: '4px 0 0' }}>Inleveren: {formatDate(a.deadline)}</p>}
-                        </div>
-                      )
-                    })}
+                        ) : (
+                          <div key={i} style={{ padding: '8px 10px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${overdue ? 'rgba(255,80,80,0.2)' : 'rgba(255,255,255,0.06)'}` }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', fontWeight: 500, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.naam || 'Onbekend'}</p>
+                                {a.vak && <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', margin: '2px 0 0' }}>{a.vak}</p>}
+                              </div>
+                              <span style={{ fontSize: 10, color: statusColor, background: statusColor + '18', border: `1px solid ${statusColor}44`, borderRadius: 6, padding: '1px 6px', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                                {statusLabel}
+                              </span>
+                            </div>
+                            {a.deadline && <p style={{ fontSize: 10, color: overdue ? '#FF6B6B' : 'rgba(255,255,255,0.25)', margin: '4px 0 0' }}>Inleveren: {formatDate(a.deadline)}</p>}
+                          </div>
+                        )
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {!creds && tab !== 'vakken' && (
-                <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>
-                  Klik op "Inloggen" om te beginnen
-                </p>
-              )}
+                {!creds && tab !== 'vakken' && (
+                  <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>
+                    Klik op "Inloggen" om te beginnen
+                  </p>
+                )}
+
+              </div>{/* einde grid/kolom wrapper */}
             </>
           )}
         </>
