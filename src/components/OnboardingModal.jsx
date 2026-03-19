@@ -6,7 +6,7 @@ export default function OnboardingModal({ user, onClose }) {
   // Zo valt de locatiestap niet weg zodra je iets opslaat in localStorage.
   const [steps] = useState(() => {
     const s = ['welcome', 'location']
-    if (!localStorage.getItem('magister_credentials')) s.push('magister')
+    if (!localStorage.getItem(`magister_credentials_${user?.id}`)) s.push('magister')
     s.push('done')
     return s
   })
@@ -76,7 +76,7 @@ export default function OnboardingModal({ user, onClose }) {
 
   const saveMagister = () => {
     if (!school || !leerlingnummer || !wachtwoord) return
-    localStorage.setItem('magister_credentials', JSON.stringify({
+    localStorage.setItem(`magister_credentials_${user?.id}`, JSON.stringify({
       school: school.trim(),
       username: leerlingnummer.trim(),
       password: wachtwoord,

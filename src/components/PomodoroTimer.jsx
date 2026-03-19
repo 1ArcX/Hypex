@@ -320,16 +320,19 @@ function CompletionPopup({ prevMode, nextMode, onStart, onSkip }) {
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusModeChange, userId, noFocusOverlay = false, fullPage = false, onSessionComplete }) {
+export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusModeChange, userId, noFocusOverlay = false, fullPage = false, onSessionComplete, displayName = 'Student' }) {
   const [state, dispatch] = useReducer(reducer, INIT)
   const stateRef           = useRef(state)
   const endTimeRef         = useRef(null)
   const startTimeRef       = useRef(null)
   const intervalRef        = useRef(null)
   const channelRef         = useRef(null)
+  const buddiesChannelRef  = useRef(null)
   const localControlUntil  = useRef(0)
   const userIdRef = useRef(userId)
+  const displayNameRef = useRef(displayName)
   useEffect(() => { userIdRef.current = userId }, [userId])
+  useEffect(() => { displayNameRef.current = displayName }, [displayName])
 
   // Call this whenever the user takes a local action — blocks remote sync for 30s
   const claimLocalControl = () => { localControlUntil.current = Date.now() + 30_000 }
@@ -444,6 +447,14 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
         startedAt: startTimeRef.current, completedAt: Date.now(),
         date: new Date().toISOString().slice(0, 10),
       })
+      if (s.mode === 'work' && userIdRef.current) {
+        supabase.from('pomodoro_sessions').insert({
+          user_id: userIdRef.current,
+          completed_at: new Date().toISOString(),
+          duration_minutes: getMins(s),
+          mode: 'work',
+        }).then(() => {})
+      }
       startTimeRef.current = null
 
       if (s.notifEnabled) {
@@ -612,11 +623,32 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
     return () => { supabase.removeChannel(channel) }
   }, [userId, broadcastState])
 
+  // ── StudieBuddies presence channel ───────────────────────────────────────
+  useEffect(() => {
+    if (!userId) return
+    const channel = supabase.channel('studiebuddies')
+    channel.subscribe()
+    buddiesChannelRef.current = channel
+    return () => {
+      channel.untrack()
+      supabase.removeChannel(channel)
+      buddiesChannelRef.current = null
+    }
+  }, [userId])
+
   // Broadcast every second while running so other devices stay frame-accurate
   useEffect(() => {
     if (!state.running || !userId) return
     const iv = setInterval(() => {
       broadcastState(stateRef.current, endTimeRef.current)
+      if (buddiesChannelRef.current && endTimeRef.current) {
+        buddiesChannelRef.current.track({
+          userId,
+          name: displayNameRef.current,
+          mode: stateRef.current.mode,
+          endTime: endTimeRef.current,
+        })
+      }
     }, 1000)
     return () => clearInterval(iv)
   }, [state.running, userId, broadcastState])
@@ -644,6 +676,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
       dispatch({ type: 'PAUSE', seconds: remaining })
       broadcastState({ ...state, running: false, seconds: remaining }, null, true)
       clearTimerSession(userIdRef.current)
+      buddiesChannelRef.current?.untrack()
     }
   }
 
@@ -653,6 +686,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
     dispatch({ type: 'RESET' })
     broadcastState({ ...state, running: false, seconds: getMins(state) * 60 }, null, true)
     clearTimerSession(userIdRef.current)
+    buddiesChannelRef.current?.untrack()
   }
 
   const skip = () => {
@@ -664,6 +698,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
     setTimeout(() => onModeChange?.(next !== 'work'), 0)
     broadcastState({ ...state, running: false, sessionsInCycle: newSIC }, null, true)
     clearTimerSession(userIdRef.current)
+    buddiesChannelRef.current?.untrack()
   }
 
   const switchMode = (mode) => {

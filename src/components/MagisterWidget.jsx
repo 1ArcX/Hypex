@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient'
 import { matchVak } from '../utils/alleVakken'
 
 const API = '/.netlify/functions/magister'
-const STORAGE_KEY = 'magister_credentials'
+const storageKey = (userId) => `magister_credentials_${userId}`
 
 async function callMagister(creds, action, extra = {}) {
   const res = await fetch(API, {
@@ -36,7 +36,8 @@ function toBookUrl(url) {
 
 export default function MagisterWidget({ userId, onSubjectsSync, tabless = false, gridLayout = false }) {
   const [creds, setCreds] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || null } catch { return null }
+    if (!userId) return null
+    try { return JSON.parse(localStorage.getItem(storageKey(userId))) || null } catch { return null }
   })
   const [formCreds, setFormCreds] = useState({ school: 'ichthus', username: '', password: '' })
   const [showSettings, setShowSettings] = useState(!creds)
@@ -167,7 +168,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
     setLoading(true); setError(null)
     try {
       await callMagister(formCreds, 'login')
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(formCreds))
+      localStorage.setItem(storageKey(userId), JSON.stringify(formCreds))
       setCreds(formCreds)
       setShowSettings(false)
       window.dispatchEvent(new Event('magisterLogin'))
@@ -183,7 +184,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
   }
 
   const logout = () => {
-    localStorage.removeItem(STORAGE_KEY)
+    localStorage.removeItem(storageKey(userId))
     setCreds(null)
     setData({ grades: null, homework: null, assignments: null })
     setShowSettings(true)

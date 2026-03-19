@@ -3,10 +3,8 @@ import { supabase } from '../supabaseClient'
 import { ExternalLink, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react'
 import { matchVak } from '../utils/alleVakken'
 
-const MAGISTER_KEY = 'magister_credentials'
-
-function getCreds() {
-  try { return JSON.parse(localStorage.getItem(MAGISTER_KEY)) || null } catch { return null }
+function getCreds(userId) {
+  try { return JSON.parse(localStorage.getItem(`magister_credentials_${userId}`)) || null } catch { return null }
 }
 
 async function magisterCall(creds, action, extra = {}) {
@@ -31,7 +29,7 @@ export default function SubjectsWidget({ userId, onSyncComplete }) {
     fetchProfile()
     fetchLinks().then(() => {
       // Auto-sync book links on mount if logged in to Magister
-      const creds = getCreds()
+      const creds = getCreds(userId)
       if (creds) syncLinks(creds)
     })
   }, [userId])

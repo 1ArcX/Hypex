@@ -91,7 +91,7 @@ function DayLog({ label, sessions }) {
   )
 }
 
-export default function PomodoroPage({ onModeChange, onFocusModeChange, userId }) {
+export default function PomodoroPage({ onModeChange, onFocusModeChange, userId, displayName }) {
   const [sessions, setSessions] = useState(loadSessions)
 
   const handleSessionComplete = (session) => {
@@ -121,6 +121,7 @@ export default function PomodoroPage({ onModeChange, onFocusModeChange, userId }
           noFocusOverlay
           fullPage
           onSessionComplete={handleSessionComplete}
+          displayName={displayName}
         />
       </div>
 

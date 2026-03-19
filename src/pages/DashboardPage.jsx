@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react'
 import Clock from '../components/Clock'
 import WeatherWidget from '../components/WeatherWidget'
 import SpotifyWidget from '../components/SpotifyWidget'
+import StudieBuddiesWidget from '../components/StudieBuddiesWidget'
 
 function useNextEvent({ tasks, calendarEvents, magisterLessons, skip }) {
   return useMemo(() => {
@@ -59,7 +60,7 @@ function useNextEvent({ tasks, calendarEvents, magisterLessons, skip }) {
 export default function DashboardPage({
   isBreak, tasks, subjects, calendarEvents, magisterLessons,
   magisterError, displayName, homeRain, onNavigate,
-  setDetailTask, openNewTask, onRequestPwaInstall,
+  setDetailTask, openNewTask, onRequestPwaInstall, profiles, userId,
 }) {
   const [skip, setSkip] = useState(0)
   const { item: ev, hasMore } = useNextEvent({ tasks, calendarEvents, magisterLessons, skip })
@@ -131,7 +132,7 @@ export default function DashboardPage({
 
       {/* Magister error/koppel prompt */}
       {(() => {
-        const hasCreds = !!localStorage.getItem('magister_credentials')
+        const hasCreds = !!localStorage.getItem(`magister_credentials_${userId}`)
         const hasError = !!magisterError
         if (!hasCreds || hasError) return (
           <div
@@ -208,6 +209,9 @@ export default function DashboardPage({
         <SpotifyWidget />
         <WeatherWidget userId={null} onRequestPwaInstall={onRequestPwaInstall} stacked />
       </div>
+
+      {/* StudieBuddies */}
+      <StudieBuddiesWidget profiles={profiles} />
 
       {/* Oningeplande taken */}
       {(() => {

@@ -4,7 +4,7 @@ import { Plus, ChevronLeft, ChevronRight, X, Save, Trash2 } from 'lucide-react'
 
 const HOUR_H = 56
 const TIME_COL = 48
-const MAGISTER_KEY = 'magister_credentials'
+const magisterKey = (userId) => `magister_credentials_${userId}`
 
 const MONTHS_FULL = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December']
 const MONTHS_SHORT = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec']
@@ -126,7 +126,7 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, defaultV
       try { setMagisterLessons(JSON.parse(cached)) } catch {}
       return
     }
-    const creds = (() => { try { return JSON.parse(localStorage.getItem(MAGISTER_KEY)) } catch { return null } })()
+    const creds = (() => { try { return JSON.parse(localStorage.getItem(magisterKey(userId))) } catch { return null } })()
     if (!creds) return
     setMagisterSyncing(true)
     setMagisterError(null)

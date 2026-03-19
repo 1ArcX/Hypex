@@ -114,15 +114,11 @@ export default function App() {
     }
   }
 
-  // Onboarding: toon bij eerste login als locatie of Magister niet is ingesteld
+  // Onboarding: toon bij elke nieuwe login (eerste keer op dit apparaat)
   useEffect(() => {
     if (!user) return
     const done = localStorage.getItem(`onboarding_done_${user.id}`)
-    if (!done) {
-      const needsLocation = !localStorage.getItem('weather_coords')
-      const needsMagister = !localStorage.getItem('magister_credentials')
-      if (needsLocation || needsMagister) setShowOnboarding(true)
-    }
+    if (!done) setShowOnboarding(true)
   }, [user])
 
   useEffect(() => {
@@ -393,6 +389,8 @@ export default function App() {
                 setDetailTask={setDetailTask}
                 openNewTask={openNewTask}
                 onRequestPwaInstall={() => setShowPwaPrompt(true)}
+                profiles={profiles}
+                userId={user?.id}
               />
             )}
 
@@ -401,6 +399,7 @@ export default function App() {
                 onModeChange={setIsBreak}
                 onFocusModeChange={setFocusMode}
                 userId={user?.id}
+                displayName={displayName}
               />
             )}
 
