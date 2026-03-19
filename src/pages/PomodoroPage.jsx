@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import PomodoroTimer from '../components/PomodoroTimer'
+import StudieBuddiesWidget from '../components/StudieBuddiesWidget'
 
 const SESSION_LOG_KEY = 'pomodoro_session_log'
 const MODE_META = {
@@ -91,7 +92,7 @@ function DayLog({ label, sessions }) {
   )
 }
 
-export default function PomodoroPage({ onModeChange, onFocusModeChange, userId, displayName }) {
+export default function PomodoroPage({ onModeChange, onFocusModeChange, userId, profiles }) {
   const [sessions, setSessions] = useState(loadSessions)
 
   const handleSessionComplete = (session) => {
@@ -114,6 +115,7 @@ export default function PomodoroPage({ onModeChange, onFocusModeChange, userId, 
     <div style={{ height: '100%', overflowY: 'auto', background: 'var(--bg-base)' }}>
       {/* Full-page timer */}
       <div style={{ maxWidth: 480, margin: '0 auto' }}>
+        <StudieBuddiesWidget profiles={profiles} />
         <PomodoroTimer
           onModeChange={onModeChange}
           onFocusModeChange={onFocusModeChange}
@@ -121,7 +123,6 @@ export default function PomodoroPage({ onModeChange, onFocusModeChange, userId, 
           noFocusOverlay
           fullPage
           onSessionComplete={handleSessionComplete}
-          displayName={displayName}
         />
       </div>
 

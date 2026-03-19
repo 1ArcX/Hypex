@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react'
 import Clock from '../components/Clock'
 import WeatherWidget from '../components/WeatherWidget'
 import SpotifyWidget from '../components/SpotifyWidget'
-import StudieBuddiesWidget from '../components/StudieBuddiesWidget'
 
 function useNextEvent({ tasks, calendarEvents, magisterLessons, skip }) {
   return useMemo(() => {
@@ -210,10 +209,7 @@ export default function DashboardPage({
         <WeatherWidget userId={null} onRequestPwaInstall={onRequestPwaInstall} stacked />
       </div>
 
-      {/* StudieBuddies */}
-      <StudieBuddiesWidget profiles={profiles} />
-
-      {/* Oningeplande taken */}
+{/* Oningeplande taken */}
       {(() => {
         const unplanned = tasks.filter(t => !t.completed && !t.date)
         if (!unplanned.length) return null

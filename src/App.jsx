@@ -153,6 +153,38 @@ export default function App() {
     return profiles.find(p => p.id === user.id) || null
   }, [profiles, user?.id])
 
+  // ── StudieBuddies altijd-aan presence (werkt ook buiten Pomodoro pagina) ──
+  const presenceNameRef = useRef('Student')
+  useEffect(() => {
+    presenceNameRef.current = userProfile?.full_name || user?.email?.split('@')[0] || 'Student'
+  }, [userProfile, user])
+
+  useEffect(() => {
+    if (!user?.id) return
+    const channel = supabase.channel('studiebuddies')
+    channel.subscribe()
+    const iv = setInterval(() => {
+      try {
+        const saved = JSON.parse(localStorage.getItem('pomodoro_v3'))
+        if (saved?.running && saved?.endTime && saved.endTime > Date.now()) {
+          channel.track({
+            userId: user.id,
+            name: presenceNameRef.current,
+            mode: saved.mode || 'work',
+            endTime: saved.endTime,
+          })
+          return
+        }
+      } catch {}
+      channel.untrack()
+    }, 1000)
+    return () => {
+      channel.untrack()
+      clearInterval(iv)
+      supabase.removeChannel(channel)
+    }
+  }, [user?.id])
+
   // Effect voor accent kleur
   useEffect(() => {
     document.documentElement.style.setProperty('--accent', theme.accent)
@@ -399,7 +431,7 @@ export default function App() {
                 onModeChange={setIsBreak}
                 onFocusModeChange={setFocusMode}
                 userId={user?.id}
-                displayName={displayName}
+                profiles={profiles}
               />
             )}
 
