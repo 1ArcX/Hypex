@@ -650,6 +650,23 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, defaultV
         </div>
       </div>}
 
+      {/* Magister sync badge — shown when toolbar is hidden (mobile dag view) */}
+      {hideToolbar && (magisterSyncing || magisterError) && (
+        <div style={{ flexShrink: 0, padding: '6px 12px', display: 'flex', justifyContent: 'center' }}>
+          {magisterSyncing && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, background: 'rgba(250,204,21,0.1)', border: '1px solid rgba(250,204,21,0.25)' }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#FACC15', animation: 'pulse 1s infinite' }} />
+              <span style={{ fontSize: 11, color: '#FACC15', fontWeight: 500 }}>Syncing Magister</span>
+            </div>
+          )}
+          {!magisterSyncing && magisterError && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, background: 'rgba(255,80,80,0.1)', border: '1px solid rgba(255,80,80,0.25)' }}>
+              <span style={{ fontSize: 11, color: '#FF6B6B', fontWeight: 500 }}>Magister: {magisterError}</span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* View content — call as functions to prevent remount on re-render */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {view === 'month' && MonthView({})}
