@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import PomodoroTimer from '../components/PomodoroTimer'
 import StudieBuddiesWidget from '../components/StudieBuddiesWidget'
+import PomodoroStats from '../components/PomodoroStats'
 
 const SESSION_LOG_KEY = 'pomodoro_session_log'
 const MODE_META = {
@@ -124,6 +125,11 @@ export default function PomodoroPage({ onModeChange, onFocusModeChange, userId, 
           fullPage
           onSessionComplete={handleSessionComplete}
         />
+      </div>
+
+      {/* Week stats */}
+      <div style={{ maxWidth: 480, margin: '0 auto', padding: '0 20px' }}>
+        <PomodoroStats refreshKey={sessions.length} />
       </div>
 
       {/* Session log */}
