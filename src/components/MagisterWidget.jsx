@@ -52,6 +52,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
   const [syncMsg, setSyncMsg] = useState('')
   const [swDetail, setSwDetail] = useState(null)        // { sw, topics, loading, error }
   const [bronLoading, setBronLoading] = useState({})
+  const [expandedTopics, setExpandedTopics] = useState({})
 
   // Fetch all Magister data at once on mount (no lazy loading per tab)
   useEffect(() => {
@@ -222,6 +223,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
       console.log('[Studiewijzer] detail raw:', result._debug?.detailText)
       console.log('[Studiewijzer] topics status:', result._debug?.topicsStatus)
       console.log('[Studiewijzer] topics raw:', result._debug?.topicsText)
+      setExpandedTopics({})
       setSwDetail({ sw, topics: result.topics || [], loading: false, error: null })
     } catch (e) {
       setSwDetail({ sw, topics: [], loading: false, error: e.message })
@@ -527,23 +529,42 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                               Geen onderdelen gevonden (check console voor API-structuur)
                             </p>
                           )}
-                          {swDetail.topics.map((topic, i) => (
-                            <div key={i} style={{ padding:'10px 16px', borderBottom: i < swDetail.topics.length-1 ? '1px solid var(--border)' : 'none' }}>
-                              <div style={{ fontWeight:600, fontSize:12, color:'var(--text-1)', marginBottom:4 }}>{topic.naam}</div>
-                              {topic.inhoud && (
-                                <p style={{ fontSize:11, color:'var(--text-3)', margin:'0 0 4px' }}>{stripHtml(topic.inhoud)}</p>
+                          {swDetail.topics.map((topic, i) => {
+                            const open = !!expandedTopics[topic.id]
+                            return (
+                            <div key={i} style={{ borderBottom: i < swDetail.topics.length-1 ? '1px solid var(--border)' : 'none' }}>
+                              {/* Map header — klikbaar */}
+                              <button onClick={() => setExpandedTopics(prev => ({ ...prev, [topic.id]: !prev[topic.id] }))}
+                                style={{ width:'100%', display:'flex', alignItems:'center', gap:8, padding:'10px 16px', background:'none', border:'none', cursor:'pointer', textAlign:'left' }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                                <span style={{ fontSize:14 }}>📁</span>
+                                <span style={{ flex:1, fontWeight:600, fontSize:12, color:'var(--text-1)' }}>{topic.naam}</span>
+                                {topic.bijlagen.length > 0 && (
+                                  <span style={{ fontSize:10, color:'var(--text-3)' }}>{topic.bijlagen.length}</span>
+                                )}
+                                <ChevronDown size={13} style={{ color:'var(--text-3)', transform: open ? 'rotate(0deg)' : 'rotate(-90deg)', transition:'transform 0.15s' }} />
+                              </button>
+                              {/* Inhoud — alleen als open */}
+                              {open && (
+                                <div style={{ padding:'0 16px 10px 38px', display:'flex', flexDirection:'column', gap:4 }}>
+                                  {topic.inhoud && (
+                                    <p style={{ fontSize:11, color:'var(--text-3)', margin:'0 0 4px' }}>{stripHtml(topic.inhoud)}</p>
+                                  )}
+                                  {topic.bijlagen.length === 0 && (
+                                    <span style={{ fontSize:11, color:'rgba(255,255,255,0.2)' }}>Geen bestanden</span>
+                                  )}
+                                  {topic.bijlagen.map((b, j) => (
+                                    (b.href || b.url)
+                                      ? <button key={j} onClick={() => openBron(b)} disabled={bronLoading[b.id]} style={{ background:'none', border:'none', cursor:'pointer', padding:0, fontSize:11, color:'var(--accent)', display:'flex', alignItems:'center', gap:4, textAlign:'left', opacity: bronLoading[b.id] ? 0.5 : 1 }}>
+                                          {bronLoading[b.id] ? <RefreshCw size={10} style={{ animation:'spin 1s linear infinite' }} /> : <ExternalLink size={10} />} {b.naam}
+                                        </button>
+                                      : <span key={j} style={{ fontSize:11, color:'var(--text-3)' }}>{b.naam}</span>
+                                  ))}
+                                </div>
                               )}
-                              <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
-                                {topic.bijlagen.map((b, j) => (
-                                  (b.href || b.url)
-                                    ? <button key={j} onClick={() => openBron(b)} disabled={bronLoading[b.id]} style={{ background:'none', border:'none', cursor:'pointer', padding:0, fontSize:11, color:'var(--accent)', display:'flex', alignItems:'center', gap:4, textAlign:'left', opacity: bronLoading[b.id] ? 0.5 : 1 }}>
-                                        {bronLoading[b.id] ? <RefreshCw size={10} style={{ animation:'spin 1s linear infinite' }} /> : <ExternalLink size={10} />} {b.naam}
-                                      </button>
-                                    : <span key={j} style={{ fontSize:11, color:'var(--text-3)' }}>{b.naam}</span>
-                                ))}
-                              </div>
                             </div>
-                          ))}
+                          )})}
                         </div>
                       )}
 
