@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { Home, Calendar, CheckSquare, Timer, MoreHorizontal, GraduationCap, Flame, FileText, Briefcase, X } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { Home, Calendar, CheckSquare, Timer, MoreHorizontal, GraduationCap, Flame, FileText, Briefcase, ChevronUp } from 'lucide-react'
 
 const PRIMARY_TABS = [
   { id: 'dashboard', Icon: Home,        label: 'Home'   },
@@ -24,58 +24,48 @@ export default function BottomNav({ activePage, setActivePage, isAdmin }) {
 
   const moreActive = moreItems.some(i => i.id === activePage)
 
+  // Auto-open/close second row based on active page
+  useEffect(() => {
+    if (moreItems.some(i => i.id === activePage)) setShowMore(true)
+    else setShowMore(false)
+  }, [activePage])
+
+  // Determine icon for Meer button
+  const activeMeerItem = moreItems.find(i => i.id === activePage)
+  const MeerIcon = showMore ? ChevronUp : (activeMeerItem ? activeMeerItem.Icon : MoreHorizontal)
+
   return (
     <>
-      {/* Bottom-sheet "Meer" */}
-      {showMore && (
-        <div
-          style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.65)' }}
-          onClick={() => setShowMore(false)}
-        >
-          <div
-            style={{
-              position: 'absolute', bottom: 0, left: 0, right: 0,
-              background: 'var(--bg-card)',
-              borderTop: '1px solid var(--border)',
-              borderRadius: '16px 16px 0 0',
-              padding: '16px 16px calc(16px + env(safe-area-inset-bottom))',
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>Meer pagina's</span>
+      {/* Uitklapbare meer-rij */}
+      <div style={{
+        overflow: 'hidden',
+        maxHeight: showMore ? 58 : 0,
+        transition: 'max-height 0.28s cubic-bezier(0.34, 1.3, 0.64, 1)',
+        background: 'var(--bg-sidebar)',
+        borderTop: showMore ? '1px solid var(--border)' : 'none',
+      }}>
+        <div style={{ display: 'flex', paddingBottom: 4, paddingTop: 4 }}>
+          {moreItems.map(({ id, Icon, label }) => {
+            const active = activePage === id
+            return (
               <button
-                onClick={() => setShowMore(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', padding: 4 }}
+                key={id}
+                onClick={() => { setActivePage(id); setShowMore(false) }}
+                style={{
+                  flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  gap: 3, padding: '6px 0',
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: active ? 'var(--accent)' : 'var(--text-2)',
+                  transition: 'color 0.15s',
+                }}
               >
-                <X size={18} />
+                <Icon size={18} strokeWidth={active ? 2.2 : 1.7} />
+                <span style={{ fontSize: 9, fontWeight: active ? 600 : 400 }}>{label}</span>
               </button>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-              {moreItems.map(({ id, Icon, label }) => {
-                const active = activePage === id
-                return (
-                  <button
-                    key={id}
-                    onClick={() => { setActivePage(id); setShowMore(false) }}
-                    style={{
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-                      padding: '14px 8px', borderRadius: 12,
-                      background: active ? 'var(--accent-dim)' : 'var(--bg-card-2)',
-                      border: active ? '1px solid rgba(0,255,209,0.3)' : '1px solid var(--border)',
-                      cursor: 'pointer',
-                      color: active ? 'var(--accent)' : 'var(--text-2)',
-                    }}
-                  >
-                    <Icon size={22} />
-                    <span style={{ fontSize: 11, fontWeight: active ? 600 : 400 }}>{label}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+            )
+          })}
         </div>
-      )}
+      </div>
 
       {/* Tab bar */}
       <nav style={{
@@ -105,7 +95,7 @@ export default function BottomNav({ activePage, setActivePage, isAdmin }) {
           )
         })}
         <button
-          onClick={() => setShowMore(true)}
+          onClick={() => setShowMore(v => !v)}
           style={{
             flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
             justifyContent: 'center', gap: 4, padding: '10px 0',
@@ -114,7 +104,7 @@ export default function BottomNav({ activePage, setActivePage, isAdmin }) {
             transition: 'color 0.15s',
           }}
         >
-          <MoreHorizontal size={20} strokeWidth={moreActive ? 2.2 : 1.7} />
+          <MeerIcon size={20} strokeWidth={moreActive ? 2.2 : 1.7} />
           <span style={{ fontSize: 10, fontWeight: moreActive ? 600 : 400 }}>Meer</span>
         </button>
       </nav>
