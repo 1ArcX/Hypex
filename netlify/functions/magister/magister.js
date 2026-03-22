@@ -297,14 +297,16 @@ exports.handler = async (event) => {
       console.log('studiewijzer topics raw:', topicsResp.status, topicsText.slice(0, 500))
 
       // Parse wat beschikbaar is
+      const toArr = (v) => Array.isArray(v) ? v : []
       let topics = []
       if (topicsText && topicsText.trim().startsWith('{')) {
         const tj = JSON.parse(topicsText)
-        topics = (tj.Items || tj.items || []).map(t => ({
+        const items = toArr(tj.Items) || toArr(tj.items)
+        topics = items.map(t => ({
           id: t.Id,
           naam: t.Naam || t.Titel || '',
           inhoud: t.Inhoud || t.Omschrijving || '',
-          bijlagen: (t.Bijlagen || t.Attachments || []).map(b => ({
+          bijlagen: toArr(t.Bijlagen || t.Attachments).map(b => ({
             naam: b.Naam || b.naam || '',
             url: b.Uri || b.Url || b.url || null,
             type: b.Type || ''
@@ -312,12 +314,14 @@ exports.handler = async (event) => {
         }))
       } else if (detailText && detailText.trim().startsWith('{')) {
         const dj = JSON.parse(detailText)
-        const onderdelen = dj.Onderdelen || dj.Topics || dj.Items || []
+        const onderdelen = toArr(dj.Onderdelen).length ? toArr(dj.Onderdelen)
+          : toArr(dj.Topics).length ? toArr(dj.Topics)
+          : toArr(dj.Items)
         topics = onderdelen.map(t => ({
           id: t.Id,
           naam: t.Naam || t.Titel || '',
           inhoud: t.Inhoud || t.Omschrijving || '',
-          bijlagen: (t.Bijlagen || t.Attachments || []).map(b => ({
+          bijlagen: toArr(t.Bijlagen || t.Attachments).map(b => ({
             naam: b.Naam || b.naam || '',
             url: b.Uri || b.Url || b.url || null,
             type: b.Type || ''
