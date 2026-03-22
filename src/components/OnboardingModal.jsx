@@ -2,6 +2,12 @@ import React, { useState } from 'react'
 import { MapPin, GraduationCap, ChevronRight, Check } from 'lucide-react'
 
 export default function OnboardingModal({ user, onClose }) {
+  const [closing, setClosing] = useState(false)
+  const handleClose = () => {
+    setClosing(true)
+    setTimeout(() => { setClosing(false); onClose() }, 200)
+  }
+
   // Stappen worden éénmalig berekend bij mount — niet elke re-render opnieuw.
   // Zo valt de locatiestap niet weg zodra je iets opslaat in localStorage.
   const [steps] = useState(() => {
@@ -39,7 +45,7 @@ export default function OnboardingModal({ user, onClose }) {
 
   const finish = () => {
     localStorage.setItem(`onboarding_done_${user?.id}`, '1')
-    onClose()
+    handleClose()
   }
 
   const next = () => {
@@ -108,12 +114,13 @@ export default function OnboardingModal({ user, onClose }) {
   }
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)',
-      backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center',
-      justifyContent: 'center', zIndex: 2000, padding: 16,
-    }}>
-      <div className="glass-card" style={{ width: '100%', maxWidth: 440, padding: 28, position: 'relative', boxSizing: 'border-box' }}>
+    <div className={closing ? 'modal-overlay modal-closing' : 'modal-overlay'}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)',
+        backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center',
+        justifyContent: 'center', zIndex: 2000, padding: 16,
+      }}>
+      <div className={`glass-card modal-content${closing ? ' modal-closing' : ''}`} style={{ width: '100%', maxWidth: 440, padding: 28, position: 'relative', boxSizing: 'border-box' }}>
 
         {/* Voortgangsbalk */}
         <div style={{ height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 2, marginBottom: 28 }}>

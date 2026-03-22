@@ -4,6 +4,11 @@ import { X, Trash2, Save } from 'lucide-react'
 const EVENT_COLORS = ['#00FFD1','#818CF8','#FF8C42','#FF6B6B','#4ADE80','#FACC15','#38BDF8']
 
 export default function TaskModal({ task, defaultTime, defaultDate, subjects, onSave, onDelete, onClose }) {
+  const [closing, setClosing] = useState(false)
+  const handleClose = () => {
+    setClosing(true)
+    setTimeout(() => { setClosing(false); onClose() }, 200)
+  }
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [date, setDate] = useState('')
@@ -51,15 +56,16 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, on
   }
 
   return (
-    <div style={{position:'fixed',inset:0,zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.7)',backdropFilter:'blur(10px)',padding:'16px'}}
-      onClick={onClose}>
-      <div className="glass-card" style={{width:'100%',maxWidth:'440px',padding:'24px',maxHeight:'90vh',overflowY:'auto'}}
+    <div className={closing ? 'modal-overlay modal-closing' : 'modal-overlay'}
+      style={{position:'fixed',inset:0,zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.7)',backdropFilter:'blur(10px)',padding:'16px'}}
+      onClick={handleClose}>
+      <div className={`glass-card modal-content${closing ? ' modal-closing' : ''}`} style={{width:'100%',maxWidth:'440px',padding:'24px',maxHeight:'90vh',overflowY:'auto'}}
         onClick={e=>e.stopPropagation()}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px'}}>
           <h2 style={{color:'white',fontWeight:700,fontSize:'16px',margin:0}}>
             {task ? '✏️ Taak bewerken' : '📝 Nieuwe taak'}
           </h2>
-          <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:'rgba(255,255,255,0.4)'}}><X size={18}/></button>
+          <button onClick={handleClose} style={{background:'none',border:'none',cursor:'pointer',color:'rgba(255,255,255,0.4)'}}><X size={18}/></button>
         </div>
 
         <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
@@ -148,7 +154,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, on
               <Trash2 size={13}/> Verwijder
             </button>
           )}
-          <button onClick={onClose}
+          <button onClick={handleClose}
             style={{flex:1,padding:'9px',borderRadius:'10px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'rgba(255,255,255,0.35)',cursor:'pointer',fontSize:'12px'}}>
             Annuleer
           </button>

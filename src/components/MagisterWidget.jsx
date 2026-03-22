@@ -473,7 +473,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                         const cijfer = parseFloat(g.cijfer)
                         const color = isNaN(cijfer) ? '#818CF8' : cijfer >= 5.5 ? '#4ADE80' : '#FF6B6B'
                         return (
-                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: i < data.grades.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                          <div key={i} className="stagger-item" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: i < data.grades.length - 1 ? '1px solid var(--border)' : 'none', animationDelay: `${i * 35}ms` }}>
                             <div style={{ width: 38, height: 38, borderRadius: 10, background: color + '18', border: `1px solid ${color}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                               <span style={{ fontSize: 14, fontWeight: 700, color }}>{g.cijfer ?? '–'}</span>
                             </div>
@@ -512,7 +512,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                         <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '20px 0', margin: 0 }}>Geen huiswerk gevonden</p>
                       )}
                       {data.homework.map((hw, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 16px', borderBottom: i < data.homework.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                        <div key={i} className="stagger-item" style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 16px', borderBottom: i < data.homework.length - 1 ? '1px solid var(--border)' : 'none', animationDelay: `${i * 35}ms` }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: hw.omschrijving ? 3 : 0 }}>
                               <span style={{ fontSize: 11, color: 'var(--accent)', background: accentBg(8), border: accentBorder(20), borderRadius: 20, padding: '1px 7px', flexShrink: 0 }}>{hw.vak || '?'}</span>
@@ -619,7 +619,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                             <p style={{ color:'rgba(255,255,255,0.25)', fontSize:'12px', textAlign:'center', padding:'20px 0', margin:0 }}>Geen studiewijzer gevonden</p>
                           )}
                           {data.studiewijzer.map((sw, i) => (
-                            <div key={i} onClick={() => openStudiewijzer(sw)} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 16px', borderBottom: i < data.studiewijzer.length-1 ? '1px solid var(--border)' : 'none', cursor:'pointer' }}
+                            <div key={i} className="stagger-item" onClick={() => openStudiewijzer(sw)} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 16px', borderBottom: i < data.studiewijzer.length-1 ? '1px solid var(--border)' : 'none', cursor:'pointer', animationDelay: `${i * 35}ms` }}
                               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
                               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                               <div style={{ flex:1, minWidth:0 }}>
@@ -680,7 +680,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                         const statusColor = a.afgesloten ? '#555' : a.ingeleverdOp ? 'var(--accent)' : overdue ? '#FF6B6B' : a.magInleveren ? '#FACC15' : 'rgba(255,255,255,0.3)'
                         const statusLabel = a.afgesloten ? 'Afgesloten' : a.opnieuwInleveren ? 'Opnieuw' : a.ingeleverdOp ? 'Ingeleverd' : overdue ? 'Te laat' : a.magInleveren ? 'Openstaand' : '–'
                         return tabless ? (
-                          <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr auto', gap: '0 12px', alignItems: 'center', padding: '10px 16px', borderBottom: i < data.assignments.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                          <div key={i} className="stagger-item" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr auto', gap: '0 12px', alignItems: 'center', padding: '10px 16px', borderBottom: i < data.assignments.length - 1 ? '1px solid var(--border)' : 'none', animationDelay: `${i * 35}ms` }}>
                             <span style={{ fontSize: 11, color: 'var(--accent)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.vak || '–'}</span>
                             <span style={{ fontSize: 12, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.naam || 'Onbekend'}</span>
                             <span style={{ fontSize: 11, color: overdue ? '#FF6B6B' : 'var(--text-3)' }}>{a.deadline ? formatDate(a.deadline) : '–'}</span>
@@ -689,7 +689,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                             </span>
                           </div>
                         ) : (
-                          <div key={i} style={{ padding: '8px 10px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${overdue ? 'rgba(255,80,80,0.2)' : 'rgba(255,255,255,0.06)'}` }}>
+                          <div key={i} className="stagger-item" style={{ padding: '8px 10px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${overdue ? 'rgba(255,80,80,0.2)' : 'rgba(255,255,255,0.06)'}`, animationDelay: `${i * 35}ms` }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', fontWeight: 500, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.naam || 'Onbekend'}</p>

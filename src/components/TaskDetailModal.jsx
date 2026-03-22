@@ -16,6 +16,11 @@ function fmtDate(dateStr) {
 }
 
 export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onEdit, onDelete, onClose }) {
+  const [closing, setClosing] = useState(false)
+  const handleClose = () => {
+    setClosing(true)
+    setTimeout(() => { setClosing(false); onClose() }, 200)
+  }
   const [editingBook, setEditingBook] = useState(false)
   const [bookInput, setBookInput] = useState('')
 
@@ -42,11 +47,12 @@ export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onE
 
   return (
     <div
+      className={closing ? 'modal-overlay modal-closing' : 'modal-overlay'}
       style={{ position:'fixed',inset:0,zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.7)',backdropFilter:'blur(10px)',padding:'16px' }}
-      onClick={onClose}
+      onClick={handleClose}
     >
       <div
-        className="glass-card"
+        className={`glass-card modal-content${closing ? ' modal-closing' : ''}`}
         style={{ width:'100%',maxWidth:'420px',padding:'24px' }}
         onClick={e => e.stopPropagation()}
       >
@@ -61,7 +67,7 @@ export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onE
               </div>
             )}
           </div>
-          <button onClick={onClose} style={{ background:'none',border:'none',cursor:'pointer',color:'rgba(255,255,255,0.4)',flexShrink:0 }}>
+          <button onClick={handleClose} style={{ background:'none',border:'none',cursor:'pointer',color:'rgba(255,255,255,0.4)',flexShrink:0 }}>
             <X size={18} />
           </button>
         </div>
@@ -154,7 +160,7 @@ export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onE
             <Trash2 size={13} /> Verwijder
           </button>
           <button
-            onClick={() => onClose()}
+            onClick={handleClose}
             style={{ flex:1,padding:'9px',borderRadius:10,border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'rgba(255,255,255,0.35)',cursor:'pointer',fontSize:12 }}
           >
             Sluiten

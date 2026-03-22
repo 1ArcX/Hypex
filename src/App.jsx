@@ -407,6 +407,7 @@ export default function App() {
 
           {/* Page content */}
           <div style={{ flex: 1, overflow: 'hidden' }}>
+          <div key={activePage} className="page-transition">
 
             {activePage === 'dashboard' && (
               <DashboardPage
@@ -482,6 +483,7 @@ export default function App() {
               <JumboPage isAdmin={isAdmin} userId={user?.id} />
             )}
 
+          </div>
           </div>
 
           {/* Mobile bottom nav */}
