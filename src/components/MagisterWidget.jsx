@@ -211,7 +211,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
       const byteArray = new Uint8Array(byteChars.length)
       for (let i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i)
       // Bepaal content type vanuit bestandsnaam als generiek
-      const ext = bron.naam.split('.').pop().toLowerCase()
+      const extMatch = bron.naam.match(/\.([a-zA-Z0-9]+)(?:\s|$|\))/); const ext = extMatch ? extMatch[1].toLowerCase() : bron.naam.split('.').pop().toLowerCase()
       const mimeMap = { pdf: 'application/pdf', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', doc: 'application/msword', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg' }
       const contentType = (result.contentType && result.contentType !== 'application/octet-stream') ? result.contentType : (mimeMap[ext] || 'application/octet-stream')
       const blob = new Blob([byteArray], { type: contentType })
