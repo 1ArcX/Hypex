@@ -210,8 +210,18 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
       const byteChars = atob(result.base64)
       const byteArray = new Uint8Array(byteChars.length)
       for (let i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i)
-      const blob = new Blob([byteArray], { type: result.contentType })
-      window.open(URL.createObjectURL(blob), '_blank')
+      // Bepaal content type vanuit bestandsnaam als generiek
+      const ext = bron.naam.split('.').pop().toLowerCase()
+      const mimeMap = { pdf: 'application/pdf', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', doc: 'application/msword', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg' }
+      const contentType = (result.contentType && result.contentType !== 'application/octet-stream') ? result.contentType : (mimeMap[ext] || 'application/octet-stream')
+      const blob = new Blob([byteArray], { type: contentType })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = bron.naam
+      if (contentType === 'application/pdf') { a.target = '_blank' }
+      document.body.appendChild(a); a.click(); document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(url), 10000)
     } catch (e) { console.error('Download mislukt:', e) }
     setBronLoading(prev => ({ ...prev, [bron.id]: false }))
   }
