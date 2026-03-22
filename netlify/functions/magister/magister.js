@@ -328,7 +328,7 @@ exports.handler = async (event) => {
           }))
         }))
       }
-      return ok(topics)
+      return ok({ topics, _debug: { detailStatus: detailResp.status, detailText: detailText.slice(0, 1000), topicsStatus: topicsResp.status, topicsText: topicsText.slice(0, 1000) } })
     }
 
     return err(`Onbekende actie: ${action}`)

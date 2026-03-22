@@ -201,8 +201,12 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
   const openStudiewijzer = async (sw) => {
     setSwDetail({ sw, topics: [], loading: true, error: null })
     try {
-      const topics = await callMagister(creds, 'studiewijzer_detail', { id: sw.id })
-      setSwDetail({ sw, topics, loading: false, error: null })
+      const result = await callMagister(creds, 'studiewijzer_detail', { id: sw.id })
+      console.log('[Studiewijzer] detail status:', result._debug?.detailStatus)
+      console.log('[Studiewijzer] detail raw:', result._debug?.detailText)
+      console.log('[Studiewijzer] topics status:', result._debug?.topicsStatus)
+      console.log('[Studiewijzer] topics raw:', result._debug?.topicsText)
+      setSwDetail({ sw, topics: result.topics || [], loading: false, error: null })
     } catch (e) {
       setSwDetail({ sw, topics: [], loading: false, error: e.message })
     }
