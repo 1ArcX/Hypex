@@ -335,11 +335,23 @@ exports.handler = async (event) => {
       if (!href) return err('href verplicht')
       const schoolBase = m._pupilUrl.replace(/\/api\/.*/, '')
 
-      // Try /data suffix first, then bare self URL
-      let resp = await m.http.get(`${schoolBase}${href}/data`)
-      if (resp.status === 404) resp = await m.http.get(`${schoolBase}${href}`)
+      // Fetch bron detail to find the real download URI
+      const metaResp = await m.http.get(`${schoolBase}${href}`)
+      const metaText = await metaResp.text()
+      console.log('bron meta:', metaResp.status, metaText.slice(0, 400))
 
+      let downloadUrl = `${schoolBase}${href}/data`
+      if (metaText.trim().startsWith('{')) {
+        const meta = JSON.parse(metaText)
+        // Look for download URI in meta
+        const uri = meta.Uri || meta.Url || meta.ContentUri || meta.DownloadUri || meta.Href
+        if (uri) downloadUrl = uri.startsWith('http') ? uri : `${schoolBase}${uri}`
+      }
+
+      console.log('downloading from:', downloadUrl)
+      const resp = await m.http.get(downloadUrl)
       const contentType = resp.headers.get('content-type') || 'application/octet-stream'
+      console.log('download status:', resp.status, 'content-type:', contentType)
       const arrayBuffer = await resp.arrayBuffer()
       const base64 = Buffer.from(arrayBuffer).toString('base64')
       return ok({ base64, contentType })
