@@ -216,12 +216,15 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
       const contentType = (result.contentType && result.contentType !== 'application/octet-stream') ? result.contentType : (mimeMap[ext] || 'application/octet-stream')
       const blob = new Blob([byteArray], { type: contentType })
       const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = bron.naam
-      if (contentType === 'application/pdf') { a.target = '_blank' }
-      document.body.appendChild(a); a.click(); document.body.removeChild(a)
-      setTimeout(() => URL.revokeObjectURL(url), 10000)
+      if (contentType === 'application/pdf' || contentType.startsWith('image/')) {
+        window.open(url, '_blank')
+        setTimeout(() => URL.revokeObjectURL(url), 60000)
+      } else {
+        const a = document.createElement('a')
+        a.href = url; a.download = bron.naam
+        document.body.appendChild(a); a.click(); document.body.removeChild(a)
+        setTimeout(() => URL.revokeObjectURL(url), 10000)
+      }
     } catch (e) { console.error('Download mislukt:', e) }
     setBronLoading(prev => ({ ...prev, [bron.id]: false }))
   }
