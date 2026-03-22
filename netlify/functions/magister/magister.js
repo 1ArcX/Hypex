@@ -304,17 +304,22 @@ exports.handler = async (event) => {
           try {
             const r = await m.http.get(`${schoolBase}${selfLink.Href}`)
             const txt = await r.text()
-            if (txt.trim().startsWith('{')) bronnen = toArr(JSON.parse(txt).Bronnen)
+            if (txt.trim().startsWith('{')) {
+              const detail = JSON.parse(txt)
+              bronnen = toArr(detail.Bronnen)
+              console.log('onderdeel detail keys:', Object.keys(detail))
+              console.log('bronnen raw:', JSON.stringify(bronnen).slice(0, 800))
+            }
           } catch (_) {}
         }
         return {
           id: t.Id,
           naam: t.Naam || t.Titel || '',
           inhoud: t.Inhoud || t.Omschrijving || '',
+          _rawBronnen: bronnen.slice(0, 2),
           bijlagen: bronnen.map(b => {
             const bSelf = ((b.Links || []).find(l => l.Rel === 'Self') || {}).Href
               || (selfLink ? `${selfLink.Href}/bronnen/${b.Id}` : null)
-            console.log('bron:', b.Id, b.Naam, 'href:', bSelf, 'uri:', b.Uri || b.Url || b.ContentUri)
             return {
               id: b.Id,
               naam: b.Naam || b.Titel || '',
