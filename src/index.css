@@ -525,3 +525,7 @@ select {
     width: 240px; height: 240px;
   }
 }
+
+/* ===== MAGISTER TABS — scrollbar verbergen ===== */
+.magister-tabs::-webkit-scrollbar { display: none; }
+.magister-tabs { -ms-overflow-style: none; scrollbar-width: none; }

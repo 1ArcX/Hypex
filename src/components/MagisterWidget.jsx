@@ -355,7 +355,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
             <>
               {/* Tabs (alleen op mobiel, niet in tabless/grid mode) */}
               {!tabless && (
-                <div style={{ display: 'flex', gap: '4px', marginBottom: '10px' }}>
+                <div className="magister-tabs" style={{ display: 'flex', gap: '4px', marginBottom: '10px', overflowX: 'auto', paddingBottom: 2 }}>
                   {[
                     { id: 'vakken', label: 'Vakken', icon: <BookMarked size={11} /> },
                     ...(creds ? [
@@ -366,7 +366,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                     ] : [])
                   ].map(t => (
                     <button key={t.id} onClick={() => setTab(t.id)}
-                      style={{ flex: 1, padding: '5px 4px', borderRadius: '8px', fontSize: '10px', cursor: 'pointer', border: '1px solid', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', borderColor: tab === t.id ? accentBg(50) : 'rgba(255,255,255,0.08)', background: tab === t.id ? accentBg(12) : 'transparent', color: tab === t.id ? 'var(--accent)' : 'rgba(255,255,255,0.4)' }}>
+                      style={{ flexShrink: 0, minWidth: 'fit-content', padding: '5px 10px', borderRadius: '8px', fontSize: '10px', cursor: 'pointer', border: '1px solid', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', whiteSpace: 'nowrap', borderColor: tab === t.id ? accentBg(50) : 'rgba(255,255,255,0.08)', background: tab === t.id ? accentBg(12) : 'transparent', color: tab === t.id ? 'var(--accent)' : 'rgba(255,255,255,0.4)' }}>
                       {t.icon} {t.label}
                     </button>
                   ))}

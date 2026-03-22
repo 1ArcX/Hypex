@@ -5,7 +5,7 @@ import Timeline from './components/Timeline'
 import TaskModal from './components/TaskModal'
 import TaskDetailModal from './components/TaskDetailModal'
 import PomodoroTimer from './components/PomodoroTimer'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, LogOut } from 'lucide-react'
 import ThemeSettings from './components/ThemeSettings'
 import AdminPanel from './components/AdminPanel'
 import HabitsWidget from './components/HabitsWidget'
@@ -27,6 +27,14 @@ import NotitiesPage from './pages/NotitiesPage'
 import JumboPage from './pages/JumboPage'
 
 const ADMIN_EMAIL = 'zhafirfachri@gmail.com'
+
+const PAGE_NAMES = {
+  dashboard: 'Dashboard', agenda: 'Agenda', taken: 'Taken',
+  pomodoro: 'Pomodoro', school: 'School',
+  gewoontes: 'Gewoontes', notities: 'Notities', jumbo: 'Jumbo',
+}
+
+const PAGE_ORDER = ['dashboard', 'agenda', 'taken', 'pomodoro', 'school', 'gewoontes', 'notities']
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -57,6 +65,49 @@ export default function App() {
   const [syncing, setSyncing] = useState(false)
   const [syncFlash, setSyncFlash] = useState(false)
   const [updateAvailable, setUpdateAvailable] = useState(false)
+
+  // Swipe between pages
+  const swipeTouchStart = useRef(null)
+
+  const handleSwipeTouchStart = (e) => {
+    swipeTouchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+  }
+  const handleSwipeTouchEnd = (e) => {
+    if (!swipeTouchStart.current) return
+    const dx = e.changedTouches[0].clientX - swipeTouchStart.current.x
+    const dy = e.changedTouches[0].clientY - swipeTouchStart.current.y
+    swipeTouchStart.current = null
+    if (Math.abs(dx) < Math.abs(dy) || Math.abs(dx) < 60) return
+    const idx = PAGE_ORDER.indexOf(activePage)
+    if (dx < 0 && idx < PAGE_ORDER.length - 1) handleSetActivePage(PAGE_ORDER[idx + 1])
+    else if (dx > 0 && idx > 0) handleSetActivePage(PAGE_ORDER[idx - 1])
+  }
+
+  // Pull-to-refresh
+  const pullStartY = useRef(null)
+  const pullStartX = useRef(null)
+  const [pullProgress, setPullProgress] = useState(0)
+  const PULL_THRESHOLD = 65
+
+  const onPullStart = (e) => {
+    const scrollEl = e.currentTarget.querySelector('[data-scrollable]') || e.currentTarget
+    if (scrollEl.scrollTop > 0) return
+    pullStartY.current = e.touches[0].clientY
+    pullStartX.current = e.touches[0].clientX
+  }
+  const onPullMove = (e) => {
+    if (pullStartY.current === null) return
+    const dx = e.touches[0].clientX - pullStartX.current
+    const dy = e.touches[0].clientY - pullStartY.current
+    if (dy < 0 || Math.abs(dy) < Math.abs(dx)) { pullStartY.current = null; return }
+    setPullProgress(Math.min(1, dy / PULL_THRESHOLD))
+  }
+  const onPullEnd = async () => {
+    if (pullProgress >= 1) await doSync()
+    pullStartY.current = null
+    pullStartX.current = null
+    setPullProgress(0)
+  }
 
   // Controleer elke 5 minuten of er een nieuwe deploy beschikbaar is
   useEffect(() => {
@@ -379,7 +430,9 @@ export default function App() {
           <div className="md:hidden flex items-center justify-between px-4 py-3"
             style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-sidebar)', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-1)' }}>⬡ Hypex</span>
+              <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-1)' }}>
+                {PAGE_NAMES[activePage] || 'Hypex'}
+              </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <RefreshCw
@@ -398,16 +451,25 @@ export default function App() {
               </button>
               <button
                 onClick={() => supabase.auth.signOut()}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', fontSize: 11, padding: 4 }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4, display: 'flex', alignItems: 'center' }}
               >
-                Uitloggen
+                <LogOut size={14} />
               </button>
             </div>
           </div>
 
           {/* Page content */}
           <div style={{ flex: 1, overflow: 'hidden' }}>
-          <div key={activePage} className="page-transition">
+          {/* Pull-to-refresh indicator */}
+          {pullProgress > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: pullProgress * 40, overflow: 'hidden', transition: pullProgress === 0 ? 'height 0.25s ease' : 'none' }}>
+              <RefreshCw size={14} style={{ color: 'var(--accent)', opacity: pullProgress, animation: pullProgress >= 1 ? 'spin 0.8s linear infinite' : 'none' }} />
+            </div>
+          )}
+          <div key={activePage} className="page-transition"
+            onTouchStart={(e) => { handleSwipeTouchStart(e); onPullStart(e) }}
+            onTouchEnd={(e) => { handleSwipeTouchEnd(e); onPullEnd() }}
+            onTouchMove={onPullMove}>
 
             {activePage === 'dashboard' && (
               <DashboardPage

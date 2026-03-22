@@ -1,4 +1,39 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
+
+function SwipeableRow({ onSwipeRight, onSwipeLeft, children }) {
+  const [offset, setOffset] = useState(0)
+  const startX = useRef(null)
+
+  const onTouchStart = (e) => { startX.current = e.touches[0].clientX }
+  const onTouchMove = (e) => {
+    if (startX.current === null) return
+    setOffset(Math.max(-100, Math.min(100, e.touches[0].clientX - startX.current)))
+  }
+  const onTouchEnd = () => {
+    if (offset > 60) onSwipeRight()
+    else if (offset < -60) onSwipeLeft()
+    setOffset(0)
+    startX.current = null
+  }
+
+  const actionBg = offset > 20
+    ? `rgba(74,222,128,${Math.min(0.35, (offset - 20) / 80)})`
+    : offset < -20
+    ? `rgba(255,107,107,${Math.min(0.35, (-offset - 20) / 80)})`
+    : 'transparent'
+
+  return (
+    <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', inset: 0, background: actionBg, transition: 'background 0.1s' }} />
+      <div
+        style={{ transform: `translateX(${offset}px)`, transition: offset === 0 ? 'transform 0.25s ease' : 'none', position: 'relative' }}
+        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+      >
+        {children}
+      </div>
+    </div>
+  )
+}
 import { Plus, GripVertical, Trash2, CheckCircle2, Circle, X, AlertCircle } from 'lucide-react'
 
 function todayStr() {
@@ -146,6 +181,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
           const subject = subjects.find(s => s.id === task.subject_id)
           const dateInfo = task.date ? formatDate(task.date, task.start_time || task.time) : null
           return (
+            <SwipeableRow key={task.id} onSwipeRight={() => onToggle(task)} onSwipeLeft={() => onDelete(task.id)}>
             <div
               key={task.id}
               draggable
@@ -189,6 +225,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                 <Trash2 size={12} />
               </button>
             </div>
+            </SwipeableRow>
           )
         })}
       </div>
