@@ -473,24 +473,25 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                         <span style={{ fontSize:14, fontWeight:700, color:'var(--text-1)' }}>Studiewijzer</span>
                       </div>
                     )}
-                    <div className={tabless ? 'card' : ''} style={tabless ? { padding:0, ...(gridLayout ? { flex:1, overflowY:'auto' } : {}) } : { display:'flex', flexDirection:'column', gap:8 }}>
+                    <div className={tabless ? 'card' : ''} style={tabless ? { padding:0, ...(gridLayout ? { flex:1, overflowY:'auto' } : {}) } : { display:'flex', flexDirection:'column', gap:4 }}>
                       {data.studiewijzer.length === 0 && (
                         <p style={{ color:'rgba(255,255,255,0.25)', fontSize:'12px', textAlign:'center', padding:'20px 0', margin:0 }}>Geen studiewijzer gevonden</p>
                       )}
                       {data.studiewijzer.map((sw, i) => (
-                        <div key={i} style={{ borderBottom: i < data.studiewijzer.length-1 ? '1px solid var(--border)' : 'none' }}>
-                          <div style={{ display:'flex', alignItems:'center', gap:6, padding:'10px 16px 6px' }}>
-                            <span style={{ fontSize:11, color:'var(--accent)', background:accentBg(8), border:accentBorder(20), borderRadius:20, padding:'1px 7px' }}>{sw.vak}</span>
-                            <span style={{ fontSize:10, color:'var(--text-3)' }}>{sw.entries.length} {sw.entries.length === 1 ? 'les' : 'lessen'}</span>
-                          </div>
-                          {sw.entries.slice(0, 3).map((e, j) => (
-                            <div key={j} style={{ padding:'4px 16px 8px', borderTop: j > 0 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-                              <div style={{ fontSize:10, color:'var(--text-3)', marginBottom:2 }}>Week {e.week} · {formatDate(e.datum)}</div>
-                              <p style={{ fontSize:11, color:'var(--text-2)', margin:0, overflow:'hidden', textOverflow:'ellipsis', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical' }}>
-                                {stripHtml(e.omschrijving)}
-                              </p>
+                        <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:12, padding:'10px 16px', borderBottom: i < data.studiewijzer.length-1 ? '1px solid var(--border)' : 'none' }}>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom: sw.vak ? 3 : 0 }}>
+                              {sw.vak && (
+                                <span style={{ fontSize:11, color:'var(--accent)', background:accentBg(8), border:accentBorder(20), borderRadius:20, padding:'1px 7px', flexShrink:0 }}>{sw.vak}</span>
+                              )}
                             </div>
-                          ))}
+                            <p style={{ fontSize:12, color:'var(--text-1)', margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sw.naam || '?'}</p>
+                            {sw.omschrijving && (
+                              <p style={{ fontSize:11, color:'var(--text-3)', margin:'2px 0 0', overflow:'hidden', textOverflow:'ellipsis', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical' }}>
+                                {stripHtml(sw.omschrijving)}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
