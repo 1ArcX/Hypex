@@ -207,6 +207,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
     setBronLoading(prev => ({ ...prev, [bron.id]: true }))
     try {
       const result = await callMagister(creds, 'bron_download', { href: bron.href })
+      console.log('[bron] debug:', result._debug)
       console.log('[bron] contentType:', result.contentType, 'base64 start:', result.base64?.slice(0, 20))
       const byteChars = atob(result.base64)
       const byteArray = new Uint8Array(byteChars.length)

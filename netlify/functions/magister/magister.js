@@ -354,7 +354,7 @@ exports.handler = async (event) => {
       console.log('download status:', resp.status, 'content-type:', contentType)
       const arrayBuffer = await resp.arrayBuffer()
       const base64 = Buffer.from(arrayBuffer).toString('base64')
-      return ok({ base64, contentType })
+      return ok({ base64, contentType, _debug: { metaStatus: metaResp.status, metaText: metaText.slice(0, 500), downloadUrl, downloadStatus: resp.status, bytes: arrayBuffer.byteLength } })
     }
 
     return err(`Onbekende actie: ${action}`)
