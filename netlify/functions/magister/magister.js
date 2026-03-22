@@ -318,14 +318,13 @@ exports.handler = async (event) => {
           inhoud: t.Inhoud || t.Omschrijving || '',
           _rawBronnen: bronnen.slice(0, 2),
           bijlagen: bronnen.map(b => {
-            const bSelf = ((b.Links || []).find(l => l.Rel === 'Self') || {}).Href
-              || (selfLink ? `${selfLink.Href}/bronnen/${b.Id}` : null)
+            const contentsHref = ((b.Links || []).find(l => l.Rel === 'Contents') || {}).Href || null
             return {
               id: b.Id,
               naam: b.Naam || b.Titel || '',
-              href: bSelf,
+              href: contentsHref,
               url: b.Uri || b.Url || b.ContentUri || null,
-              type: b.ContentType || b.Type || b.Extensie || ''
+              type: b.ContentType || 'application/octet-stream'
             }
           })
         }
@@ -340,26 +339,20 @@ exports.handler = async (event) => {
       if (!href) return err('href verplicht')
       const schoolBase = m._pupilUrl.replace(/\/api\/.*/, '')
 
-      // Fetch bron detail to find the real download URI
-      const metaResp = await m.http.get(`${schoolBase}${href}`)
-      const metaText = await metaResp.text()
-      console.log('bron meta:', metaResp.status, metaText.slice(0, 400))
-
-      let downloadUrl = `${schoolBase}${href}/data`
-      if (metaText.trim().startsWith('{')) {
-        const meta = JSON.parse(metaText)
-        // Look for download URI in meta
-        const uri = meta.Uri || meta.Url || meta.ContentUri || meta.DownloadUri || meta.Href
-        if (uri) downloadUrl = uri.startsWith('http') ? uri : `${schoolBase}${uri}`
+      // href is the Contents link, e.g. /api/.../bijlagen/165859
+      // Try with /data suffix first, then bare
+      let resp = await m.http.get(`${schoolBase}${href}/data`)
+      console.log('bijlagen/data status:', resp.status)
+      if (resp.status === 404 || resp.status >= 400) {
+        resp = await m.http.get(`${schoolBase}${href}`)
+        console.log('bijlagen bare status:', resp.status)
       }
 
-      console.log('downloading from:', downloadUrl)
-      const resp = await m.http.get(downloadUrl)
       const contentType = resp.headers.get('content-type') || 'application/octet-stream'
-      console.log('download status:', resp.status, 'content-type:', contentType)
       const arrayBuffer = await resp.arrayBuffer()
       const base64 = Buffer.from(arrayBuffer).toString('base64')
-      return ok({ base64, contentType, _debug: { metaStatus: metaResp.status, metaText: metaText.slice(0, 500), downloadUrl, downloadStatus: resp.status, bytes: arrayBuffer.byteLength } })
+      console.log('bytes:', arrayBuffer.byteLength, 'contentType:', contentType)
+      return ok({ base64, contentType })
     }
 
     return err(`Onbekende actie: ${action}`)
