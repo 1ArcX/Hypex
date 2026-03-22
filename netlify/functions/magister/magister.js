@@ -314,17 +314,16 @@ exports.handler = async (event) => {
         }))
       } else if (detailText && detailText.trim().startsWith('{')) {
         const dj = JSON.parse(detailText)
-        const onderdelen = toArr(dj.Onderdelen).length ? toArr(dj.Onderdelen)
-          : toArr(dj.Topics).length ? toArr(dj.Topics)
-          : toArr(dj.Items)
+        // Onderdelen is { Items: [...] }, not a direct array
+        const onderdelen = toArr(dj.Onderdelen?.Items || dj.Onderdelen)
         topics = onderdelen.map(t => ({
           id: t.Id,
           naam: t.Naam || t.Titel || '',
           inhoud: t.Inhoud || t.Omschrijving || '',
-          bijlagen: toArr(t.Bijlagen || t.Attachments).map(b => ({
-            naam: b.Naam || b.naam || '',
-            url: b.Uri || b.Url || b.url || null,
-            type: b.Type || ''
+          bijlagen: toArr(t.Bronnen || t.Bijlagen || t.Attachments).map(b => ({
+            naam: b.Naam || b.naam || b.Titel || '',
+            url: b.Uri || b.Url || b.url || b.ContentUri || null,
+            type: b.Type || b.Extensie || ''
           }))
         }))
       }
