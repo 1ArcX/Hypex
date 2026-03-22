@@ -51,6 +51,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState('')
   const [swDetail, setSwDetail] = useState(null)        // { sw, topics, loading, error }
+  const [bronLoading, setBronLoading] = useState({})
 
   // Fetch all Magister data at once on mount (no lazy loading per tab)
   useEffect(() => {
@@ -196,6 +197,21 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
   const refresh = () => {
     setData({ grades: null, homework: null, assignments: null, studiewijzer: null })
     fetchAllData(creds)
+  }
+
+  const openBron = async (bron) => {
+    if (!bron.href && bron.url) { window.open(bron.url, '_blank'); return }
+    if (!bron.href) return
+    setBronLoading(prev => ({ ...prev, [bron.id]: true }))
+    try {
+      const result = await callMagister(creds, 'bron_download', { href: bron.href })
+      const byteChars = atob(result.base64)
+      const byteArray = new Uint8Array(byteChars.length)
+      for (let i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i)
+      const blob = new Blob([byteArray], { type: result.contentType })
+      window.open(URL.createObjectURL(blob), '_blank')
+    } catch (e) { console.error('Download mislukt:', e) }
+    setBronLoading(prev => ({ ...prev, [bron.id]: false }))
   }
 
   const openStudiewijzer = async (sw) => {
@@ -519,10 +535,10 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                               )}
                               <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
                                 {topic.bijlagen.map((b, j) => (
-                                  b.url
-                                    ? <a key={j} href={b.url} target="_blank" rel="noopener noreferrer" style={{ fontSize:11, color:'var(--accent)', display:'flex', alignItems:'center', gap:4, textDecoration:'none' }}>
-                                        <ExternalLink size={10} /> {b.naam}
-                                      </a>
+                                  (b.href || b.url)
+                                    ? <button key={j} onClick={() => openBron(b)} disabled={bronLoading[b.id]} style={{ background:'none', border:'none', cursor:'pointer', padding:0, fontSize:11, color:'var(--accent)', display:'flex', alignItems:'center', gap:4, textAlign:'left', opacity: bronLoading[b.id] ? 0.5 : 1 }}>
+                                        {bronLoading[b.id] ? <RefreshCw size={10} style={{ animation:'spin 1s linear infinite' }} /> : <ExternalLink size={10} />} {b.naam}
+                                      </button>
                                     : <span key={j} style={{ fontSize:11, color:'var(--text-3)' }}>{b.naam}</span>
                                 ))}
                               </div>

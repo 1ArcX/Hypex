@@ -286,48 +286,61 @@ exports.handler = async (event) => {
       const { id } = body
       if (!id) return err('id verplicht')
 
-      // Probeer detail endpoint
+      const toArr = (v) => Array.isArray(v) ? v : []
+      const schoolBase = m._pupilUrl.replace(/\/api\/.*/, '')
+
       const detailResp = await m.http.get(`${m._pupilUrl}/studiewijzers/${id}`)
       const detailText = await detailResp.text()
-      console.log('studiewijzer detail raw:', detailResp.status, detailText.slice(0, 500))
+      if (!detailText || !detailText.trim().startsWith('{')) return ok({ topics: [] })
 
-      // Probeer topics sub-resource
-      const topicsResp = await m.http.get(`${m._pupilUrl}/studiewijzers/${id}/topics?top=50&skip=0`)
-      const topicsText = await topicsResp.text()
-      console.log('studiewijzer topics raw:', topicsResp.status, topicsText.slice(0, 500))
+      const dj = JSON.parse(detailText)
+      const ondrItems = toArr(dj.Onderdelen?.Items || dj.Onderdelen)
 
-      // Parse wat beschikbaar is
-      const toArr = (v) => Array.isArray(v) ? v : []
-      let topics = []
-      if (topicsText && topicsText.trim().startsWith('{')) {
-        const tj = JSON.parse(topicsText)
-        const items = toArr(tj.Items) || toArr(tj.items)
-        topics = items.map(t => ({
+      // Fetch each onderdeel detail in parallel to get Bronnen
+      const settled = await Promise.allSettled(ondrItems.map(async (t) => {
+        const selfLink = (t.Links || []).find(l => l.Rel === 'Self')
+        let bronnen = toArr(t.Bronnen)
+        if (selfLink && bronnen.length === 0) {
+          try {
+            const r = await m.http.get(`${schoolBase}${selfLink.Href}`)
+            const txt = await r.text()
+            if (txt.trim().startsWith('{')) bronnen = toArr(JSON.parse(txt).Bronnen)
+          } catch (_) {}
+        }
+        return {
           id: t.Id,
           naam: t.Naam || t.Titel || '',
           inhoud: t.Inhoud || t.Omschrijving || '',
-          bijlagen: toArr(t.Bijlagen || t.Attachments).map(b => ({
-            naam: b.Naam || b.naam || '',
-            url: b.Uri || b.Url || b.url || null,
-            type: b.Type || ''
-          }))
-        }))
-      } else if (detailText && detailText.trim().startsWith('{')) {
-        const dj = JSON.parse(detailText)
-        // Onderdelen is { Items: [...] }, not a direct array
-        const onderdelen = toArr(dj.Onderdelen?.Items || dj.Onderdelen)
-        topics = onderdelen.map(t => ({
-          id: t.Id,
-          naam: t.Naam || t.Titel || '',
-          inhoud: t.Inhoud || t.Omschrijving || '',
-          bijlagen: toArr(t.Bronnen || t.Bijlagen || t.Attachments).map(b => ({
-            naam: b.Naam || b.naam || b.Titel || '',
-            url: b.Uri || b.Url || b.url || b.ContentUri || null,
-            type: b.Type || b.Extensie || ''
-          }))
-        }))
-      }
-      return ok({ topics, _debug: { detailStatus: detailResp.status, detailText: detailText.slice(0, 1000), topicsStatus: topicsResp.status, topicsText: topicsText.slice(0, 1000) } })
+          bijlagen: bronnen.map(b => {
+            const bSelf = ((b.Links || []).find(l => l.Rel === 'Self') || {}).Href || null
+            return {
+              id: b.Id,
+              naam: b.Naam || b.Titel || '',
+              href: bSelf,
+              url: b.Uri || b.Url || b.ContentUri || null,
+              type: b.ContentType || b.Type || b.Extensie || ''
+            }
+          })
+        }
+      }))
+
+      const topics = settled.filter(r => r.status === 'fulfilled').map(r => r.value)
+      return ok({ topics })
+    }
+
+    if (action === 'bron_download') {
+      const { href } = body
+      if (!href) return err('href verplicht')
+      const schoolBase = m._pupilUrl.replace(/\/api\/.*/, '')
+
+      // Try /data suffix first, then bare self URL
+      let resp = await m.http.get(`${schoolBase}${href}/data`)
+      if (resp.status === 404) resp = await m.http.get(`${schoolBase}${href}`)
+
+      const contentType = resp.headers.get('content-type') || 'application/octet-stream'
+      const arrayBuffer = await resp.arrayBuffer()
+      const base64 = Buffer.from(arrayBuffer).toString('base64')
+      return ok({ base64, contentType })
     }
 
     return err(`Onbekende actie: ${action}`)
