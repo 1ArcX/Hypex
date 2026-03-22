@@ -268,17 +268,27 @@ exports.handler = async (event) => {
     }
 
     if (action === 'studiewijzer') {
-      const count = body.count || 50
-      const resp = await m.http.get(`${m._personUrl}/studiewijzers?top=${count}&skip=0`)
-      const json = await resp.json()
-      const items = json.Items || []
-      return ok(items.map(item => ({
-        id: item.Id,
-        vak: item.Vak?.Omschrijving || item.Vak?.Afkorting || '',
-        titel: item.Titel || '',
-        week: item.Week || null,
-        omschrijving: item.Omschrijving || ''
-      })))
+      const from = new Date(); from.setDate(from.getDate() - 14)
+      const to   = new Date(); to.setDate(to.getDate() + 56)
+      const appointments = await m.appointments(from, to)
+
+      const vakMap = {}
+      for (const a of appointments) {
+        if (!a.content?.trim()) continue
+        const vak = a.classes?.join(', ') || a.description || ''
+        if (!vak || vak === 'D_LNK') continue
+        if (!vakMap[vak]) vakMap[vak] = []
+        const d = new Date(a.start)
+        const tmp = new Date(d); tmp.setHours(0,0,0,0)
+        tmp.setDate(tmp.getDate() + 4 - (tmp.getDay() || 7))
+        const week = Math.ceil((((tmp - new Date(tmp.getFullYear(),0,1)) / 86400000) + 1) / 7)
+        vakMap[vak].push({ datum: dateStr(a.start), week, omschrijving: a.content })
+      }
+
+      const items = Object.entries(vakMap)
+        .sort(([a],[b]) => a.localeCompare(b, 'nl'))
+        .map(([vak, entries]) => ({ vak, entries }))
+      return ok(items)
     }
 
     return err(`Onbekende actie: ${action}`)
