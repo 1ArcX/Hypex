@@ -241,7 +241,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
       console.log('[Studiewijzer] topics raw:', result._debug?.topicsText)
       setExpandedTopics({})
       const topics = result.topics || []
-      topics.forEach(t => { if (t._rawBronnen?.length) console.log('[rawBron]', t.naam, t._rawBronnen) })
+      topics.forEach(t => { if (t._rawBronnen?.length) console.log('[rawBron]', t.naam, JSON.stringify(t._rawBronnen[0])) })
       setSwDetail({ sw, topics, loading: false, error: null })
     } catch (e) {
       setSwDetail({ sw, topics: [], loading: false, error: e.message })
