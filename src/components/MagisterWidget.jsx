@@ -44,7 +44,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
   const [tab, setTab] = useState('vakken')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [data, setData] = useState({ grades: null, homework: null, assignments: null })
+  const [data, setData] = useState({ grades: null, homework: null, assignments: null, studiewijzer: null })
   const [expanded, setExpanded] = useState(true)
   const [profile, setProfile] = useState(null)
   const [subjectLinks, setSubjectLinks] = useState({})
@@ -86,12 +86,13 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
     setLoading(true); setError(null)
     try {
       const today = new Date().toISOString().slice(0, 10)
-      const [grades, homework, assignments] = await Promise.all([
+      const [grades, homework, assignments, studiewijzer] = await Promise.all([
         callMagister(c, 'grades', { top: 30 }),
         callMagister(c, 'homework', { start: inDays(-7), end: inDays(30) }),
-        callMagister(c, 'opdrachten', { count: 50 })
+        callMagister(c, 'opdrachten', { count: 50 }),
+        callMagister(c, 'studiewijzer', { count: 50 })
       ])
-      setData({ grades, homework, assignments })
+      setData({ grades, homework, assignments, studiewijzer })
     } catch (e) {
       setError(e.message)
     }
@@ -186,13 +187,13 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
   const logout = () => {
     localStorage.removeItem(storageKey(userId))
     setCreds(null)
-    setData({ grades: null, homework: null, assignments: null })
+    setData({ grades: null, homework: null, assignments: null, studiewijzer: null })
     setShowSettings(true)
     setFormCreds({ school: '', username: '', password: '' })
   }
 
   const refresh = () => {
-    setData({ grades: null, homework: null, assignments: null })
+    setData({ grades: null, homework: null, assignments: null, studiewijzer: null })
     fetchAllData(creds)
   }
 
@@ -298,6 +299,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                     { id: 'vakken', label: 'Vakken', icon: <BookMarked size={11} /> },
                     ...(creds ? [
                       { id: 'cijfers', label: 'Cijfers', icon: <BookOpen size={11} /> },
+                      { id: 'studiewijzer', label: 'Studiewijzer', icon: <BookOpen size={11} /> },
                       { id: 'huiswerk', label: 'Huiswerk', icon: <ClipboardList size={11} /> },
                       { id: 'opdrachten', label: 'Opdrachten', icon: <FileText size={11} /> },
                     ] : [])
@@ -433,7 +435,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                     {tabless && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexShrink: 0 }}>
                         <span style={{ fontSize: 16 }}>📋</span>
-                        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>Studiewijzer</span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>Huiswerk</span>
                       </div>
                     )}
                     <div className={tabless ? 'card' : ''} style={tabless ? { padding: 0, ...(gridLayout ? { flex: 1, overflowY: 'auto' } : {}) } : { display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -456,6 +458,41 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                           {hw.datum && (
                             <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0, marginTop: 2 }}>{formatDate(hw.datum)}</span>
                           )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Studiewijzer */}
+                {(tabless || tab === 'studiewijzer') && !loading && data.studiewijzer && (
+                  <div style={tabless ? secWrap : {}}>
+                    {tabless && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexShrink: 0 }}>
+                        <span style={{ fontSize: 16 }}>📖</span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>Studiewijzer</span>
+                      </div>
+                    )}
+                    <div className={tabless ? 'card' : ''} style={tabless ? { padding: 0, ...(gridLayout ? { flex: 1, overflowY: 'auto' } : {}) } : { display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {data.studiewijzer.length === 0 && (
+                        <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '20px 0', margin: 0 }}>Geen studiewijzer gevonden</p>
+                      )}
+                      {data.studiewijzer.map((sw, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 16px', borderBottom: i < data.studiewijzer.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: sw.titel ? 3 : 0 }}>
+                              <span style={{ fontSize: 11, color: 'var(--accent)', background: accentBg(8), border: accentBorder(20), borderRadius: 20, padding: '1px 7px', flexShrink: 0 }}>{sw.vak || '?'}</span>
+                              {sw.week && <span style={{ fontSize: 10, color: 'var(--text-3)' }}>Week {sw.week}</span>}
+                            </div>
+                            {sw.titel && (
+                              <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '4px 0 0', fontWeight: 500 }}>{sw.titel}</p>
+                            )}
+                            {sw.omschrijving && (
+                              <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                                {stripHtml(sw.omschrijving)}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>

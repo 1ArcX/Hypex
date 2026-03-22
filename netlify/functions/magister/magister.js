@@ -267,6 +267,20 @@ exports.handler = async (event) => {
       })))
     }
 
+    if (action === 'studiewijzer') {
+      const count = body.count || 50
+      const resp = await m.http.get(`${m._personUrl}/studiewijzers?top=${count}&skip=0`)
+      const json = await resp.json()
+      const items = json.Items || []
+      return ok(items.map(item => ({
+        id: item.Id,
+        vak: item.Vak?.Omschrijving || item.Vak?.Afkorting || '',
+        titel: item.Titel || '',
+        week: item.Week || null,
+        omschrijving: item.Omschrijving || ''
+      })))
+    }
+
     return err(`Onbekende actie: ${action}`)
 
   } catch (e) {
