@@ -275,10 +275,56 @@ exports.handler = async (event) => {
       const json = JSON.parse(text)
       const items = json.Items || []
       return ok(items.map(item => ({
+        id: item.Id,
         naam: item.Naam || item.Titel || '',
         vak: item.Vak?.Omschrijving || item.Vak?.Afkorting || '',
         omschrijving: item.Omschrijving || ''
       })))
+    }
+
+    if (action === 'studiewijzer_detail') {
+      const { id } = body
+      if (!id) return err('id verplicht')
+
+      // Probeer detail endpoint
+      const detailResp = await m.http.get(`${m._pupilUrl}/studiewijzers/${id}`)
+      const detailText = await detailResp.text()
+      console.log('studiewijzer detail raw:', detailResp.status, detailText.slice(0, 500))
+
+      // Probeer topics sub-resource
+      const topicsResp = await m.http.get(`${m._pupilUrl}/studiewijzers/${id}/topics?top=50&skip=0`)
+      const topicsText = await topicsResp.text()
+      console.log('studiewijzer topics raw:', topicsResp.status, topicsText.slice(0, 500))
+
+      // Parse wat beschikbaar is
+      let topics = []
+      if (topicsText && topicsText.trim().startsWith('{')) {
+        const tj = JSON.parse(topicsText)
+        topics = (tj.Items || tj.items || []).map(t => ({
+          id: t.Id,
+          naam: t.Naam || t.Titel || '',
+          inhoud: t.Inhoud || t.Omschrijving || '',
+          bijlagen: (t.Bijlagen || t.Attachments || []).map(b => ({
+            naam: b.Naam || b.naam || '',
+            url: b.Uri || b.Url || b.url || null,
+            type: b.Type || ''
+          }))
+        }))
+      } else if (detailText && detailText.trim().startsWith('{')) {
+        const dj = JSON.parse(detailText)
+        const onderdelen = dj.Onderdelen || dj.Topics || dj.Items || []
+        topics = onderdelen.map(t => ({
+          id: t.Id,
+          naam: t.Naam || t.Titel || '',
+          inhoud: t.Inhoud || t.Omschrijving || '',
+          bijlagen: (t.Bijlagen || t.Attachments || []).map(b => ({
+            naam: b.Naam || b.naam || '',
+            url: b.Uri || b.Url || b.url || null,
+            type: b.Type || ''
+          }))
+        }))
+      }
+      return ok(topics)
     }
 
     return err(`Onbekende actie: ${action}`)

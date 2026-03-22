@@ -50,6 +50,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
   const [subjectLinks, setSubjectLinks] = useState({})
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState('')
+  const [swDetail, setSwDetail] = useState(null)        // { sw, topics, loading, error }
 
   // Fetch all Magister data at once on mount (no lazy loading per tab)
   useEffect(() => {
@@ -195,6 +196,16 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
   const refresh = () => {
     setData({ grades: null, homework: null, assignments: null, studiewijzer: null })
     fetchAllData(creds)
+  }
+
+  const openStudiewijzer = async (sw) => {
+    setSwDetail({ sw, topics: [], loading: true, error: null })
+    try {
+      const topics = await callMagister(creds, 'studiewijzer_detail', { id: sw.id })
+      setSwDetail({ sw, topics, loading: false, error: null })
+    } catch (e) {
+      setSwDetail({ sw, topics: [], loading: false, error: e.message })
+    }
   }
 
   const formatDate = (str) => {
@@ -474,26 +485,76 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                       </div>
                     )}
                     <div className={tabless ? 'card' : ''} style={tabless ? { padding:0, ...(gridLayout ? { flex:1, overflowY:'auto' } : {}) } : { display:'flex', flexDirection:'column', gap:4 }}>
-                      {data.studiewijzer.length === 0 && (
-                        <p style={{ color:'rgba(255,255,255,0.25)', fontSize:'12px', textAlign:'center', padding:'20px 0', margin:0 }}>Geen studiewijzer gevonden</p>
-                      )}
-                      {data.studiewijzer.map((sw, i) => (
-                        <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:12, padding:'10px 16px', borderBottom: i < data.studiewijzer.length-1 ? '1px solid var(--border)' : 'none' }}>
-                          <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom: sw.vak ? 3 : 0 }}>
-                              {sw.vak && (
-                                <span style={{ fontSize:11, color:'var(--accent)', background:accentBg(8), border:accentBorder(20), borderRadius:20, padding:'1px 7px', flexShrink:0 }}>{sw.vak}</span>
-                              )}
+
+                      {/* Detail view */}
+                      {swDetail && (
+                        <div style={{ display:'flex', flexDirection:'column' }}>
+                          <button onClick={() => setSwDetail(null)} style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, padding:'6px 12px', cursor:'pointer', color:'var(--text-1)', fontSize:12, fontWeight:600, margin:'10px 16px 8px', textAlign:'left' }}>
+                            <ChevronDown size={13} style={{ transform:'rotate(90deg)' }} /> {swDetail.sw.naam}
+                          </button>
+                          {swDetail.loading && (
+                            <div style={{ textAlign:'center', padding:'16px', color:'rgba(255,255,255,0.3)', fontSize:'12px' }}>
+                              <RefreshCw size={14} style={{ animation:'spin 1s linear infinite', display:'block', margin:'0 auto 4px' }} /> Laden...
                             </div>
-                            <p style={{ fontSize:12, color:'var(--text-1)', margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sw.naam || '?'}</p>
-                            {sw.omschrijving && (
-                              <p style={{ fontSize:11, color:'var(--text-3)', margin:'2px 0 0', overflow:'hidden', textOverflow:'ellipsis', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical' }}>
-                                {stripHtml(sw.omschrijving)}
-                              </p>
-                            )}
-                          </div>
+                          )}
+                          {swDetail.error && (
+                            <div style={{ display:'flex', alignItems:'center', gap:6, color:'#ff6b6b', fontSize:'11px', padding:'8px 16px' }}>
+                              <AlertCircle size={12} /> {swDetail.error}
+                            </div>
+                          )}
+                          {!swDetail.loading && swDetail.topics.length === 0 && !swDetail.error && (
+                            <p style={{ color:'rgba(255,255,255,0.25)', fontSize:'12px', textAlign:'center', padding:'20px 0', margin:0 }}>
+                              Geen onderdelen gevonden (check console voor API-structuur)
+                            </p>
+                          )}
+                          {swDetail.topics.map((topic, i) => (
+                            <div key={i} style={{ padding:'10px 16px', borderBottom: i < swDetail.topics.length-1 ? '1px solid var(--border)' : 'none' }}>
+                              <div style={{ fontWeight:600, fontSize:12, color:'var(--text-1)', marginBottom:4 }}>{topic.naam}</div>
+                              {topic.inhoud && (
+                                <p style={{ fontSize:11, color:'var(--text-3)', margin:'0 0 4px' }}>{stripHtml(topic.inhoud)}</p>
+                              )}
+                              <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                                {topic.bijlagen.map((b, j) => (
+                                  b.url
+                                    ? <a key={j} href={b.url} target="_blank" rel="noopener noreferrer" style={{ fontSize:11, color:'var(--accent)', display:'flex', alignItems:'center', gap:4, textDecoration:'none' }}>
+                                        <ExternalLink size={10} /> {b.naam}
+                                      </a>
+                                    : <span key={j} style={{ fontSize:11, color:'var(--text-3)' }}>{b.naam}</span>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      )}
+
+                      {/* Lijst view */}
+                      {!swDetail && (
+                        <>
+                          {data.studiewijzer.length === 0 && (
+                            <p style={{ color:'rgba(255,255,255,0.25)', fontSize:'12px', textAlign:'center', padding:'20px 0', margin:0 }}>Geen studiewijzer gevonden</p>
+                          )}
+                          {data.studiewijzer.map((sw, i) => (
+                            <div key={i} onClick={() => openStudiewijzer(sw)} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 16px', borderBottom: i < data.studiewijzer.length-1 ? '1px solid var(--border)' : 'none', cursor:'pointer' }}
+                              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                              <div style={{ flex:1, minWidth:0 }}>
+                                <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom: sw.vak ? 3 : 0 }}>
+                                  {sw.vak && (
+                                    <span style={{ fontSize:11, color:'var(--accent)', background:accentBg(8), border:accentBorder(20), borderRadius:20, padding:'1px 7px', flexShrink:0 }}>{sw.vak}</span>
+                                  )}
+                                </div>
+                                <p style={{ fontSize:12, color:'var(--text-1)', margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sw.naam || '?'}</p>
+                                {sw.omschrijving && (
+                                  <p style={{ fontSize:11, color:'var(--text-3)', margin:'2px 0 0', overflow:'hidden', textOverflow:'ellipsis', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical' }}>
+                                    {stripHtml(sw.omschrijving)}
+                                  </p>
+                                )}
+                              </div>
+                              <ChevronDown size={14} style={{ transform:'rotate(-90deg)', color:'var(--text-3)', flexShrink:0, marginTop:2 }} />
+                            </div>
+                          ))}
+                        </>
+                      )}
                     </div>
                   </div>
                 )}
