@@ -1,5 +1,6 @@
 import React from 'react'
 import { Home, Timer, Calendar, GraduationCap, CheckSquare, Flame, FileText, Briefcase, Settings, Shield, LogOut, RefreshCw } from 'lucide-react'
+import VersionChecker from './VersionChecker'
 
 const NAV_ITEMS = [
   { id: 'dashboard',  Icon: Home,           label: 'Dashboard'  },
@@ -63,21 +64,6 @@ export default function Sidebar({
             }}
           />
         </div>
-        {updateAvailable && (
-          <button
-            onClick={() => window.location.reload()}
-            style={{
-              marginTop: 8, width: '100%',
-              display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'center',
-              padding: '5px 10px', borderRadius: 7, cursor: 'pointer',
-              background: 'var(--accent-dim)',
-              border: '1px solid rgba(0,255,209,0.3)',
-              color: 'var(--accent)', fontSize: 11, fontWeight: 600,
-              animation: 'pulse 2s ease-in-out infinite',
-            }}>
-            <RefreshCw size={10} /> Update beschikbaar
-          </button>
-        )}
       </div>
 
       {/* Nav */}
@@ -170,6 +156,10 @@ export default function Sidebar({
         >
           <LogOut size={15} /> Uitloggen
         </button>
+
+        <div style={{ padding: '0 10px 6px' }}>
+          <VersionChecker />
+        </div>
 
         {/* Avatar */}
         <div style={{

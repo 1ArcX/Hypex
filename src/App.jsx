@@ -15,6 +15,7 @@ import PasswordResetPage from './components/PasswordResetPage'
 import OnboardingModal from './components/OnboardingModal'
 
 import Sidebar from './components/Sidebar'
+import VersionChecker from './components/VersionChecker'
 import BottomNav from './components/BottomNav'
 import DashboardPage from './pages/DashboardPage'
 import PomodoroPage from './pages/PomodoroPage'
