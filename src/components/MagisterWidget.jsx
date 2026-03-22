@@ -19,6 +19,22 @@ async function callMagister(creds, action, extra = {}) {
 
 function inDays(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10) }
 
+function Skeleton({ rows = 4, compact = false }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: compact ? 8 : 12, padding: compact ? '10px 16px' : '12px 16px' }}>
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {!compact && <div style={{ width: 36, height: 36, borderRadius: 9, background: 'rgba(255,255,255,0.06)', flexShrink: 0, animation: 'pulse 1.4s ease-in-out infinite' }} />}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <div style={{ height: 11, borderRadius: 4, background: 'rgba(255,255,255,0.07)', width: `${65 + (i % 3) * 12}%`, animation: 'pulse 1.4s ease-in-out infinite' }} />
+            <div style={{ height: 9, borderRadius: 4, background: 'rgba(255,255,255,0.04)', width: `${40 + (i % 2) * 15}%`, animation: 'pulse 1.4s ease-in-out infinite' }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function stripHtml(html) {
   if (!html) return ''
   return html
@@ -88,14 +104,8 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
     if (!c) return
     setLoading(true); setError(null)
     try {
-      const today = new Date().toISOString().slice(0, 10)
-      const [grades, homework, assignments, studiewijzer] = await Promise.all([
-        callMagister(c, 'grades', { top: 30 }),
-        callMagister(c, 'homework', { start: inDays(-7), end: inDays(30) }),
-        callMagister(c, 'opdrachten', { count: 50 }),
-        callMagister(c, 'studiewijzer', { count: 50 })
-      ])
-      setData({ grades, homework, assignments, studiewijzer })
+      const result = await callMagister(c, 'fetchAll', { hwStart: inDays(-7), hwEnd: inDays(30) })
+      setData({ grades: result.grades, homework: result.homework, assignments: result.assignments, studiewijzer: result.studiewijzer })
     } catch (e) {
       setError(e.message)
     }
@@ -431,18 +441,18 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                   </div>
                 )}
 
-                {/* Loading */}
-                {loading && (tab !== 'vakken' || tabless) && (
-                  <div style={{ textAlign: 'center', padding: '20px', color: 'rgba(255,255,255,0.3)', fontSize: '12px', ...(gridLayout ? { gridColumn: '1/-1' } : {}) }}>
-                    <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite', display: 'block', margin: '0 auto 6px' }} />
-                    Laden...
-                  </div>
-                )}
-
                 {/* Error */}
                 {error && !loading && (tab !== 'vakken' || tabless) && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ff6b6b', fontSize: '12px', padding: '8px', borderRadius: '8px', background: 'rgba(255,80,80,0.08)', ...(gridLayout ? { gridColumn: '1/-1' } : {}) }}>
                     <AlertCircle size={13} /> {error}
+                  </div>
+                )}
+
+                {/* Cijfers skeleton */}
+                {(tabless || tab === 'cijfers') && loading && (
+                  <div style={tabless ? secWrap : {}}>
+                    {tabless && <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}><span style={{ fontSize:16 }}>📊</span><span style={{ fontSize:14, fontWeight:700, color:'var(--text-1)' }}>Laatste cijfers</span></div>}
+                    <div className={tabless ? 'card' : ''}><Skeleton rows={4} /></div>
                   </div>
                 )}
 
@@ -480,6 +490,14 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                   </div>
                 )}
 
+                {/* Huiswerk skeleton */}
+                {(tabless || tab === 'huiswerk') && loading && (
+                  <div style={tabless ? secWrap : {}}>
+                    {tabless && <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}><span style={{ fontSize:16 }}>📋</span><span style={{ fontSize:14, fontWeight:700, color:'var(--text-1)' }}>Huiswerk</span></div>}
+                    <div className={tabless ? 'card' : ''}><Skeleton rows={5} compact /></div>
+                  </div>
+                )}
+
                 {/* Huiswerk / Studiewijzer */}
                 {(tabless || tab === 'huiswerk') && !loading && data.homework && (
                   <div style={tabless ? secWrap : {}}>
@@ -512,6 +530,14 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                         </div>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {/* Studiewijzer skeleton */}
+                {(tabless || tab === 'studiewijzer') && loading && (
+                  <div style={tabless ? secWrap : {}}>
+                    {tabless && <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}><span style={{ fontSize:16 }}>📖</span><span style={{ fontSize:14, fontWeight:700, color:'var(--text-1)' }}>Studiewijzer</span></div>}
+                    <div className={tabless ? 'card' : ''}><Skeleton rows={4} compact /></div>
                   </div>
                 )}
 
@@ -618,6 +644,14 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                   </div>
                 )}
 
+                {/* Opdrachten skeleton */}
+                {(tabless || tab === 'opdrachten') && loading && (
+                  <div style={tabless ? secWrap : {}}>
+                    {tabless && <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}><span style={{ fontSize:16 }}>📝</span><span style={{ fontSize:14, fontWeight:700, color:'var(--text-1)' }}>Opdrachten</span></div>}
+                    <div className={tabless ? 'card' : ''}><Skeleton rows={5} compact /></div>
+                  </div>
+                )}
+
                 {/* Opdrachten */}
                 {(tabless || tab === 'opdrachten') && !loading && data.assignments && (
                   <div style={tabless ? secWrap : {}}>
@@ -685,7 +719,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
         </>
       )}
 
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } } @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
     </div>
   )
 }

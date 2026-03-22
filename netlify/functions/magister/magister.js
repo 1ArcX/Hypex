@@ -170,6 +170,63 @@ exports.handler = async (event) => {
       return ok({ success: true })
     }
 
+    if (action === 'fetchAll') {
+      const hwFrom = new Date(body.hwStart || new Date())
+      const hwTo   = new Date(body.hwEnd   || (() => { const d = new Date(); d.setDate(d.getDate() + 14); return d })())
+
+      const [coursesRes, appointmentsRes, opdrachtenRes, swRes] = await Promise.allSettled([
+        m.courses(),
+        m.appointments(hwFrom, hwTo),
+        m.http.get(`${m._personUrl}/opdrachten?top=50&skip=0`).then(r => r.json()).catch(() => ({ Items: [] })),
+        m.http.get(`${m._pupilUrl}/studiewijzers?top=50&skip=0`).then(r => r.text()).catch(() => ''),
+      ])
+
+      // Grades
+      let grades = []
+      if (coursesRes.status === 'fulfilled') {
+        const courses = coursesRes.value
+        const current = courses.find(c => c.isCurrent) || courses[courses.length - 1]
+        if (current) {
+          try { grades = await current.grades({ fillGrades: true }) } catch (_) {}
+          if (!grades.length) { try { grades = await current.grades({ latest: true, fillGrades: true }) } catch (_) {} }
+          grades = grades.slice().sort((a, b) => new Date(b.dateFilledIn || b.testDate) - new Date(a.dateFilledIn || a.testDate)).slice(0, 30)
+            .map(g => ({ vak: g.class?.description || g.class?.abbreviation || '', cijfer: g.grade, omschrijving: g.description || g.type?.description || '', datum: dateStr(g.dateFilledIn || g.testDate), weging: g.weight, klaar: g.passed }))
+        }
+      }
+
+      // Homework
+      let homework = []
+      if (appointmentsRes.status === 'fulfilled') {
+        homework = appointmentsRes.value.filter(a => a.content && a.content.trim())
+          .map(a => ({ vak: a.classes?.join(', ') || a.description || '', omschrijving: a.content || '', datum: dateStr(a.start), klaar: a.finished || false }))
+      }
+
+      // Opdrachten
+      let assignments = []
+      if (opdrachtenRes.status === 'fulfilled') {
+        const ids = (opdrachtenRes.value.Items || []).map(i => i.Id)
+        const details = await Promise.allSettled(ids.map(id => m.http.get(`${m._personUrl}/opdrachten/${id}`).then(r => r.json())))
+        assignments = details.filter(r => r.status === 'fulfilled').map(r => r.value).map(raw => ({
+          naam: raw.Titel || '', omschrijving: raw.Omschrijving || '',
+          vak: raw.Vak?.Omschrijving || raw.Vak?.Afkorting || '',
+          deadline: dateStr(raw.InleverenVoor), ingeleverdOp: dateStr(raw.IngeleverdOp),
+          beoordeling: raw.Beoordeling || null, beoordeeldOp: dateStr(raw.BeoordeeldOp),
+          afgesloten: raw.Afgesloten || false, magInleveren: raw.MagInleveren || false, opnieuwInleveren: raw.OpnieuwInleveren || false
+        }))
+      }
+
+      // Studiewijzer
+      let studiewijzer = []
+      if (swRes.status === 'fulfilled') {
+        const text = swRes.value
+        if (text && text.trim().startsWith('{')) {
+          studiewijzer = (JSON.parse(text).Items || []).map(item => ({ id: item.Id, naam: item.Naam || item.Titel || '', vak: item.Vak?.Omschrijving || item.Vak?.Afkorting || '', omschrijving: item.Omschrijving || '' }))
+        }
+      }
+
+      return ok({ grades, homework, assignments, studiewijzer })
+    }
+
     if (action === 'grades') {
       const top = body.top || 30
       const courses = await m.courses()
