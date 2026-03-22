@@ -201,8 +201,9 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
   }
 
   const openBron = async (bron) => {
+    console.log('[openBron]', bron)
     if (!bron.href && bron.url) { window.open(bron.url, '_blank'); return }
-    if (!bron.href) return
+    if (!bron.href) { console.warn('[openBron] geen href of url'); return }
     setBronLoading(prev => ({ ...prev, [bron.id]: true }))
     try {
       const result = await callMagister(creds, 'bron_download', { href: bron.href })

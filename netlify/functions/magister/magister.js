@@ -312,7 +312,9 @@ exports.handler = async (event) => {
           naam: t.Naam || t.Titel || '',
           inhoud: t.Inhoud || t.Omschrijving || '',
           bijlagen: bronnen.map(b => {
-            const bSelf = ((b.Links || []).find(l => l.Rel === 'Self') || {}).Href || null
+            const bSelf = ((b.Links || []).find(l => l.Rel === 'Self') || {}).Href
+              || (selfLink ? `${selfLink.Href}/bronnen/${b.Id}` : null)
+            console.log('bron:', b.Id, b.Naam, 'href:', bSelf, 'uri:', b.Uri || b.Url || b.ContentUri)
             return {
               id: b.Id,
               naam: b.Naam || b.Titel || '',
