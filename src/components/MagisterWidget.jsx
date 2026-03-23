@@ -103,7 +103,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
     if (!c) return
     setLoading(true); setError(null)
     try {
-      const result = await callMagister(c, 'fetchAll', { hwStart: inDays(-7), hwEnd: inDays(30) })
+      const result = await callMagister(c, 'fetchAll', { hwStart: inDays(0), hwEnd: inDays(30) })
       setData({ grades: result.grades, homework: result.homework, assignments: result.assignments, studiewijzer: result.studiewijzer })
     } catch (e) {
       setError(e.message)
