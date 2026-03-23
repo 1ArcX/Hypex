@@ -75,7 +75,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
 
   // Fetch all Magister data at once on mount (no lazy loading per tab)
   useEffect(() => {
-    if (creds) fetchAllData(creds)
+    if (creds) { fetchAllData(creds); fetchActiviteiten() }
   }, [creds])
 
   useEffect(() => {
@@ -763,13 +763,20 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                 )}
 
                 {/* Activiteiten skeleton */}
-                {tab === 'activiteiten' && activiteitenLoading && (
+                {(tabless || tab === 'activiteiten') && activiteitenLoading && (
                   <div><Skeleton rows={4} compact /></div>
                 )}
 
                 {/* Activiteiten */}
-                {tab === 'activiteiten' && !activiteitenLoading && activiteiten && (
+                {(tabless || tab === 'activiteiten') && !activiteitenLoading && activiteiten && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+
+                    {tabless && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexShrink: 0 }}>
+                        <span style={{ fontSize: 16 }}>📅</span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>Activiteiten</span>
+                      </div>
+                    )}
 
                     {/* Detail view */}
                     {activiteitDetail && (
