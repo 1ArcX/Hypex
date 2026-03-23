@@ -90,8 +90,13 @@ export default function App() {
   const PULL_THRESHOLD = 65
 
   const onPullStart = (e) => {
-    const scrollEl = e.currentTarget.querySelector('[data-scrollable]') || e.currentTarget
-    if (scrollEl.scrollTop > 0) return
+    // Loop omhoog vanaf het aangetikte element; als een scrollbare
+    // ancestor al gescrolled is, geen pull-to-refresh starten.
+    let el = e.target
+    while (el && el !== e.currentTarget) {
+      if (el.scrollTop > 0) return
+      el = el.parentElement
+    }
     pullStartY.current = e.touches[0].clientY
     pullStartX.current = e.touches[0].clientX
   }
