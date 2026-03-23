@@ -50,6 +50,29 @@ function toBookUrl(url) {
   return m ? `https://apps.noordhoff.nl/se/deeplink?targetEAN=${m[1]}` : url
 }
 
+function extractEan(url) {
+  if (!url) return null
+  const m1 = url.match(/\/Ean\/(\d+)/i)
+  if (m1) return m1[1]
+  const m2 = url.match(/targetEAN=(\d+)/i)
+  if (m2) return m2[1]
+  return null
+}
+
+async function openBook(url, creds) {
+  const ean = extractEan(url)
+  if (!ean) { window.open(url.startsWith('http') ? url : `https://${url}`, '_blank', 'noopener,noreferrer'); return }
+  const win = window.open('', '_blank')
+  const fallback = `https://apps.noordhoff.nl/se/deeplink?targetEAN=${ean}`
+  try {
+    if (!creds) throw new Error('no creds')
+    const { url: ssoUrl } = await callMagister(creds, 'open_book', { ean })
+    win.location.href = ssoUrl || fallback
+  } catch {
+    win.location.href = fallback
+  }
+}
+
 export default function MagisterWidget({ userId, onSubjectsSync, tabless = false, gridLayout = false }) {
   const [creds, setCreds] = useState(() => {
     if (!userId) return null
@@ -437,10 +460,10 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                           {vakken.map(vak => {
                             const link = subjectLinks[vak]
                             return link ? (
-                              <a key={vak} href={link} target="_blank" rel="noopener noreferrer"
-                                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 12px', borderRadius: 20, background: accentBg(8), border: accentBorder(20), color: 'var(--accent)', fontSize: 12, fontWeight: 500, textDecoration: 'none' }}>
+                              <button key={vak} onClick={() => openBook(link, creds)}
+                                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 12px', borderRadius: 20, background: accentBg(8), border: accentBorder(20), color: 'var(--accent)', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
                                 {vak} <ExternalLink size={10} />
-                              </a>
+                              </button>
                             ) : (
                               <span key={vak} style={{ padding: '4px 12px', borderRadius: 20, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-2)', fontSize: 12 }}>
                                 {vak}

@@ -269,6 +269,20 @@ exports.handler = async (event) => {
       })))
     }
 
+    if (action === 'open_book') {
+      const { ean } = body
+      if (!ean) return err('ean required')
+      const fallback = `https://apps.noordhoff.nl/se/deeplink?targetEAN=${ean}`
+      try {
+        const resp = await m.http.get(`${m._personUrl}/digitaallesmateriaal/Ean/${ean}?redirect_type=body&display=inline`)
+        const data = await resp.json()
+        const url = data.location || data.Location || data.Url || data.url
+        return ok({ url: url || fallback })
+      } catch {
+        return ok({ url: fallback })
+      }
+    }
+
     if (action === 'opdrachten') {
       const count = body.count || 50
       const listResp = await m.http.get(`${m._personUrl}/opdrachten?top=${count}&skip=0`)

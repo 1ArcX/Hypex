@@ -17,6 +17,29 @@ async function magisterCall(creds, action, extra = {}) {
   return res.json()
 }
 
+function extractEan(url) {
+  if (!url) return null
+  const m1 = url.match(/\/Ean\/(\d+)/i)
+  if (m1) return m1[1]
+  const m2 = url.match(/targetEAN=(\d+)/i)
+  if (m2) return m2[1]
+  return null
+}
+
+async function openBook(url, creds) {
+  const ean = extractEan(url)
+  if (!ean) { window.open(url.startsWith('http') ? url : `https://${url}`, '_blank', 'noopener,noreferrer'); return }
+  const win = window.open('', '_blank')
+  const fallback = `https://apps.noordhoff.nl/se/deeplink?targetEAN=${ean}`
+  try {
+    if (!creds) throw new Error('no creds')
+    const { url: ssoUrl } = await magisterCall(creds, 'open_book', { ean })
+    win.location.href = ssoUrl || fallback
+  } catch {
+    win.location.href = fallback
+  }
+}
+
 export default function SubjectsWidget({ userId, onSyncComplete }) {
   const [profile, setProfile] = useState(null)
   const [subjectLinks, setSubjectLinks] = useState({})
@@ -156,11 +179,11 @@ export default function SubjectsWidget({ userId, onSyncComplete }) {
                 onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}>
                 <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.75)', fontWeight: 500 }}>{vak}</span>
                 {link ? (
-                  <a href={link} target="_blank" rel="noopener noreferrer"
-                    onClick={e => e.stopPropagation()}
-                    style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#00FFD1', textDecoration: 'none', background: 'rgba(0,255,209,0.08)', border: '1px solid rgba(0,255,209,0.2)', borderRadius: '6px', padding: '2px 7px' }}>
+                  <button
+                    onClick={e => { e.stopPropagation(); openBook(link, getCreds(userId)) }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#00FFD1', background: 'rgba(0,255,209,0.08)', border: '1px solid rgba(0,255,209,0.2)', borderRadius: '6px', padding: '2px 7px', cursor: 'pointer' }}>
                     <ExternalLink size={10} /> Boek
-                  </a>
+                  </button>
                 ) : (
                   <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.12)' }}>–</span>
                 )}
