@@ -141,12 +141,12 @@ body {
 .text-secondary { color: var(--text-secondary) !important; }
 .text-muted { color: var(--text-muted) !important; }
 
-/* ===== MOBILE: geen pagina-scroll ===== */
-@media (max-width: 767px) {
-  html, body, #root {
-    height: 100%;
-    overflow: hidden;
-  }
+/* Geen document-level scroll — app beheert eigen scroll containers.
+   Dit geldt ook op tablet/desktop zodat iOS niet de pagina gaat scrollen
+   bij toetsenbord-focus (iPad standalone PWA bug). */
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
 }
 
 /* ===== SCROLLBAR ===== */

@@ -214,6 +214,11 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
     console.log('[openBron]', bron)
     if (!bron.href && bron.url) { window.open(bron.url, '_blank'); return }
     if (!bron.href) { console.warn('[openBron] geen href of url'); return }
+
+    // Open venster SYNCHROON binnen de user gesture (Safari-fix)
+    // Zonder dit blokkeert Safari window.open na de async fetch
+    const newWin = window.open('', '_blank')
+
     setBronLoading(prev => ({ ...prev, [bron.id]: true }))
     try {
       const result = await callMagister(creds, 'bron_download', { href: bron.href })
@@ -229,15 +234,22 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
       const blob = new Blob([byteArray], { type: contentType })
       const url = URL.createObjectURL(blob)
       if (contentType === 'application/pdf' || contentType.startsWith('image/')) {
-        window.open(url, '_blank')
+        // Navigeer het al-geopende venster → werkt op Safari
+        if (newWin) newWin.location.href = url
+        else window.open(url, '_blank')           // fallback (niet-Safari)
         setTimeout(() => URL.revokeObjectURL(url), 60000)
       } else {
+        // Download: sluit het lege venster, gebruik anchor-trick
+        if (newWin) newWin.close()
         const a = document.createElement('a')
         a.href = url; a.download = bron.naam
         document.body.appendChild(a); a.click(); document.body.removeChild(a)
         setTimeout(() => URL.revokeObjectURL(url), 10000)
       }
-    } catch (e) { console.error('Download mislukt:', e) }
+    } catch (e) {
+      if (newWin) newWin.close()         // Ruim venster op bij fout
+      console.error('Download mislukt:', e)
+    }
     setBronLoading(prev => ({ ...prev, [bron.id]: false }))
   }
 
