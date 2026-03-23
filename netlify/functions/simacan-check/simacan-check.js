@@ -146,4 +146,4 @@ async function simacanCheckHandler() {
   return { statusCode: 200 }
 }
 
-exports.handler = schedule('*/5 * * * *', simacanCheckHandler)
+exports.handler = schedule('* * * * *', simacanCheckHandler)
