@@ -391,6 +391,46 @@ exports.handler = async (event) => {
       return ok({ topics })
     }
 
+    if (action === 'activiteiten') {
+      const resp = await m.http.get(`${m._personUrl}/activiteiten?top=50&skip=0`)
+      const json = await resp.json()
+      return ok((json.Items || []).map(a => ({
+        id: a.Id,
+        naam: a.Naam || a.Titel || '',
+        omschrijving: a.Omschrijving || '',
+        inschrijvenVan: dateStr(a.InschrijvenVan),
+        inschrijvenTot: dateStr(a.InschrijvenTot),
+        aantalDeelnemers: a.AantalDeelnemers ?? null,
+        minDeelnemers: a.MinDeelnemers ?? null,
+        maxDeelnemers: a.MaxDeelnemers ?? null,
+        isIngeschreven: a.IsIngeschreven || false,
+      })))
+    }
+
+    if (action === 'activiteiten_detail') {
+      const { id } = body
+      if (!id) return err('id verplicht')
+      const resp = await m.http.get(`${m._personUrl}/activiteiten/${id}`)
+      const raw = await resp.json()
+      return ok({
+        id: raw.Id,
+        naam: raw.Naam || raw.Titel || '',
+        omschrijving: raw.Omschrijving || '',
+        inschrijvenVan: dateStr(raw.InschrijvenVan),
+        inschrijvenTot: dateStr(raw.InschrijvenTot),
+        aantalDeelnemers: raw.AantalDeelnemers ?? null,
+        minDeelnemers: raw.MinDeelnemers ?? null,
+        maxDeelnemers: raw.MaxDeelnemers ?? null,
+        isIngeschreven: raw.IsIngeschreven || false,
+        deelactiviteiten: (raw.Deelactiviteiten?.Items || []).map(d => ({
+          id: d.Id,
+          naam: d.Naam || '',
+          inhoud: d.Inhoud || '',
+          beschikbarePlaatsen: d.BeschikbarePlaatsen ?? null,
+        }))
+      })
+    }
+
     if (action === 'bron_download') {
       const { href } = body
       if (!href) return err('href verplicht')
