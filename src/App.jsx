@@ -381,7 +381,7 @@ export default function App() {
   )
 
   if (!session) return (
-    <div style={{ background: 'var(--bg-base)', minHeight: '100vh' }}>
+    <div style={{ background: 'var(--bg-base)', height: '100%', overflowY: 'auto' }}>
       <AuthPage />
     </div>
   )

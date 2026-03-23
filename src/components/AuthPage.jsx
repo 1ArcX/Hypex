@@ -44,7 +44,7 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative z-10">
+    <div className="min-h-full flex items-center justify-center p-4 relative z-10" style={{ minHeight: '100%' }}>
       <div className="glass-card p-8 w-full max-w-md">
         {/* Logo */}
         <div className="flex items-center justify-center gap-3 mb-8">
