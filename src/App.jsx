@@ -29,6 +29,14 @@ import StatsPage from './pages/StatsPage'
 
 const ADMIN_EMAIL = 'zhafirfachri@gmail.com'
 
+const VAPID_PUBLIC = 'BCsu1QaHUead0cgQ23qUKIu3_MnSi0s21LaD_c9wBcqdP43A9ojEx-nWZ4_xUDYLVMQn0CqzqdhSuLQr6eOQqh4'
+function urlBase64ToUint8Array(b) {
+  const pad = '='.repeat((4 - b.length % 4) % 4)
+  const base64 = (b + pad).replace(/-/g, '+').replace(/_/g, '/')
+  const raw = atob(base64)
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)))
+}
+
 const PAGE_NAMES = {
   dashboard: 'Dashboard', agenda: 'Agenda', taken: 'Taken',
   pomodoro: 'Pomodoro', school: 'School',
@@ -195,6 +203,27 @@ export default function App() {
       subscription.unsubscribe()
     }
   }, [])
+
+  // Globale push-subscription refresh — draait bij elke app-start als permissie al granted is,
+  // ongeacht welke widget meldingen heeft aanstaan (Vracht, Regen, Pomodoro, enz.)
+  useEffect(() => {
+    if (!user?.id) return
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+    navigator.serviceWorker.ready.then(async (reg) => {
+      try {
+        const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC) })
+        const { data: existing } = await supabase.from('push_subscriptions').select('id').eq('user_id', user.id).maybeSingle()
+        if (existing) {
+          await supabase.from('push_subscriptions').update({ subscription: sub.toJSON() }).eq('user_id', user.id)
+        } else {
+          await supabase.from('push_subscriptions').insert({ user_id: user.id, subscription: sub.toJSON() })
+        }
+      } catch (e) {
+        console.error('Global push refresh failed:', e)
+      }
+    })
+  }, [user?.id])
 
   // Load data
   useEffect(() => {
