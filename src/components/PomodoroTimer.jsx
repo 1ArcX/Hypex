@@ -701,6 +701,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
       }
       dispatch({ type: 'TOGGLE_NOTIF' })
       await registerPushSubscription(userId)
+      await sendPushNotif(userId, 'Meldingen ingeschakeld 🔔', 'Je ontvangt een melding als je timer afloopt.')
     } else {
       dispatch({ type: 'TOGGLE_NOTIF' })
     }
@@ -767,6 +768,14 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
             <button onClick={toggleNotif} style={iconBtn} title={notifEnabled ? 'Meldingen uit' : 'Meldingen aan'}>
               {notifEnabled ? <Bell size={14} /> : <BellOff size={14} />}
             </button>
+            {notifEnabled && (
+              <button
+                onClick={() => sendPushNotif(userId, 'Test melding 🔔', 'Push meldingen werken correct!')}
+                style={{ fontSize: 11, color: 'var(--text-3)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}
+              >
+                Test
+              </button>
+            )}
           </div>
 
           {/* Mode selector — hidden when running, label shown instead */}
@@ -1007,6 +1016,14 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
             <button onClick={toggleNotif} style={iconBtn} title={notifEnabled ? 'Meldingen uit' : 'Meldingen aan'}>
               {notifEnabled ? <Bell size={13} /> : <BellOff size={13} />}
             </button>
+            {notifEnabled && (
+              <button
+                onClick={() => sendPushNotif(userId, 'Test melding 🔔', 'Push meldingen werken correct!')}
+                style={{ fontSize: 11, color: 'var(--text-3)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}
+              >
+                Test
+              </button>
+            )}
             <button onClick={() => dispatch({ type: 'TOGGLE_SETTINGS' })} style={iconBtn}>
               {showSettings ? <X size={13} /> : <Settings size={13} />}
             </button>
