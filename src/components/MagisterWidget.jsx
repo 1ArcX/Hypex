@@ -69,20 +69,10 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
   const [swDetail, setSwDetail] = useState(null)        // { sw, topics, loading, error }
   const [bronLoading, setBronLoading] = useState({})
   const [expandedTopics, setExpandedTopics] = useState({})
-  const [activiteiten, setActiviteiten] = useState(null) // null = not loaded
-  const [activiteitenLoading, setActiviteitenLoading] = useState(false)
-  const [activiteitDetail, setActiviteitDetail] = useState(null) // { act, deelactiviteiten, loading, error }
-
   // Fetch all Magister data at once on mount (no lazy loading per tab)
   useEffect(() => {
-    if (creds) { fetchAllData(creds); fetchActiviteiten() }
+    if (creds) fetchAllData(creds)
   }, [creds])
-
-  useEffect(() => {
-    if (tab === 'activiteiten' && creds && activiteiten === null && !activiteitenLoading) {
-      fetchActiviteiten()
-    }
-  }, [tab, creds])
 
   useEffect(() => {
     if (!userId) return
@@ -210,19 +200,13 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
     localStorage.removeItem(storageKey(userId))
     setCreds(null)
     setData({ grades: null, homework: null, assignments: null, studiewijzer: null })
-    setActiviteiten(null)
     setShowSettings(true)
     setFormCreds({ school: '', username: '', password: '' })
   }
 
   const refresh = () => {
     setData({ grades: null, homework: null, assignments: null, studiewijzer: null })
-    setActiviteiten(null)
-    if (tab === 'activiteiten') {
-      fetchActiviteiten()
-    } else {
-      fetchAllData(creds)
-    }
+    fetchAllData(creds)
   }
 
   const openBron = async (bron) => {
@@ -282,32 +266,6 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
       setSwDetail({ sw, topics, loading: false, error: null })
     } catch (e) {
       setSwDetail({ sw, topics: [], loading: false, error: e.message })
-    }
-  }
-
-  const fetchActiviteiten = async () => {
-    if (!creds || activiteitenLoading) return
-    const cacheKey = `magister_activiteiten_${creds.username}`
-    const cached = sessionStorage.getItem(cacheKey)
-    if (cached) { setActiviteiten(JSON.parse(cached)); return }
-    setActiviteitenLoading(true)
-    try {
-      const result = await callMagister(creds, 'activiteiten')
-      setActiviteiten(result)
-      sessionStorage.setItem(cacheKey, JSON.stringify(result))
-    } catch (e) {
-      setActiviteiten([])
-    }
-    setActiviteitenLoading(false)
-  }
-
-  const openActiviteit = async (act) => {
-    setActiviteitDetail({ act, deelactiviteiten: [], loading: true, error: null })
-    try {
-      const result = await callMagister(creds, 'activiteiten_detail', { id: act.id })
-      setActiviteitDetail({ act, deelactiviteiten: result.deelactiviteiten || [], loading: false, error: null })
-    } catch (e) {
-      setActiviteitDetail({ act, deelactiviteiten: [], loading: false, error: e.message })
     }
   }
 
@@ -416,7 +374,6 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                       { id: 'studiewijzer', label: 'Studiewijzer', icon: <BookOpen size={11} /> },
                       { id: 'huiswerk', label: 'Huiswerk', icon: <ClipboardList size={11} /> },
                       { id: 'opdrachten', label: 'Opdrachten', icon: <FileText size={11} /> },
-                      { id: 'activiteiten', label: 'Activiteiten', icon: <ClipboardList size={11} />, badge: activiteiten?.some(a => a.inschrijvenTot && new Date(a.inschrijvenTot) > new Date()) },
                     ] : [])
                   ].map(t => (
                     <button key={t.id} onClick={() => setTab(t.id)}
@@ -759,100 +716,6 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                         )
                       })}
                     </div>
-                  </div>
-                )}
-
-                {/* Activiteiten skeleton */}
-                {(tabless || tab === 'activiteiten') && activiteitenLoading && (
-                  <div><Skeleton rows={4} compact /></div>
-                )}
-
-                {/* Activiteiten */}
-                {(tabless || tab === 'activiteiten') && !activiteitenLoading && activiteiten && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-
-                    {tabless && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexShrink: 0 }}>
-                        <span style={{ fontSize: 16 }}>📅</span>
-                        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>Activiteiten</span>
-                      </div>
-                    )}
-
-                    {/* Detail view */}
-                    {activiteitDetail && (
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <button onClick={() => setActiviteitDetail(null)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', color: 'var(--text-1)', fontSize: 12, fontWeight: 600, margin: '10px 0 8px', textAlign: 'left' }}>
-                          <ChevronDown size={13} style={{ transform: 'rotate(90deg)' }} /> {activiteitDetail.act.naam}
-                        </button>
-                        {activiteitDetail.act.inschrijvenVan && (
-                          <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '0 0 8px', padding: '0 2px' }}>
-                            Inschrijven: {formatDate(activiteitDetail.act.inschrijvenVan)} – {formatDate(activiteitDetail.act.inschrijvenTot)}
-                            {activiteitDetail.act.maxDeelnemers != null && ` · ${activiteitDetail.act.aantalDeelnemers ?? 0}/${activiteitDetail.act.maxDeelnemers} deelnemers`}
-                          </p>
-                        )}
-                        {activiteitDetail.loading && (
-                          <div style={{ textAlign: 'center', padding: '16px', color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>
-                            <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite', display: 'block', margin: '0 auto 4px' }} /> Laden...
-                          </div>
-                        )}
-                        {activiteitDetail.error && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#ff6b6b', fontSize: '11px', padding: '8px 0' }}>
-                            <AlertCircle size={12} /> {activiteitDetail.error}
-                          </div>
-                        )}
-                        {!activiteitDetail.loading && activiteitDetail.deelactiviteiten.length === 0 && !activiteitDetail.error && (
-                          <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '20px 0', margin: 0 }}>Geen deelactiviteiten gevonden</p>
-                        )}
-                        {activiteitDetail.deelactiviteiten.map((d, i) => (
-                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: i < activiteitDetail.deelactiviteiten.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <p style={{ fontSize: 12, color: 'var(--text-1)', fontWeight: 500, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.naam || '–'}</p>
-                              {d.inhoud && (
-                                <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stripHtml(d.inhoud)}</p>
-                              )}
-                            </div>
-                            {d.beschikbarePlaatsen != null && (
-                              <span style={{ fontSize: 11, color: d.beschikbarePlaatsen > 0 ? '#4ADE80' : '#FF6B6B', flexShrink: 0 }}>
-                                {d.beschikbarePlaatsen} vrij
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Lijst view */}
-                    {!activiteitDetail && (
-                      <>
-                        {activiteiten.length === 0 && (
-                          <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '20px 0', margin: 0 }}>Geen activiteiten gevonden</p>
-                        )}
-                        {activiteiten.map((a, i) => {
-                          const open = a.inschrijvenTot && new Date(a.inschrijvenTot) > new Date()
-                          return (
-                            <div key={i} className="stagger-item" onClick={() => openActiviteit(a)}
-                              style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: i < activiteiten.length - 1 ? '1px solid var(--border)' : 'none', cursor: 'pointer', animationDelay: `${i * 35}ms` }}
-                              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
-                              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                                  <p style={{ fontSize: 12, color: 'var(--text-1)', fontWeight: 500, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.naam || '–'}</p>
-                                  {open && <span style={{ fontSize: 9, color: '#FACC15', background: 'rgba(250,204,21,0.1)', border: '1px solid rgba(250,204,21,0.3)', borderRadius: 20, padding: '1px 6px', flexShrink: 0 }}>Open</span>}
-                                  {a.isIngeschreven && <span style={{ fontSize: 9, color: '#4ADE80', background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.3)', borderRadius: 20, padding: '1px 6px', flexShrink: 0 }}>Ingeschreven</span>}
-                                </div>
-                                {a.inschrijvenVan && (
-                                  <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>
-                                    {formatDate(a.inschrijvenVan)} – {formatDate(a.inschrijvenTot)}
-                                    {a.maxDeelnemers != null && ` · ${a.aantalDeelnemers ?? 0}/${a.maxDeelnemers}`}
-                                  </p>
-                                )}
-                              </div>
-                              <ChevronDown size={14} style={{ transform: 'rotate(-90deg)', color: 'var(--text-3)', flexShrink: 0 }} />
-                            </div>
-                          )
-                        })}
-                      </>
-                    )}
                   </div>
                 )}
 
