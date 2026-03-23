@@ -4,10 +4,10 @@ import VersionChecker from './VersionChecker'
 
 const NAV_ITEMS = [
   { id: 'dashboard',  Icon: Home,           label: 'Dashboard'  },
-  { id: 'pomodoro',   Icon: Timer,          label: 'Pomodoro'   },
   { id: 'agenda',     Icon: Calendar,       label: 'Agenda'     },
-  { id: 'school',     Icon: GraduationCap,  label: 'School'     },
   { id: 'taken',      Icon: CheckSquare,    label: 'Taken'      },
+  { id: 'pomodoro',   Icon: Timer,          label: 'Pomodoro'   },
+  { id: 'school',     Icon: GraduationCap,  label: 'School'     },
   { id: 'gewoontes',  Icon: Flame,          label: 'Gewoontes'  },
   { id: 'notities',   Icon: FileText,       label: 'Notities'   },
 ]
