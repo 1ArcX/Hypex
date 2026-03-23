@@ -60,6 +60,11 @@ async function sendPush(subs, title, body, tag) {
 }
 
 async function simacanCheckHandler() {
+  // Skip between 22:00 and 06:00 Amsterdam time — no deliveries active
+  const hour = new Date().toLocaleString('nl-NL', { timeZone: 'Europe/Amsterdam', hour: 'numeric', hour12: false })
+  const h = parseInt(hour, 10)
+  if (h >= 22 || h < 6) return { statusCode: 200, body: 'Nacht — overgeslagen' }
+
   // Get users with vracht notifications enabled
   const { data: rows } = await supabase
     .from('push_subscriptions')
