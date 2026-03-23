@@ -15,7 +15,7 @@
   schedule = "* * * * *"
 
 [functions."simacan-check/simacan-check"]
-  schedule = "*/5 * * * *"
+  schedule = "* * * * *"
 
 [[headers]]
   for = "/simacan-arrival.html"
