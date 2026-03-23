@@ -1,15 +1,16 @@
 import React from 'react'
-import { Home, Timer, Calendar, GraduationCap, CheckSquare, Flame, FileText, Briefcase, Settings, Shield, LogOut, RefreshCw } from 'lucide-react'
+import { Home, Timer, Calendar, GraduationCap, CheckSquare, Flame, FileText, Briefcase, Settings, Shield, LogOut, RefreshCw, BarChart2 } from 'lucide-react'
 import VersionChecker from './VersionChecker'
 
 const NAV_ITEMS = [
-  { id: 'dashboard',  Icon: Home,           label: 'Dashboard'  },
-  { id: 'agenda',     Icon: Calendar,       label: 'Agenda'     },
-  { id: 'taken',      Icon: CheckSquare,    label: 'Taken'      },
-  { id: 'pomodoro',   Icon: Timer,          label: 'Pomodoro'   },
-  { id: 'school',     Icon: GraduationCap,  label: 'School'     },
-  { id: 'gewoontes',  Icon: Flame,          label: 'Gewoontes'  },
-  { id: 'notities',   Icon: FileText,       label: 'Notities'   },
+  { id: 'dashboard',    Icon: Home,           label: 'Dashboard'    },
+  { id: 'agenda',       Icon: Calendar,       label: 'Agenda'       },
+  { id: 'taken',        Icon: CheckSquare,    label: 'Taken'        },
+  { id: 'pomodoro',     Icon: Timer,          label: 'Pomodoro'     },
+  { id: 'school',       Icon: GraduationCap,  label: 'School'       },
+  { id: 'gewoontes',    Icon: Flame,          label: 'Gewoontes'    },
+  { id: 'notities',     Icon: FileText,       label: 'Notities'     },
+  { id: 'statistieken', Icon: BarChart2,      label: 'Statistieken' },
 ]
 
 export default function Sidebar({

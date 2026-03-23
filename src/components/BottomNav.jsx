@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Home, Calendar, CheckSquare, Timer, MoreHorizontal, GraduationCap, Flame, FileText, Briefcase, ChevronUp } from 'lucide-react'
+import { Home, Calendar, CheckSquare, Timer, MoreHorizontal, GraduationCap, Flame, FileText, Briefcase, ChevronUp, BarChart2 } from 'lucide-react'
 
 const PRIMARY_TABS = [
   { id: 'dashboard', Icon: Home,        label: 'Home'   },
@@ -9,9 +9,10 @@ const PRIMARY_TABS = [
 ]
 
 const MORE_BASE = [
-  { id: 'school',    Icon: GraduationCap, label: 'School'    },
-  { id: 'gewoontes', Icon: Flame,         label: 'Gewoontes' },
-  { id: 'notities',  Icon: FileText,      label: 'Notities'  },
+  { id: 'school',       Icon: GraduationCap, label: 'School'    },
+  { id: 'gewoontes',    Icon: Flame,         label: 'Gewoontes' },
+  { id: 'notities',     Icon: FileText,      label: 'Notities'  },
+  { id: 'statistieken', Icon: BarChart2,     label: 'Stats'     },
 ]
 
 export default function BottomNav({ activePage, setActivePage, isAdmin }) {

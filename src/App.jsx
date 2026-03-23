@@ -25,16 +25,17 @@ import TakenPage from './pages/TakenPage'
 import GewoontesPage from './pages/GewoontesPage'
 import NotitiesPage from './pages/NotitiesPage'
 import JumboPage from './pages/JumboPage'
+import StatsPage from './pages/StatsPage'
 
 const ADMIN_EMAIL = 'zhafirfachri@gmail.com'
 
 const PAGE_NAMES = {
   dashboard: 'Dashboard', agenda: 'Agenda', taken: 'Taken',
   pomodoro: 'Pomodoro', school: 'School',
-  gewoontes: 'Gewoontes', notities: 'Notities', jumbo: 'Jumbo',
+  gewoontes: 'Gewoontes', notities: 'Notities', statistieken: 'Statistieken', jumbo: 'Jumbo',
 }
 
-const PAGE_ORDER = ['dashboard', 'agenda', 'taken', 'pomodoro', 'school', 'gewoontes', 'notities']
+const PAGE_ORDER = ['dashboard', 'agenda', 'taken', 'pomodoro', 'school', 'gewoontes', 'notities', 'statistieken']
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -544,6 +545,10 @@ export default function App() {
 
             {activePage === 'notities' && (
               <NotitiesPage userId={user.id} syncTrigger={syncTrigger} />
+            )}
+
+            {activePage === 'statistieken' && (
+              <StatsPage tasks={tasks} userId={user.id} />
             )}
 
             {activePage === 'jumbo' && isAdmin && (
