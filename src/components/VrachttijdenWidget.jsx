@@ -456,6 +456,30 @@ export default function VrachttijdenWidget() {
 
   // ─── Start ────────────────────────────────────────────────────────────────
   useEffect(() => {
+    // Mobile redirect flow: check for pending auth code from simacan-callback.html
+    const pendingRaw = localStorage.getItem('simacan_pending_code')
+    const pendingErr = localStorage.getItem('simacan_pending_error')
+    if (pendingErr) {
+      localStorage.removeItem('simacan_pending_error')
+      setError(pendingErr)
+    }
+    if (pendingRaw) {
+      localStorage.removeItem('simacan_pending_code')
+      try {
+        const { code } = JSON.parse(pendingRaw)
+        const verifier = sessionStorage.getItem('simacan_verifier')
+        const redirectUri = `${window.location.origin}/simacan-callback.html`
+        if (code && verifier) {
+          sessionStorage.removeItem('simacan_verifier')
+          exchangeCode(code, verifier, redirectUri).then(td => {
+            const t = { accessToken: td.access_token, refreshToken: td.refresh_token }
+            saveTokens(t); fetchStops(t)
+          }).catch(e => setError(e.message))
+          return
+        }
+      } catch (_) {}
+    }
+
     if (tokens) { fetchStops(tokens); return }
     supabase.auth.getUser().then(({ data: { user } }) => {
       const t = user?.user_metadata?.simacan_tokens
@@ -470,23 +494,29 @@ export default function VrachttijdenWidget() {
   }, [!!tokens, selectedDate, fetchStops])
 
   // ─── Login ────────────────────────────────────────────────────────────────
-  const isLocalhost = window.location.hostname === 'localhost'
-  const REDIRECT_URI = 'http://localhost:3000/simacan-callback.html'
+  const REDIRECT_URI = `${window.location.origin}/simacan-callback.html`
 
   const handleLogin = useCallback(async () => {
     setLoginLoading(true); setError(null)
     try {
       const verifier = randomBase64url(32); const challenge = await sha256Base64url(verifier); const state = randomBase64url(16)
       const authUrl = `${KC_BASE}/auth?` + new URLSearchParams({ client_id:KC_CLIENT_ID, response_type:'code', scope:'openid offline_access', redirect_uri:REDIRECT_URI, state, code_challenge:challenge, code_challenge_method:'S256' }).toString()
+      // Sla verifier op voor redirect flow (mobiel herladen pagina)
+      sessionStorage.setItem('simacan_verifier', verifier)
       const popup = window.open(authUrl, 'simacan_login', 'width=520,height=640,left=200,top=100')
-      if (!popup) throw new Error('Popup geblokkeerd. Sta popups toe voor deze site.')
+      if (!popup) {
+        // Mobiel: geen popup → volledige redirect
+        window.location.href = authUrl
+        return
+      }
       await new Promise((resolve, reject) => {
         const handler = async (event) => {
-          if (event.origin !== 'http://localhost:3000' && event.origin !== window.location.origin) return
+          if (event.origin !== window.location.origin) return
           if (event.data?.type === 'simacan_auth_error') { window.removeEventListener('message', handler); reject(new Error(event.data.description || event.data.error)); return }
           if (event.data?.type !== 'simacan_auth') return
           if (event.data.state !== state) { reject(new Error('State mismatch')); return }
           window.removeEventListener('message', handler)
+          sessionStorage.removeItem('simacan_verifier')
           try { const td = await exchangeCode(event.data.code, verifier, REDIRECT_URI); const t = { accessToken:td.access_token, refreshToken:td.refresh_token }; saveTokens(t); fetchStops(t); resolve() }
           catch (e) { reject(e) }
         }
