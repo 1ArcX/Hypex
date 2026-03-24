@@ -61,27 +61,35 @@ async function sendPush(subs, title, body, tag) {
 
 async function simacanCheckHandler() {
   // Skip between 22:00 and 06:00 Amsterdam time — no deliveries active
-  const hour = new Date().toLocaleString('nl-NL', { timeZone: 'Europe/Amsterdam', hour: 'numeric', hour12: false })
-  const h = parseInt(hour, 10)
-  if (h >= 22 || h < 6) return { statusCode: 200, body: 'Nacht — overgeslagen' }
+  const nowAms = new Date().toLocaleString('nl-NL', { timeZone: 'Europe/Amsterdam', hour: 'numeric', hour12: false })
+  const h = parseInt(nowAms, 10)
+  if (h >= 22 || h < 6) {
+    console.log(`[simacan-check] Nacht (${h}u) — overgeslagen`)
+    return { statusCode: 200, body: 'Nacht — overgeslagen' }
+  }
 
   // Get users with vracht notifications enabled
-  const { data: rows } = await supabase
+  const { data: rows, error: rowsErr } = await supabase
     .from('push_subscriptions')
     .select('id, user_id, subscription, vracht_notify_stops')
     .eq('vracht_enabled', true)
 
+  if (rowsErr) { console.error('[simacan-check] Supabase fout:', rowsErr.message); return { statusCode: 500 } }
+  console.log(`[simacan-check] Gebruikers met vracht_enabled: ${rows?.length ?? 0}`)
+
   for (const row of rows || []) {
-    const notifyStops = Array.isArray(row.vracht_notify_stops) ? row.vracht_notify_stops : []
+    const notifyStops = (Array.isArray(row.vracht_notify_stops) ? row.vracht_notify_stops : []).map(String)
+    console.log(`[simacan-check] Gebruiker ${row.user_id} — notifyStops:`, notifyStops)
     if (!notifyStops.length) continue
 
     // Get Simacan tokens from user metadata
     const { data: { user } } = await supabase.auth.admin.getUserById(row.user_id)
     const tokens = user?.user_metadata?.simacan_tokens
-    if (!tokens?.accessToken) continue
+    if (!tokens?.accessToken) { console.log(`[simacan-check] Geen Simacan tokens voor ${row.user_id}`); continue }
 
     // Fetch today's stops
     const { stops, newTokens } = await fetchStops(tokens.accessToken, tokens.refreshToken)
+    console.log(`[simacan-check] Stops opgehaald: ${stops.length}`)
 
     // Update tokens if refreshed
     if (newTokens) {
@@ -104,9 +112,10 @@ async function simacanCheckHandler() {
     const subs = [{ id: row.id, subscription: row.subscription }]
 
     for (const stop of stops) {
-      if (!notifyStops.includes(stop.id)) {
+      const stopId = String(stop.id)
+      if (!notifyStops.includes(stopId)) {
         // Still track state for all stops, even if not monitored
-        newStates[stop.id] = { delay: stop.delay, activity: stop.tripStatus?.activity, eta: stop.actualStartTime || stop.eta || stop.plannedStartTime }
+        newStates[stopId] = { delay: stop.delay, activity: stop.tripStatus?.activity, eta: stop.actualStartTime || stop.eta || stop.plannedStartTime }
         continue
       }
 
@@ -115,24 +124,30 @@ async function simacanCheckHandler() {
       const act    = stop.tripStatus?.activity
       const delay  = stop.delay
       const tripId = stop.trip?.tripId || 'Rit'
-      const prev   = prevStates[stop.id]
+      const prev   = prevStates[stopId]
+
+      console.log(`[simacan-check] Stop ${stopId} (${tripId}) — delay: ${delay}, act: ${act}, prev:`, prev)
 
       if (prev) {
         if (prev.delay != null && delay != null && Math.abs(delay - prev.delay) >= 3) {
           const more = delay > prev.delay
+          console.log(`[simacan-check] Push: vertraging gewijzigd stop ${stopId}`)
           await sendPush(subs, '🚛 Vrachttijden',
             more ? `${tripId} loopt meer uit (+${delay} min) — komt nu om ${etaFmt}`
                  : `${tripId} loopt in (${delay > 0 ? '+' : ''}${delay} min) — komt om ${etaFmt}`,
-            `delay-${stop.id}`)
+            `delay-${stopId}`)
         }
         if (prev.activity !== 'AFGEROND' && act === 'AFGEROND') {
+          console.log(`[simacan-check] Push: afgerond stop ${stopId}`)
           await sendPush(subs, '✅ Vracht aangekomen',
             `${tripId} is aangekomen${stop.actualStartTime ? ' om ' + new Date(stop.actualStartTime).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }) : ''}`,
-            `arrived-${stop.id}`)
+            `arrived-${stopId}`)
         }
+      } else {
+        console.log(`[simacan-check] Stop ${stopId} — geen vorige staat, eerste run`)
       }
 
-      newStates[stop.id] = { delay, activity: act, eta }
+      newStates[stopId] = { delay, activity: act, eta }
     }
 
     // Update stored state
