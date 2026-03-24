@@ -570,20 +570,11 @@ export default function VrachttijdenWidget() {
       {!tokens && (
         <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'10px', padding:'20px 0' }}>
           <Truck size={28} style={{ color:'var(--accent)', opacity:0.5 }} />
-          {isLocalhost ? (
-            <>
-              <p style={{ fontSize:'12px', color:'rgba(255,255,255,0.4)', margin:0, textAlign:'center' }}>Log eenmalig in — daarna werkt het automatisch op alle apparaten.</p>
-              <button onClick={handleLogin} disabled={loginLoading}
-                style={{ display:'flex', alignItems:'center', gap:'8px', padding:'9px 20px', borderRadius:'10px', border:accentBorder(40), background:accentBg(12), color:'var(--accent)', cursor:loginLoading?'wait':'pointer', fontSize:'13px', fontWeight:600 }}>
-                {loginLoading ? <><RefreshCw size={14} style={{ animation:'spin 1s linear infinite' }} /> Bezig...</> : <><LogIn size={14} /> Inloggen met Simacan</>}
-              </button>
-            </>
-          ) : (
-            <p style={{ fontSize:'12px', color:'rgba(255,255,255,0.4)', margin:0, textAlign:'center', lineHeight:'1.5' }}>
-              Log eenmalig in via <span style={{ color:'var(--accent)', fontFamily:'monospace' }}>localhost:3000</span><br/>
-              (run <span style={{ color:'rgba(255,255,255,0.6)', fontFamily:'monospace' }}>npm run dev</span>), daarna werkt het hier vanzelf.
-            </p>
-          )}
+          <p style={{ fontSize:'12px', color:'rgba(255,255,255,0.4)', margin:0, textAlign:'center' }}>Log eenmalig in — daarna werkt het automatisch op alle apparaten.</p>
+          <button onClick={handleLogin} disabled={loginLoading}
+            style={{ display:'flex', alignItems:'center', gap:'8px', padding:'9px 20px', borderRadius:'10px', border:accentBorder(40), background:accentBg(12), color:'var(--accent)', cursor:loginLoading?'wait':'pointer', fontSize:'13px', fontWeight:600 }}>
+            {loginLoading ? <><RefreshCw size={14} style={{ animation:'spin 1s linear infinite' }} /> Bezig...</> : <><LogIn size={14} /> Inloggen met Simacan</>}
+          </button>
           {error && <div style={{ display:'flex', alignItems:'center', gap:'6px', color:'#ff6b6b', fontSize:'11px', textAlign:'center' }}><AlertCircle size={12} style={{ flexShrink:0 }} /> {error}</div>}
         </div>
       )}
