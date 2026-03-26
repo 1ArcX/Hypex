@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { supabase } from '../supabaseClient'
 import { Plus, ChevronLeft, ChevronRight, X, Save, Trash2 } from 'lucide-react'
+import { callMagister } from '../utils/magisterApi'
 
 const HOUR_H = 56
 const TIME_COL = 48
@@ -130,12 +131,7 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, defaultV
     if (!creds) return
     setMagisterSyncing(true)
     setMagisterError(null)
-    fetch('/.netlify/functions/magister', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...creds, action: 'schedule', start, end })
-    }).then(async r => {
-      const data = await r.json()
+    callMagister(creds, 'schedule', { start, end }).then(data => {
       if (Array.isArray(data)) {
         sessionStorage.setItem(cacheKey, JSON.stringify(data))
         setMagisterLessons(data)
@@ -145,15 +141,10 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, defaultV
         const nextStart = new Date(days[0]); nextStart.setDate(nextStart.getDate() + 7)
         const nextEnd   = new Date(days[days.length - 1]); nextEnd.setDate(nextEnd.getDate() + 7)
         const nextKey   = `magister_sched_${toDateStr(nextStart)}_${toDateStr(nextEnd)}`
-        if (!sessionStorage.getItem(nextKey) && creds) {
-          fetch('/.netlify/functions/magister', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...creds, action: 'schedule', start: toDateStr(nextStart), end: toDateStr(nextEnd) })
-          }).then(async r => {
-            const d = await r.json()
-            if (Array.isArray(d)) sessionStorage.setItem(nextKey, JSON.stringify(d))
-          }).catch(() => {})
+        if (!sessionStorage.getItem(nextKey)) {
+          callMagister(creds, 'schedule', { start: toDateStr(nextStart), end: toDateStr(nextEnd) })
+            .then(d => { if (Array.isArray(d)) sessionStorage.setItem(nextKey, JSON.stringify(d)) })
+            .catch(() => {})
         }
       } else {
         const msg = data?.error || 'Geen lessen ontvangen'

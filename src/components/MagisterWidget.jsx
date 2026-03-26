@@ -2,20 +2,9 @@ import React, { useState, useEffect } from 'react'
 import { BookOpen, ClipboardList, RefreshCw, Settings, ChevronDown, ChevronUp, AlertCircle, FileText, ExternalLink, BookMarked } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { matchVak } from '../utils/alleVakken'
+import { callMagister, clearStoredTokens } from '../utils/magisterApi'
 
-const API = '/.netlify/functions/magister'
 const storageKey = (userId) => `magister_credentials_${userId}`
-
-async function callMagister(creds, action, extra = {}) {
-  const res = await fetch(API, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...creds, action, ...extra })
-  })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || 'Serverfout')
-  return data
-}
 
 function inDays(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10) }
 
@@ -162,18 +151,12 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
     try {
       const materials = await callMagister(credsToUse, 'lesmateriaal')
       if (!materials?.length) return
-      for (const mat of materials) {
-        if (!mat.url) continue
-        const vakNaam = matchVak(mat.vak)
-        if (!vakNaam) continue
-        const bookUrl = toBookUrl(mat.url)
-        const { data: existing } = await supabase.from('subject_links').select('id').eq('vak_naam', vakNaam).maybeSingle()
-        if (existing) {
-          await supabase.from('subject_links').update({ url: bookUrl }).eq('vak_naam', vakNaam)
-        } else {
-          await supabase.from('subject_links').insert({ vak_naam: vakNaam, url: bookUrl })
-        }
-      }
+      const rows = materials
+        .filter(mat => mat.url)
+        .map(mat => ({ vak_naam: matchVak(mat.vak), url: toBookUrl(mat.url) }))
+        .filter(row => row.vak_naam)
+      if (!rows.length) return
+      await supabase.from('subject_links').upsert(rows, { onConflict: 'vak_naam' })
       await fetchLinks()
     } catch (e) {
       console.warn('Lesmateriaal sync mislukt:', e.message)
@@ -220,6 +203,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
   }
 
   const logout = () => {
+    if (creds?.username) clearStoredTokens(creds.username)
     localStorage.removeItem(storageKey(userId))
     setCreds(null)
     setData({ grades: null, homework: null, assignments: null, studiewijzer: null })

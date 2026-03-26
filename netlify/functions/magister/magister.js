@@ -5,14 +5,44 @@ const HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'Content-Type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Expose-Headers': 'X-Magister-Tokens',
   'Content-Type': 'application/json'
 }
 
-function ok(data) {
-  return { statusCode: 200, headers: HEADERS, body: JSON.stringify(data) }
+function ok(data, tokenSet) {
+  const headers = { ...HEADERS }
+  if (tokenSet?.access_token) {
+    try {
+      headers['X-Magister-Tokens'] = Buffer.from(JSON.stringify({
+        access_token: tokenSet.access_token,
+        refresh_token: tokenSet.refresh_token,
+        expires_at: tokenSet.expires_at
+      })).toString('base64')
+    } catch {}
+  }
+  return { statusCode: 200, headers, body: JSON.stringify(data) }
 }
 function err(msg, status = 400) {
   return { statusCode: status, headers: HEADERS, body: JSON.stringify({ error: msg }) }
+}
+
+async function refreshTokens(refreshToken) {
+  const res = await fetch('https://accounts.magister.net/connect/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': UA },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+      client_id: 'M6LOAPP',
+    }).toString()
+  })
+  if (!res.ok) throw new Error(`Token refresh mislukt: ${res.status}`)
+  const data = await res.json()
+  return {
+    access_token: data.access_token,
+    refresh_token: data.refresh_token || refreshToken,
+    expires_at: Math.floor(Date.now() / 1000) + (data.expires_in || 3600)
+  }
 }
 function dateStr(d) {
   if (!d) return null
@@ -139,35 +169,57 @@ exports.handler = async (event) => {
   let body
   try { body = JSON.parse(event.body || '{}') } catch { return err('Invalid JSON') }
 
-  const { action, username, password } = body
+  const { action, username, password, savedTokens } = body
   const school = 'ichthus'
 
-  if (!action || !username || !password) return err('action, username en password zijn verplicht')
+  if (!action || !username) return err('action en username zijn verplicht')
 
   let tokenSet
-  try {
-    tokenSet = await authenticate(school, username, password)
-    console.log('Auth OK voor', username)
-  } catch (e) {
-    console.error('Auth FOUT:', e.message)
-    return err(e.message || 'Inloggen mislukt. Controleer je leerlingnummer en wachtwoord.', 401)
+  let m
+
+  // Probeer bestaande tokens te gebruiken (skip volledige OAuth flow)
+  if (savedTokens?.access_token && action !== 'login') {
+    try {
+      const now = Math.floor(Date.now() / 1000)
+      if (savedTokens.expires_at && savedTokens.expires_at - now < 120) {
+        console.log('Tokens verlopen, refreshen voor', username)
+        tokenSet = await refreshTokens(savedTokens.refresh_token)
+      } else {
+        tokenSet = savedTokens
+      }
+      const magister = require('magister.js').default
+      m = await magister({
+        school: { url: `https://${school}.magister.net` },
+        username, password: undefined, tokenSet,
+      })
+      console.log('Auth via cached tokens voor', username)
+    } catch (e) {
+      console.warn('Token reuse mislukt, fallback naar wachtwoord auth:', e.message)
+      tokenSet = null
+      m = null
+    }
   }
 
-  let m
-  try {
-    const magister = require('magister.js').default
-    m = await magister({
-      school: { url: `https://${school}.magister.net` },
-      username, password: undefined, tokenSet,
-    })
-  } catch (e) {
-    console.error('Magister session error:', e.message)
-    return err('Sessie aanmaken mislukt', 500)
+  // Fallback: volledige OAuth login
+  if (!m) {
+    if (!password) return err('action, username en password zijn verplicht')
+    try {
+      tokenSet = await authenticate(school, username, password)
+      console.log('Auth OK (full) voor', username)
+      const magister = require('magister.js').default
+      m = await magister({
+        school: { url: `https://${school}.magister.net` },
+        username, password: undefined, tokenSet,
+      })
+    } catch (e) {
+      console.error('Auth FOUT:', e.message)
+      return err(e.message || 'Inloggen mislukt. Controleer je leerlingnummer en wachtwoord.', 401)
+    }
   }
 
   try {
     if (action === 'login') {
-      return ok({ success: true })
+      return ok({ success: true }, tokenSet)
     }
 
     if (action === 'fetchAll') {
@@ -224,14 +276,14 @@ exports.handler = async (event) => {
         }
       }
 
-      return ok({ grades, homework, assignments, studiewijzer })
+      return ok({ grades, homework, assignments, studiewijzer }, tokenSet)
     }
 
     if (action === 'grades') {
       const top = body.top || 30
       const courses = await m.courses()
       const current = courses.find(c => c.isCurrent) || courses[courses.length - 1]
-      if (!current) return ok([])
+      if (!current) return ok([], tokenSet)
       let grades = []
       try { grades = await current.grades({ fillGrades: true }) } catch (_) {}
       if (!grades.length) {
@@ -245,18 +297,18 @@ exports.handler = async (event) => {
         datum: dateStr(g.dateFilledIn || g.testDate),
         weging: g.weight,
         klaar: g.passed
-      })))
+      })), tokenSet)
     }
 
     if (action === 'vakken') {
       const courses = await m.courses()
       const current = courses.find(c => c.isCurrent) || courses[courses.length - 1]
-      if (!current) return ok([])
+      if (!current) return ok([], tokenSet)
       const classes = await current.classes()
       return ok(classes.map(c => ({
         naam: c.description || c.abbreviation || '',
         afkorting: c.abbreviation || ''
-      })))
+      })), tokenSet)
     }
 
     if (action === 'lesmateriaal') {
@@ -266,7 +318,7 @@ exports.handler = async (event) => {
         uitgeverij: u.publisher || '',
         url: u.url || null,
         vak: u.class?.description || u.class?.abbreviation || ''
-      })))
+      })), tokenSet)
     }
 
     if (action === 'open_book') {
@@ -277,9 +329,9 @@ exports.handler = async (event) => {
         const resp = await m.http.get(`${m._personUrl}/digitaallesmateriaal/Ean/${ean}?redirect_type=body&display=inline`)
         const data = await resp.json()
         const url = data.location || data.Location || data.Url || data.url
-        return ok({ url: url || fallback })
+        return ok({ url: url || fallback }, tokenSet)
       } catch {
-        return ok({ url: fallback })
+        return ok({ url: fallback }, tokenSet)
       }
     }
 
@@ -288,26 +340,21 @@ exports.handler = async (event) => {
       const listResp = await m.http.get(`${m._personUrl}/opdrachten?top=${count}&skip=0`)
       const listData = await listResp.json()
       const ids = (listData.Items || []).map(i => i.Id)
-      const results = []
-      for (const id of ids) {
-        try {
-          const resp = await m.http.get(`${m._personUrl}/opdrachten/${id}`)
-          const raw = await resp.json()
-          results.push({
-            naam: raw.Titel || '',
-            omschrijving: raw.Omschrijving || '',
-            vak: raw.Vak?.Omschrijving || raw.Vak?.Afkorting || '',
-            deadline: dateStr(raw.InleverenVoor),
-            ingeleverdOp: dateStr(raw.IngeleverdOp),
-            beoordeling: raw.Beoordeling || null,
-            beoordeeldOp: dateStr(raw.BeoordeeldOp),
-            afgesloten: raw.Afgesloten || false,
-            magInleveren: raw.MagInleveren || false,
-            opnieuwInleveren: raw.OpnieuwInleveren || false
-          })
-        } catch (_) {}
-      }
-      return ok(results)
+      const details = await Promise.allSettled(ids.map(id =>
+        m.http.get(`${m._personUrl}/opdrachten/${id}`).then(r => r.json())
+      ))
+      return ok(details.filter(r => r.status === 'fulfilled').map(r => r.value).map(raw => ({
+        naam: raw.Titel || '',
+        omschrijving: raw.Omschrijving || '',
+        vak: raw.Vak?.Omschrijving || raw.Vak?.Afkorting || '',
+        deadline: dateStr(raw.InleverenVoor),
+        ingeleverdOp: dateStr(raw.IngeleverdOp),
+        beoordeling: raw.Beoordeling || null,
+        beoordeeldOp: dateStr(raw.BeoordeeldOp),
+        afgesloten: raw.Afgesloten || false,
+        magInleveren: raw.MagInleveren || false,
+        opnieuwInleveren: raw.OpnieuwInleveren || false
+      })), tokenSet)
     }
 
     if (action === 'schedule') {
@@ -322,7 +369,7 @@ exports.handler = async (event) => {
         docent: a.teachers?.map(t => t.fullName || t.name).join(', ') || '',
         uitgevallen: a.isCancelled || false,
         huiswerk: a.content || ''
-      })))
+      })), tokenSet)
     }
 
     if (action === 'homework') {
@@ -335,14 +382,14 @@ exports.handler = async (event) => {
         omschrijving: a.content || '',
         datum: dateStr(a.start),
         klaar: a.finished || false
-      })))
+      })), tokenSet)
     }
 
     if (action === 'studiewijzer') {
       const resp = await m.http.get(`${m._pupilUrl}/studiewijzers?top=50&skip=0`)
       const text = await resp.text()
       console.log('studiewijzers raw:', resp.status, text.slice(0, 300))
-      if (!text || !text.trim().startsWith('{')) return ok([])
+      if (!text || !text.trim().startsWith('{')) return ok([], tokenSet)
       const json = JSON.parse(text)
       const items = json.Items || []
       return ok(items.map(item => ({
@@ -350,7 +397,7 @@ exports.handler = async (event) => {
         naam: item.Naam || item.Titel || '',
         vak: item.Vak?.Omschrijving || item.Vak?.Afkorting || '',
         omschrijving: item.Omschrijving || ''
-      })))
+      })), tokenSet)
     }
 
     if (action === 'studiewijzer_detail') {
@@ -362,7 +409,7 @@ exports.handler = async (event) => {
 
       const detailResp = await m.http.get(`${m._pupilUrl}/studiewijzers/${id}`)
       const detailText = await detailResp.text()
-      if (!detailText || !detailText.trim().startsWith('{')) return ok({ topics: [] })
+      if (!detailText || !detailText.trim().startsWith('{')) return ok({ topics: [] }, tokenSet)
 
       const dj = JSON.parse(detailText)
       const ondrItems = toArr(dj.Onderdelen?.Items || dj.Onderdelen)
@@ -402,7 +449,7 @@ exports.handler = async (event) => {
       }))
 
       const topics = settled.filter(r => r.status === 'fulfilled').map(r => r.value)
-      return ok({ topics })
+      return ok({ topics }, tokenSet)
     }
 
     if (action === 'activiteiten') {
@@ -418,7 +465,7 @@ exports.handler = async (event) => {
         minDeelnemers: a.MinDeelnemers ?? null,
         maxDeelnemers: a.MaxDeelnemers ?? null,
         isIngeschreven: a.IsIngeschreven || false,
-      })))
+      })), tokenSet)
     }
 
     if (action === 'activiteiten_detail') {
@@ -442,7 +489,7 @@ exports.handler = async (event) => {
           inhoud: d.Inhoud || '',
           beschikbarePlaatsen: d.BeschikbarePlaatsen ?? null,
         }))
-      })
+      }, tokenSet)
     }
 
     if (action === 'bron_download') {
@@ -463,7 +510,7 @@ exports.handler = async (event) => {
       const arrayBuffer = await resp.arrayBuffer()
       const base64 = Buffer.from(arrayBuffer).toString('base64')
       console.log('bytes:', arrayBuffer.byteLength, 'contentType:', contentType)
-      return ok({ base64, contentType })
+      return ok({ base64, contentType }, tokenSet)
     }
 
     return err(`Onbekende actie: ${action}`)
