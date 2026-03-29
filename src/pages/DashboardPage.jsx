@@ -168,7 +168,7 @@ export default function DashboardPage({
       })()}
 
       {/* Regen grafiek */}
-      {homeRain && Math.max(...homeRain.slice(0, 12).map(d => d.precip)) > 0.1 && (() => {
+      {homeRain && Math.max(...homeRain.map(d => d.precip)) > 0.1 && (() => {
         const data = homeRain
         const maxP = Math.max(...data.map(d => d.precip), 0.5)
         const W = 260, H = 64, PL = 4, PB = 14, PR = 4, PT = 4
@@ -179,14 +179,17 @@ export default function DashboardPage({
         const lineD = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
         const areaD = `${lineD} L${pts[pts.length-1][0].toFixed(1)},${(PT+iH).toFixed(1)} L${PL},${(PT+iH).toFixed(1)} Z`
         const maxLabel = maxP < 0.5 ? 'Lichte regen' : maxP < 2 ? 'Matige regen' : 'Zware regen'
+        const rainIdxs = data.map((d, i) => d.precip > 0.1 ? i : -1).filter(i => i !== -1)
+        const startTime = data[rainIdxs[0]]?.time
+        const endTime = data[rainIdxs[rainIdxs.length - 1]]?.time
+        const timeLabel = startTime === endTime || !endTime ? `vanaf ${startTime}` : `${startTime}–${endTime}`
         return (
           <div className="card"
-            onClick={() => onNavigate('tools')}
-            style={{ padding: '12px 14px', border: '1px solid rgba(0,180,255,0.25)', background: 'rgba(0,150,255,0.05)', cursor: 'pointer' }}
+            style={{ padding: '12px 14px', border: '1px solid rgba(0,180,255,0.25)', background: 'rgba(0,150,255,0.05)' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
               <span style={{ fontSize: 14 }}>🌧️</span>
-              <span style={{ fontSize: 12, color: 'rgba(0,200,255,0.9)', fontWeight: 600 }}>{maxLabel} de komende 2 uur</span>
+              <span style={{ fontSize: 12, color: 'rgba(0,200,255,0.9)', fontWeight: 600 }}>{maxLabel} {timeLabel}</span>
             </div>
             <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }}>
               <defs>
@@ -206,7 +209,7 @@ export default function DashboardPage({
       {/* Spotify + Weather: Spotify boven op mobiel, naast elkaar op desktop */}
       <div className="grid gap-4 md:grid-cols-2">
         <SpotifyWidget />
-        <WeatherWidget userId={null} onRequestPwaInstall={onRequestPwaInstall} stacked />
+        <WeatherWidget userId={userId} onRequestPwaInstall={onRequestPwaInstall} stacked />
       </div>
 
 {/* Oningeplande taken */}
