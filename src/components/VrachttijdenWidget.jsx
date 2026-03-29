@@ -111,6 +111,13 @@ const DARK_MAP_STYLE = {
 // ─── Route map component (fullscreen popup, dark style) ───────────────────────
 function RouteMap({ routeStops, vehiclePos, onClose, tripLabel }) {
   const containerRef = useRef(null)
+  const vehicleMarkerRef = useRef(null)
+
+  // Live vehicle position updates without rebuilding the map
+  useEffect(() => {
+    if (!vehiclePos?.lat || !vehicleMarkerRef.current) return
+    vehicleMarkerRef.current.setLngLat([vehiclePos.lng, vehiclePos.lat])
+  }, [vehiclePos])
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -204,7 +211,7 @@ function RouteMap({ routeStops, vehiclePos, onClose, tripLabel }) {
             'box-shadow:0 0 16px rgba(249,115,22,0.8)', 'cursor:default', 'font-size:18px'
           ].join(';')
           el.textContent = '🚛'
-          new mgl.Marker({ element: el }).setLngLat([vehiclePos.lng, vehiclePos.lat]).addTo(map)
+          vehicleMarkerRef.current = new mgl.Marker({ element: el }).setLngLat([vehiclePos.lng, vehiclePos.lat]).addTo(map)
         }
 
         const storeEl = document.createElement('div')
@@ -468,6 +475,26 @@ export default function VrachttijdenWidget() {
     const t = setInterval(() => fetchStops(), 60000)
     return () => clearInterval(t)
   }, [!!tokens, selectedDate, fetchStops])
+
+  // Sync vehiclePos in routeData after every stops refresh (for live map updates)
+  useEffect(() => {
+    if (!stops) return
+    setRouteData(prev => {
+      let changed = false
+      const updated = { ...prev }
+      for (const stop of stops) {
+        if (!updated[stop.id]) continue
+        const lkp = stop.tripStatus?.lastKnownPosition
+        const vp = Array.isArray(lkp) && lkp.length >= 2
+          ? { lng: lkp[0], lat: lkp[1] }
+          : lkp?.latitude != null ? { lat: lkp.latitude, lng: lkp.longitude }
+          : lkp?.lat != null ? { lat: lkp.lat, lng: lkp.lng }
+          : null
+        if (vp) { updated[stop.id] = { ...updated[stop.id], vehiclePos: vp }; changed = true }
+      }
+      return changed ? updated : prev
+    })
+  }, [stops])
 
   // ─── Login ────────────────────────────────────────────────────────────────
   const REDIRECT_URI = 'http://localhost:3000/simacan-callback.html'

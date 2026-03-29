@@ -145,8 +145,9 @@ export default function Sidebar({
 
         <button
           onClick={onLogout}
+          className="hidden md:flex"
           style={{
-            width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+            width: '100%', alignItems: 'center', gap: 10,
             padding: '8px 10px', borderRadius: 8, marginBottom: 6,
             background: 'transparent', border: 'none', borderLeft: '2px solid transparent',
             cursor: 'pointer', color: 'var(--text-3)', fontSize: 13, textAlign: 'left',
