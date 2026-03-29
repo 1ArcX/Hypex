@@ -348,7 +348,7 @@ export default function WorkWidget({ userId = null }) {
                     <div style={{ borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', padding: '10px 12px', marginTop: '2px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                         <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', fontWeight: 500 }}>
-                          Wie werkt er op {formatShiftDate(selectedDay)}?
+                          Andere afdelingen op {formatShiftDate(selectedDay)}
                         </span>
                         <button onClick={() => setSelectedDay(null)}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '0', lineHeight: 0 }}>
@@ -364,31 +364,27 @@ export default function WorkWidget({ userId = null }) {
 
                       {!dayLoading && dayShifts && (
                         <>
-                          {dayShifts.shifts.length === 0 ? (
-                            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: 0, textAlign: 'center' }}>Geen shifts gevonden</p>
-                          ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                              {dayShifts.shifts.map((s, i) => (
-                                <React.Fragment key={i}>
-                                  {i === dayShifts.ownDeptCount && dayShifts.ownDeptCount > 0 && dayShifts.shifts.length > dayShifts.ownDeptCount && (
-                                    <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)', padding: '4px 4px 2px', marginTop: '2px' }}>
-                                      Andere afdelingen
-                                    </div>
-                                  )}
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px',
+                          {(() => {
+                            // Toon alleen andere afdelingen (niet goederenverwerking)
+                            const otherShifts = dayShifts.shifts.slice(dayShifts.ownDeptCount)
+                            if (otherShifts.length === 0) return (
+                              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: 0, textAlign: 'center' }}>Geen collega's van andere afdelingen</p>
+                            )
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                {otherShifts.map((s, i) => (
+                                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px',
                                     borderRadius: '7px',
                                     opacity: s.worksToday === false ? 0.4 : 1,
-                                    background: s.isOwn ? accentBg(12) : 'rgba(255,255,255,0.03)',
-                                    border: s.isOwn ? accentBorder(30) : '1px solid rgba(255,255,255,0.05)' }}>
+                                    background: 'rgba(255,255,255,0.03)',
+                                    border: '1px solid rgba(255,255,255,0.05)' }}>
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
-                                        <span style={{ fontSize: '11px', color: s.isOwn ? 'var(--accent)' : 'rgba(255,255,255,0.85)',
-                                          fontWeight: s.isOwn ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.85)',
+                                          fontWeight: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                           {s.name ? s.name.split(' ')[0] : '—'}
-                                          {s.isOwn && <span style={{ fontSize: '10px', marginLeft: '5px', opacity: 0.7 }}>(jij)</span>}
                                         </span>
-                                        <span style={{ fontSize: '11px', color: s.isOwn ? 'var(--accent)' : 'rgba(255,255,255,0.6)',
-                                          fontWeight: 500, flexShrink: 0 }}>
+                                        <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 500, flexShrink: 0 }}>
                                           {s.start && s.end ? `${s.start} – ${s.end}` : '—'}
                                         </span>
                                       </div>
@@ -397,10 +393,10 @@ export default function WorkWidget({ userId = null }) {
                                       </p>
                                     </div>
                                   </div>
-                                </React.Fragment>
-                              ))}
-                            </div>
-                          )}
+                                ))}
+                              </div>
+                            )
+                          })()}
                           <div style={{ marginTop: '8px', textAlign: 'center' }}>
                             <a href={toPmtDayUrl(selectedDay)} target="_blank" rel="noopener noreferrer"
                               style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
