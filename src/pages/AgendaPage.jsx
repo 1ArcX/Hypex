@@ -28,8 +28,34 @@ function getWeekDays(date) {
   })
 }
 
+function pad2(n) { return String(n).padStart(2, '0') }
+function toDateStr(d) { return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}` }
+
+function getDayDensity(day, tasks, calendarEvents, magisterLessons) {
+  const ds = toDateStr(day)
+  let count = 0
+  // Taken
+  count += (tasks || []).filter(t => t.date === ds && !t.completed).length
+  // Agenda-events
+  count += (calendarEvents || []).filter(ev => {
+    try { return new Date(ev.start_time).toISOString().slice(0, 10) === ds } catch { return false }
+  }).length
+  // Magister lessen
+  count += (magisterLessons || []).filter(l => {
+    try { return new Date(l.start).toISOString().slice(0, 10) === ds } catch { return false }
+  }).length
+  return count
+}
+
+function densityColor(count) {
+  if (count === 0) return 'transparent'
+  if (count <= 2) return 'rgba(74,222,128,0.7)'   // groen
+  if (count <= 4) return 'rgba(250,204,21,0.7)'    // geel
+  return 'rgba(255,107,107,0.7)'                    // rood
+}
+
 // ─── Week strip (like the image) ─────────────────────────────────────────────
-function WeekStrip({ selectedDay, onSelectDay, onPrevWeek, onNextWeek }) {
+function WeekStrip({ selectedDay, onSelectDay, onPrevWeek, onNextWeek, tasks, calendarEvents, magisterLessons }) {
   const now = new Date()
   const weekDays = getWeekDays(selectedDay)
   const weekStart = weekDays[0]
@@ -59,6 +85,7 @@ function WeekStrip({ selectedDay, onSelectDay, onPrevWeek, onNextWeek }) {
         {weekDays.map((day, i) => {
           const isToday    = isSameDay(day, now)
           const isSelected = isSameDay(day, selectedDay)
+          const density    = getDayDensity(day, tasks, calendarEvents, magisterLessons)
 
           return (
             <div
@@ -90,6 +117,13 @@ function WeekStrip({ selectedDay, onSelectDay, onPrevWeek, onNextWeek }) {
               }}>
                 {day.getDate()}
               </div>
+
+              {/* Density dot */}
+              <div style={{
+                width: 5, height: 5, borderRadius: '50%',
+                background: densityColor(density),
+                transition: 'background 0.2s',
+              }} />
             </div>
           )
         })}
@@ -165,6 +199,7 @@ function MonthCalendar({ selectedDay, onSelectDay }) {
 // ─── Main AgendaPage ──────────────────────────────────────────────────────────
 export default function AgendaPage({
   userId, tasks, subjects,
+  calendarEvents, magisterLessons,
   onToggleTask, onEditTask, isAdmin,
   onLessonsChange, onEventsChange, onMagisterError,
 }) {
@@ -232,6 +267,9 @@ export default function AgendaPage({
               onSelectDay={handleSelectDay}
               onPrevWeek={prevWeek}
               onNextWeek={nextWeek}
+              tasks={tasks}
+              calendarEvents={calendarEvents}
+              magisterLessons={magisterLessons}
             />
             <div style={{ flex: 1, overflow: 'hidden' }}>
               <Timeline

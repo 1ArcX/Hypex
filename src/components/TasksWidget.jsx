@@ -34,7 +34,13 @@ function SwipeableRow({ onSwipeRight, onSwipeLeft, children }) {
     </div>
   )
 }
-import { Plus, GripVertical, Trash2, CheckCircle2, Circle, X, AlertCircle } from 'lucide-react'
+import { Plus, GripVertical, Trash2, CheckCircle2, Circle, X, AlertCircle, Flag } from 'lucide-react'
+
+const PRIORITY_DOT = {
+  1: '#FF6B6B',
+  2: '#FACC15',
+  3: 'rgba(255,255,255,0.2)',
+}
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -94,7 +100,15 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
     if (e.key === 'Escape') setAdding(false)
   }
 
-  const incomplete = tasks.filter(t => !t.completed)
+  const incomplete = tasks
+    .filter(t => !t.completed)
+    .sort((a, b) => {
+      const pa = a.priority ?? 2, pb = b.priority ?? 2
+      if (pa !== pb) return pa - pb
+      const da = a.due_date || a.date || '9999-99-99'
+      const db = b.due_date || b.date || '9999-99-99'
+      return da.localeCompare(db)
+    })
   const complete = tasks.filter(t => t.completed)
 
   return (
@@ -199,6 +213,10 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
               onMouseEnter={e => e.currentTarget.style.background = dateInfo?.overdue ? 'rgba(255,80,80,0.07)' : 'color-mix(in srgb, var(--accent) 4%, transparent)'}
               onMouseLeave={e => e.currentTarget.style.background = dateInfo?.overdue ? 'rgba(255,80,80,0.04)' : 'rgba(255,255,255,0.01)'}>
               <GripVertical size={13} style={{ color: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
+              {/* Prioriteit dot */}
+              {(task.priority ?? 2) !== 2 && (
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: PRIORITY_DOT[task.priority ?? 2], flexShrink: 0 }} />
+              )}
               <button onClick={e => { e.stopPropagation(); onToggle(task) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
                 <Circle size={16} style={{ color: 'rgba(255,255,255,0.3)' }} />
               </button>
@@ -213,6 +231,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                     {(task.start_time || task.time) ? ` · ${task.start_time || task.time}` : ''}
                     {task.end_time ? `–${task.end_time}` : ''}
                     {subject ? ` · ${subject.name}` : ''}
+                    {task.due_date && task.due_date !== task.date ? ` · ⏰ ${new Date(task.due_date + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}` : ''}
                   </span>
                 </p>
               </div>

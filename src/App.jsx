@@ -360,7 +360,10 @@ export default function App() {
       start_time: taskData.start_time || null,
       end_time: taskData.end_time || null,
       subject_id: taskData.subject_id || null,
-      completed: taskData.completed ?? false
+      completed: taskData.completed ?? false,
+      priority: taskData.priority ?? 2,
+      duration_minutes: taskData.duration_minutes ?? 30,
+      due_date: taskData.due_date || null,
     }
     let error
     if (taskData.id) {
@@ -539,6 +542,8 @@ export default function App() {
                 userId={user.id}
                 tasks={tasks}
                 subjects={subjects}
+                calendarEvents={calendarEvents}
+                magisterLessons={magisterLessons}
                 onToggleTask={handleToggleTask}
                 onEditTask={openEditTask}
                 isAdmin={isAdmin}
@@ -615,7 +620,8 @@ export default function App() {
           defaultTime={defaultTime}
           defaultDate={defaultDate}
           subjects={subjects}
-          userId={user.id}
+          calendarEvents={calendarEvents}
+          tasks={tasks}
           onClose={() => { setShowTaskModal(false); setSelectedTask(null) }}
           onSave={handleSaveTask}
           onDelete={handleDeleteTask}
