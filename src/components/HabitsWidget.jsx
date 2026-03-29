@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import ReactDOM from 'react-dom'
 import { supabase } from '../supabaseClient'
-import { Plus, X, Trash2, Flame, Pencil, ChevronDown, ChevronUp, Minus } from 'lucide-react'
+import { Plus, X, Trash2, Flame, Pencil, ChevronDown, ChevronUp, Minus, Trophy } from 'lucide-react'
 
 const EMOJIS = [
   '🏃','📚','💧','🧘','🥗','😴','💪','🎯','✍️','🎨',
@@ -11,7 +11,6 @@ const EMOJIS = [
 const COLORS = ['#00FFD1','#818CF8','#F59E0B','#EF4444','#10B981','#3B82F6','#EC4899','#8B5CF6']
 const DAY_LABELS = ['Ma','Di','Wo','Do','Vr','Za','Zo']
 
-// Preset habits library
 const PRESET_HABITS = [
   { name: 'Water drinken', icon: '💧', color: '#38BDF8', type: 'counter', unit: 'glazen', target: 8 },
   { name: 'Water drinken (ml)', icon: '💧', color: '#38BDF8', type: 'counter', unit: 'ml', target: 2000 },
@@ -31,7 +30,54 @@ const PRESET_HABITS = [
 
 const COUNTER_UNITS = ['glazen', 'ml', 'keer', 'km', 'minuten', 'pagina\'s']
 
-// localStorage helpers for counter config + values
+// ─── XP + Level ──────────────────────────────────────────────────────────────
+const XP_PER_HABIT = 10
+const LEVEL_XP = 100
+
+function loadXP() { try { return parseInt(localStorage.getItem('habit_xp') || '0') } catch { return 0 } }
+function saveXP(xp) { localStorage.setItem('habit_xp', String(Math.max(0, xp))) }
+function getLevel(xp) { return Math.floor(xp / LEVEL_XP) + 1 }
+function xpInLevel(xp) { return xp % LEVEL_XP }
+
+// ─── Achievements ────────────────────────────────────────────────────────────
+const ACHIEVEMENTS = [
+  { key: 'streak_7',  icon: '🔥', title: '7 dagen streak!',   desc: 'Geweldig volgehouden!' },
+  { key: 'streak_14', icon: '⚡', title: '2 weken streak!',   desc: 'Je bent niet te stoppen!' },
+  { key: 'streak_30', icon: '🏆', title: '30 dagen streak!',  desc: 'Absolute machine.' },
+  { key: 'perfect_3', icon: '⭐', title: '3 perfecte dagen!', desc: 'Alles 3 dagen gedaan!' },
+  { key: 'perfect_7', icon: '👑', title: 'Perfecte week!',    desc: 'Elke dag alles gedaan!' },
+  { key: 'level_5',   icon: '🎯', title: 'Level 5 bereikt!',  desc: '500 XP — lekker bezig!' },
+  { key: 'level_10',  icon: '💎', title: 'Level 10 bereikt!', desc: '1000 XP — respect!' },
+]
+
+function loadSeenAchievements() {
+  try { return new Set(JSON.parse(localStorage.getItem('habit_achievements_seen') || '[]')) } catch { return new Set() }
+}
+function saveSeenAchievements(s) {
+  localStorage.setItem('habit_achievements_seen', JSON.stringify([...s]))
+}
+function loadPerfectDays() {
+  try { return new Set(JSON.parse(localStorage.getItem('habit_perfect_days') || '[]')) } catch { return new Set() }
+}
+function savePerfectDays(s) {
+  localStorage.setItem('habit_perfect_days', JSON.stringify([...s]))
+}
+
+// ─── Streak helpers ───────────────────────────────────────────────────────────
+function streakColor(streak) {
+  if (streak >= 30) return '#FF3D00'
+  if (streak >= 14) return '#FF6B00'
+  if (streak >= 7)  return '#FF8C42'
+  if (streak >= 3)  return '#FFA040'
+  return 'rgba(255,140,66,0.5)'
+}
+function streakGlow(streak) {
+  if (streak >= 14) return `0 0 10px ${streakColor(streak)}90`
+  if (streak >= 7)  return `0 0 6px ${streakColor(streak)}60`
+  return 'none'
+}
+
+// ─── localStorage helpers ─────────────────────────────────────────────────────
 function loadCounterConfig() {
   try { return JSON.parse(localStorage.getItem('habit_counter_config')) || {} } catch { return {} }
 }
@@ -72,6 +118,74 @@ function calcStreak(completionSet, habit) {
     d.setDate(d.getDate() - 1)
   }
   return streak
+}
+
+// ─── Achievement Toast ────────────────────────────────────────────────────────
+function AchievementToast({ achievement, onDone }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 3800)
+    return () => clearTimeout(t)
+  }, [onDone])
+
+  return ReactDOM.createPortal(
+    <div style={{
+      position: 'fixed', bottom: 88, left: '50%', transform: 'translateX(-50%)',
+      zIndex: 99999, animation: 'habitSlideUp 0.4s cubic-bezier(0.34,1.56,0.64,1)',
+      pointerEvents: 'none',
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 14,
+        padding: '14px 22px', borderRadius: 18,
+        background: 'rgba(10,10,26,0.97)', backdropFilter: 'blur(24px)',
+        border: '1px solid rgba(250,204,21,0.45)',
+        boxShadow: '0 8px 48px rgba(0,0,0,0.7), 0 0 24px rgba(250,204,21,0.12)',
+        minWidth: 240, maxWidth: 320,
+      }}>
+        <span style={{ fontSize: 32, lineHeight: 1 }}>{achievement.icon}</span>
+        <div>
+          <p style={{ color: '#FACC15', fontWeight: 700, fontSize: 14, margin: 0 }}>{achievement.title}</p>
+          <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12, margin: '3px 0 0' }}>{achievement.desc}</p>
+        </div>
+      </div>
+      <style>{`
+        @keyframes habitSlideUp {
+          from { opacity: 0; transform: translateX(-50%) translateY(24px) scale(0.9); }
+          to   { opacity: 1; transform: translateX(-50%) translateY(0)    scale(1);   }
+        }
+      `}</style>
+    </div>,
+    document.body
+  )
+}
+
+// ─── Perfect Day Banner ───────────────────────────────────────────────────────
+function PerfectDayBanner({ onDone }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 3200)
+    return () => clearTimeout(t)
+  }, [onDone])
+
+  return (
+    <div style={{
+      margin: '0 0 10px', padding: '12px 16px', borderRadius: 14,
+      background: 'linear-gradient(135deg, rgba(0,255,209,0.12), rgba(129,140,248,0.12))',
+      border: '1px solid rgba(0,255,209,0.35)',
+      animation: 'habitPop 0.5s cubic-bezier(0.34,1.56,0.64,1)',
+      display: 'flex', alignItems: 'center', gap: 10,
+    }}>
+      <span style={{ fontSize: 24 }}>🌟</span>
+      <div>
+        <p style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 13, margin: 0 }}>Perfecte dag!</p>
+        <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, margin: '2px 0 0' }}>Alle gewoontes van vandaag gedaan 💪</p>
+      </div>
+      <style>{`
+        @keyframes habitPop {
+          from { opacity: 0; transform: scale(0.92); }
+          to   { opacity: 1; transform: scale(1); }
+        }
+      `}</style>
+    </div>
+  )
 }
 
 // ─── Add / Edit modal ────────────────────────────────────────────────────────
@@ -118,7 +232,6 @@ function HabitModal({ habit, onSave, onClose, onDelete, counterConfig }) {
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
     }}>
       <div className="glass-card" style={{ width: '100%', maxWidth: 400, padding: 24, position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
-        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h2 style={{ fontSize: 16, fontWeight: 700, color: 'white', margin: 0 }}>
             {habit ? 'Gewoonte bewerken' : 'Nieuwe gewoonte'}
@@ -128,7 +241,6 @@ function HabitModal({ habit, onSave, onClose, onDelete, counterConfig }) {
           </button>
         </div>
 
-        {/* Bibliotheek toggle */}
         {!habit && (
           <button
             onClick={() => setShowLibrary(v => !v)}
@@ -145,7 +257,6 @@ function HabitModal({ habit, onSave, onClose, onDelete, counterConfig }) {
           </button>
         )}
 
-        {/* Library grid */}
         {showLibrary && (
           <div style={{
             display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, marginBottom: 16,
@@ -171,7 +282,6 @@ function HabitModal({ habit, onSave, onClose, onDelete, counterConfig }) {
           </div>
         )}
 
-        {/* Name + icon preview */}
         <div style={{ marginBottom: 14 }}>
           <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, display: 'block', marginBottom: 6 }}>Naam</label>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -191,7 +301,6 @@ function HabitModal({ habit, onSave, onClose, onDelete, counterConfig }) {
           </div>
         </div>
 
-        {/* Habit type toggle */}
         <div style={{ marginBottom: 14 }}>
           <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, display: 'block', marginBottom: 6 }}>Type</label>
           <div style={{ display: 'flex', gap: 6, padding: 3, background: 'rgba(255,255,255,0.04)', borderRadius: 10 }}>
@@ -206,7 +315,6 @@ function HabitModal({ habit, onSave, onClose, onDelete, counterConfig }) {
           </div>
         </div>
 
-        {/* Counter settings */}
         {habitType === 'counter' && (
           <div style={{ marginBottom: 14, padding: 12, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -227,7 +335,6 @@ function HabitModal({ habit, onSave, onClose, onDelete, counterConfig }) {
           </div>
         )}
 
-        {/* Emoji grid */}
         <div style={{ marginBottom: 14 }}>
           <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, display: 'block', marginBottom: 6 }}>Icoon</label>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: 3 }}>
@@ -242,7 +349,6 @@ function HabitModal({ habit, onSave, onClose, onDelete, counterConfig }) {
           </div>
         </div>
 
-        {/* Color row */}
         <div style={{ marginBottom: 14 }}>
           <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, display: 'block', marginBottom: 6 }}>Kleur</label>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -258,7 +364,6 @@ function HabitModal({ habit, onSave, onClose, onDelete, counterConfig }) {
           </div>
         </div>
 
-        {/* Frequency */}
         <div style={{ marginBottom: 22 }}>
           <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, display: 'block', marginBottom: 6 }}>Herhaling</label>
           <div style={{ display: 'flex', gap: 5 }}>
@@ -275,7 +380,6 @@ function HabitModal({ habit, onSave, onClose, onDelete, counterConfig }) {
           </div>
         </div>
 
-        {/* Buttons */}
         <div style={{ display: 'flex', gap: 8 }}>
           {habit && (
             <button onClick={() => onDelete(habit.id)} style={{
@@ -309,12 +413,20 @@ function HabitModal({ habit, onSave, onClose, onDelete, counterConfig }) {
 // ─── Main widget ─────────────────────────────────────────────────────────────
 export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 }) {
   const [habits, setHabits] = useState([])
-  const [completions, setCompletions] = useState({})   // { habitId: Set<dateStr> }
+  const [completions, setCompletions] = useState({})
   const [counterValues, setCounterValues] = useState(() => loadCounterValues())
   const [counterConfig, setCounterConfig] = useState(() => loadCounterConfig())
   const [modalHabit, setModalHabit] = useState(null)
   const [loading, setLoading] = useState(true)
   const [animating, setAnimating] = useState({})
+
+  // XP + gamification state
+  const [xp, setXpState] = useState(loadXP)
+  const [pendingAchievement, setPendingAchievement] = useState(null)
+  const [showPerfectDay, setShowPerfectDay] = useState(false)
+  const seenAchievementsRef = useRef(loadSeenAchievements())
+  const perfectDaysRef = useRef(loadPerfectDays())
+
   const channelRef = useRef(null)
   const ignoreRemoteRef = useRef(false)
 
@@ -325,7 +437,6 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
   const todayHabits = habits.filter(h => (h.frequency ?? [0,1,2,3,4,5,6]).includes(todayFreq))
   const otherHabits = habits.filter(h => !(h.frequency ?? [0,1,2,3,4,5,6]).includes(todayFreq))
 
-  // A counter habit is "done" if count >= target
   function isHabitDone(habit) {
     const cfg = counterConfig[habit.id]
     if (cfg?.type === 'counter') {
@@ -336,6 +447,32 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
   }
 
   const doneToday = todayHabits.filter(h => isHabitDone(h)).length
+  const level = getLevel(xp)
+  const xpProgress = xpInLevel(xp)
+
+  // ── Perfect day check ──────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!todayHabits.length || loading) return
+    const allDone = todayHabits.every(h => isHabitDone(h))
+    if (allDone && !perfectDaysRef.current.has(today)) {
+      perfectDaysRef.current.add(today)
+      savePerfectDays(perfectDaysRef.current)
+      setShowPerfectDay(true)
+
+      // Check perfect day achievements
+      const recentPerfect = [...perfectDaysRef.current].filter(d => {
+        const ago = new Date(); ago.setDate(ago.getDate() - 7)
+        return d >= ago.toISOString().slice(0, 10)
+      }).length
+
+      const achKey = recentPerfect >= 7 ? 'perfect_7' : recentPerfect >= 3 ? 'perfect_3' : null
+      if (achKey && !seenAchievementsRef.current.has(achKey)) {
+        seenAchievementsRef.current.add(achKey)
+        saveSeenAchievements(seenAchievementsRef.current)
+        setTimeout(() => setPendingAchievement(ACHIEVEMENTS.find(a => a.key === achKey)), 1500)
+      }
+    }
+  }, [completions, counterValues]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchHabits = useCallback(async () => {
     const { data } = await supabase
@@ -364,14 +501,13 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
     Promise.all([fetchHabits(), fetchCompletions()]).then(() => setLoading(false))
   }, [userId, fetchHabits, fetchCompletions])
 
-  // Hersync bij externe trigger
   useEffect(() => {
     if (syncTrigger === 0 || !userId) return
     fetchHabits()
     fetchCompletions()
   }, [syncTrigger])
 
-  // ── Supabase realtime sync voor counter config + values ──────────────────
+  // ── Realtime sync ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!userId) return
     const channel = supabase.channel(`habits:${userId}`, { config: { broadcast: { self: false } } })
@@ -389,12 +525,10 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
         saveCounterValues(merged)
       })
       .on('broadcast', { event: 'request_state' }, () => {
-        // Another device joined – send current state
         channel.send({ type: 'broadcast', event: 'counter_config', payload: loadCounterConfig() })
         channel.send({ type: 'broadcast', event: 'counter_values', payload: loadCounterValues() })
       })
       .subscribe(() => {
-        // On connect, request state from other devices
         channel.send({ type: 'broadcast', event: 'request_state', payload: {} })
       })
     channelRef.current = channel
@@ -415,7 +549,27 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
     setTimeout(() => { ignoreRemoteRef.current = false }, 200)
   }, [])
 
-  // Toggle check habit
+  // ── Helper: award XP + check level achievements ───────────────────────────
+  const awardXP = useCallback((delta) => {
+    const current = loadXP()
+    const newXp = Math.max(0, current + delta)
+    saveXP(newXp)
+    setXpState(newXp)
+    if (delta > 0) {
+      const oldLevel = getLevel(current)
+      const newLevel = getLevel(newXp)
+      if (newLevel > oldLevel) {
+        const ach = ACHIEVEMENTS.find(a => a.key === `level_${newLevel}`)
+        if (ach && !seenAchievementsRef.current.has(ach.key)) {
+          seenAchievementsRef.current.add(ach.key)
+          saveSeenAchievements(seenAchievementsRef.current)
+          setTimeout(() => setPendingAchievement(ach), 400)
+        }
+      }
+    }
+  }, [])
+
+  // ── Toggle check habit ─────────────────────────────────────────────────────
   const toggleCompletion = async (habit) => {
     setAnimating(a => ({ ...a, [habit.id]: true }))
     setTimeout(() => setAnimating(a => ({ ...a, [habit.id]: false })), 350)
@@ -424,16 +578,31 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
     const next = new Set(set)
     if (done) next.delete(today); else next.add(today)
     setCompletions(c => ({ ...c, [habit.id]: next }))
-    if (done) {
-      await supabase.from('habit_completions').delete()
-        .eq('habit_id', habit.id).eq('user_id', userId).eq('date', today)
-    } else {
+
+    if (!done) {
+      awardXP(XP_PER_HABIT)
       await supabase.from('habit_completions')
         .insert({ habit_id: habit.id, user_id: userId, date: today })
+      // Check streak achievements
+      const streak = calcStreak(next, habit)
+      for (const n of [7, 14, 30]) {
+        if (streak === n) {
+          const ach = ACHIEVEMENTS.find(a => a.key === `streak_${n}`)
+          if (ach && !seenAchievementsRef.current.has(ach.key)) {
+            seenAchievementsRef.current.add(ach.key)
+            saveSeenAchievements(seenAchievementsRef.current)
+            setPendingAchievement(ach)
+          }
+        }
+      }
+    } else {
+      awardXP(-XP_PER_HABIT)
+      await supabase.from('habit_completions').delete()
+        .eq('habit_id', habit.id).eq('user_id', userId).eq('date', today)
     }
   }
 
-  // Increment/decrement counter habit
+  // ── Counter habit ──────────────────────────────────────────────────────────
   const adjustCounter = (habit, delta) => {
     const cfg = counterConfig[habit.id]
     const current = counterValues[habit.id]?.[today] || 0
@@ -446,11 +615,11 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
     saveCounterValues(newVals)
     broadcastValues(newVals)
 
-    // Mark as completion in DB when reaching target, remove when going below
     const target = cfg?.target || 1
     const wasDone = current >= target
     const isDone = newCount >= target
     if (!wasDone && isDone) {
+      awardXP(XP_PER_HABIT)
       supabase.from('habit_completions').insert({ habit_id: habit.id, user_id: userId, date: today }).then(() => {})
       setCompletions(c => {
         const s = new Set(c[habit.id] || [])
@@ -458,6 +627,7 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
         return { ...c, [habit.id]: s }
       })
     } else if (wasDone && !isDone) {
+      awardXP(-XP_PER_HABIT)
       supabase.from('habit_completions').delete().eq('habit_id', habit.id).eq('user_id', userId).eq('date', today).then(() => {})
       setCompletions(c => {
         const s = new Set(c[habit.id] || [])
@@ -476,7 +646,6 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
       const { data: inserted } = await supabase.from('habits').insert({ ...data, user_id: userId, sort_order: habits.length }).select().single()
       habitId = inserted?.id
     }
-    // Save counter config locally + broadcast
     if (habitId) {
       const newCfg = { ...counterConfig, [habitId]: counterData }
       setCounterConfig(newCfg)
@@ -493,7 +662,7 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
     fetchHabits()
   }
 
-  // ── Compact mode (for mobile home screen preview) ────────────────────────
+  // ── Compact mode ───────────────────────────────────────────────────────────
   if (compact) {
     return (
       <div className="glass-card" style={{ padding: '14px 16px' }}>
@@ -571,19 +740,30 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
               </span>
             )}
           </div>
-          <button onClick={() => setModalHabit('new')} style={{
-            background: 'color-mix(in srgb, var(--accent) 10%, transparent)',
-            border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
-            borderRadius: 8, padding: '4px 8px', cursor: 'pointer',
-            color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12,
-          }}>
-            <Plus size={12} /> Nieuw
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {/* Level badge */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 4,
+              padding: '2px 8px', borderRadius: 20,
+              background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.2)',
+            }}>
+              <Trophy size={10} color="#FACC15" />
+              <span style={{ fontSize: 11, color: '#FACC15', fontWeight: 600 }}>Lvl {level}</span>
+            </div>
+            <button onClick={() => setModalHabit('new')} style={{
+              background: 'color-mix(in srgb, var(--accent) 10%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
+              borderRadius: 8, padding: '4px 8px', cursor: 'pointer',
+              color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12,
+            }}>
+              <Plus size={12} /> Nieuw
+            </button>
+          </div>
         </div>
 
-        {/* Progress bar */}
+        {/* Habit progress bar */}
         {todayHabits.length > 0 && (
-          <div style={{ height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 4, marginBottom: 12, overflow: 'hidden' }}>
+          <div style={{ height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 4, marginBottom: 6, overflow: 'hidden' }}>
             <div style={{
               height: '100%',
               width: `${(doneToday / todayHabits.length) * 100}%`,
@@ -593,6 +773,25 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
               boxShadow: '0 0 8px color-mix(in srgb, var(--accent) 50%, transparent)',
             }} />
           </div>
+        )}
+
+        {/* XP bar */}
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ height: 2, background: 'rgba(255,255,255,0.04)', borderRadius: 4, overflow: 'hidden' }}>
+            <div style={{
+              height: '100%', width: `${(xpProgress / LEVEL_XP) * 100}%`,
+              background: 'linear-gradient(90deg, #FACC15, #F59E0B)',
+              borderRadius: 4, transition: 'width 0.6s ease',
+            }} />
+          </div>
+          <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.18)', margin: '2px 0 0', textAlign: 'right' }}>
+            {xpProgress}/{LEVEL_XP} XP → Lvl {level + 1}
+          </p>
+        </div>
+
+        {/* Perfect day banner */}
+        {showPerfectDay && (
+          <PerfectDayBanner onDone={() => setShowPerfectDay(false)} />
         )}
 
         {loading && (
@@ -620,6 +819,7 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
               const count = isCounter ? (counterValues[habit.id]?.[today] || 0) : null
               const target = isCounter ? (cfg.target || 1) : null
               const done = isHabitDone(habit)
+              const sc = streakColor(streak)
 
               return (
                 <div key={habit.id}
@@ -633,7 +833,6 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
                     transition: 'border-color 0.2s, background 0.2s',
                   }}>
 
-                  {/* Check circle OR counter controls */}
                   {isCounter ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
                       <button
@@ -684,7 +883,6 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
                     </div>
                   )}
 
-                  {/* Icon + name + dots */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
                       <span style={{ fontSize: 15 }}>{habit.icon}</span>
@@ -699,12 +897,11 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
                         <span style={{ fontSize: 10, color: habit.color, opacity: 0.7 }}>{cfg.unit}</span>
                       )}
                     </div>
-                    {/* 7-day history dots */}
                     <div style={{ display: 'flex', gap: 3 }}>
                       {last7.map(date => {
                         const dayFreq = jsDayToFreq(new Date(date + 'T12:00:00').getDay())
                         const scheduled = (habit.frequency ?? [0,1,2,3,4,5,6]).includes(dayFreq)
-                        const completed = set.has(date)
+                        const completed = (completions[habit.id] || new Set()).has(date)
                         return (
                           <div key={date} style={{
                             width: 5, height: 5, borderRadius: '50%',
@@ -717,12 +914,20 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
                     </div>
                   </div>
 
-                  {/* Streak + pencil */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
                     {streak > 0 && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Flame size={12} color={streak >= 7 ? '#FF8C42' : 'rgba(255,140,66,0.45)'} />
-                        <span style={{ fontSize: 12, fontWeight: 600, color: streak >= 7 ? '#FF8C42' : 'rgba(255,255,255,0.3)' }}>
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 2,
+                        padding: streak >= 7 ? '2px 6px' : '0',
+                        borderRadius: 20,
+                        background: streak >= 7 ? `${sc}18` : 'transparent',
+                        border: streak >= 7 ? `1px solid ${sc}40` : 'none',
+                      }}>
+                        <Flame size={12} color={sc} style={{ filter: streak >= 7 ? `drop-shadow(0 0 4px ${sc})` : 'none' }} />
+                        <span style={{
+                          fontSize: 12, fontWeight: 700, color: sc,
+                          textShadow: streak >= 14 ? `0 0 8px ${sc}` : 'none',
+                        }}>
                           {streak}
                         </span>
                       </div>
@@ -739,7 +944,6 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
               )
             })}
 
-            {/* Habits not scheduled today */}
             {otherHabits.length > 0 && (
               <div style={{ marginTop: 6 }}>
                 <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.18)', margin: '0 0 5px 2px' }}>Niet vandaag</p>
@@ -764,7 +968,6 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
         )}
       </div>
 
-      {/* Modal */}
       {modalHabit !== null && (
         <HabitModal
           habit={modalHabit === 'new' ? null : modalHabit}
@@ -772,6 +975,13 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
           onSave={saveHabit}
           onClose={() => setModalHabit(null)}
           onDelete={deleteHabit}
+        />
+      )}
+
+      {pendingAchievement && (
+        <AchievementToast
+          achievement={pendingAchievement}
+          onDone={() => setPendingAchievement(null)}
         />
       )}
     </>

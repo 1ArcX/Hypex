@@ -411,6 +411,31 @@ export default function WorkWidget({ userId = null }) {
                     </div>
                   )}
 
+                  {/* Uren teller deze maand */}
+                  {(() => {
+                    const now = new Date()
+                    const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+                    const monthShifts = shifts.filter(s => s.date?.startsWith(monthStr) && s.start && s.end)
+                    if (!monthShifts.length) return null
+                    const totalMins = monthShifts.reduce((sum, s) => {
+                      const [sh, sm] = s.start.split(':').map(Number)
+                      const [eh, em] = s.end.split(':').map(Number)
+                      let mins = (eh * 60 + em) - (sh * 60 + sm)
+                      if (mins < 0) mins += 24 * 60
+                      return sum + mins
+                    }, 0)
+                    const h = Math.floor(totalMins / 60)
+                    const m = totalMins % 60
+                    return (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', borderRadius: 10, background: accentBg(4), border: accentBorder(12), marginTop: 4 }}>
+                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Uren deze maand</span>
+                        <span style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 700 }}>
+                          {h}u{m > 0 ? ` ${m}m` : ''} · {monthShifts.length} dienst{monthShifts.length !== 1 ? 'en' : ''}
+                        </span>
+                      </div>
+                    )
+                  })()}
+
                   <div style={{ textAlign: 'center', marginTop: '4px' }}>
                     <a href={pmtUrl} target="_blank" rel="noopener noreferrer"
                       style={{ fontSize: '11px', color: 'rgba(255,255,255,0.2)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px' }}

@@ -62,6 +62,95 @@ async function openBook(url, creds) {
   }
 }
 
+// ─── Cijfer-voorspeller ───────────────────────────────────────────────────────
+function GradePredictor({ grades }) {
+  const [selectedVak, setSelectedVak] = useState('')
+  const [targetAvg, setTargetAvg] = useState('6.0')
+  const [weging, setWeging] = useState('1')
+
+  if (!grades || grades.length === 0) {
+    return <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, textAlign: 'center', padding: '20px 0' }}>Geen cijfers beschikbaar</p>
+  }
+
+  // Group grades by vak
+  const vakken = {}
+  for (const g of grades) {
+    const c = parseFloat(g.cijfer)
+    if (isNaN(c)) continue
+    const w = parseFloat(g.weging) || 1
+    if (!vakken[g.vak]) vakken[g.vak] = []
+    vakken[g.vak].push({ cijfer: c, weging: w })
+  }
+  const vakList = Object.keys(vakken).sort()
+  const vak = selectedVak || vakList[0] || ''
+  const vakGrades = vakken[vak] || []
+
+  // Current weighted average
+  const totalW = vakGrades.reduce((s, g) => s + g.weging, 0)
+  const currentAvg = totalW > 0 ? vakGrades.reduce((s, g) => s + g.cijfer * g.weging, 0) / totalW : null
+
+  // Required grade for target
+  const target = parseFloat(targetAvg) || 6.0
+  const w = parseFloat(weging) || 1
+  const required = totalW > 0 ? ((target * (totalW + w)) - vakGrades.reduce((s, g) => s + g.cijfer * g.weging, 0)) / w : target
+  const reqColor = required <= 5.4 ? '#4ADE80' : required <= 7 ? '#FACC15' : required <= 9 ? '#FF8C42' : '#FF6B6B'
+  const reqText = required < 1 ? '< 1.0' : required > 10 ? '> 10' : required.toFixed(1)
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 0' }}>
+      <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Wat heb ik nodig?</p>
+
+      {/* Vak selector */}
+      <select
+        value={vak}
+        onChange={e => setSelectedVak(e.target.value)}
+        className="glass-input"
+        style={{ fontSize: 13, colorScheme: 'dark' }}
+      >
+        {vakList.map(v => <option key={v} value={v}>{v}</option>)}
+      </select>
+
+      {currentAvg !== null && (
+        <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ flex: 1, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', textAlign: 'center' }}>
+            <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', margin: '0 0 4px' }}>Huidig gem.</p>
+            <p style={{ fontSize: 20, fontWeight: 700, margin: 0, color: currentAvg >= 5.5 ? '#4ADE80' : '#FF6B6B' }}>{currentAvg.toFixed(1)}</p>
+            <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', margin: '2px 0 0' }}>{vakGrades.length} cijfer{vakGrades.length !== 1 ? 's' : ''}</p>
+          </div>
+          <div style={{ flex: 1, padding: '10px 12px', borderRadius: 10, background: `${reqColor}12`, border: `1px solid ${reqColor}35`, textAlign: 'center' }}>
+            <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', margin: '0 0 4px' }}>Volgende toets</p>
+            <p style={{ fontSize: 20, fontWeight: 700, margin: 0, color: reqColor }}>{reqText}</p>
+            <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', margin: '2px 0 0' }}>weging {w}×</p>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ flex: 1 }}>
+          <label style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', display: 'block', marginBottom: 4 }}>Doel gemiddelde</label>
+          <input
+            type="number" step="0.1" min="1" max="10"
+            value={targetAvg}
+            onChange={e => setTargetAvg(e.target.value)}
+            className="glass-input"
+            style={{ fontSize: 13, colorScheme: 'dark', width: '100%' }}
+          />
+        </div>
+        <div style={{ flex: 1 }}>
+          <label style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', display: 'block', marginBottom: 4 }}>Weging toets</label>
+          <input
+            type="number" step="0.5" min="0.5" max="5"
+            value={weging}
+            onChange={e => setWeging(e.target.value)}
+            className="glass-input"
+            style={{ fontSize: 13, colorScheme: 'dark', width: '100%' }}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function MagisterWidget({ userId, onSubjectsSync, tabless = false, gridLayout = false }) {
   const [creds, setCreds] = useState(() => {
     if (!userId) return null
@@ -378,6 +467,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                     { id: 'vakken', label: 'Vakken', icon: <BookMarked size={11} /> },
                     ...(creds ? [
                       { id: 'cijfers', label: 'Cijfers', icon: <BookOpen size={11} /> },
+                      { id: 'voorspeller', label: 'Voorspeller', icon: <span style={{ fontSize: 11 }}>🎯</span> },
                       { id: 'studiewijzer', label: 'Studiewijzer', icon: <BookOpen size={11} /> },
                       { id: 'huiswerk', label: 'Huiswerk', icon: <ClipboardList size={11} /> },
                       { id: 'opdrachten', label: 'Opdrachten', icon: <FileText size={11} /> },
@@ -506,6 +596,16 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                         )
                       })}
                     </div>
+                  </div>
+                )}
+
+                {/* Cijfer-voorspeller */}
+                {tab === 'voorspeller' && !loading && (
+                  <GradePredictor grades={data.grades} />
+                )}
+                {tab === 'voorspeller' && loading && (
+                  <div style={{ display: 'flex', justifyContent: 'center', padding: '24px 0' }}>
+                    <div style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid var(--accent)', borderTopColor: 'transparent', animation: 'spin 1s linear infinite' }} />
                   </div>
                 )}
 
