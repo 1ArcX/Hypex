@@ -219,18 +219,17 @@ export default function WeatherWidget({ stacked = false, userId, onRequestPwaIns
     setLoading(false)
   }
 
-  const loadRain = async (overrideCoords) => {
-    const c = overrideCoords || coords
-    if (!c) return
+  const loadRain = async () => {
+    if (!coords) return
     setRainLoading(true)
     try {
-      const cacheKey = `buienalarm_${c.lat}_${c.lon}`
+      const cacheKey = `buienalarm_${coords.lat}_${coords.lon}`
       const cached = sessionStorage.getItem(cacheKey)
       if (cached) {
         const { data, ts } = JSON.parse(cached)
         if (Date.now() - ts < 5 * 60 * 1000) { setRain(data); setRainLoading(false); return }
       }
-      const data = await fetchBuienalarm(c.lat, c.lon)
+      const data = await fetchBuienalarm(coords.lat, coords.lon)
       sessionStorage.setItem(cacheKey, JSON.stringify({ data, ts: Date.now() }))
       setRain(data)
     } catch { setRain([]) }
@@ -314,20 +313,16 @@ export default function WeatherWidget({ stacked = false, userId, onRequestPwaIns
     }
   }
 
-  // Switch to buien tab → fetch rain (stacked is al gedaan bij mount)
   useEffect(() => {
     if ((tab === 'buien' || stacked) && coords && !rain) loadRain()
-  }, [tab, coords])
+  }, [tab, coords, stacked])
 
-  // Auto-refresh — start buienalarm direct parallel met cached coords
+  // Auto-refresh — zet coords direct uit localStorage zodat buienalarm
+  // parallel start via useEffect([tab, coords]) zonder op fetchWeather te wachten
   useEffect(() => {
     const stored = localStorage.getItem('weather_coords')
     if (stored) {
-      try {
-        const c = JSON.parse(stored)
-        setCoords(c)
-        if (stacked) loadRain(c)
-      } catch {}
+      try { setCoords(JSON.parse(stored)) } catch {}
     }
     fetchWeather()
     timerRef.current = setInterval(() => fetchWeather(), REFRESH_INTERVAL)
