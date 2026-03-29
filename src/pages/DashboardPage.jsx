@@ -99,6 +99,43 @@ export default function DashboardPage({
         </div>
       )}
 
+      {/* Naderende deadlines */}
+      {(() => {
+        const now = new Date()
+        const in3 = new Date(now); in3.setDate(now.getDate() + 3)
+        const in3Str = in3.toISOString().slice(0, 10)
+        const todayS = now.toISOString().slice(0, 10)
+        const deadlines = tasks
+          .filter(t => !t.completed && t.due_date && t.due_date >= todayS && t.due_date <= in3Str)
+          .sort((a, b) => a.due_date.localeCompare(b.due_date))
+        if (!deadlines.length) return null
+        const fmt = d => {
+          if (d === todayS) return 'Vandaag'
+          const tom = new Date(now); tom.setDate(now.getDate() + 1)
+          if (d === tom.toISOString().slice(0, 10)) return 'Morgen'
+          const dt = new Date(d + 'T00:00:00')
+          return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+        }
+        return (
+          <div className="card" style={{ padding: '12px 14px', border: '1px solid rgba(255,107,107,0.25)', background: 'rgba(255,80,80,0.04)' }}>
+            <p style={{ fontSize: 10, color: 'rgba(255,107,107,0.8)', margin: '0 0 8px', letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 600 }}>
+              ⏰ Naderende deadlines
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {deadlines.map(t => (
+                <div key={t.id} onClick={() => setDetailTask(t)}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 8px', borderRadius: 7, background: 'rgba(255,255,255,0.02)', cursor: 'pointer' }}>
+                  <span style={{ fontSize: 13, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{t.title}</span>
+                  <span style={{ fontSize: 11, color: t.due_date === todayS ? '#ff6b6b' : 'rgba(255,107,107,0.7)', flexShrink: 0, marginLeft: 8, fontWeight: 600 }}>
+                    {fmt(t.due_date)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Volgende gebeurtenis */}
       <div className="card" style={{ padding: '14px 18px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>

@@ -275,6 +275,155 @@ function GewoontesCard({ userId }) {
   )
 }
 
+function XPCard() {
+  const xp      = (() => { try { return parseInt(localStorage.getItem('habit_xp')) || 0 } catch { return 0 } })()
+  const level   = Math.floor(xp / 100) + 1
+  const xpIn    = xp % 100
+  const LEVEL_NAMES = ['Beginner','Leerling','Gevorderd','Expert','Meester','Legende']
+  const levelName = LEVEL_NAMES[Math.min(level - 1, LEVEL_NAMES.length - 1)] || `Level ${level}`
+
+  const achievements = (() => {
+    try { return JSON.parse(localStorage.getItem('habit_achievements')) || [] } catch { return [] }
+  })()
+
+  return (
+    <div className="card" style={{ padding: '18px 20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>
+          Gewoontes niveau
+        </span>
+        <span style={{ fontSize: 11, color: '#FACC15', fontWeight: 700 }}>
+          🏆 Lvl {level}
+        </span>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12 }}>
+        <div style={{
+          width: 52, height: 52, borderRadius: 14, flexShrink: 0,
+          background: 'rgba(250,204,21,0.1)', border: '2px solid rgba(250,204,21,0.35)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 26,
+        }}>
+          {level >= 5 ? '🌟' : level >= 3 ? '⭐' : '✨'}
+        </div>
+        <div style={{ flex: 1 }}>
+          <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', margin: '0 0 2px' }}>{levelName}</p>
+          <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '0 0 8px' }}>{xp} XP totaal</p>
+          <div style={{ height: 6, background: 'rgba(255,255,255,0.07)', borderRadius: 3, overflow: 'hidden' }}>
+            <div style={{
+              height: '100%', width: `${xpIn}%`, borderRadius: 3,
+              background: 'linear-gradient(90deg, #FACC15, #F59E0B)',
+              transition: 'width 0.5s ease',
+            }} />
+          </div>
+          <p style={{ fontSize: 10, color: 'var(--text-3)', margin: '3px 0 0', textAlign: 'right' }}>
+            {xpIn}/100 XP
+          </p>
+        </div>
+      </div>
+
+      {achievements.length > 0 && (
+        <div>
+          <p style={{ fontSize: 10, color: 'var(--text-3)', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Behaald ({achievements.length})
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {achievements.slice(-8).map((id, i) => {
+              const labels = {
+                streak_7: '🔥7', streak_14: '🔥14', streak_30: '🔥30',
+                perfect_3: '💎3', perfect_7: '💎7',
+                level_5: '⭐L5', level_10: '🌟L10',
+              }
+              return (
+                <span key={i} style={{
+                  fontSize: 11, padding: '3px 8px', borderRadius: 10,
+                  background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.2)',
+                  color: 'rgba(250,204,21,0.9)',
+                }}>
+                  {labels[id] || id}
+                </span>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function JumboCard() {
+  const shifts = (() => { try { return JSON.parse(localStorage.getItem('pmt_work_shifts')) || [] } catch { return [] } })()
+  const now = new Date()
+  const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const MONTHS_NL = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December']
+
+  const monthShifts = shifts.filter(s => s.date?.startsWith(monthStr) && s.start_time && s.end_time)
+  if (!monthShifts.length) return null
+
+  const totalMins = monthShifts.reduce((sum, s) => {
+    const [sh, sm] = s.start_time.split(':').map(Number)
+    const [eh, em] = s.end_time.split(':').map(Number)
+    return sum + (eh * 60 + em) - (sh * 60 + sm)
+  }, 0)
+
+  const h = Math.floor(totalMins / 60)
+  const m = totalMins % 60
+  const hStr = m > 0 ? `${h}u ${m}m` : `${h}u`
+
+  // Bar chart per week (4 weken)
+  const weeks = [0, 1, 2, 3].map(w => {
+    const weekShifts = monthShifts.filter(s => {
+      const d = new Date(s.date + 'T00:00:00')
+      return d.getDate() >= w * 7 + 1 && d.getDate() <= (w + 1) * 7
+    })
+    const mins = weekShifts.reduce((sum, s) => {
+      const [sh, sm] = s.start_time.split(':').map(Number)
+      const [eh, em] = s.end_time.split(':').map(Number)
+      return sum + (eh * 60 + em) - (sh * 60 + sm)
+    }, 0)
+    return { label: `W${w + 1}`, mins, count: weekShifts.length }
+  })
+  const maxMins = Math.max(...weeks.map(w => w.mins), 1)
+
+  return (
+    <div className="card" style={{ padding: '18px 20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>
+          Jumbo — {MONTHS_NL[now.getMonth()]}
+        </span>
+        <span style={{ fontSize: 15, color: '#FACC15', fontWeight: 700 }}>{hStr}</span>
+      </div>
+      <div style={{ marginBottom: 14 }}>
+        <span style={{ fontSize: 11, color: 'var(--text-2)' }}>
+          {monthShifts.length} dienst{monthShifts.length !== 1 ? 'en' : ''} · gem. {Math.round(totalMins / monthShifts.length / 60 * 10) / 10}u per dienst
+        </span>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+        {weeks.map((w, i) => {
+          const barH = w.mins > 0 ? Math.max(4, Math.round((w.mins / maxMins) * 64)) : 3
+          return (
+            <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+              <div style={{ height: 64, display: 'flex', alignItems: 'flex-end', width: '100%' }}>
+                <div style={{
+                  width: '100%', height: barH, borderRadius: 4,
+                  background: w.mins === 0 ? 'rgba(255,255,255,0.07)' : 'rgba(250,204,21,0.55)',
+                  boxShadow: w.mins > 0 ? '0 0 6px rgba(250,204,21,0.2)' : 'none',
+                  transition: 'height 0.4s ease',
+                }} />
+              </div>
+              <span style={{ fontSize: 9, color: 'var(--text-3)' }}>{w.label}</span>
+              <span style={{ fontSize: 9, color: 'var(--text-3)' }}>
+                {w.mins > 0 ? `${Math.floor(w.mins / 60)}u` : '—'}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export default function StatsPage({ tasks, userId }) {
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '20px 16px 100px' }}>
@@ -287,6 +436,8 @@ export default function StatsPage({ tasks, userId }) {
         <FocusCard />
         <TakenCard tasks={tasks} />
         <GewoontesCard userId={userId} />
+        <XPCard />
+        <JumboCard />
       </div>
     </div>
   )
