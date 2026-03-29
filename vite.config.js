@@ -25,6 +25,6 @@ export default defineConfig({
     __BUILD_TIME__: buildTime,
   },
   server: {
-    port: 3000,
+    port: parseInt(process.env.PORT) || 3000,
   },
 })
