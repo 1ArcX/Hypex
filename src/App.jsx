@@ -5,7 +5,7 @@ import Timeline from './components/Timeline'
 import TaskModal from './components/TaskModal'
 import TaskDetailModal from './components/TaskDetailModal'
 import PomodoroTimer from './components/PomodoroTimer'
-import { RefreshCw, LogOut } from 'lucide-react'
+import { RefreshCw, Settings } from 'lucide-react'
 import ThemeSettings from './components/ThemeSettings'
 import AdminPanel from './components/AdminPanel'
 import HabitsWidget from './components/HabitsWidget'
@@ -74,23 +74,6 @@ export default function App() {
   const [syncing, setSyncing] = useState(false)
   const [syncFlash, setSyncFlash] = useState(false)
   const [updateAvailable, setUpdateAvailable] = useState(false)
-
-  // Swipe between pages
-  const swipeTouchStart = useRef(null)
-
-  const handleSwipeTouchStart = (e) => {
-    swipeTouchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
-  }
-  const handleSwipeTouchEnd = (e) => {
-    if (!swipeTouchStart.current) return
-    const dx = e.changedTouches[0].clientX - swipeTouchStart.current.x
-    const dy = e.changedTouches[0].clientY - swipeTouchStart.current.y
-    swipeTouchStart.current = null
-    if (Math.abs(dx) < Math.abs(dy) || Math.abs(dx) < 60) return
-    const idx = PAGE_ORDER.indexOf(activePage)
-    if (dx < 0 && idx < PAGE_ORDER.length - 1) handleSetActivePage(PAGE_ORDER[idx + 1])
-    else if (dx > 0 && idx > 0) handleSetActivePage(PAGE_ORDER[idx - 1])
-  }
 
   // Pull-to-refresh
   const pullStartY = useRef(null)
@@ -465,33 +448,24 @@ export default function App() {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
           {/* Mobile header */}
-          <div className="md:hidden flex items-center justify-between px-4 py-3"
-            style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-sidebar)', flexShrink: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-1)' }}>
-                {PAGE_NAMES[activePage] || 'Hypex'}
-              </span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <RefreshCw
-                size={12}
-                style={{
-                  color: syncFlash ? '#1DB954' : 'var(--text-3)',
-                  transition: 'color 0.5s',
-                  animation: syncing ? 'spin 0.8s linear infinite' : 'none',
-                }}
-              />
+          <div className="md:hidden flex items-center justify-between px-4"
+            style={{ height: 52, borderBottom: '1px solid var(--border)', background: 'var(--bg-sidebar)', flexShrink: 0 }}>
+            <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-1)', letterSpacing: '-0.01em' }}>
+              {PAGE_NAMES[activePage] || 'Hypex'}
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {/* Sync dot */}
+              <div style={{
+                width: 7, height: 7, borderRadius: '50%',
+                background: syncFlash ? '#1DB954' : syncing ? 'var(--accent)' : 'transparent',
+                boxShadow: syncing ? '0 0 6px var(--accent)' : 'none',
+                transition: 'background 0.4s, box-shadow 0.4s',
+              }} />
               <button
                 onClick={() => setShowThemeSettings(true)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', padding: 4 }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: '6px', display: 'flex', alignItems: 'center', borderRadius: 8 }}
               >
-                ⚙️
-              </button>
-              <button
-                onClick={() => supabase.auth.signOut()}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4, display: 'flex', alignItems: 'center' }}
-              >
-                <LogOut size={14} />
+                <Settings size={17} />
               </button>
             </div>
           </div>
@@ -505,8 +479,8 @@ export default function App() {
             </div>
           )}
           <div key={activePage} className="page-transition"
-            onTouchStart={(e) => { handleSwipeTouchStart(e); onPullStart(e) }}
-            onTouchEnd={(e) => { handleSwipeTouchEnd(e); onPullEnd() }}
+            onTouchStart={onPullStart}
+            onTouchEnd={onPullEnd}
             onTouchMove={onPullMove}>
 
             {activePage === 'dashboard' && (
