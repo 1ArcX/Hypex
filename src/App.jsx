@@ -371,7 +371,7 @@ export default function App() {
     } else {
       ({ error } = await supabase.from('tasks').insert({ ...fields, completed: false, user_id: user.id }))
     }
-    if (error) { console.error('Taak opslaan mislukt:', error); return }
+    if (error) { console.error('Taak opslaan mislukt:', error); alert('Opslaan mislukt: ' + (error.message || JSON.stringify(error))); return }
     setShowTaskModal(false)
     setSelectedTask(null)
     fetchTasks()
