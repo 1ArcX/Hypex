@@ -57,7 +57,13 @@ export default function App() {
   const [defaultTime, setDefaultTime] = useState('09:00')
   const [defaultDate, setDefaultDate] = useState('')
   const [showThemeSettings, setShowThemeSettings] = useState(false)
-  const [theme, setTheme] = useState({ accent: '#00FFD1', bg1: '#0f0f0f', bg2: '#171717' })
+  const [theme, setTheme] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('app_theme'))
+      if (saved?.accent) return saved
+    } catch {}
+    return { accent: '#00FFD1', bg1: '#0f0f0f', bg2: '#171717' }
+  })
   const [focusMode, setFocusMode] = useState(false)
   const [profiles, setProfiles] = useState([])
   const [showAdmin, setShowAdmin] = useState(false)
@@ -255,10 +261,13 @@ export default function App() {
     }
   }, [user?.id])
 
-  // Effect voor accent kleur
+  // Effect voor accent kleur + persistentie
   useEffect(() => {
     document.documentElement.style.setProperty('--accent', theme.accent)
-  }, [theme.accent])
+    if (theme.bg1) document.documentElement.style.setProperty('--bg1', theme.bg1)
+    if (theme.bg2) document.documentElement.style.setProperty('--bg2', theme.bg2)
+    try { localStorage.setItem('app_theme', JSON.stringify(theme)) } catch {}
+  }, [theme.accent, theme.bg1, theme.bg2])
 
   useEffect(() => {
     const handler = () => { if (user?.id) fetchTasks() }

@@ -21,35 +21,43 @@ function minsToTimeStr(mins) {
   return `${pad(Math.floor(clamped / 60))}:${pad(clamped % 60)}`
 }
 
+const TRAVEL_MINS = 30 // reistijd buffer voor school en werk
+
 function getFreeSlots(dateStr, durationMins, tasks, calendarEvents) {
   const bezet = []
 
-  // 1. Magister lessen uit sessionStorage
+  // 1. Magister lessen + reistijd aan beide kanten
   Object.keys(sessionStorage)
     .filter(k => k.startsWith('magister_sched_'))
     .forEach(k => {
       try {
         const lessons = JSON.parse(sessionStorage.getItem(k)) || []
         lessons
-          .filter(l => l.start && new Date(l.start).toISOString().slice(0, 10) === dateStr)
+          .filter(l => l.start && new Date(l.start).toISOString().slice(0, 10) === dateStr && !l.uitgevallen)
           .forEach(l => {
             const s = new Date(l.start)
             const e = new Date(l.einde || l.start)
-            bezet.push({ start: s.getHours() * 60 + s.getMinutes(), end: e.getHours() * 60 + e.getMinutes() })
+            bezet.push({
+              start: s.getHours() * 60 + s.getMinutes() - TRAVEL_MINS,
+              end:   e.getHours() * 60 + e.getMinutes() + TRAVEL_MINS,
+            })
           })
       } catch {}
     })
 
-  // 2. Werkdiensten uit localStorage
+  // 2. Werkdiensten + reistijd aan beide kanten
   try {
     const shifts = JSON.parse(localStorage.getItem('pmt_work_shifts')) || []
     shifts.filter(s => s.date?.slice(0, 10) === dateStr).forEach(s => {
       if (s.start_time && s.end_time)
-        bezet.push({ start: timeStrToMins(s.start_time), end: timeStrToMins(s.end_time) })
+        bezet.push({
+          start: timeStrToMins(s.start_time) - TRAVEL_MINS,
+          end:   timeStrToMins(s.end_time)   + TRAVEL_MINS,
+        })
     })
   } catch {}
 
-  // 3. Agenda-events
+  // 3. Agenda-events (geen reistijd)
   ;(calendarEvents || []).forEach(ev => {
     try {
       const s = new Date(ev.start_time)
@@ -59,7 +67,7 @@ function getFreeSlots(dateStr, durationMins, tasks, calendarEvents) {
     } catch {}
   })
 
-  // 4. Al geplande taken op die dag
+  // 4. Al geplande taken (geen reistijd)
   ;(tasks || []).filter(t => t.date === dateStr && t.start_time && t.end_time).forEach(t => {
     bezet.push({ start: timeStrToMins(t.start_time), end: timeStrToMins(t.end_time) })
   })
@@ -74,21 +82,45 @@ function getFreeSlots(dateStr, durationMins, tasks, calendarEvents) {
       merged.push({ ...b })
   }
 
-  // Vrije slots tussen 07:00 (420) en 22:00 (1320)
+  // Bouw vrije periodes op (07:00–22:00)
   const DAY_START = 420, DAY_END = 1320
-  const free = []
+  const freePeriods = []
   let cursor = DAY_START
   for (const b of merged) {
-    if (b.start > cursor && b.start - cursor >= durationMins)
-      free.push({ start: cursor, end: b.start })
+    const bStart = Math.max(b.start, DAY_START)
+    if (bStart > cursor && bStart - cursor >= durationMins)
+      freePeriods.push({ start: cursor, end: bStart })
     if (b.end > cursor) cursor = b.end
   }
-  if (cursor < DAY_END && DAY_END - cursor >= durationMins)
-    free.push({ start: cursor, end: DAY_END })
+  if (DAY_END - cursor >= durationMins)
+    freePeriods.push({ start: cursor, end: DAY_END })
 
-  return free.slice(0, 3).map(slot => ({
-    startStr: minsToTimeStr(slot.start),
-    endStr:   minsToTimeStr(slot.start + durationMins),
+  // Genereer kandidaattijden op 30-min grenzen binnen vrije periodes
+  const candidates = []
+  for (const p of freePeriods) {
+    const roundedStart = Math.ceil(p.start / 30) * 30
+    for (let t = roundedStart; t + durationMins <= Math.min(p.end, DAY_END); t += 30)
+      candidates.push(t)
+  }
+  if (!candidates.length) return []
+
+  // Geef voorkeur aan tijden vanaf 09:00
+  const afterNine  = candidates.filter(t => t >= 540) // 09:00
+  const afterEight = candidates.filter(t => t >= 480) // 08:00
+  const pool = afterNine.length >= 2 ? afterNine : afterEight.length > 0 ? afterEight : candidates
+
+  // Kies 3: eerste, midden en laatste van de pool (max spreiding)
+  let picks
+  if (pool.length <= 3) {
+    picks = pool
+  } else {
+    const n = pool.length
+    picks = [pool[0], pool[Math.floor(n / 2)], pool[n - 1]]
+  }
+
+  return picks.map(t => ({
+    startStr: minsToTimeStr(t),
+    endStr:   minsToTimeStr(t + durationMins),
   }))
 }
 
