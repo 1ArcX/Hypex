@@ -440,7 +440,10 @@ export default function App() {
   }
 
   const handleToggleTask = async (task) => {
-    await supabase.from('tasks').update({ completed: !task.completed }).eq('id', task.id)
+    await supabase.from('tasks').update({
+      completed: !task.completed,
+      updated_at: new Date().toISOString()
+    }).eq('id', task.id)
     fetchTasks()
   }
 
@@ -592,6 +595,7 @@ export default function App() {
                 magisterLessons={magisterLessons}
                 onToggleTask={handleToggleTask}
                 onEditTask={openEditTask}
+                onViewDetail={setDetailTask}
                 isAdmin={isAdmin}
                 onLessonsChange={setMagisterLessons}
                 onEventsChange={setCalendarEvents}
@@ -683,6 +687,7 @@ export default function App() {
           onEdit={(task) => { setDetailTask(null); openEditTask(task) }}
           onDelete={(id) => { setDetailTask(null); handleDeleteTask(id) }}
           onClose={() => setDetailTask(null)}
+          onStartPomodoro={() => { setDetailTask(null); setActivePage('pomodoro') }}
         />
       )}
 

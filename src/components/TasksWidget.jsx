@@ -46,27 +46,32 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
-function formatDate(dateStr, timeStr) {
-  if (!dateStr) return ''
-  const d = new Date(dateStr + 'T00:00:00')
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const target = new Date(dateStr + 'T00:00:00')
-  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1)
-  const tStr = todayStr()
-  const tomStr = tomorrow.toISOString().slice(0, 10)
-  if (target < today) return { label: `Verlopen · ${d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`, overdue: true }
-  if (dateStr === tStr) {
-    // If there's a time set and it has already passed, mark as overdue
-    if (timeStr) {
-      const [h, m] = timeStr.split(':').map(Number)
-      const taskTime = new Date(); taskTime.setHours(h, m, 0, 0)
-      if (taskTime < new Date()) return { label: 'Te laat', overdue: true }
-    }
-    return { label: 'Vandaag', overdue: false }
+function timeStrToMins(str) {
+  if (!str) return 0
+  const [h, m] = (str || '').split(':').map(Number)
+  return (h||0)*60 + (m||0)
+}
+
+function getTimeStatus(dateStr, startTime, endTime) {
+  if (!dateStr) return null
+  const pad2 = n => String(n).padStart(2,'0')
+  const now = new Date()
+  const todayStr2 = `${now.getFullYear()}-${pad2(now.getMonth()+1)}-${pad2(now.getDate())}`
+  if (dateStr < todayStr2) return { label: 'Te laat', overdue: true }
+  if (dateStr > todayStr2) {
+    const d = new Date(dateStr + 'T00:00:00')
+    const tom = new Date(now); tom.setDate(now.getDate()+1); tom.setHours(0,0,0,0)
+    if (dateStr === `${tom.getFullYear()}-${pad2(tom.getMonth()+1)}-${pad2(tom.getDate())}`) return { label: 'Morgen', overdue: false }
+    return { label: d.toLocaleDateString('nl-NL', { day:'numeric', month:'short' }), overdue: false }
   }
-  if (dateStr === tomStr) return { label: 'Morgen', overdue: false }
-  return { label: d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }), overdue: false }
+  // today
+  if (!startTime && !endTime) return { label: 'Vandaag', overdue: false }
+  const nowMins = now.getHours()*60 + now.getMinutes()
+  const startMins = timeStrToMins(startTime)
+  const endMins = timeStrToMins(endTime)
+  if (endMins && nowMins > endMins) return { label: 'Te laat', overdue: true }
+  if (startMins && endMins && nowMins >= startMins && nowMins <= endMins) return { label: 'Nu', overdue: false, active: true }
+  return { label: 'Vandaag', overdue: false }
 }
 
 export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle, onEdit, onDragStart, onViewDetail, onNew }) {
@@ -110,6 +115,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
       return da.localeCompare(db)
     })
   const complete = tasks.filter(t => t.completed)
+    .sort((a, b) => (b.updated_at || b.date || '').localeCompare(a.updated_at || a.date || ''))
 
   return (
     <div className="glass-card p-4">
@@ -193,7 +199,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
         {incomplete.map(task => {
           const subject = subjects.find(s => s.id === task.subject_id)
-          const dateInfo = task.date ? formatDate(task.date, task.start_time || task.time) : null
+          const dateInfo = getTimeStatus(task.date, task.start_time || task.time, task.end_time)
           return (
             <SwipeableRow key={task.id} onSwipeRight={() => onToggle(task)} onSwipeLeft={() => onDelete(task.id)}>
             <div
@@ -205,29 +211,37 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
               }}
               onClick={() => onViewDetail ? onViewDetail(task) : onEdit?.(task)}
               style={{
-                display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', borderRadius: '10px',
-                border: dateInfo?.overdue ? '1px solid rgba(255,100,100,0.2)' : '1px solid rgba(255,255,255,0.06)',
-                cursor: 'pointer', background: dateInfo?.overdue ? 'rgba(255,80,80,0.04)' : 'rgba(255,255,255,0.01)',
+                display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14,
+                border: dateInfo?.overdue ? '1px solid rgba(255,100,100,0.2)' : dateInfo?.active ? '1px solid color-mix(in srgb, var(--accent) 30%, transparent)' : '1px solid rgba(255,255,255,0.07)',
+                cursor: 'pointer',
+                background: dateInfo?.overdue ? 'rgba(255,80,80,0.05)' : dateInfo?.active ? 'color-mix(in srgb, var(--accent) 5%, transparent)' : 'rgba(255,255,255,0.02)',
                 transition: 'background 0.15s',
+                marginBottom: 2,
               }}
-              onMouseEnter={e => e.currentTarget.style.background = dateInfo?.overdue ? 'rgba(255,80,80,0.07)' : 'color-mix(in srgb, var(--accent) 4%, transparent)'}
-              onMouseLeave={e => e.currentTarget.style.background = dateInfo?.overdue ? 'rgba(255,80,80,0.04)' : 'rgba(255,255,255,0.01)'}>
+              onMouseEnter={e => e.currentTarget.style.background = dateInfo?.overdue ? 'rgba(255,80,80,0.07)' : dateInfo?.active ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'color-mix(in srgb, var(--accent) 4%, transparent)'}
+              onMouseLeave={e => e.currentTarget.style.background = dateInfo?.overdue ? 'rgba(255,80,80,0.05)' : dateInfo?.active ? 'color-mix(in srgb, var(--accent) 5%, transparent)' : 'rgba(255,255,255,0.02)'}>
               <GripVertical size={13} style={{ color: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
               {/* Prioriteit dot */}
               {(task.priority ?? 2) !== 2 && (
                 <div style={{ width: 6, height: 6, borderRadius: '50%', background: PRIORITY_DOT[task.priority ?? 2], flexShrink: 0 }} />
               )}
-              <button onClick={e => { e.stopPropagation(); onToggle(task) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
-                <Circle size={16} style={{ color: 'rgba(255,255,255,0.3)' }} />
+              <button onClick={e => { e.stopPropagation(); onToggle(task) }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
+                <div style={{
+                  width: 26, height: 26, borderRadius: '50%',
+                  border: `2px solid ${dateInfo?.overdue ? 'rgba(255,100,100,0.5)' : dateInfo?.active ? 'var(--accent)' : 'rgba(255,255,255,0.2)'}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'all 0.15s',
+                }} />
               </button>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.85)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>
+                <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.85)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>
                   {task.title}
                 </p>
-                <p style={{ fontSize: '11px', margin: 0, marginTop: '2px', display: 'flex', alignItems: 'center', gap: 3 }}>
+                <p style={{ fontSize: '12px', margin: 0, marginTop: '2px', display: 'flex', alignItems: 'center', gap: 3 }}>
                   {dateInfo?.overdue && <AlertCircle size={9} style={{ color: '#ff6b6b', flexShrink: 0 }} />}
-                  <span style={{ color: dateInfo?.overdue ? '#ff8080' : 'rgba(255,255,255,0.3)' }}>
-                    {dateInfo?.label || ''}
+                  <span style={{ color: dateInfo?.overdue ? '#ff8080' : dateInfo?.active ? 'var(--accent)' : 'rgba(255,255,255,0.3)' }}>
+                    {dateInfo?.active ? '• Nu' : dateInfo?.label || ''}
                     {(task.start_time || task.time) ? ` · ${task.start_time || task.time}` : ''}
                     {task.end_time ? `–${task.end_time}` : ''}
                     {subject ? ` · ${subject.name}` : ''}

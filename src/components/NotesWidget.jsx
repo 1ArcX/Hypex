@@ -32,8 +32,18 @@ const btnBase = {
   display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
 }
 
-function formatDate(iso) {
+function formatRelTime(iso) {
+  if (!iso) return ''
   const d = new Date(iso)
+  const now = new Date()
+  const diff = now - d
+  const mins = Math.floor(diff / 60000)
+  if (mins < 2) return 'zojuist'
+  if (mins < 60) return `${mins}m geleden`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}u geleden`
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `${days}d geleden`
   const months = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec']
   return `${d.getDate()} ${months[d.getMonth()]}`
 }
@@ -226,6 +236,18 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
         >
           <FolderPlus size={14} />
         </button>
+        {filterFolder && (
+          <button
+            onClick={() => {
+              if (window.confirm(`Map "${folders.find(f=>f.id===filterFolder)?.name}" verwijderen? Notities blijven bewaard.`))
+                deleteFolder(filterFolder)
+            }}
+            style={{ ...btnBase, color: 'rgba(255,80,80,0.35)', marginRight: 4 }}
+            title="Map verwijderen"
+          >
+            <Trash2 size={13} />
+          </button>
+        )}
         <button onClick={createNote} style={{ ...btnBase, color: 'var(--accent)' }} title="Nieuwe notitie">
           <Plus size={17} />
         </button>
@@ -272,13 +294,6 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
             >
               {f.name}
             </button>
-            {f.id && (
-              <button
-                onClick={() => deleteFolder(f.id)}
-                style={{ ...btnBase, color: 'rgba(255,255,255,0.2)', marginLeft: 1, padding: '0 2px', fontSize: 11, lineHeight: 1 }}
-                title="Map verwijderen"
-              >×</button>
-            )}
           </div>
         ))}
       </div>
@@ -318,8 +333,8 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
                   {note.content ? note.content.replace(/\n/g, ' ').slice(0, 55) : 'Leeg'}
                 </div>
               </div>
-              <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.18)', flexShrink: 0 }}>
-                {formatDate(note.updated_at)}
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', flexShrink: 0, textAlign: 'right' }}>
+                {formatRelTime(note.updated_at)}
               </span>
             </button>
           ))

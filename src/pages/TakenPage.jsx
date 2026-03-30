@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react'
+import ReactDOM from 'react-dom'
 import TasksWidget from '../components/TasksWidget'
 
 const FILTERS = [
@@ -25,6 +26,19 @@ export default function TakenPage({
   onAdd, onEdit, onDelete, onToggle, onViewDetail, onNew,
 }) {
   const [filter, setFilter] = useState('alles')
+  const [undoTask, setUndoTask] = useState(null)
+  const undoTimerRef = React.useRef(null)
+
+  const handleToggleWithUndo = (task) => {
+    onToggle(task)
+    if (!task.completed) {
+      clearTimeout(undoTimerRef.current)
+      setUndoTask(task)
+      undoTimerRef.current = setTimeout(() => setUndoTask(null), 5000)
+    } else {
+      setUndoTask(null)
+    }
+  }
 
   const ts = todayStr()
   const tom = tomorrowStr()
@@ -114,11 +128,30 @@ export default function TakenPage({
           onAdd={onAdd}
           onEdit={onEdit}
           onDelete={onDelete}
-          onToggle={onToggle}
+          onToggle={handleToggleWithUndo}
           onViewDetail={onViewDetail}
           onNew={onNew}
         />
       </div>
+
+      {undoTask && ReactDOM.createPortal(
+        <div style={{
+          position: 'fixed', bottom: 90, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 9998, display: 'flex', alignItems: 'center', gap: 10,
+          background: 'var(--bg-sidebar)', border: '1px solid var(--border)',
+          borderRadius: 14, padding: '10px 16px', boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
+          animation: 'sheetUp 0.3s ease', whiteSpace: 'nowrap',
+        }}>
+          <span style={{ fontSize: 13, color: 'var(--text-1)' }}>✓ Afgerond</span>
+          <button
+            onClick={() => { onToggle(undoTask); setUndoTask(null); clearTimeout(undoTimerRef.current) }}
+            style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 35%, transparent)', color: 'var(--accent)', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+          >
+            Ongedaan maken
+          </button>
+        </div>,
+        document.body
+      )}
     </div>
   )
 }

@@ -200,7 +200,7 @@ function MonthCalendar({ selectedDay, onSelectDay }) {
 export default function AgendaPage({
   userId, tasks, subjects,
   calendarEvents, magisterLessons,
-  onToggleTask, onEditTask, isAdmin,
+  onToggleTask, onEditTask, onViewDetail, isAdmin,
   onLessonsChange, onEventsChange, onMagisterError,
 }) {
   const today = new Date()
@@ -236,7 +236,7 @@ export default function AgendaPage({
           <div style={{ flex: 1, overflow: 'hidden', padding: '16px' }}>
             <Timeline
               userId={userId} tasks={tasks} subjects={subjects}
-              onToggleTask={onToggleTask} onEditTask={onEditTask} isAdmin={isAdmin}
+              onToggleTask={onToggleTask} onEditTask={onEditTask} onViewDetail={onViewDetail} isAdmin={isAdmin}
               onLessonsChange={onLessonsChange} onEventsChange={onEventsChange}
               onMagisterError={onMagisterError}
             />
@@ -275,7 +275,7 @@ export default function AgendaPage({
               <Timeline
                 key={selectedDay.toDateString()}
                 userId={userId} tasks={tasks} subjects={subjects}
-                onToggleTask={onToggleTask} onEditTask={onEditTask} isAdmin={isAdmin}
+                onToggleTask={onToggleTask} onEditTask={onEditTask} onViewDetail={onViewDetail} isAdmin={isAdmin}
                 onLessonsChange={onLessonsChange} onEventsChange={onEventsChange}
                 onMagisterError={onMagisterError}
                 defaultView="day"

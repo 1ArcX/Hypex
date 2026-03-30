@@ -15,7 +15,7 @@ function fmtDate(dateStr) {
   return `${DAYS_NL[d.getDay()]} ${d.getDate()} ${MONTHS_NL[d.getMonth()]}`
 }
 
-export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onEdit, onDelete, onClose }) {
+export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onEdit, onDelete, onClose, onStartPomodoro }) {
   const [closing, setClosing] = useState(false)
   const handleClose = () => {
     setClosing(true)
@@ -165,6 +165,14 @@ export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onE
           >
             Sluiten
           </button>
+          {onStartPomodoro && (
+            <button
+              onClick={onStartPomodoro}
+              style={{ padding:'9px 12px', borderRadius:10, border:'1px solid rgba(255,100,100,0.3)', background:'rgba(255,100,100,0.08)', color:'#ff8080', cursor:'pointer', fontSize:12, display:'flex', alignItems:'center', gap:4 }}
+            >
+              🍅 Pomodoro
+            </button>
+          )}
           <button
             onClick={() => onEdit(task)}
             style={{ flex:2,padding:'9px',borderRadius:10,border:'1px solid color-mix(in srgb, var(--accent) 40%, transparent)',background:'color-mix(in srgb, var(--accent) 12%, transparent)',color:'var(--accent)',cursor:'pointer',fontSize:12,fontWeight:600,display:'flex',alignItems:'center',justifyContent:'center',gap:4 }}

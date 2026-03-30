@@ -79,7 +79,7 @@ const emptyForm = (date, hour) => ({
   color: '#818CF8', recurrence: '', recurrence_days: []
 })
 
-export default function Timeline({ userId, tasks, subjects, onEditTask, defaultView = 'week', initialDate, isMobile = false, hideToolbar = false, onLessonsChange, onEventsChange, onMagisterError }) {
+export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDetail, defaultView = 'week', initialDate, isMobile = false, hideToolbar = false, onLessonsChange, onEventsChange, onMagisterError }) {
   const [view, setView] = useState(defaultView)
   const [current, setCurrent] = useState(initialDate || new Date())
   const [events, setEvents] = useState([])
@@ -478,7 +478,7 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, defaultV
                         <div key={item.key}
                           draggable
                           onDragStart={e => e.dataTransfer.setData('taskId', task.id)}
-                          onClick={e => { e.stopPropagation(); onEditTask?.(task) }}
+                          onClick={e => { e.stopPropagation(); onViewDetail ? onViewDetail(task) : onEditTask?.(task) }}
                           style={{ position: 'absolute', top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, background: color + '18', borderLeft: `3px solid ${color}`, borderRadius: '5px', padding: '3px 7px', overflow: 'hidden', cursor: 'pointer', zIndex: 3, boxSizing: 'border-box', marginLeft: '2px', opacity: task.completed ? 0.55 : 1 }}>
                           <div style={{ fontSize: '11px', fontWeight: 600, color, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: task.completed ? 'line-through' : 'none' }}>
                             {task.completed ? '✓ ' : ''}{task.title}
