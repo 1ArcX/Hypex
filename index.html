@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/hypex.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-visual" />
     <meta name="theme-color" content="#00FFD1" />
     <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/hypex.svg" />
@@ -12,6 +12,10 @@
       /* Prevent iOS zoom on input focus */
       input, textarea, select { font-size: 16px !important; }
       input[type="time"], input[type="date"] { font-size: 16px !important; }
+
+      /* Prevent body scroll jump when keyboard opens */
+      html, body { height: 100%; overflow: hidden; }
+      #root { height: 100%; overflow: hidden; }
     </style>
   </head>
   <body>
