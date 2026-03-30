@@ -585,6 +585,7 @@ export default function App() {
           onClose={() => setShowThemeSettings(false)}
           theme={theme}
           setTheme={setTheme}
+          onLogout={() => supabase.auth.signOut()}
         />
       )}
 

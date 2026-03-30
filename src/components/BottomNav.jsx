@@ -2,17 +2,17 @@ import React, { useState, useEffect, useRef } from 'react'
 import { Home, Calendar, CheckSquare, Timer, MoreHorizontal, GraduationCap, Flame, FileText, Briefcase, BarChart2 } from 'lucide-react'
 
 const PRIMARY_TABS = [
-  { id: 'dashboard', Icon: Home,          label: 'Home'   },
-  { id: 'agenda',    Icon: Calendar,      label: 'Agenda' },
-  { id: 'taken',     Icon: CheckSquare,   label: 'Taken'  },
-  { id: 'school',    Icon: GraduationCap, label: 'School' },
+  { id: 'dashboard', Icon: Home,          label: 'Home'      },
+  { id: 'agenda',    Icon: Calendar,      label: 'Agenda'    },
+  { id: 'taken',     Icon: CheckSquare,   label: 'Taken'     },
+  { id: 'gewoontes', Icon: Flame,         label: 'Gewoontes' },
 ]
 
 const SHEET_BASE = [
-  { id: 'pomodoro',     Icon: Timer,     label: 'Pomodoro'  },
-  { id: 'gewoontes',    Icon: Flame,     label: 'Gewoontes' },
-  { id: 'statistieken', Icon: BarChart2, label: 'Stats'     },
-  { id: 'notities',     Icon: FileText,  label: 'Notities'  },
+  { id: 'school',       Icon: GraduationCap, label: 'School'   },
+  { id: 'pomodoro',     Icon: Timer,         label: 'Pomodoro' },
+  { id: 'statistieken', Icon: BarChart2,     label: 'Stats'    },
+  { id: 'notities',     Icon: FileText,      label: 'Notities' },
 ]
 
 export default function BottomNav({ activePage, setActivePage, isAdmin }) {

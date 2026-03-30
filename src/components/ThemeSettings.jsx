@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { X, Palette, RotateCcw } from 'lucide-react'
+import { X, Palette, RotateCcw, LogOut } from 'lucide-react'
 
 const PRESETS = [
   { name: 'Neon Cyan', accent: '#00FFD1', bg1: '#0a0a1a', bg2: '#0d1117' },
@@ -10,7 +10,7 @@ const PRESETS = [
   { name: 'Sky Blue', accent: '#60A5FA', bg1: '#0a0f1a', bg2: '#0d1420' },
 ]
 
-export default function ThemeSettings({ onClose, theme, setTheme }) {
+export default function ThemeSettings({ onClose, theme, setTheme, onLogout }) {
   const [customAccent, setCustomAccent] = useState(theme.accent)
 
   const applyPreset = (preset) => {
@@ -82,9 +82,19 @@ export default function ThemeSettings({ onClose, theme, setTheme }) {
 
         <button onClick={resetTheme}
           className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-sm"
-          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)', cursor: 'pointer' }}>
+          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', marginBottom: 8 }}>
           <RotateCcw size={13} /> Standaard herstellen
         </button>
+
+        {onLogout && (
+          <button onClick={onLogout}
+            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-sm"
+            style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', color: 'rgba(239,68,68,0.7)', cursor: 'pointer' }}
+            onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
+            onMouseLeave={e => e.currentTarget.style.color = 'rgba(239,68,68,0.7)'}>
+            <LogOut size={13} /> Uitloggen
+          </button>
+        )}
       </div>
     </div>
   )
