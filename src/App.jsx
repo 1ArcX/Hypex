@@ -16,6 +16,7 @@ import OnboardingModal from './components/OnboardingModal'
 
 import Sidebar from './components/Sidebar'
 import VersionChecker from './components/VersionChecker'
+import { callMagister } from './utils/magisterApi'
 import BottomNav from './components/BottomNav'
 import DashboardPage from './pages/DashboardPage'
 import PomodoroPage from './pages/PomodoroPage'
@@ -126,6 +127,68 @@ export default function App() {
     const id = setInterval(check, 5 * 60 * 1000)
     return () => clearInterval(id)
   }, [])
+
+  // Achtergrond-sync: Magister rooster + PMT diensten bij opstarten
+  useEffect(() => {
+    if (!session) return
+    const uid = session.user?.id
+    if (!uid) return
+
+    const pad = n => String(n).padStart(2, '0')
+    const fmt = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`
+
+    const syncMagister = async () => {
+      try {
+        const creds = JSON.parse(localStorage.getItem(`magister_credentials_${uid}`))
+        if (!creds) return
+        const now = new Date()
+        const day = now.getDay()
+        const ws = new Date(now); ws.setDate(now.getDate() - (day === 0 ? 6 : day - 1)); ws.setHours(0,0,0,0)
+        const we = new Date(ws); we.setDate(ws.getDate() + 6)
+        for (let i = 0; i < 2; i++) {
+          const start = new Date(ws.getTime() + i * 7 * 86400000)
+          const end   = new Date(we.getTime() + i * 7 * 86400000)
+          const key = `magister_sched_${fmt(start)}_${fmt(end)}`
+          if (sessionStorage.getItem(key)) continue
+          try {
+            const lessons = await callMagister(creds, 'schedule', { start: start.toISOString(), end: end.toISOString() })
+            if (Array.isArray(lessons)) sessionStorage.setItem(key, JSON.stringify(lessons))
+          } catch {}
+        }
+      } catch {}
+    }
+
+    const syncPMT = async () => {
+      try {
+        const pmtCreds = JSON.parse(localStorage.getItem('pmt_credentials'))
+        if (!pmtCreds) return
+        const cached = JSON.parse(localStorage.getItem('pmt_work_shifts')) || []
+        const todayStr = new Date().toISOString().slice(0, 10)
+        if (cached.some(s => s.date >= todayStr)) return // al vers
+        const isoWeek = (d = new Date()) => {
+          const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+          const day = dt.getUTCDay() || 7; dt.setUTCDate(dt.getUTCDate() + 4 - day)
+          const ys = new Date(Date.UTC(dt.getUTCFullYear(), 0, 1))
+          return { week: Math.ceil((((dt - ys) / 86400000) + 1) / 7), year: dt.getUTCFullYear() }
+        }
+        const weeksInYear = y => { const d = new Date(y,11,28); const j = new Date(y,0,4); return Math.ceil(((d-j)/86400000+j.getDay()+1)/7) }
+        let { week: w, year: y } = isoWeek()
+        const allShifts = []
+        for (let i = 0; i < 3; i++) {
+          try {
+            const res = await fetch('/.netlify/functions/pmt', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ...pmtCreds, action:'schedule', week:w, year:y }) })
+            const data = await res.json()
+            if (data.shifts) allShifts.push(...data.shifts)
+          } catch {}
+          w++; if (w > weeksInYear(y)) { y++; w = 1 }
+        }
+        if (allShifts.length) localStorage.setItem('pmt_work_shifts', JSON.stringify(allShifts))
+      } catch {}
+    }
+
+    syncMagister()
+    syncPMT()
+  }, [session?.user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch rain data for dashboard
   useEffect(() => {

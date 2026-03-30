@@ -33,7 +33,13 @@ function getFreeSlots(dateStr, durationMins, tasks, calendarEvents) {
       try {
         const lessons = JSON.parse(sessionStorage.getItem(k)) || []
         lessons
-          .filter(l => l.start && new Date(l.start).toISOString().slice(0, 10) === dateStr && !l.uitgevallen)
+          .filter(l => {
+            if (!l.start || l.uitgevallen) return false
+            if (new Date(l.start).toISOString().slice(0, 10) !== dateStr) return false
+            const vak = (l.vak || '').toUpperCase().trim()
+            if (vak === 'LNK' || vak.startsWith('LNK ')) return false // keuze werktijd
+            return true
+          })
           .forEach(l => {
             const s = new Date(l.start)
             const e = new Date(l.einde || l.start)
@@ -124,6 +130,55 @@ function getFreeSlots(dateStr, durationMins, tasks, calendarEvents) {
   }))
 }
 
+function getConflicts(dateStr, startMins, endMins, tasks, calendarEvents, excludeId) {
+  if (!dateStr || startMins >= endMins) return []
+  const hits = []
+
+  Object.keys(sessionStorage)
+    .filter(k => k.startsWith('magister_sched_'))
+    .forEach(k => {
+      try {
+        const lessons = JSON.parse(sessionStorage.getItem(k)) || []
+        lessons.forEach(l => {
+          if (!l.start || l.uitgevallen) return
+          if (new Date(l.start).toISOString().slice(0, 10) !== dateStr) return
+          const vak = (l.vak || '').toUpperCase().trim()
+          if (vak === 'LNK' || vak.startsWith('LNK ')) return
+          const s = new Date(l.start), e = new Date(l.einde || l.start)
+          const ls = s.getHours() * 60 + s.getMinutes()
+          const le = e.getHours() * 60 + e.getMinutes()
+          if (startMins < le && endMins > ls) hits.push(l.vak || 'Les')
+        })
+      } catch {}
+    })
+
+  try {
+    const shifts = JSON.parse(localStorage.getItem('pmt_work_shifts')) || []
+    shifts.filter(s => s.date?.slice(0, 10) === dateStr && s.start_time && s.end_time).forEach(s => {
+      const ss = timeStrToMins(s.start_time), se = timeStrToMins(s.end_time)
+      if (startMins < se && endMins > ss) hits.push('Werk')
+    })
+  } catch {}
+
+  ;(calendarEvents || []).forEach(ev => {
+    try {
+      const s = new Date(ev.start_time)
+      if (s.toISOString().slice(0, 10) !== dateStr) return
+      const e = new Date(ev.end_time)
+      const es = s.getHours() * 60 + s.getMinutes()
+      const ee = e.getHours() * 60 + e.getMinutes()
+      if (startMins < ee && endMins > es) hits.push(ev.title || 'Event')
+    } catch {}
+  })
+
+  ;(tasks || []).filter(t => t.date === dateStr && t.id !== excludeId && t.start_time && t.end_time).forEach(t => {
+    const ts = timeStrToMins(t.start_time), te = timeStrToMins(t.end_time)
+    if (startMins < te && endMins > ts) hits.push(t.title || 'Taak')
+  })
+
+  return [...new Set(hits)]
+}
+
 export default function TaskModal({ task, defaultTime, defaultDate, subjects, calendarEvents, tasks, onSave, onDelete, onClose }) {
   const [closing, setClosing] = useState(false)
   const handleClose = () => {
@@ -184,6 +239,11 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
     if (noDate || allDay || !date) return []
     return getFreeSlots(date, durationMinutes, tasks, calendarEvents)
   }, [date, durationMinutes, noDate, allDay, tasks, calendarEvents])
+
+  const overlapConflicts = useMemo(() => {
+    if (noDate || allDay || !date || !startTime || !endTime) return []
+    return getConflicts(date, timeStrToMins(startTime), timeStrToMins(endTime), tasks, calendarEvents, task?.id)
+  }, [date, startTime, endTime, noDate, allDay, tasks, calendarEvents, task?.id])
 
   const handleSave = () => {
     if (!title.trim()) return
@@ -317,6 +377,16 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
                         onChange={e => setEndTime(e.target.value)} />
                     </div>
                   </div>
+
+                  {/* Overlap waarschuwing */}
+                  {overlapConflicts.length > 0 && (
+                    <div style={{ display: 'flex', gap: 7, alignItems: 'flex-start', padding: '8px 10px', borderRadius: 9, background: 'rgba(250,204,21,0.06)', border: '1px solid rgba(250,204,21,0.22)' }}>
+                      <span style={{ fontSize: 13, flexShrink: 0 }}>⚠️</span>
+                      <span style={{ fontSize: 12, color: 'rgba(250,204,21,0.85)', lineHeight: 1.4 }}>
+                        Overlapt met: <strong>{overlapConflicts.join(', ')}</strong>
+                      </span>
+                    </div>
+                  )}
                 </>
               )}
 
