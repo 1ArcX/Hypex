@@ -88,6 +88,8 @@ export default function TakenPage({
         {FILTERS.map(f => {
           const active = filter === f.id
           const cnt = counts[f.id]
+          const isUrgentChip = f.id === 'urgent'
+          const urgentHasItems = isUrgentChip && cnt > 0
           return (
             <button
               key={f.id}
@@ -97,14 +99,16 @@ export default function TakenPage({
                 padding: '6px 12px',
                 borderRadius: 20,
                 border: active
-                  ? '1px solid color-mix(in srgb, var(--accent) 50%, transparent)'
-                  : '1px solid rgba(255,255,255,0.1)',
+                  ? isUrgentChip ? '1px solid rgba(255,60,60,0.55)' : '1px solid color-mix(in srgb, var(--accent) 50%, transparent)'
+                  : urgentHasItems ? '1px solid rgba(255,60,60,0.3)' : '1px solid rgba(255,255,255,0.1)',
                 background: active
-                  ? 'color-mix(in srgb, var(--accent) 12%, transparent)'
-                  : 'rgba(255,255,255,0.03)',
-                color: active ? 'var(--accent)' : 'var(--text-3)',
+                  ? isUrgentChip ? 'rgba(255,50,50,0.15)' : 'color-mix(in srgb, var(--accent) 12%, transparent)'
+                  : urgentHasItems ? 'rgba(255,50,50,0.06)' : 'rgba(255,255,255,0.03)',
+                color: active
+                  ? isUrgentChip ? '#ff5555' : 'var(--accent)'
+                  : urgentHasItems ? 'rgba(255,80,80,0.75)' : 'var(--text-3)',
                 fontSize: 12,
-                fontWeight: active ? 600 : 400,
+                fontWeight: active || urgentHasItems ? 600 : 400,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -112,15 +116,19 @@ export default function TakenPage({
                 transition: 'all 0.15s',
               }}
             >
-              {f.label}
+              {isUrgentChip ? '🔥 ' : ''}{f.label}
               {cnt > 0 && (
                 <span style={{
                   fontSize: 10,
-                  background: active ? 'color-mix(in srgb, var(--accent) 25%, transparent)' : 'rgba(255,255,255,0.08)',
-                  color: active ? 'var(--accent)' : 'var(--text-3)',
+                  background: active
+                    ? isUrgentChip ? 'rgba(255,50,50,0.25)' : 'color-mix(in srgb, var(--accent) 25%, transparent)'
+                    : urgentHasItems ? 'rgba(255,50,50,0.12)' : 'rgba(255,255,255,0.08)',
+                  color: active
+                    ? isUrgentChip ? '#ff5555' : 'var(--accent)'
+                    : urgentHasItems ? 'rgba(255,80,80,0.8)' : 'var(--text-3)',
                   borderRadius: 10,
                   padding: '1px 5px',
-                  fontWeight: 600,
+                  fontWeight: 700,
                 }}>
                   {cnt}
                 </span>

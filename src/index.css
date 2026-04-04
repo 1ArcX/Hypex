@@ -530,3 +530,12 @@ select {
 /* ===== MAGISTER TABS — scrollbar verbergen ===== */
 .magister-tabs::-webkit-scrollbar { display: none; }
 .magister-tabs { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ===== URGENT TASK PULSE ===== */
+@keyframes urgentPulse {
+  0%, 100% { box-shadow: 0 2px 16px rgba(255,50,50,0.12); }
+  50%       { box-shadow: 0 2px 22px rgba(255,50,50,0.28); }
+}
+.urgent-task {
+  animation: urgentPulse 2.5s ease-in-out infinite;
+}

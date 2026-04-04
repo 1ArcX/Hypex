@@ -34,7 +34,7 @@ function SwipeableRow({ onSwipeRight, onSwipeLeft, children }) {
     </div>
   )
 }
-import { Plus, GripVertical, Trash2, CheckCircle2, Circle, X, AlertCircle, Flag } from 'lucide-react'
+import { Plus, GripVertical, Trash2, CheckCircle2, Circle, X, AlertCircle, Flag, ChevronDown, ChevronRight } from 'lucide-react'
 
 const PRIORITY_DOT = {
   1: '#FF6B6B',
@@ -76,6 +76,7 @@ function getTimeStatus(dateStr, startTime, endTime) {
 
 export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle, onEdit, onDragStart, onViewDetail, onNew }) {
   const [adding, setAdding] = useState(false)
+  const [collapsedGroups, setCollapsedGroups] = useState(new Set())
   const [newTitle, setNewTitle] = useState('')
   const [newDate, setNewDate] = useState(todayStr())
   const [newTime, setNewTime] = useState('09:00')
@@ -217,15 +218,68 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
         {groupedSections.map(section => (
           <div key={section.name ?? '__none__'}>
-            {section.name && (
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', padding: '8px 4px 4px', display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block', flexShrink: 0 }} />
-                {section.name}
-              </div>
-            )}
-            {section.items.map(task => {
+            {section.name && (() => {
+              const isCollapsed = collapsedGroups.has(section.name)
+              const totalMins = section.items.reduce((sum, t) => sum + (t.duration_minutes || 0), 0)
+              const durLabel = totalMins > 0
+                ? (Math.floor(totalMins / 60) > 0
+                    ? `${Math.floor(totalMins / 60)}u${totalMins % 60 > 0 ? ` ${totalMins % 60}m` : ''}`
+                    : `${totalMins}m`)
+                : null
+              return (
+                <div
+                  onClick={() => setCollapsedGroups(prev => {
+                    const next = new Set(prev)
+                    if (next.has(section.name)) next.delete(section.name)
+                    else next.add(section.name)
+                    return next
+                  })}
+                  style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', padding: '8px 4px 4px', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', userSelect: 'none' }}
+                >
+                  {isCollapsed
+                    ? <ChevronRight size={11} style={{ flexShrink: 0, color: 'rgba(255,255,255,0.25)' }} />
+                    : <ChevronDown size={11} style={{ flexShrink: 0, color: 'rgba(255,255,255,0.25)' }} />}
+                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block', flexShrink: 0 }} />
+                  {section.name}
+                  {durLabel && (
+                    <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.2)', letterSpacing: 0, textTransform: 'none', marginLeft: 2 }}>
+                      · {durLabel}
+                    </span>
+                  )}
+                  <span style={{ marginLeft: 'auto', fontSize: 10, color: 'rgba(255,255,255,0.18)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
+                    {section.items.length} {section.items.length === 1 ? 'taak' : 'taken'}
+                  </span>
+                </div>
+              )
+            })()}
+            {!collapsedGroups.has(section.name) && section.items.map(task => {
               const subject = subjects.find(s => s.id === task.subject_id)
               const dateInfo = getTimeStatus(task.date, task.start_time || task.time, task.end_time)
+              const isUrgent = (task.priority ?? 2) === 1
+              const isLow = (task.priority ?? 2) === 3
+
+              // Card styling by urgency level
+              const cardBg = isUrgent
+                ? 'linear-gradient(135deg, rgba(255,50,50,0.1) 0%, rgba(255,50,50,0.05) 100%)'
+                : dateInfo?.overdue ? 'rgba(255,80,80,0.06)'
+                : dateInfo?.active ? 'color-mix(in srgb, var(--accent) 5%, transparent)'
+                : 'rgba(255,255,255,0.02)'
+              const cardBgHover = isUrgent
+                ? 'linear-gradient(135deg, rgba(255,50,50,0.14) 0%, rgba(255,50,50,0.07) 100%)'
+                : dateInfo?.overdue ? 'rgba(255,80,80,0.09)'
+                : dateInfo?.active ? 'color-mix(in srgb, var(--accent) 8%, transparent)'
+                : 'color-mix(in srgb, var(--accent) 4%, transparent)'
+              const cardBorder = isUrgent
+                ? '1px solid rgba(255,60,60,0.35)'
+                : dateInfo?.overdue ? '1px solid rgba(255,100,100,0.25)'
+                : dateInfo?.active ? '1px solid color-mix(in srgb, var(--accent) 30%, transparent)'
+                : '1px solid rgba(255,255,255,0.07)'
+              const circleColor = isUrgent ? 'rgba(255,60,60,0.7)'
+                : dateInfo?.overdue ? 'rgba(255,100,100,0.5)'
+                : dateInfo?.active ? 'var(--accent)'
+                : isLow ? 'rgba(255,255,255,0.12)'
+                : 'rgba(255,255,255,0.2)'
+
               return (
                 <SwipeableRow key={task.id} onSwipeRight={() => onToggle(task)} onSwipeLeft={() => onDelete(task.id)}>
                 <div
@@ -235,36 +289,49 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                     onDragStart?.(task)
                   }}
                   onClick={() => onViewDetail ? onViewDetail(task) : onEdit?.(task)}
+                  className={isUrgent ? 'urgent-task' : undefined}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14,
-                    border: dateInfo?.overdue ? '1px solid rgba(255,100,100,0.2)' : dateInfo?.active ? '1px solid color-mix(in srgb, var(--accent) 30%, transparent)' : '1px solid rgba(255,255,255,0.07)',
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: isUrgent ? '13px 14px' : '12px 14px',
+                    borderRadius: 14,
+                    border: cardBorder,
+                    borderLeft: isUrgent ? '3px solid rgba(255,60,60,0.75)' : cardBorder,
                     cursor: 'pointer',
-                    background: dateInfo?.overdue ? 'rgba(255,80,80,0.05)' : dateInfo?.active ? 'color-mix(in srgb, var(--accent) 5%, transparent)' : 'rgba(255,255,255,0.02)',
+                    background: cardBg,
                     transition: 'background 0.15s',
-                    marginBottom: 2,
+                    marginBottom: 3,
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = dateInfo?.overdue ? 'rgba(255,80,80,0.07)' : dateInfo?.active ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'color-mix(in srgb, var(--accent) 4%, transparent)'}
-                  onMouseLeave={e => e.currentTarget.style.background = dateInfo?.overdue ? 'rgba(255,80,80,0.05)' : dateInfo?.active ? 'color-mix(in srgb, var(--accent) 5%, transparent)' : 'rgba(255,255,255,0.02)'}>
-                  <GripVertical size={13} style={{ color: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
-                  {(task.priority ?? 2) !== 2 && (
-                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: PRIORITY_DOT[task.priority ?? 2], flexShrink: 0 }} />
-                  )}
+                  onMouseEnter={e => e.currentTarget.style.background = cardBgHover}
+                  onMouseLeave={e => e.currentTarget.style.background = cardBg}>
+                  <GripVertical size={13} style={{ color: 'rgba(255,255,255,0.12)', flexShrink: 0 }} />
                   <button onClick={e => { e.stopPropagation(); onToggle(task) }}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
                     <div style={{
-                      width: 26, height: 26, borderRadius: '50%',
-                      border: `2px solid ${dateInfo?.overdue ? 'rgba(255,100,100,0.5)' : dateInfo?.active ? 'var(--accent)' : 'rgba(255,255,255,0.2)'}`,
+                      width: 28, height: 28, borderRadius: '50%',
+                      border: `2px solid ${circleColor}`,
+                      background: isUrgent ? 'rgba(255,60,60,0.08)' : 'transparent',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       transition: 'all 0.15s',
                     }} />
                   </button>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.85)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>
-                      {task.title}
-                    </p>
-                    <p style={{ fontSize: '12px', margin: 0, marginTop: '2px', display: 'flex', alignItems: 'center', gap: 3 }}>
-                      {dateInfo?.overdue && <AlertCircle size={9} style={{ color: '#ff6b6b', flexShrink: 0 }} />}
-                      <span style={{ color: dateInfo?.overdue ? '#ff8080' : dateInfo?.active ? 'var(--accent)' : 'rgba(255,255,255,0.3)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: isUrgent || dateInfo?.overdue ? 3 : 2 }}>
+                      <p style={{ fontSize: '14px', color: isUrgent ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.85)', fontWeight: isUrgent ? 600 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0, flex: 1, minWidth: 0 }}>
+                        {task.title}
+                      </p>
+                      {isUrgent && (
+                        <span style={{ fontSize: 10, fontWeight: 700, color: '#ff5555', background: 'rgba(255,50,50,0.15)', border: '1px solid rgba(255,50,50,0.3)', borderRadius: 5, padding: '1px 6px', flexShrink: 0, letterSpacing: '0.03em' }}>
+                          🔥 URGENT
+                        </span>
+                      )}
+                      {!isUrgent && dateInfo?.overdue && (
+                        <span style={{ fontSize: 10, fontWeight: 700, color: '#ff8080', background: 'rgba(255,80,80,0.12)', border: '1px solid rgba(255,80,80,0.25)', borderRadius: 5, padding: '1px 6px', flexShrink: 0 }}>
+                          ⚠️ Te laat
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ fontSize: '11px', margin: 0, display: 'flex', alignItems: 'center', gap: 3 }}>
+                      <span style={{ color: isUrgent ? 'rgba(255,100,100,0.7)' : dateInfo?.overdue ? '#ff8080' : dateInfo?.active ? 'var(--accent)' : 'rgba(255,255,255,0.28)' }}>
                         {dateInfo?.active ? '• Nu' : dateInfo?.label || ''}
                         {(task.start_time || task.time) ? ` · ${task.start_time || task.time}` : ''}
                         {task.end_time ? `–${task.end_time}` : ''}
@@ -276,9 +343,9 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                   <button
                     onClick={e => { e.stopPropagation(); onDelete(task.id) }}
                     title="Verwijderen"
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,80,80,0.35)', padding: '3px', flexShrink: 0, borderRadius: '4px' }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,80,80,0.3)', padding: '3px', flexShrink: 0, borderRadius: '4px' }}
                     onMouseEnter={e => e.currentTarget.style.color = '#ff6b6b'}
-                    onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,80,80,0.35)'}>
+                    onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,80,80,0.3)'}>
                     <Trash2 size={12} />
                   </button>
                 </div>

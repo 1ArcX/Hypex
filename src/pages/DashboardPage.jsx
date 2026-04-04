@@ -149,6 +149,10 @@ export default function DashboardPage({
   const hasMagisterCreds = !!localStorage.getItem(`magister_credentials_${userId}`)
   const showMagisterBanner = !hasMagisterCreds || !!magisterError
 
+  const urgentCount  = tasks.filter(t => !t.completed && (t.priority ?? 2) === 1).length
+  const overdueCount = tasks.filter(t => !t.completed && t.date && t.date < today).length
+  const openCount    = tasks.filter(t => !t.completed).length
+
   // Naderende deadlines (max 3 pills)
   const now = new Date()
   const in3 = new Date(now); in3.setDate(now.getDate() + 3)
@@ -161,15 +165,30 @@ export default function DashboardPage({
     <div style={{ height: '100%', overflowY: 'auto', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
       {/* ── HERO: Greeting + Clock + Progress ── */}
-      <div className="card" style={{ padding: '20px 22px' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: totalToday > 0 ? 16 : 0 }}>
+      <div className="card" style={{
+        padding: '22px 22px 20px',
+        background: 'linear-gradient(135deg, #1e1e1e 0%, #171717 100%)',
+        position: 'relative', overflow: 'hidden',
+      }}>
+        {/* Accent glow blob */}
+        <div style={{
+          position: 'absolute', top: '60%', left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: 280, height: 180,
+          background: `radial-gradient(ellipse, ${isBreak ? 'rgba(255,140,66,0.07)' : 'rgba(0,255,209,0.06)'} 0%, transparent 70%)`,
+          pointerEvents: 'none',
+        }} />
+
+        {/* Greeting row */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, position: 'relative' }}>
           <div>
-            <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 6px' }}>
-              {getGreeting()}, <strong style={{ color: 'var(--text-1)' }}>{displayName}</strong>
+            <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '0 0 2px', letterSpacing: '0.04em', textTransform: 'uppercase', fontWeight: 600 }}>
+              {getGreeting()}
             </p>
-            <Clock isBreak={isBreak} />
+            <p style={{ fontSize: 18, color: 'var(--text-1)', margin: 0, fontWeight: 700, letterSpacing: '-0.3px' }}>
+              {displayName}
+            </p>
           </div>
-          {/* Magister status badge in hero */}
           {showMagisterBanner && (
             <button
               onClick={() => onNavigate('school')}
@@ -189,55 +208,114 @@ export default function DashboardPage({
           )}
         </div>
 
+        {/* Klok gecenterd */}
+        <div style={{ textAlign: 'center', marginBottom: totalToday > 0 ? 18 : 0, position: 'relative' }}>
+          <Clock isBreak={isBreak} />
+        </div>
+
         {totalToday > 0 && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Vandaag</span>
-              <span style={{ fontSize: 11, color: progressPct === 100 ? 'var(--accent)' : 'var(--text-2)', fontWeight: 600 }}>
-                {completedToday}/{totalToday} taken {progressPct === 100 ? '✓' : ''}
+          <div style={{ position: 'relative' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 500 }}>Voortgang vandaag</span>
+              <span style={{ fontSize: 11, color: progressPct === 100 ? 'var(--accent)' : 'var(--text-2)', fontWeight: 700 }}>
+                {completedToday}/{totalToday} {progressPct === 100 ? '✓' : ''}
               </span>
             </div>
-            <div style={{ height: 5, background: 'rgba(255,255,255,0.06)', borderRadius: 4 }}>
+            <div style={{ height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 6 }}>
               <div style={{
-                height: '100%', width: `${progressPct}%`, borderRadius: 4,
-                background: progressPct === 100 ? 'var(--accent)' : 'color-mix(in srgb, var(--accent) 70%, transparent)',
-                transition: 'width 0.5s ease',
-                boxShadow: progressPct > 0 ? '0 0 8px var(--accent-dim)' : 'none',
+                height: '100%', width: `${progressPct}%`, borderRadius: 6,
+                background: progressPct === 100
+                  ? 'linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #fff))'
+                  : 'linear-gradient(90deg, color-mix(in srgb, var(--accent) 70%, transparent), var(--accent))',
+                transition: 'width 0.6s ease',
+                boxShadow: progressPct > 0 ? '0 0 10px rgba(0,255,209,0.35)' : 'none',
               }} />
             </div>
           </div>
         )}
       </div>
 
+      {/* ── STATS MINI-GRID ── */}
+      {openCount > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+          <div style={{
+            background: urgentCount > 0 ? 'rgba(255,60,60,0.08)' : 'rgba(255,255,255,0.03)',
+            border: `1px solid ${urgentCount > 0 ? 'rgba(255,60,60,0.25)' : 'rgba(255,255,255,0.07)'}`,
+            borderRadius: 12, padding: '12px 10px', textAlign: 'center',
+          }}>
+            <p style={{ fontSize: 24, fontWeight: 800, color: urgentCount > 0 ? '#ff6b6b' : 'var(--text-2)', margin: 0, lineHeight: 1 }}>
+              {urgentCount}
+            </p>
+            <p style={{ fontSize: 10, color: urgentCount > 0 ? 'rgba(255,107,107,0.6)' : 'var(--text-3)', margin: '4px 0 0', fontWeight: 600, letterSpacing: '0.04em' }}>
+              Urgent
+            </p>
+          </div>
+          <div style={{
+            background: overdueCount > 0 ? 'rgba(255,120,50,0.07)' : 'rgba(255,255,255,0.03)',
+            border: `1px solid ${overdueCount > 0 ? 'rgba(255,120,50,0.2)' : 'rgba(255,255,255,0.07)'}`,
+            borderRadius: 12, padding: '12px 10px', textAlign: 'center',
+          }}>
+            <p style={{ fontSize: 24, fontWeight: 800, color: overdueCount > 0 ? '#FF8C42' : 'var(--text-2)', margin: 0, lineHeight: 1 }}>
+              {overdueCount}
+            </p>
+            <p style={{ fontSize: 10, color: overdueCount > 0 ? 'rgba(255,140,66,0.6)' : 'var(--text-3)', margin: '4px 0 0', fontWeight: 600, letterSpacing: '0.04em' }}>
+              Te laat
+            </p>
+          </div>
+          <div style={{
+            background: 'rgba(0,255,209,0.05)',
+            border: '1px solid rgba(0,255,209,0.12)',
+            borderRadius: 12, padding: '12px 10px', textAlign: 'center',
+          }}>
+            <p style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)', margin: 0, lineHeight: 1 }}>
+              {openCount}
+            </p>
+            <p style={{ fontSize: 10, color: 'rgba(0,255,209,0.5)', margin: '4px 0 0', fontWeight: 600, letterSpacing: '0.04em' }}>
+              Open
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ── VANDAAG-STRIP ── */}
       {todayItems.length > 0 && (
         <div>
-          <p style={{ fontSize: 10, color: 'var(--text-3)', margin: '0 0 6px', letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 600, paddingLeft: 2 }}>
-            Vandaag
+          <p style={{ fontSize: 10, color: 'var(--text-3)', margin: '0 0 8px', letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 600, paddingLeft: 2 }}>
+            Schema vandaag
           </p>
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
-            {todayItems.map((item, i) => (
-              <button
-                key={i}
-                onClick={() => item.type === 'task' && item.raw && setDetailTask(item.raw)}
-                style={{
-                  flexShrink: 0, padding: '7px 12px', borderRadius: 20,
-                  background: `${item.color}18`,
-                  border: `1px solid ${item.color}40`,
-                  color: item.color,
-                  cursor: item.type === 'task' ? 'pointer' : 'default',
-                  display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
-                  gap: 2, maxWidth: 130,
-                }}
-              >
-                <span style={{ fontSize: 10, opacity: 0.75, fontWeight: 500 }}>
-                  {item.time}{item.end ? `–${item.end}` : ''}
-                </span>
-                <span style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 110 }}>
-                  {item.label}
-                </span>
-              </button>
-            ))}
+            {todayItems.map((item, i) => {
+              const icon = item.type === 'lesson' ? '📚' : item.type === 'work' ? '💼' : '✅'
+              const nowMins = new Date().getHours()*60 + new Date().getMinutes()
+              const isNow = item.sortMins <= nowMins && item.end && (parseInt(item.end)*60 + parseInt(item.end.split(':')[1]||0)) >= nowMins
+              return (
+                <button
+                  key={i}
+                  onClick={() => item.type === 'task' && item.raw && setDetailTask(item.raw)}
+                  style={{
+                    flexShrink: 0, padding: '9px 13px', borderRadius: 14,
+                    background: isNow ? `${item.color}22` : `${item.color}11`,
+                    border: `1px solid ${item.color}${isNow ? '60' : '30'}`,
+                    color: item.color,
+                    cursor: item.type === 'task' ? 'pointer' : 'default',
+                    display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
+                    gap: 3, maxWidth: 140,
+                    boxShadow: isNow ? `0 0 12px ${item.color}20` : 'none',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, width: '100%' }}>
+                    <span style={{ fontSize: 11 }}>{icon}</span>
+                    <span style={{ fontSize: 10, opacity: 0.7, fontWeight: 500, flex: 1, whiteSpace: 'nowrap' }}>
+                      {item.time}{item.end ? `–${item.end}` : ''}
+                    </span>
+                    {isNow && <span style={{ fontSize: 9, fontWeight: 700, background: `${item.color}25`, borderRadius: 4, padding: '1px 4px' }}>Nu</span>}
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 120 }}>
+                    {item.label}
+                  </span>
+                </button>
+              )
+            })}
           </div>
         </div>
       )}
@@ -245,41 +323,49 @@ export default function DashboardPage({
       {/* ── VOLGENDE + DEADLINES (2 kolommen) ── */}
       <div style={{ display: 'grid', gridTemplateColumns: deadlines.length ? '1fr 1fr' : '1fr', gap: 10 }}>
         {/* Volgende gebeurtenis */}
-        <div className="card" style={{ padding: '12px 14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-            <p style={{ fontSize: 9, color: 'var(--text-3)', margin: 0, letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 600 }}>Volgende</p>
+        <div className="card" style={{
+          padding: '14px 15px',
+          borderLeft: '3px solid rgba(129,140,248,0.5)',
+          background: 'linear-gradient(135deg, rgba(129,140,248,0.05) 0%, transparent 70%)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <p style={{ fontSize: 9, color: 'rgba(129,140,248,0.7)', margin: 0, letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700 }}>Volgende</p>
             {ev && hasMore && (
               <button onClick={() => setSkip(s => s + 1)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', padding: 0, fontSize: 14, lineHeight: 1 }}>›</button>
+                style={{ background: 'rgba(129,140,248,0.1)', border: '1px solid rgba(129,140,248,0.2)', borderRadius: 6, cursor: 'pointer', color: 'rgba(129,140,248,0.8)', padding: '2px 7px', fontSize: 13, lineHeight: 1 }}>›</button>
             )}
           </div>
           {ev ? (
             <div onClick={() => ev.type === 'task' && ev.raw && setDetailTask(ev.raw)}
               style={{ cursor: ev.type === 'task' ? 'pointer' : 'default' }}>
-              <p style={{ fontSize: 13, color: 'var(--text-1)', fontWeight: 600, margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {ev.type === 'lesson' ? '🎓 ' : ev.type === 'event' ? '📅 ' : '✅ '}{ev.label}
+              <p style={{ fontSize: 13, color: 'var(--text-1)', fontWeight: 600, margin: '0 0 4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {ev.type === 'lesson' ? '📚 ' : ev.type === 'event' ? '📅 ' : '✅ '}{ev.label}
               </p>
-              <p style={{ fontSize: 11, color: 'var(--accent)', margin: 0 }}>{ev.timeStr}</p>
+              <p style={{ fontSize: 11, color: 'rgba(129,140,248,0.8)', margin: 0, fontWeight: 500 }}>{ev.timeStr}</p>
             </div>
           ) : (
-            <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>Niets meer</p>
+            <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>Niets meer gepland</p>
           )}
         </div>
 
         {/* Deadline pills */}
         {deadlines.length > 0 && (
-          <div className="card" style={{ padding: '12px 14px' }}>
-            <p style={{ fontSize: 9, color: 'rgba(255,107,107,0.8)', margin: '0 0 6px', letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 600 }}>⏰ Deadlines</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div className="card" style={{
+            padding: '14px 15px',
+            borderLeft: '3px solid rgba(255,80,80,0.5)',
+            background: 'linear-gradient(135deg, rgba(255,60,60,0.06) 0%, transparent 70%)',
+          }}>
+            <p style={{ fontSize: 9, color: 'rgba(255,107,107,0.75)', margin: '0 0 8px', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700 }}>🔥 Deadlines</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
               {deadlines.map(t => (
                 <div key={t.id} onClick={() => setDetailTask(t)}
                   style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', gap: 4 }}>
-                  <span style={{ fontSize: 11, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{t.title}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, fontWeight: 500 }}>{t.title}</span>
                   <span style={{
-                    fontSize: 10, borderRadius: 10, padding: '1px 6px', flexShrink: 0, fontWeight: 600,
-                    background: t.due_date === today ? 'rgba(255,80,80,0.15)' : 'rgba(255,107,107,0.08)',
-                    color: t.due_date === today ? '#ff6b6b' : 'rgba(255,107,107,0.8)',
-                    border: `1px solid ${t.due_date === today ? 'rgba(255,80,80,0.4)' : 'rgba(255,107,107,0.2)'}`,
+                    fontSize: 10, borderRadius: 8, padding: '2px 7px', flexShrink: 0, fontWeight: 700,
+                    background: t.due_date === today ? 'rgba(255,60,60,0.2)' : 'rgba(255,107,107,0.1)',
+                    color: t.due_date === today ? '#ff5555' : 'rgba(255,107,107,0.85)',
+                    border: `1px solid ${t.due_date === today ? 'rgba(255,60,60,0.45)' : 'rgba(255,107,107,0.25)'}`,
                   }}>
                     {fmtDeadline(t.due_date, today)}
                   </span>
@@ -340,29 +426,43 @@ export default function DashboardPage({
         const unplanned = tasks.filter(t => !t.completed && !t.date)
         if (!unplanned.length) return null
         return (
-          <div className="card" style={{ padding: '12px 14px', border: '1px solid rgba(250,204,21,0.15)', background: 'rgba(250,204,21,0.03)' }}>
-            <p style={{ fontSize: 10, color: 'rgba(250,204,21,0.7)', margin: '0 0 8px', letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 600 }}>
-              📋 Nog in te plannen ({unplanned.length})
+          <div className="card" style={{
+            padding: '14px 15px',
+            borderLeft: '3px solid rgba(250,204,21,0.4)',
+            background: 'linear-gradient(135deg, rgba(250,204,21,0.04) 0%, transparent 70%)',
+          }}>
+            <p style={{ fontSize: 9, color: 'rgba(250,204,21,0.7)', margin: '0 0 10px', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700 }}>
+              📋 Nog in te plannen · {unplanned.length}
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {unplanned.map(task => {
+              {unplanned.slice(0, 5).map(task => {
                 const subject = subjects.find(s => s.id === task.subject_id)
                 return (
                   <div key={task.id} onClick={() => setDetailTask(task)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 7, background: 'rgba(255,255,255,0.03)', cursor: 'pointer' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.025)', cursor: 'pointer', border: '1px solid transparent', transition: 'background 0.15s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(250,204,21,0.05)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.025)'}
                   >
-                    <span style={{ fontSize: 13, color: 'var(--text-1)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</span>
+                    <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'rgba(250,204,21,0.5)', flexShrink: 0 }} />
+                    <span style={{ fontSize: 13, color: 'var(--text-1)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>{task.title}</span>
                     {subject && <span style={{ fontSize: 10, color: 'var(--text-3)', flexShrink: 0 }}>{subject.name}</span>}
                   </div>
                 )
               })}
+              {unplanned.length > 5 && (
+                <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '2px 0 0 10px' }}>+{unplanned.length - 5} meer</p>
+              )}
             </div>
           </div>
         )
       })()}
 
       <button className="btn-neon" onClick={() => openNewTask()}
-        style={{ padding: '13px', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%' }}>
+        style={{
+          padding: '14px', fontSize: 14, display: 'flex', alignItems: 'center',
+          justifyContent: 'center', gap: 8, width: '100%',
+          boxShadow: '0 0 20px rgba(0,255,209,0.1)',
+        }}>
         + Taak toevoegen
       </button>
 
