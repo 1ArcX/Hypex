@@ -105,15 +105,33 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
     if (e.key === 'Escape') setAdding(false)
   }
 
-  const incomplete = tasks
-    .filter(t => !t.completed)
-    .sort((a, b) => {
-      const pa = a.priority ?? 2, pb = b.priority ?? 2
-      if (pa !== pb) return pa - pb
-      const da = a.due_date || a.date || '9999-99-99'
-      const db = b.due_date || b.date || '9999-99-99'
-      return da.localeCompare(db)
-    })
+  const sortFn = (a, b) => {
+    const pa = a.priority ?? 2, pb = b.priority ?? 2
+    if (pa !== pb) return pa - pb
+    const da = a.due_date || a.date || '9999-99-99'
+    const db = b.due_date || b.date || '9999-99-99'
+    return da.localeCompare(db)
+  }
+  const incomplete = tasks.filter(t => !t.completed).sort(sortFn)
+
+  // Groepeer: taken met groep apart, taken zonder groep direct
+  const groupedSections = (() => {
+    const withGroup = {}
+    const noGroup = []
+    for (const t of incomplete) {
+      if (t.group_name) {
+        if (!withGroup[t.group_name]) withGroup[t.group_name] = []
+        withGroup[t.group_name].push(t)
+      } else {
+        noGroup.push(t)
+      }
+    }
+    const sections = []
+    for (const [name, items] of Object.entries(withGroup)) sections.push({ name, items })
+    if (noGroup.length) sections.push({ name: null, items: noGroup })
+    return sections
+  })()
+
   const complete = tasks.filter(t => t.completed)
     .sort((a, b) => (b.updated_at || b.date || '').localeCompare(a.updated_at || a.date || ''))
 
@@ -197,70 +215,78 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
 
       {/* Taken lijst */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-        {incomplete.map(task => {
-          const subject = subjects.find(s => s.id === task.subject_id)
-          const dateInfo = getTimeStatus(task.date, task.start_time || task.time, task.end_time)
-          return (
-            <SwipeableRow key={task.id} onSwipeRight={() => onToggle(task)} onSwipeLeft={() => onDelete(task.id)}>
-            <div
-              key={task.id}
-              draggable
-              onDragStart={e => {
-                e.dataTransfer.setData('taskId', task.id)
-                onDragStart?.(task)
-              }}
-              onClick={() => onViewDetail ? onViewDetail(task) : onEdit?.(task)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14,
-                border: dateInfo?.overdue ? '1px solid rgba(255,100,100,0.2)' : dateInfo?.active ? '1px solid color-mix(in srgb, var(--accent) 30%, transparent)' : '1px solid rgba(255,255,255,0.07)',
-                cursor: 'pointer',
-                background: dateInfo?.overdue ? 'rgba(255,80,80,0.05)' : dateInfo?.active ? 'color-mix(in srgb, var(--accent) 5%, transparent)' : 'rgba(255,255,255,0.02)',
-                transition: 'background 0.15s',
-                marginBottom: 2,
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = dateInfo?.overdue ? 'rgba(255,80,80,0.07)' : dateInfo?.active ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'color-mix(in srgb, var(--accent) 4%, transparent)'}
-              onMouseLeave={e => e.currentTarget.style.background = dateInfo?.overdue ? 'rgba(255,80,80,0.05)' : dateInfo?.active ? 'color-mix(in srgb, var(--accent) 5%, transparent)' : 'rgba(255,255,255,0.02)'}>
-              <GripVertical size={13} style={{ color: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
-              {/* Prioriteit dot */}
-              {(task.priority ?? 2) !== 2 && (
-                <div style={{ width: 6, height: 6, borderRadius: '50%', background: PRIORITY_DOT[task.priority ?? 2], flexShrink: 0 }} />
-              )}
-              <button onClick={e => { e.stopPropagation(); onToggle(task) }}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
-                <div style={{
-                  width: 26, height: 26, borderRadius: '50%',
-                  border: `2px solid ${dateInfo?.overdue ? 'rgba(255,100,100,0.5)' : dateInfo?.active ? 'var(--accent)' : 'rgba(255,255,255,0.2)'}`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  transition: 'all 0.15s',
-                }} />
-              </button>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.85)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>
-                  {task.title}
-                </p>
-                <p style={{ fontSize: '12px', margin: 0, marginTop: '2px', display: 'flex', alignItems: 'center', gap: 3 }}>
-                  {dateInfo?.overdue && <AlertCircle size={9} style={{ color: '#ff6b6b', flexShrink: 0 }} />}
-                  <span style={{ color: dateInfo?.overdue ? '#ff8080' : dateInfo?.active ? 'var(--accent)' : 'rgba(255,255,255,0.3)' }}>
-                    {dateInfo?.active ? '• Nu' : dateInfo?.label || ''}
-                    {(task.start_time || task.time) ? ` · ${task.start_time || task.time}` : ''}
-                    {task.end_time ? `–${task.end_time}` : ''}
-                    {subject ? ` · ${subject.name}` : ''}
-                    {task.due_date && task.due_date !== task.date ? ` · ⏰ ${new Date(task.due_date + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}` : ''}
-                  </span>
-                </p>
+        {groupedSections.map(section => (
+          <div key={section.name ?? '__none__'}>
+            {section.name && (
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', padding: '8px 4px 4px', display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block', flexShrink: 0 }} />
+                {section.name}
               </div>
-              <button
-                onClick={e => { e.stopPropagation(); onDelete(task.id) }}
-                title="Verwijderen"
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,80,80,0.35)', padding: '3px', flexShrink: 0, borderRadius: '4px' }}
-                onMouseEnter={e => e.currentTarget.style.color = '#ff6b6b'}
-                onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,80,80,0.35)'}>
-                <Trash2 size={12} />
-              </button>
-            </div>
-            </SwipeableRow>
-          )
-        })}
+            )}
+            {section.items.map(task => {
+              const subject = subjects.find(s => s.id === task.subject_id)
+              const dateInfo = getTimeStatus(task.date, task.start_time || task.time, task.end_time)
+              return (
+                <SwipeableRow key={task.id} onSwipeRight={() => onToggle(task)} onSwipeLeft={() => onDelete(task.id)}>
+                <div
+                  draggable
+                  onDragStart={e => {
+                    e.dataTransfer.setData('taskId', task.id)
+                    onDragStart?.(task)
+                  }}
+                  onClick={() => onViewDetail ? onViewDetail(task) : onEdit?.(task)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14,
+                    border: dateInfo?.overdue ? '1px solid rgba(255,100,100,0.2)' : dateInfo?.active ? '1px solid color-mix(in srgb, var(--accent) 30%, transparent)' : '1px solid rgba(255,255,255,0.07)',
+                    cursor: 'pointer',
+                    background: dateInfo?.overdue ? 'rgba(255,80,80,0.05)' : dateInfo?.active ? 'color-mix(in srgb, var(--accent) 5%, transparent)' : 'rgba(255,255,255,0.02)',
+                    transition: 'background 0.15s',
+                    marginBottom: 2,
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = dateInfo?.overdue ? 'rgba(255,80,80,0.07)' : dateInfo?.active ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'color-mix(in srgb, var(--accent) 4%, transparent)'}
+                  onMouseLeave={e => e.currentTarget.style.background = dateInfo?.overdue ? 'rgba(255,80,80,0.05)' : dateInfo?.active ? 'color-mix(in srgb, var(--accent) 5%, transparent)' : 'rgba(255,255,255,0.02)'}>
+                  <GripVertical size={13} style={{ color: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
+                  {(task.priority ?? 2) !== 2 && (
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: PRIORITY_DOT[task.priority ?? 2], flexShrink: 0 }} />
+                  )}
+                  <button onClick={e => { e.stopPropagation(); onToggle(task) }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
+                    <div style={{
+                      width: 26, height: 26, borderRadius: '50%',
+                      border: `2px solid ${dateInfo?.overdue ? 'rgba(255,100,100,0.5)' : dateInfo?.active ? 'var(--accent)' : 'rgba(255,255,255,0.2)'}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      transition: 'all 0.15s',
+                    }} />
+                  </button>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.85)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>
+                      {task.title}
+                    </p>
+                    <p style={{ fontSize: '12px', margin: 0, marginTop: '2px', display: 'flex', alignItems: 'center', gap: 3 }}>
+                      {dateInfo?.overdue && <AlertCircle size={9} style={{ color: '#ff6b6b', flexShrink: 0 }} />}
+                      <span style={{ color: dateInfo?.overdue ? '#ff8080' : dateInfo?.active ? 'var(--accent)' : 'rgba(255,255,255,0.3)' }}>
+                        {dateInfo?.active ? '• Nu' : dateInfo?.label || ''}
+                        {(task.start_time || task.time) ? ` · ${task.start_time || task.time}` : ''}
+                        {task.end_time ? `–${task.end_time}` : ''}
+                        {subject ? ` · ${subject.name}` : ''}
+                        {task.due_date && task.due_date !== task.date ? ` · ⏰ ${new Date(task.due_date + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}` : ''}
+                      </span>
+                    </p>
+                  </div>
+                  <button
+                    onClick={e => { e.stopPropagation(); onDelete(task.id) }}
+                    title="Verwijderen"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,80,80,0.35)', padding: '3px', flexShrink: 0, borderRadius: '4px' }}
+                    onMouseEnter={e => e.currentTarget.style.color = '#ff6b6b'}
+                    onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,80,80,0.35)'}>
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+                </SwipeableRow>
+              )
+            })}
+          </div>
+        ))}
       </div>
 
       {/* Afgeronde taken */}

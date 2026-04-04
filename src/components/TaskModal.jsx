@@ -179,7 +179,7 @@ function getConflicts(dateStr, startMins, endMins, tasks, calendarEvents, exclud
   return [...new Set(hits)]
 }
 
-export default function TaskModal({ task, defaultTime, defaultDate, subjects, calendarEvents, tasks, onSave, onDelete, onClose }) {
+export default function TaskModal({ task, defaultTime, defaultDate, subjects, calendarEvents, tasks, allTasks, onSave, onDelete, onClose }) {
   const [closing, setClosing] = useState(false)
   const handleClose = () => {
     setClosing(true)
@@ -199,6 +199,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
   const [priority,        setPriority]        = useState(2)
   const [durationMinutes, setDurationMinutes] = useState(30)
   const [dueDate,         setDueDate]         = useState('')
+  const [groupName,       setGroupName]       = useState('')
 
   useEffect(() => {
     if (task) {
@@ -217,6 +218,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
       setPriority(task.priority ?? 2)
       setDurationMinutes(task.duration_minutes ?? 30)
       setDueDate(task.due_date || '')
+      setGroupName(task.group_name || '')
     } else {
       setNoDate(false)
       setDate(defaultDate || new Date().toISOString().slice(0, 10))
@@ -226,6 +228,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
       setPriority(2)
       setDurationMinutes(30)
       setDueDate('')
+      setGroupName('')
     }
   }, [task, defaultTime, defaultDate])
 
@@ -257,6 +260,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
       priority,
       duration_minutes: durationMinutes,
       due_date: dueDate || null,
+      group_name: groupName.trim() || null,
     })
   }
 
@@ -303,6 +307,35 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
             </div>
           </div>
 
+          {/* Groep */}
+          {(() => {
+            const existingGroups = [...new Set((allTasks || tasks || []).map(t => t.group_name).filter(Boolean))]
+            return (
+              <div>
+                <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Groep (optioneel)</label>
+                <input
+                  className="glass-input"
+                  list="task-groups-list"
+                  placeholder="Bijv. Trading, School..."
+                  value={groupName}
+                  onChange={e => setGroupName(e.target.value)}
+                  style={{ fontSize: '13px' }}
+                />
+                {existingGroups.length > 0 && (
+                  <datalist id="task-groups-list">
+                    {existingGroups.map(g => <option key={g} value={g} />)}
+                  </datalist>
+                )}
+                {groupName && (
+                  <button type="button" onClick={() => setGroupName('')}
+                    style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0', marginTop: 2 }}>
+                    × Groep verwijderen
+                  </button>
+                )}
+              </div>
+            )
+          })()}
+
           {/* Nog in te plannen */}
           <button type="button" onClick={() => { setNoDate(v => !v); if (!noDate) setAllDay(false) }}
             style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', color: noDate ? '#FACC15' : 'rgba(255,255,255,0.4)', fontSize: 13, padding: 0, width: 'fit-content' }}>
@@ -312,6 +345,22 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
             Nog in te plannen
           </button>
 
+          {/* Duur presets — altijd zichtbaar */}
+          <div>
+            <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', display: 'block', marginBottom: '6px' }}>Duur</label>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {DURATION_PRESETS.map(d => {
+                const active = durationMinutes === d
+                return (
+                  <button key={d} type="button" onClick={() => setDurationMinutes(d)}
+                    style={{ padding: '5px 10px', borderRadius: '8px', border: `1px solid ${active ? 'color-mix(in srgb, var(--accent) 50%, transparent)' : 'rgba(255,255,255,0.1)'}`, background: active ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'transparent', color: active ? 'var(--accent)' : 'rgba(255,255,255,0.35)', fontSize: '12px', cursor: 'pointer', transition: 'all 0.15s' }}>
+                    {d < 60 ? `${d}m` : `${d / 60}u`}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
           {!noDate && (
             <>
               {/* Datum */}
@@ -319,22 +368,6 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
                 <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Datum</label>
                 <input type="date" className="glass-input" value={date} style={{ colorScheme: 'dark' }}
                   onChange={e => setDate(e.target.value)} />
-              </div>
-
-              {/* Duur presets */}
-              <div>
-                <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', display: 'block', marginBottom: '6px' }}>Duur</label>
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  {DURATION_PRESETS.map(d => {
-                    const active = durationMinutes === d
-                    return (
-                      <button key={d} type="button" onClick={() => setDurationMinutes(d)}
-                        style={{ padding: '5px 10px', borderRadius: '8px', border: `1px solid ${active ? 'color-mix(in srgb, var(--accent) 50%, transparent)' : 'rgba(255,255,255,0.1)'}`, background: active ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'transparent', color: active ? 'var(--accent)' : 'rgba(255,255,255,0.35)', fontSize: '12px', cursor: 'pointer', transition: 'all 0.15s' }}>
-                        {d < 60 ? `${d}m` : `${d / 60}u`}
-                      </button>
-                    )
-                  })}
-                </div>
               </div>
 
               {/* Hele dag toggle */}
@@ -369,7 +402,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
                     <div>
                       <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Starttijd</label>
                       <input type="time" className="glass-input" value={startTime} style={{ colorScheme: 'dark', width: '100%' }}
-                        onChange={e => setStartTime(e.target.value)} />
+                        onChange={e => { setStartTime(e.target.value); setEndTime(minsToTimeStr(timeStrToMins(e.target.value) + durationMinutes)) }} />
                     </div>
                     <div>
                       <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Eindtijd</label>

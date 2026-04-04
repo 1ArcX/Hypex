@@ -44,16 +44,26 @@ export default function TakenPage({
   const tom = tomorrowStr()
   const wEnd = weekEndStr()
 
-  const counts = useMemo(() => ({
-    alles:     tasks.filter(t => !t.completed).length,
-    vandaag:   tasks.filter(t => !t.completed && t.date === ts).length,
-    morgen:    tasks.filter(t => !t.completed && t.date === tom).length,
-    week:      tasks.filter(t => !t.completed && t.date && t.date >= ts && t.date <= wEnd).length,
-    urgent:    tasks.filter(t => !t.completed && (t.priority ?? 2) === 1).length,
-    ongepland: tasks.filter(t => !t.completed && !t.date).length,
-  }), [tasks, ts, tom, wEnd])
+  const groups = useMemo(() => [...new Set(tasks.filter(t => t.group_name).map(t => t.group_name))], [tasks])
+
+  const counts = useMemo(() => {
+    const base = {
+      alles:     tasks.filter(t => !t.completed).length,
+      vandaag:   tasks.filter(t => !t.completed && t.date === ts).length,
+      morgen:    tasks.filter(t => !t.completed && t.date === tom).length,
+      week:      tasks.filter(t => !t.completed && t.date && t.date >= ts && t.date <= wEnd).length,
+      urgent:    tasks.filter(t => !t.completed && (t.priority ?? 2) === 1).length,
+      ongepland: tasks.filter(t => !t.completed && !t.date).length,
+    }
+    for (const g of groups) base[`group:${g}`] = tasks.filter(t => !t.completed && t.group_name === g).length
+    return base
+  }, [tasks, ts, tom, wEnd, groups])
 
   const filtered = useMemo(() => {
+    if (filter.startsWith('group:')) {
+      const g = filter.slice(6)
+      return tasks.filter(t => t.group_name === g)
+    }
     switch (filter) {
       case 'vandaag':   return tasks.filter(t => t.date === ts)
       case 'morgen':    return tasks.filter(t => t.date === tom)
@@ -108,6 +118,51 @@ export default function TakenPage({
                   fontSize: 10,
                   background: active ? 'color-mix(in srgb, var(--accent) 25%, transparent)' : 'rgba(255,255,255,0.08)',
                   color: active ? 'var(--accent)' : 'var(--text-3)',
+                  borderRadius: 10,
+                  padding: '1px 5px',
+                  fontWeight: 600,
+                }}>
+                  {cnt}
+                </span>
+              )}
+            </button>
+          )
+        })}
+        {/* Groep chips */}
+        {groups.map(g => {
+          const id = `group:${g}`
+          const active = filter === id
+          const cnt = counts[id]
+          return (
+            <button
+              key={id}
+              onClick={() => setFilter(active ? 'alles' : id)}
+              style={{
+                flexShrink: 0,
+                padding: '6px 12px',
+                borderRadius: 20,
+                border: active
+                  ? '1px solid rgba(250,204,21,0.5)'
+                  : '1px solid rgba(250,204,21,0.2)',
+                background: active
+                  ? 'rgba(250,204,21,0.12)'
+                  : 'rgba(250,204,21,0.04)',
+                color: active ? '#FACC15' : 'rgba(250,204,21,0.5)',
+                fontSize: 12,
+                fontWeight: active ? 600 : 400,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                transition: 'all 0.15s',
+              }}
+            >
+              {g}
+              {cnt > 0 && (
+                <span style={{
+                  fontSize: 10,
+                  background: active ? 'rgba(250,204,21,0.25)' : 'rgba(250,204,21,0.08)',
+                  color: active ? '#FACC15' : 'rgba(250,204,21,0.5)',
                   borderRadius: 10,
                   padding: '1px 5px',
                   fontWeight: 600,

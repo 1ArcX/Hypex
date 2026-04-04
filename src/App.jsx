@@ -419,6 +419,7 @@ export default function App() {
       priority: taskData.priority ?? 2,
       duration_minutes: taskData.duration_minutes ?? 30,
       due_date: taskData.due_date || null,
+      group_name: taskData.group_name || null,
     }
     let error
     if (taskData.id) {
@@ -673,6 +674,7 @@ export default function App() {
           subjects={subjects}
           calendarEvents={calendarEvents}
           tasks={tasks}
+          allTasks={tasks}
           onClose={() => { setShowTaskModal(false); setSelectedTask(null) }}
           onSave={handleSaveTask}
           onDelete={handleDeleteTask}
