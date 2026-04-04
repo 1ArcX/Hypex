@@ -278,7 +278,8 @@ export default function SpotifyWidget() {
       repeat:  { method: 'PUT',  url: `https://api.spotify.com/v1/me/player/repeat?state=${nextRepeat(repeatState)}` },
     }
     const { method, url } = endpoints[action]
-    await fetch(url, { method, headers: { Authorization: `Bearer ${getToken()}` } })
+    const res = await fetch(url, { method, headers: { Authorization: `Bearer ${getToken()}` } })
+    if (!res.ok) console.warn(`Spotify control(${action}) ${res.status}`)
 
     // Optimistisch bijwerken
     if (action === 'shuffle') setShuffleState(p => !p)
@@ -300,17 +301,17 @@ export default function SpotifyWidget() {
     if (isDesktop && tab === 'queue') setTab('nu')
   }, [isDesktop, tab])
 
-  // Nu afspelen: speelt de track direct af, in zijn context als die beschikbaar is
+  // Nu afspelen: altijd via track URI (context_uri + offset faalt bij radio/autoplay contexts)
   const playNow = async (trackUri) => {
     setTrackMenu(null)
-    const body = contextUri
-      ? JSON.stringify({ context_uri: contextUri, offset: { uri: trackUri } })
-      : JSON.stringify({ uris: [trackUri] })
-    await fetch('https://api.spotify.com/v1/me/player/play', {
+    const res = await fetch('https://api.spotify.com/v1/me/player/play', {
       method: 'PUT',
       headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
-      body,
+      body: JSON.stringify({ uris: [trackUri] }),
     })
+    if (!res.ok) {
+      console.warn(`Spotify playNow ${res.status}:`, await res.text().catch(() => ''))
+    }
     setTimeout(() => { fetchPlayback(); fetchQueue() }, 600)
   }
 
