@@ -301,17 +301,36 @@ export default function SpotifyWidget() {
     if (isDesktop && tab === 'queue') setTab('nu')
   }, [isDesktop, tab])
 
-  // Nu afspelen: altijd via track URI (context_uri + offset faalt bij radio/autoplay contexts)
+  // Nu afspelen via queue-positie: skip N keer zodat de wachtrij intact blijft
+  const playFromQueue = async (queueIndex) => {
+    for (let i = 0; i <= queueIndex; i++) {
+      await fetch('https://api.spotify.com/v1/me/player/next', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${getToken()}` },
+      })
+      if (i < queueIndex) await new Promise(r => setTimeout(r, 250))
+    }
+    setTimeout(() => { fetchPlayback(); fetchQueue() }, 700)
+  }
+
+  // Nu afspelen voor recent-tab: via URI (geen wachtrij-context om te bewaren)
   const playNow = async (trackUri) => {
     setTrackMenu(null)
+    // Gebruik context_uri+offset voor playlist/album/artist; anders losse URI
+    const isRegularCtx = contextUri && (
+      contextUri.startsWith('spotify:playlist:') ||
+      contextUri.startsWith('spotify:album:') ||
+      contextUri.startsWith('spotify:artist:')
+    )
+    const body = isRegularCtx
+      ? JSON.stringify({ context_uri: contextUri, offset: { uri: trackUri } })
+      : JSON.stringify({ uris: [trackUri] })
     const res = await fetch('https://api.spotify.com/v1/me/player/play', {
       method: 'PUT',
       headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uris: [trackUri] }),
+      body,
     })
-    if (!res.ok) {
-      console.warn(`Spotify playNow ${res.status}:`, await res.text().catch(() => ''))
-    }
+    if (!res.ok) console.warn(`Spotify playNow ${res.status}:`, await res.text().catch(() => ''))
     setTimeout(() => { fetchPlayback(); fetchQueue() }, 600)
   }
 
@@ -429,7 +448,7 @@ export default function SpotifyWidget() {
                 <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.22)', letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>Wachtrij</span>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   {(isDesktop ? queueTracks : queueTracks.slice(0, 3)).map((t, i) => (
-                    <TrackRow key={i} track={t} onPlayNow={() => playNow(t.uri)} onAddToQueue={() => addToQueue(t.uri)} compact />
+                    <TrackRow key={i} track={t} onPlayNow={() => playFromQueue(i)} onAddToQueue={() => addToQueue(t.uri)} compact />
                   ))}
                 </div>
               </div>
@@ -448,7 +467,7 @@ export default function SpotifyWidget() {
           {queueTracks.length === 0 ? (
             <p className="text-xs text-center py-4" style={{ color: 'rgba(255,255,255,0.3)' }}>Wachtrij is leeg</p>
           ) : queueTracks.map((t, i) => (
-            <TrackRow key={i} track={t} onPlayNow={() => playNow(t.uri)} onAddToQueue={() => addToQueue(t.uri)} index={i + 1} />
+            <TrackRow key={i} track={t} onPlayNow={() => playFromQueue(i)} onAddToQueue={() => addToQueue(t.uri)} index={i + 1} />
           ))}
         </div>
       )}

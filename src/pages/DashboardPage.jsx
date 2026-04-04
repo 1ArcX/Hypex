@@ -165,30 +165,12 @@ export default function DashboardPage({
     <div style={{ height: '100%', overflowY: 'auto', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
       {/* ── HERO: Greeting + Clock + Progress ── */}
-      <div className="card" style={{
-        padding: '22px 22px 20px',
-        background: 'linear-gradient(135deg, #1e1e1e 0%, #171717 100%)',
-        position: 'relative', overflow: 'hidden',
-      }}>
-        {/* Accent glow blob */}
-        <div style={{
-          position: 'absolute', top: '60%', left: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: 280, height: 180,
-          background: `radial-gradient(ellipse, ${isBreak ? 'rgba(255,140,66,0.07)' : 'rgba(0,255,209,0.06)'} 0%, transparent 70%)`,
-          pointerEvents: 'none',
-        }} />
-
+      <div className="card" style={{ padding: '20px 22px 18px' }}>
         {/* Greeting row */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, position: 'relative' }}>
-          <div>
-            <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '0 0 2px', letterSpacing: '0.04em', textTransform: 'uppercase', fontWeight: 600 }}>
-              {getGreeting()}
-            </p>
-            <p style={{ fontSize: 18, color: 'var(--text-1)', margin: 0, fontWeight: 700, letterSpacing: '-0.3px' }}>
-              {displayName}
-            </p>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0, letterSpacing: '0.03em' }}>
+            {getGreeting()}{displayName ? `, ${displayName}` : ''}
+          </p>
           {showMagisterBanner && (
             <button
               onClick={() => onNavigate('school')}
@@ -209,13 +191,13 @@ export default function DashboardPage({
         </div>
 
         {/* Klok gecenterd */}
-        <div style={{ textAlign: 'center', marginBottom: totalToday > 0 ? 18 : 0, position: 'relative' }}>
+        <div style={{ textAlign: 'center', marginBottom: totalToday > 0 ? 14 : 0 }}>
           <Clock isBreak={isBreak} />
         </div>
 
         {totalToday > 0 && (
-          <div style={{ position: 'relative' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7 }}>
               <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 500 }}>Voortgang vandaag</span>
               <span style={{ fontSize: 11, color: progressPct === 100 ? 'var(--accent)' : 'var(--text-2)', fontWeight: 700 }}>
                 {completedToday}/{totalToday} {progressPct === 100 ? '✓' : ''}
@@ -235,47 +217,39 @@ export default function DashboardPage({
         )}
       </div>
 
-      {/* ── STATS MINI-GRID ── */}
+      {/* ── STATS ROW ── */}
       {openCount > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
           <div style={{
             background: urgentCount > 0 ? 'rgba(255,60,60,0.08)' : 'rgba(255,255,255,0.03)',
             border: `1px solid ${urgentCount > 0 ? 'rgba(255,60,60,0.25)' : 'rgba(255,255,255,0.07)'}`,
-            borderRadius: 12, padding: '12px 10px', textAlign: 'center',
+            borderRadius: 12, padding: '10px 12px',
+            display: 'flex', alignItems: 'center', gap: 8,
           }}>
-            <p style={{ fontSize: 24, fontWeight: 800, color: urgentCount > 0 ? '#ff6b6b' : 'var(--text-2)', margin: 0, lineHeight: 1 }}>
-              {urgentCount}
-            </p>
-            <p style={{ fontSize: 10, color: urgentCount > 0 ? 'rgba(255,107,107,0.6)' : 'var(--text-3)', margin: '4px 0 0', fontWeight: 600, letterSpacing: '0.04em' }}>
-              Urgent
-            </p>
+            <span style={{ fontSize: 18, fontWeight: 800, color: urgentCount > 0 ? '#ff6b6b' : 'var(--text-2)', lineHeight: 1 }}>{urgentCount}</span>
+            <span style={{ fontSize: 11, color: urgentCount > 0 ? 'rgba(255,107,107,0.65)' : 'var(--text-3)', fontWeight: 600 }}>Urgent</span>
           </div>
           <div style={{
             background: overdueCount > 0 ? 'rgba(255,120,50,0.07)' : 'rgba(255,255,255,0.03)',
             border: `1px solid ${overdueCount > 0 ? 'rgba(255,120,50,0.2)' : 'rgba(255,255,255,0.07)'}`,
-            borderRadius: 12, padding: '12px 10px', textAlign: 'center',
+            borderRadius: 12, padding: '10px 12px',
+            display: 'flex', alignItems: 'center', gap: 8,
           }}>
-            <p style={{ fontSize: 24, fontWeight: 800, color: overdueCount > 0 ? '#FF8C42' : 'var(--text-2)', margin: 0, lineHeight: 1 }}>
-              {overdueCount}
-            </p>
-            <p style={{ fontSize: 10, color: overdueCount > 0 ? 'rgba(255,140,66,0.6)' : 'var(--text-3)', margin: '4px 0 0', fontWeight: 600, letterSpacing: '0.04em' }}>
-              Te laat
-            </p>
+            <span style={{ fontSize: 18, fontWeight: 800, color: overdueCount > 0 ? '#FF8C42' : 'var(--text-2)', lineHeight: 1 }}>{overdueCount}</span>
+            <span style={{ fontSize: 11, color: overdueCount > 0 ? 'rgba(255,140,66,0.65)' : 'var(--text-3)', fontWeight: 600 }}>Te laat</span>
           </div>
           <div style={{
             background: 'rgba(0,255,209,0.05)',
             border: '1px solid rgba(0,255,209,0.12)',
-            borderRadius: 12, padding: '12px 10px', textAlign: 'center',
+            borderRadius: 12, padding: '10px 12px',
+            display: 'flex', alignItems: 'center', gap: 8,
           }}>
-            <p style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)', margin: 0, lineHeight: 1 }}>
-              {openCount}
-            </p>
-            <p style={{ fontSize: 10, color: 'rgba(0,255,209,0.5)', margin: '4px 0 0', fontWeight: 600, letterSpacing: '0.04em' }}>
-              Open
-            </p>
+            <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}>{openCount}</span>
+            <span style={{ fontSize: 11, color: 'rgba(0,255,209,0.55)', fontWeight: 600 }}>Open</span>
           </div>
         </div>
       )}
+
 
       {/* ── VANDAAG-STRIP ── */}
       {todayItems.length > 0 && (
