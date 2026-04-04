@@ -129,7 +129,7 @@ export default function PomodoroPage({ onModeChange, onFocusModeChange, userId, 
 
       {/* Week stats */}
       <div style={{ maxWidth: 480, margin: '0 auto', padding: '0 20px' }}>
-        <PomodoroStats refreshKey={sessions.length} />
+        <PomodoroStats refreshKey={sessions.length} userId={userId} />
       </div>
 
       {/* Session log */}

@@ -33,6 +33,38 @@ function nextRepeat(r) {
   return r === 'off' ? 'context' : r === 'context' ? 'track' : 'off'
 }
 
+// ── TrackRow: track met "▶ Nu" en "+ Queue" knoppen ─────────────────────────
+function TrackRow({ track, onPlayNow, onAddToQueue, compact = false, index }) {
+  if (!track) return null
+  const imgUrl = track.album?.images?.[compact ? 2 : 1]?.url
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: compact ? 7 : 10, padding: compact ? '2px 4px' : '5px 8px', borderRadius: 8 }}>
+      {imgUrl && (
+        <img src={imgUrl} style={{ width: compact ? 22 : 32, height: compact ? 22 : 32, borderRadius: 4, flexShrink: 0 }} alt="" />
+      )}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontSize: compact ? 11 : 12, color: 'rgba(255,255,255,0.75)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>
+          {track.name}
+        </p>
+        <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {track.artists?.map(a => a.name).join(', ')}
+        </p>
+      </div>
+      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+        <button onClick={onPlayNow} title="Nu afspelen"
+          style={{ background: 'rgba(29,185,84,0.12)', border: '1px solid rgba(29,185,84,0.25)', borderRadius: 6, color: '#1DB954', cursor: 'pointer', padding: '4px 7px', fontSize: 10, fontWeight: 600 }}>
+          ▶
+        </button>
+        <button onClick={onAddToQueue} title="Aan queue toevoegen"
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: 'rgba(255,255,255,0.45)', cursor: 'pointer', padding: '4px 7px', fontSize: 10, fontWeight: 600 }}>
+          +
+        </button>
+      </div>
+      {index !== undefined && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.18)', marginLeft: 2, flexShrink: 0 }}>{index}</span>}
+    </div>
+  )
+}
+
 export default function SpotifyWidget() {
   const [token, setToken] = useState(localStorage.getItem('spotify_token') || null)
   const [track, setTrack] = useState(null)
@@ -41,10 +73,12 @@ export default function SpotifyWidget() {
   const [durationMs, setDurationMs] = useState(0)
   const [shuffleState, setShuffleState] = useState(false)
   const [repeatState, setRepeatState] = useState('off')
+  const [contextUri, setContextUri] = useState(null)
   const [queueTracks, setQueueTracks] = useState([])
   const [recentTracks, setRecentTracks] = useState(null)
   const [recentError, setRecentError] = useState(false)
   const [tab, setTab] = useState('nu')
+  const [trackMenu, setTrackMenu] = useState(null) // { uri, x, y }
   const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 768)
   const [needsReconnect, setNeedsReconnect] = useState(() =>
     !!localStorage.getItem('spotify_token') &&
@@ -180,6 +214,7 @@ export default function SpotifyWidget() {
     setIsPlaying(data.is_playing)
     setShuffleState(data.shuffle_state)
     setRepeatState(data.repeat_state)
+    setContextUri(data.context?.uri || null)
     setProgressMs(data.progress_ms)
     setDurationMs(data.item.duration_ms)
 
@@ -197,7 +232,6 @@ export default function SpotifyWidget() {
 
     // Track change → queue opnieuw ophalen
     if (prevTrackId && prevTrackId !== newTrackId) {
-      setNextTrack(null)
       fetchQueue()
     }
   }, [refreshAccessToken, fetchQueue])
@@ -266,16 +300,28 @@ export default function SpotifyWidget() {
     if (isDesktop && tab === 'queue') setTab('nu')
   }, [isDesktop, tab])
 
-  const playQueueTrack = async (index) => {
-    // Skip (index + 1) times to reach the song while keeping queue/playlist context
-    for (let i = 0; i <= index; i++) {
-      await fetch('https://api.spotify.com/v1/me/player/next', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${getToken()}` },
-      })
-      if (i < index) await new Promise(r => setTimeout(r, 250))
-    }
+  // Nu afspelen: speelt de track direct af, in zijn context als die beschikbaar is
+  const playNow = async (trackUri) => {
+    setTrackMenu(null)
+    const body = contextUri
+      ? JSON.stringify({ context_uri: contextUri, offset: { uri: trackUri } })
+      : JSON.stringify({ uris: [trackUri] })
+    await fetch('https://api.spotify.com/v1/me/player/play', {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
+      body,
+    })
     setTimeout(() => { fetchPlayback(); fetchQueue() }, 600)
+  }
+
+  // Aan queue toevoegen
+  const addToQueue = async (trackUri) => {
+    setTrackMenu(null)
+    await fetch(`https://api.spotify.com/v1/me/player/queue?uri=${encodeURIComponent(trackUri)}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getToken()}` },
+    })
+    setTimeout(fetchQueue, 800)
   }
 
   const handleLogout = () => {
@@ -381,21 +427,8 @@ export default function SpotifyWidget() {
               <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                 <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.22)', letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>Wachtrij</span>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {(isDesktop ? queueTracks : queueTracks.slice(0, 1)).map((t, i) => (
-                    <div key={i}
-                      onClick={() => playQueueTrack(i)}
-                      style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', borderRadius: 6, padding: '2px 4px', margin: '0 -4px', transition: 'background 0.1s' }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                    >
-                      {t.album?.images?.[2]?.url && (
-                        <img src={t.album.images[2].url} style={{ width: 22, height: 22, borderRadius: 3, flexShrink: 0 }} alt="" />
-                      )}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</p>
-                        <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.artists?.map(a => a.name).join(', ')}</p>
-                      </div>
-                    </div>
+                  {(isDesktop ? queueTracks : queueTracks.slice(0, 3)).map((t, i) => (
+                    <TrackRow key={i} track={t} onPlayNow={() => playNow(t.uri)} onAddToQueue={() => addToQueue(t.uri)} compact />
                   ))}
                 </div>
               </div>
@@ -410,29 +443,11 @@ export default function SpotifyWidget() {
 
       {/* Tab: Queue */}
       {tab === 'queue' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {queueTracks.length === 0 ? (
-            <p className="text-xs text-center py-4" style={{ color: 'rgba(255,255,255,0.3)' }}>
-              Wachtrij is leeg
-            </p>
+            <p className="text-xs text-center py-4" style={{ color: 'rgba(255,255,255,0.3)' }}>Wachtrij is leeg</p>
           ) : queueTracks.map((t, i) => (
-            <div key={i}
-              onClick={() => playQueueTrack(i)}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', borderRadius: 8, cursor: 'pointer', transition: 'background 0.1s' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-            >
-              {t.album?.images?.[2]?.url && (
-                <img src={t.album.images[2].url} style={{ width: 32, height: 32, borderRadius: 4, flexShrink: 0 }} alt="" />
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium truncate text-white">{t.name}</p>
-                <p className="text-xs truncate" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                  {t.artists?.map(a => a.name).join(', ')}
-                </p>
-              </div>
-              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', flexShrink: 0 }}>{i + 1}</span>
-            </div>
+            <TrackRow key={i} track={t} onPlayNow={() => playNow(t.uri)} onAddToQueue={() => addToQueue(t.uri)} index={i + 1} />
           ))}
         </div>
       )}
@@ -442,9 +457,7 @@ export default function SpotifyWidget() {
         <div>
           {(recentError || needsReconnect) ? (
             <div className="text-center py-3">
-              <p className="text-xs mb-3" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                Herverbind om recent afgespeeld te zien
-              </p>
+              <p className="text-xs mb-3" style={{ color: 'rgba(255,255,255,0.4)' }}>Herverbind om recent afgespeeld te zien</p>
               <button onClick={handleLogin} style={{ background: 'rgba(29,185,84,0.15)', border: '1px solid rgba(29,185,84,0.4)', borderRadius: 6, color: '#1DB954', fontSize: 11, cursor: 'pointer', padding: '6px 12px' }}>
                 Herverbind
               </button>
@@ -454,19 +467,9 @@ export default function SpotifyWidget() {
           ) : recentTracks.length === 0 ? (
             <p className="text-xs text-center py-4" style={{ color: 'rgba(255,255,255,0.3)' }}>Geen recent afgespeeld</p>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {recentTracks.map((item, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {item.track?.album?.images?.[2]?.url && (
-                    <img src={item.track.album.images[2].url} style={{ width: 28, height: 28, borderRadius: 4 }} alt="" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium truncate text-white">{item.track?.name}</p>
-                    <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }} className="truncate">
-                      {item.track?.artists?.map(a => a.name).join(', ')}
-                    </p>
-                  </div>
-                </div>
+                <TrackRow key={i} track={item.track} onPlayNow={() => playNow(item.track.uri)} onAddToQueue={() => addToQueue(item.track.uri)} />
               ))}
             </div>
           )}

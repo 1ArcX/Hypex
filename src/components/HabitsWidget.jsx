@@ -63,6 +63,32 @@ function savePerfectDays(s) {
   localStorage.setItem('habit_perfect_days', JSON.stringify([...s]))
 }
 
+async function loadAchievementsCloud(userId) {
+  try {
+    const { data } = await supabase.from('habit_achievements')
+      .select('xp, seen_achievements, perfect_days').eq('user_id', userId).single()
+    if (!data) return null
+    return {
+      xp: data.xp || 0,
+      seenAchievements: new Set(data.seen_achievements || []),
+      perfectDays: new Set(data.perfect_days || []),
+    }
+  } catch { return null }
+}
+
+async function saveAchievementsCloud(userId, xp, seenAchievements, perfectDays) {
+  if (!userId) return
+  try {
+    await supabase.from('habit_achievements').upsert({
+      user_id: userId,
+      xp: Math.max(0, xp),
+      seen_achievements: [...seenAchievements],
+      perfect_days: [...perfectDays],
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id' })
+  } catch {}
+}
+
 // ─── Streak helpers ───────────────────────────────────────────────────────────
 function streakColor(streak) {
   if (streak >= 30) return '#FF3D00'
@@ -471,6 +497,7 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
         saveSeenAchievements(seenAchievementsRef.current)
         setTimeout(() => setPendingAchievement(ACHIEVEMENTS.find(a => a.key === achKey)), 1500)
       }
+      saveAchievementsCloud(userId, loadXP(), seenAchievementsRef.current, perfectDaysRef.current)
     }
   }, [completions, counterValues]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -500,6 +527,24 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
     if (!userId) return
     Promise.all([fetchHabits(), fetchCompletions()]).then(() => setLoading(false))
   }, [userId, fetchHabits, fetchCompletions])
+
+  // ── Laad achievements uit cloud bij start ──────────────────────────────────
+  useEffect(() => {
+    if (!userId) return
+    loadAchievementsCloud(userId).then(cloud => {
+      if (!cloud) return
+      const localXp = loadXP()
+      const bestXp = Math.max(localXp, cloud.xp)
+      saveXP(bestXp)
+      setXpState(bestXp)
+      const mergedSeen = new Set([...seenAchievementsRef.current, ...cloud.seenAchievements])
+      seenAchievementsRef.current = mergedSeen
+      saveSeenAchievements(mergedSeen)
+      const mergedDays = new Set([...perfectDaysRef.current, ...cloud.perfectDays])
+      perfectDaysRef.current = mergedDays
+      savePerfectDays(mergedDays)
+    })
+  }, [userId])
 
   useEffect(() => {
     if (syncTrigger === 0 || !userId) return
@@ -567,7 +612,8 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
         }
       }
     }
-  }, [])
+    saveAchievementsCloud(userId, newXp, seenAchievementsRef.current, perfectDaysRef.current)
+  }, [userId])
 
   // ── Toggle check habit ─────────────────────────────────────────────────────
   const toggleCompletion = async (habit) => {
@@ -591,6 +637,7 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
           if (ach && !seenAchievementsRef.current.has(ach.key)) {
             seenAchievementsRef.current.add(ach.key)
             saveSeenAchievements(seenAchievementsRef.current)
+            saveAchievementsCloud(userId, loadXP(), seenAchievementsRef.current, perfectDaysRef.current)
             setPendingAchievement(ach)
           }
         }

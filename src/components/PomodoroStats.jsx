@@ -1,12 +1,13 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
+import { supabase } from '../supabaseClient'
 
 const LS_STATS = 'pomodoro_stats'
 const DAYS = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo']
 
 function getWeekDays() {
   const now = new Date()
-  const day = now.getDay()                       // 0=zo, 1=ma, ...
-  const mondayOffset = day === 0 ? -6 : 1 - day // hoeveel dagen terug naar maandag
+  const day = now.getDay()
+  const mondayOffset = day === 0 ? -6 : 1 - day
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(now)
     d.setDate(now.getDate() + mondayOffset + i)
@@ -21,11 +22,47 @@ function fmtMins(mins) {
   return h > 0 ? (m > 0 ? `${h}u ${m}m` : `${h}u`) : `${m}m`
 }
 
-export default function PomodoroStats({ refreshKey }) {
-  const stats = (() => { try { return JSON.parse(localStorage.getItem(LS_STATS)) || {} } catch { return {} } })()
+function loadLocalStats() {
+  try { return JSON.parse(localStorage.getItem(LS_STATS)) || {} } catch { return {} }
+}
+
+export default function PomodoroStats({ refreshKey, userId }) {
   const weekDays = getWeekDays()
   const todayStr = new Date().toISOString().slice(0, 10)
-  const values = weekDays.map(d => stats[d] || 0)
+  const [statsMap, setStatsMap] = useState(() => loadLocalStats())
+
+  useEffect(() => {
+    if (!userId) {
+      setStatsMap(loadLocalStats())
+      return
+    }
+    const from = weekDays[0]
+    supabase
+      .from('pomodoro_sessions')
+      .select('date, duration_mins')
+      .eq('user_id', userId)
+      .eq('mode', 'work')
+      .gte('date', from)
+      .then(({ data }) => {
+        if (!data || data.length === 0) {
+          setStatsMap(loadLocalStats())
+          return
+        }
+        // Sommeer minuten per dag
+        const map = {}
+        for (const row of data) {
+          map[row.date] = (map[row.date] || 0) + (row.duration_mins || 0)
+        }
+        // Merge met localStorage (neem max per dag)
+        const local = loadLocalStats()
+        for (const [day, mins] of Object.entries(local)) {
+          map[day] = Math.max(map[day] || 0, mins)
+        }
+        setStatsMap(map)
+      })
+  }, [userId, refreshKey]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const values = weekDays.map(d => statsMap[d] || 0)
   const maxVal = Math.max(...values, 1)
   const total = values.reduce((a, b) => a + b, 0)
   const BAR_MAX_H = 52
