@@ -2,6 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { supabase } from '../supabaseClient'
 import { Plus, ChevronLeft, ChevronRight, X, Save, Trash2 } from 'lucide-react'
 import { callMagister } from '../utils/magisterApi'
+import { callSomtoday, getSomtodayCreds } from '../utils/somtodayApi'
 
 const HOUR_H = 56
 const TIME_COL = 48
@@ -89,6 +90,7 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
   const [form, setForm] = useState(emptyForm(new Date()))
   const [saving, setSaving] = useState(false)
   const [magisterLessons, setMagisterLessons] = useState([])
+  const [somtodayLessons, setSomtodayLessons] = useState([])
   const [lessonDetail, setLessonDetail] = useState(null)
   const [scheduleVersion, setScheduleVersion] = useState(0)
   const [magisterSyncing, setMagisterSyncing] = useState(false)
@@ -97,7 +99,7 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
   const now = new Date()
 
   useEffect(() => { fetchEvents() }, [])
-  useEffect(() => { onLessonsChange?.(magisterLessons) }, [magisterLessons])
+  useEffect(() => { onLessonsChange?.([...magisterLessons, ...somtodayLessons]) }, [magisterLessons, somtodayLessons])
   useEffect(() => { onEventsChange?.(events) }, [events])
 
   useLayoutEffect(() => {
@@ -117,6 +119,23 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
     window.addEventListener('magisterLogin', handler)
     return () => window.removeEventListener('magisterLogin', handler)
   }, [])
+
+  // Listen for SOMtoday login → re-fetch schedule
+  useEffect(() => {
+    const handler = () => {
+      const days = view === 'week' ? getWeekDays(current) : [current]
+      const from = toDateStr(days[0])
+      const to = toDateStr(days[days.length - 1])
+      getSomtodayCreds(userId).then(creds => {
+        if (!creds) return
+        callSomtoday('schedule', { accessToken: creds.accessToken, somtodayApiUrl: creds.somtodayApiUrl, from, to })
+          .then(data => { if (Array.isArray(data)) setSomtodayLessons(data) })
+          .catch(() => {})
+      })
+    }
+    window.addEventListener('somtodayLogin', handler)
+    return () => window.removeEventListener('somtodayLogin', handler)
+  }, [view, current])
 
   // Fetch Magister schedule for visible range, cached per range in sessionStorage
   useEffect(() => {
@@ -160,6 +179,19 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
     }).finally(() => setMagisterSyncing(false))
   }, [view, toDateStr(current), scheduleVersion])
 
+  // Fetch SOMtoday schedule for visible range
+  useEffect(() => {
+    const days = view === 'week' ? getWeekDays(current) : [current]
+    const from = toDateStr(days[0])
+    const to = toDateStr(days[days.length - 1])
+    getSomtodayCreds(userId).then(creds => {
+      if (!creds) return
+      callSomtoday('schedule', { accessToken: creds.accessToken, somtodayApiUrl: creds.somtodayApiUrl, from, to })
+        .then(data => { if (Array.isArray(data)) setSomtodayLessons(data) })
+        .catch(() => {})
+    })
+  }, [view, toDateStr(current)])
+
   const fetchEvents = async () => {
     const { data } = await supabase.from('calendar_events').select('*').eq('user_id', userId)
     if (data) setEvents(data)
@@ -172,7 +204,7 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
     } catch { return [] }
   }
 
-  const getMagisterLessonsForDay = (date) => magisterLessons.filter(les => {
+  const getMagisterLessonsForDay = (date) => [...magisterLessons, ...somtodayLessons].filter(les => {
     if (!les.start) return false
     return isSameDay(new Date(les.start), date)
   })

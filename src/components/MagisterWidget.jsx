@@ -3,6 +3,7 @@ import { BookOpen, ClipboardList, RefreshCw, Settings, ChevronDown, ChevronUp, A
 import { supabase } from '../supabaseClient'
 import { matchVak } from '../utils/alleVakken'
 import { callMagister, clearStoredTokens } from '../utils/magisterApi'
+import { callSomtoday, searchSchools, somtodayKey } from '../utils/somtodayApi'
 
 const storageKey = (userId) => `magister_credentials_${userId}`
 
@@ -67,8 +68,26 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
     if (!userId) return null
     try { return JSON.parse(localStorage.getItem(storageKey(userId))) || null } catch { return null }
   })
+  const [somtodayCreds, setSomtodayCreds] = useState(() => {
+    if (!userId) return null
+    try { return JSON.parse(localStorage.getItem(somtodayKey(userId))) || null } catch { return null }
+  })
   const [formCreds, setFormCreds] = useState({ school: 'ichthus', username: '', password: '' })
-  const [showSettings, setShowSettings] = useState(!creds)
+  const [showSettings, setShowSettings] = useState(() => {
+    if (!userId) return true
+    try {
+      return !JSON.parse(localStorage.getItem(storageKey(userId))) && !JSON.parse(localStorage.getItem(somtodayKey(userId)))
+    } catch { return true }
+  })
+  // SOMtoday login form state
+  const [stProvider, setStProvider] = useState('magister')  // 'magister' | 'somtoday'
+  const [stSchoolQuery, setStSchoolQuery] = useState('')
+  const [stSchoolResults, setStSchoolResults] = useState([])
+  const [stSelectedSchool, setStSelectedSchool] = useState(null)  // { name, uuid }
+  const [stUsername, setStUsername] = useState('')
+  const [stPassword, setStPassword] = useState('')
+  const [stLoading, setStLoading] = useState(false)
+  const [stError, setStError] = useState(null)
   const [tab, setTab] = useState('vakken')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -207,8 +226,61 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
     localStorage.removeItem(storageKey(userId))
     setCreds(null)
     setData({ grades: null, homework: null, assignments: null, studiewijzer: null })
-    setShowSettings(true)
+    if (!somtodayCreds) setShowSettings(true)
     setFormCreds({ school: '', username: '', password: '' })
+  }
+
+  // SOMtoday: search schools with debounce
+  const searchSomtodaySchools = async (q) => {
+    setStSchoolQuery(q)
+    setStSelectedSchool(null)
+    if (q.length < 2) { setStSchoolResults([]); return }
+    try {
+      const results = await searchSchools(q)
+      setStSchoolResults(results)
+    } catch { setStSchoolResults([]) }
+  }
+
+  const loginSomtoday = async () => {
+    if (!stSelectedSchool || !stUsername || !stPassword) return
+    setStLoading(true); setStError(null)
+    try {
+      const tokenData = await callSomtoday('token', {
+        username: stUsername,
+        password: stPassword,
+        schoolUuid: stSelectedSchool.uuid,
+      })
+      // Fetch student info
+      const me = await callSomtoday('me', {
+        accessToken: tokenData.access_token,
+        somtodayApiUrl: tokenData.somtoday_api_url,
+      })
+      const stored = {
+        schoolUuid: stSelectedSchool.uuid,
+        schoolName: stSelectedSchool.name,
+        somtodayApiUrl: tokenData.somtoday_api_url,
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token,
+        expiresAt: Math.floor(Date.now() / 1000) + (tokenData.expires_in || 3600),
+        studentId: me.id,
+        displayName: me.roepnaam || stUsername,
+      }
+      localStorage.setItem(somtodayKey(userId), JSON.stringify(stored))
+      setSomtodayCreds(stored)
+      setShowSettings(false)
+      window.dispatchEvent(new Event('somtodayLogin'))
+      // Reset form
+      setStUsername(''); setStPassword(''); setStSchoolQuery(''); setStSelectedSchool(null); setStSchoolResults([])
+    } catch (e) {
+      setStError(e.message)
+    }
+    setStLoading(false)
+  }
+
+  const logoutSomtoday = () => {
+    localStorage.removeItem(somtodayKey(userId))
+    setSomtodayCreds(null)
+    if (!creds) setShowSettings(true)
   }
 
   const refresh = () => {
@@ -315,10 +387,15 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
           <div style={{ width: 24, height: 24, borderRadius: 8, background: 'rgba(129,140,248,0.15)', border: '1px solid rgba(129,140,248,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <BookOpen size={12} style={{ color: '#818CF8' }} />
           </div>
-          <span style={{ fontSize: 10, color: '#818CF8', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Magister</span>
+          <span style={{ fontSize: 10, color: '#818CF8', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase' }}>School</span>
           {creds && (
             <span style={{ background: accentBg(10), border: accentBorder(25), borderRadius: '20px', padding: '1px 8px', fontSize: '10px', color: 'var(--accent)' }}>
-              {creds.school}
+              Magister
+            </span>
+          )}
+          {somtodayCreds && (
+            <span style={{ background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.3)', borderRadius: '20px', padding: '1px 8px', fontSize: '10px', color: '#FBBF24' }}>
+              SOMtoday
             </span>
           )}
         </div>
@@ -333,7 +410,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
           )}
           <button onClick={() => setShowSettings(!showSettings)}
             style={{ background: showSettings ? accentBg(15) : 'rgba(255,255,255,0.05)', border: showSettings ? accentBorder(40) : '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '3px 7px', cursor: 'pointer', color: showSettings ? 'var(--accent)' : 'rgba(255,255,255,0.4)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Settings size={11} /> {creds ? (showSettings ? 'Sluiten' : 'Instelling') : 'Inloggen'}
+            <Settings size={11} /> {(creds || somtodayCreds) ? (showSettings ? 'Sluiten' : 'Instelling') : 'Inloggen'}
           </button>
           <button onClick={() => setExpanded(!expanded)}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '2px' }}>
@@ -346,39 +423,122 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
         <>
           {/* Login/instellingen form */}
           {showSettings && (
-            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '14px', marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', margin: 0 }}>
-                Log in met je Magister-account. Vakken en digitaal lesmateriaal worden automatisch gesynchroniseerd.
-              </p>
-              <input className="glass-input" placeholder="Leerlingnummer" value={formCreds.username}
-                onChange={e => setFormCreds(p => ({ ...p, username: e.target.value }))}
-                autoComplete="off" style={{ fontSize: '12px' }} />
-              <input className="glass-input" type="password" placeholder="Wachtwoord" value={formCreds.password}
-                onChange={e => setFormCreds(p => ({ ...p, password: e.target.value }))}
-                onKeyDown={e => e.key === 'Enter' && saveCreds()}
-                autoComplete="new-password" style={{ fontSize: '12px' }} />
-              {error && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ff6b6b', fontSize: '11px' }}>
-                  <AlertCircle size={12} /> {error}
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: '8px' }}>
-                {creds && (
-                  <button onClick={logout}
-                    style={{ flex: 1, padding: '7px', borderRadius: '8px', border: '1px solid rgba(255,80,80,0.3)', background: 'rgba(255,80,80,0.08)', color: '#ff6b6b', cursor: 'pointer', fontSize: '12px' }}>
-                    Uitloggen
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '14px', marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {/* Provider selector */}
+              <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 3, border: '1px solid rgba(255,255,255,0.08)' }}>
+                {['magister', 'somtoday'].map(p => (
+                  <button key={p} onClick={() => setStProvider(p)}
+                    style={{ flex: 1, padding: '5px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: stProvider === p ? 700 : 400,
+                      background: stProvider === p ? (p === 'somtoday' ? 'rgba(251,191,36,0.15)' : accentBg(15)) : 'transparent',
+                      color: stProvider === p ? (p === 'somtoday' ? '#FBBF24' : 'var(--accent)') : 'rgba(255,255,255,0.4)',
+                      transition: 'all 0.12s',
+                    }}>
+                    {p === 'magister' ? 'Magister' : 'SOMtoday'}
                   </button>
-                )}
-                <button onClick={saveCreds} disabled={loading || !formCreds.username || !formCreds.password}
-                  style={{ flex: 2, padding: '7px', borderRadius: '8px', border: accentBorder(40), background: accentBg(12), color: 'var(--accent)', cursor: 'pointer', fontSize: '12px', fontWeight: 600, opacity: (!formCreds.username || !formCreds.password) ? 0.4 : 1 }}>
-                  {loading ? 'Bezig...' : 'Inloggen & opslaan'}
-                </button>
+                ))}
               </div>
+
+              {/* Magister form */}
+              {stProvider === 'magister' && (<>
+                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', margin: 0 }}>
+                  Log in met je Magister-account. Vakken en lesmateriaal worden automatisch gesynchroniseerd.
+                </p>
+                <input className="glass-input" placeholder="Leerlingnummer" value={formCreds.username}
+                  onChange={e => setFormCreds(p => ({ ...p, username: e.target.value }))}
+                  autoComplete="off" style={{ fontSize: '12px' }} />
+                <input className="glass-input" type="password" placeholder="Wachtwoord" value={formCreds.password}
+                  onChange={e => setFormCreds(p => ({ ...p, password: e.target.value }))}
+                  onKeyDown={e => e.key === 'Enter' && saveCreds()}
+                  autoComplete="new-password" style={{ fontSize: '12px' }} />
+                {error && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ff6b6b', fontSize: '11px' }}>
+                    <AlertCircle size={12} /> {error}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {creds && (
+                    <button onClick={logout}
+                      style={{ flex: 1, padding: '7px', borderRadius: '8px', border: '1px solid rgba(255,80,80,0.3)', background: 'rgba(255,80,80,0.08)', color: '#ff6b6b', cursor: 'pointer', fontSize: '12px' }}>
+                      Ontkoppelen
+                    </button>
+                  )}
+                  <button onClick={saveCreds} disabled={loading || !formCreds.username || !formCreds.password}
+                    style={{ flex: 2, padding: '7px', borderRadius: '8px', border: accentBorder(40), background: accentBg(12), color: 'var(--accent)', cursor: 'pointer', fontSize: '12px', fontWeight: 600, opacity: (!formCreds.username || !formCreds.password) ? 0.4 : 1 }}>
+                    {loading ? 'Bezig...' : creds ? 'Opnieuw inloggen' : 'Inloggen & opslaan'}
+                  </button>
+                </div>
+              </>)}
+
+              {/* SOMtoday form */}
+              {stProvider === 'somtoday' && (<>
+                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', margin: 0 }}>
+                  Log in met je SOMtoday-account voor rooster en lessen.
+                </p>
+                {/* School search */}
+                <div style={{ position: 'relative' }}>
+                  <input className="glass-input" placeholder="Zoek je school..." value={stSelectedSchool ? stSelectedSchool.name : stSchoolQuery}
+                    onChange={e => { if (stSelectedSchool) setStSelectedSchool(null); searchSomtodaySchools(e.target.value) }}
+                    autoComplete="off" style={{ fontSize: '12px', width: '100%' }} />
+                  {stSchoolResults.length > 0 && !stSelectedSchool && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, marginTop: 2, maxHeight: 180, overflowY: 'auto' }}>
+                      {stSchoolResults.map(s => (
+                        <div key={s.uuid} onClick={() => { setStSelectedSchool(s); setStSchoolQuery(s.name); setStSchoolResults([]) }}
+                          style={{ padding: '8px 12px', fontSize: 12, cursor: 'pointer', color: 'var(--text-1)', borderBottom: '1px solid var(--border)' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                          {s.name}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <input className="glass-input" placeholder="Gebruikersnaam (bijv. 123456@school.nl)" value={stUsername}
+                  onChange={e => setStUsername(e.target.value)}
+                  autoComplete="off" style={{ fontSize: '12px' }} />
+                <input className="glass-input" type="password" placeholder="Wachtwoord" value={stPassword}
+                  onChange={e => setStPassword(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && loginSomtoday()}
+                  autoComplete="new-password" style={{ fontSize: '12px' }} />
+                {stError && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ff6b6b', fontSize: '11px' }}>
+                    <AlertCircle size={12} /> {stError}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {somtodayCreds && (
+                    <button onClick={logoutSomtoday}
+                      style={{ flex: 1, padding: '7px', borderRadius: '8px', border: '1px solid rgba(255,80,80,0.3)', background: 'rgba(255,80,80,0.08)', color: '#ff6b6b', cursor: 'pointer', fontSize: '12px' }}>
+                      Ontkoppelen
+                    </button>
+                  )}
+                  <button onClick={loginSomtoday} disabled={stLoading || !stSelectedSchool || !stUsername || !stPassword}
+                    style={{ flex: 2, padding: '7px', borderRadius: '8px', border: '1px solid rgba(251,191,36,0.4)', background: 'rgba(251,191,36,0.1)', color: '#FBBF24', cursor: 'pointer', fontSize: '12px', fontWeight: 600, opacity: (!stSelectedSchool || !stUsername || !stPassword) ? 0.4 : 1 }}>
+                    {stLoading ? 'Bezig...' : somtodayCreds ? 'Opnieuw inloggen' : 'Inloggen & opslaan'}
+                  </button>
+                </div>
+                {somtodayCreds && (
+                  <p style={{ margin: 0, fontSize: 11, color: '#4ADE80' }}>
+                    ✓ Gekoppeld als {somtodayCreds.displayName} ({somtodayCreds.schoolName})
+                  </p>
+                )}
+              </>)}
             </div>
           )}
 
           {!showSettings && (
             <>
+              {/* SOMtoday status banner (when connected) */}
+              {somtodayCreds && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', borderRadius: 8, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', marginBottom: 10 }}>
+                  <span style={{ fontSize: 11, color: '#FBBF24' }}>
+                    📅 SOMtoday rooster geladen — zichtbaar in Agenda
+                  </span>
+                  <button onClick={logoutSomtoday} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,80,80,0.6)', fontSize: 10, padding: '0 2px' }}>
+                    Ontkoppelen
+                  </button>
+                </div>
+              )}
+
               {/* Tabs (alleen op mobiel, niet in tabless/grid mode) */}
               {!tabless && (
                 <div className="magister-tabs" style={{ display: 'flex', gap: '4px', marginBottom: '10px', overflowX: 'auto', paddingBottom: 2 }}>
