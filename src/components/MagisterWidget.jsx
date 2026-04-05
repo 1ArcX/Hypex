@@ -62,7 +62,7 @@ async function openBook(url, creds) {
   }
 }
 
-export default function MagisterWidget({ userId, onSubjectsSync, tabless = false, gridLayout = false }) {
+export default function MagisterWidget({ userId, onSubjectsSync, tabless = false, gridLayout = false, seamless = false }) {
   const [creds, setCreds] = useState(() => {
     if (!userId) return null
     try { return JSON.parse(localStorage.getItem(storageKey(userId))) || null } catch { return null }
@@ -301,13 +301,14 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
     ? { display: 'flex', flexDirection: 'column', overflow: 'hidden' }
     : { marginBottom: 16 }
 
-  const widgetStyle = tabless ? {} : {
+  const noCard = tabless || seamless
+  const widgetStyle = noCard ? {} : {
     borderLeft: '3px solid rgba(129,140,248,0.45)',
     background: 'linear-gradient(135deg, rgba(129,140,248,0.05) 0%, transparent 60%)',
   }
 
   return (
-    <div className={tabless ? '' : 'glass-card p-4'} style={{ ...(gridLayout ? { height: '100%', display: 'flex', flexDirection: 'column' } : {}), ...widgetStyle }}>
+    <div className={noCard ? '' : 'glass-card p-4'} style={{ ...(gridLayout ? { height: '100%', display: 'flex', flexDirection: 'column' } : {}), ...widgetStyle }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: expanded ? '12px' : 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

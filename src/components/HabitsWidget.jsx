@@ -437,7 +437,7 @@ function HabitModal({ habit, onSave, onClose, onDelete, counterConfig }) {
 }
 
 // ─── Main widget ─────────────────────────────────────────────────────────────
-export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 }) {
+export default function HabitsWidget({ userId, compact = false, syncTrigger = 0, seamless = false }) {
   const [habits, setHabits] = useState([])
   const [completions, setCompletions] = useState({})
   const [counterValues, setCounterValues] = useState(() => loadCounterValues())
@@ -712,14 +712,14 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
   // ── Compact mode ───────────────────────────────────────────────────────────
   if (compact) {
     return (
-      <div className="glass-card" style={{ padding: '14px 16px', borderLeft: '3px solid rgba(34,197,94,0.45)', background: 'linear-gradient(135deg, rgba(34,197,94,0.05) 0%, transparent 60%)' }}>
+      <div className={seamless ? '' : 'glass-card'} style={{ padding: '14px 16px', ...(seamless ? {} : { borderLeft: '3px solid rgba(34,197,94,0.45)', background: 'linear-gradient(135deg, rgba(34,197,94,0.05) 0%, transparent 60%)' }) }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {!seamless && <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <div style={{ width: 20, height: 20, borderRadius: 6, background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <Leaf size={10} style={{ color: '#22C55E' }} />
             </div>
             <span style={{ fontSize: 10, color: '#22C55E', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Gewoontes</span>
-          </div>
+          </div>}
           {todayHabits.length > 0 && (
             <span style={{ fontSize: 11, color: doneToday === todayHabits.length ? 'var(--accent)' : 'rgba(255,255,255,0.3)', fontWeight: 600 }}>
               {doneToday}/{todayHabits.length}
@@ -774,13 +774,12 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
   // ── Full render ────────────────────────────────────────────────────────────
   return (
     <>
-      <div className="glass-card p-4" style={{
-        borderLeft: '3px solid rgba(34,197,94,0.45)',
-        background: 'linear-gradient(135deg, rgba(34,197,94,0.05) 0%, transparent 60%)',
+      <div className={seamless ? '' : 'glass-card p-4'} style={{
+        ...(seamless ? { padding: '0 4px' } : { borderLeft: '3px solid rgba(34,197,94,0.45)', background: 'linear-gradient(135deg, rgba(34,197,94,0.05) 0%, transparent 60%)' }),
       }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          {!seamless && <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
             <div style={{ width: 24, height: 24, borderRadius: 8, background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <Leaf size={12} style={{ color: '#22C55E' }} />
             </div>
@@ -793,7 +792,7 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
                 {doneToday}/{todayHabits.length}
               </span>
             )}
-          </div>
+          </div>}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {/* Level badge */}
             <div style={{

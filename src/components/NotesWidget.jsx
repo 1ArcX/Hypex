@@ -48,7 +48,7 @@ function formatRelTime(iso) {
   return `${d.getDate()} ${months[d.getMonth()]}`
 }
 
-export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 0 }) {
+export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 0, seamless = false }) {
   const [folders, setFolders]       = useState([])
   const [notes, setNotes]           = useState([])
   const [activeNote, setActiveNote] = useState(null)
@@ -223,17 +223,16 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
 
   // ─── List view ────────────────────────────────────────────────
   return (
-    <div className="glass-card p-4 flex flex-col" style={{
+    <div className={seamless ? 'flex flex-col' : 'glass-card p-4 flex flex-col'} style={{
       ...(fullHeight ? { height: '100%' } : {}),
-      borderLeft: '3px solid rgba(245,158,11,0.45)',
-      background: 'linear-gradient(135deg, rgba(245,158,11,0.05) 0%, transparent 60%)',
+      ...(seamless ? {} : { borderLeft: '3px solid rgba(245,158,11,0.45)', background: 'linear-gradient(135deg, rgba(245,158,11,0.05) 0%, transparent 60%)' }),
     }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexShrink: 0 }}>
-        <div style={{ width: 24, height: 24, borderRadius: 8, background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        {!seamless && <div style={{ width: 24, height: 24, borderRadius: 8, background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <StickyNote size={12} style={{ color: '#F59E0B' }} />
-        </div>
-        <span style={{ fontSize: 10, color: '#F59E0B', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Notities</span>
+        </div>}
+        {!seamless && <span style={{ fontSize: 10, color: '#F59E0B', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Notities</span>}
         <div style={{ flex: 1 }} />
         <button
           onClick={() => { setNewFolderMode(v => !v); setNewFolderName('') }}

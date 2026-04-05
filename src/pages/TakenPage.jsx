@@ -1,6 +1,17 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import ReactDOM from 'react-dom'
 import TasksWidget from '../components/TasksWidget'
+
+function useIsDesktop() {
+  const [v, setV] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 768)
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)')
+    const h = e => setV(e.matches)
+    mq.addEventListener('change', h)
+    return () => mq.removeEventListener('change', h)
+  }, [])
+  return v
+}
 
 const FILTERS = [
   { id: 'alles',     label: 'Alles'    },
@@ -25,6 +36,7 @@ export default function TakenPage({
   tasks, subjects,
   onAdd, onEdit, onDelete, onToggle, onViewDetail, onNew,
 }) {
+  const isDesktop = useIsDesktop()
   const [filter, setFilter] = useState('alles')
   const [undoTask, setUndoTask] = useState(null)
   const undoTimerRef = React.useRef(null)
@@ -195,6 +207,7 @@ export default function TakenPage({
           onToggle={handleToggleWithUndo}
           onViewDetail={onViewDetail}
           onNew={onNew}
+          seamless={!isDesktop}
         />
       </div>
 

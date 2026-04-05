@@ -29,6 +29,7 @@ export default function SchoolPage({ userId, onSubjectsSync }) {
           onSubjectsSync={onSubjectsSync}
           tabless={isDesktop}
           gridLayout={isDesktop}
+          seamless={!isDesktop}
         />
       </div>
     </div>
