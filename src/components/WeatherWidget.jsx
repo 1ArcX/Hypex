@@ -182,6 +182,19 @@ export default function WeatherWidget({ stacked = false, userId, onRequestPwaIns
   const [notifLoading, setNotifLoading] = useState(false)
   const timerRef = useRef(null)
 
+  const checkRainHidden = () => { const t = localStorage.getItem('rain_hidden'); return !!t && Date.now() - Number(t) < 4 * 3600 * 1000 }
+  const [rainHidden, setRainHiddenState] = useState(checkRainHidden)
+  const toggleRainChart = () => {
+    if (rainHidden) { localStorage.removeItem('rain_hidden') } else { localStorage.setItem('rain_hidden', Date.now()) }
+    setRainHiddenState(!rainHidden)
+    window.dispatchEvent(new Event('rainHiddenChanged'))
+  }
+  useEffect(() => {
+    const handler = () => setRainHiddenState(checkRainHidden())
+    window.addEventListener('rainHiddenChanged', handler)
+    return () => window.removeEventListener('rainHiddenChanged', handler)
+  }, [])
+
   const fetchWeather = async (cityName = city) => {
     setLoading(true); setError('')
     try {
@@ -381,10 +394,16 @@ export default function WeatherWidget({ stacked = false, userId, onRequestPwaIns
           </div>
           <h3 style={{ fontSize: 10, color: '#38BDF8', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', margin: 0 }}>Weer</h3>
         </div>
-        <button onClick={() => { fetchWeather(); if (tab === 'buien') { setRain(null) } }}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}>
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button onClick={toggleRainChart} title={rainHidden ? 'Regenkaart tonen op dashboard' : 'Regenkaart verbergen op dashboard'}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: rainHidden ? 'rgba(255,255,255,0.25)' : 'rgba(56,189,248,0.7)', fontSize: 15, lineHeight: 1, padding: 0 }}>
+            🌧️
+          </button>
+          <button onClick={() => { fetchWeather(); if (tab === 'buien') { setRain(null) } }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}>
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+          </button>
+        </div>
       </div>
 
       {/* City search */}

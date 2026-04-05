@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import Clock from '../components/Clock'
 import WeatherWidget from '../components/WeatherWidget'
 import SpotifyWidget from '../components/SpotifyWidget'
@@ -147,6 +147,18 @@ export default function DashboardPage({
   const progressPct = totalToday > 0 ? (completedToday / totalToday) * 100 : 0
 
   const hasMagisterCreds = !!localStorage.getItem(`magister_credentials_${userId}`)
+
+  const checkRainHidden = () => {
+    const t = localStorage.getItem('rain_hidden')
+    return !!t && Date.now() - Number(t) < 4 * 3600 * 1000
+  }
+  const [rainHidden, setRainHiddenState] = useState(checkRainHidden)
+  const dismissRain = () => { localStorage.setItem('rain_hidden', Date.now()); setRainHiddenState(true); window.dispatchEvent(new Event('rainHiddenChanged')) }
+  useEffect(() => {
+    const handler = () => setRainHiddenState(checkRainHidden())
+    window.addEventListener('rainHiddenChanged', handler)
+    return () => window.removeEventListener('rainHiddenChanged', handler)
+  }, [])
   const showMagisterBanner = !hasMagisterCreds || !!magisterError
 
   const urgentCount  = tasks.filter(t => !t.completed && (t.priority ?? 2) === 1).length
@@ -351,7 +363,7 @@ export default function DashboardPage({
       </div>
 
       {/* ── REGEN GRAFIEK ── */}
-      {homeRain && Math.max(...homeRain.map(d => d.precip)) > 0.1 && (() => {
+      {homeRain && !rainHidden && Math.max(...homeRain.map(d => d.precip)) > 0.1 && (() => {
         const data = homeRain
         const maxP = Math.max(...data.map(d => d.precip), 0.5)
         const W = 260, H = 64, PL = 4, PB = 14, PR = 4, PT = 4
@@ -373,6 +385,7 @@ export default function DashboardPage({
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
               <span style={{ fontSize: 14 }}>🌧️</span>
               <span style={{ fontSize: 12, color: 'rgba(0,200,255,0.9)', fontWeight: 600 }}>{maxLabel} {timeLabel}</span>
+              <button onClick={dismissRain} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '2px', lineHeight: 1, fontSize: 16 }} title="Verbergen">×</button>
             </div>
             <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }}>
               <defs>
