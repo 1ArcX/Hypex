@@ -72,7 +72,7 @@ async function startSession() {
   const res  = await follow(authUrl, jar)
   const html = await res.text?.() || ''
   const m    = html.match(/action="([^"]*organisatieSelectionForm[^"]*)"/)
-  if (!m) throw new Error('School selectie pagina niet gevonden')
+  if (!m) throw new Error('School selectie pagina niet gevonden — HTML: ' + html.slice(0, 400))
   return { verifier, formAction: m[1].replace(/&amp;/g, '&'), jar }
 }
 
