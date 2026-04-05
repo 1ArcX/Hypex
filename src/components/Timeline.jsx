@@ -184,9 +184,23 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
     const endD = new Date(end.getFullYear(), end.getMonth(), end.getDate())
     const checkD = new Date(date.getFullYear(), date.getMonth(), date.getDate())
     if (checkD >= startD && checkD <= endD) return true
-    if (ev.recurrence === 'daily') return start <= date
-    if (ev.recurrence === 'weekly' && ev.recurrence_days?.includes(date.getDay())) return start <= date
-    if (ev.recurrence === 'monthly' && start.getDate() === date.getDate()) return start <= date
+    if (checkD < startD) return false
+    const r = ev.recurrence
+    if (r === 'daily') return true
+    if (r === 'weekdays') return date.getDay() >= 1 && date.getDay() <= 5
+    if (r === 'weekly') return ev.recurrence_days?.includes(date.getDay())
+    if (r === 'biweekly') {
+      const targetDays = ev.recurrence_days?.length ? ev.recurrence_days : [start.getDay()]
+      if (!targetDays.includes(date.getDay())) return false
+      const startDow = startD.getDay() === 0 ? 6 : startD.getDay() - 1
+      const startMon = new Date(startD.getTime() - startDow * 86400000)
+      const checkDow = checkD.getDay() === 0 ? 6 : checkD.getDay() - 1
+      const checkMon = new Date(checkD.getTime() - checkDow * 86400000)
+      const weeksDiff = Math.round((checkMon - startMon) / (7 * 86400000))
+      return weeksDiff % 2 === 0
+    }
+    if (r === 'monthly') return start.getDate() === date.getDate()
+    if (r === 'yearly') return start.getMonth() === date.getMonth() && start.getDate() === date.getDate()
     return false
   })
 
@@ -839,13 +853,16 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
                 </div>
               )}
               <select className="glass-input" value={form.recurrence}
-                onChange={e => setForm(p => ({ ...p, recurrence: e.target.value }))}>
+                onChange={e => setForm(p => ({ ...p, recurrence: e.target.value, recurrence_days: [] }))}>
                 <option value="">Geen herhaling</option>
                 <option value="daily">Dagelijks</option>
+                <option value="weekdays">Elke werkdag (ma–vr)</option>
                 <option value="weekly">Wekelijks</option>
+                <option value="biweekly">Om de week</option>
                 <option value="monthly">Maandelijks</option>
+                <option value="yearly">Jaarlijks</option>
               </select>
-              {form.recurrence === 'weekly' && (
+              {(form.recurrence === 'weekly' || form.recurrence === 'biweekly') && (
                 <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                   {['Ma','Di','Wo','Do','Vr','Za','Zo'].map((d, i) => {
                     const dayNum = (i + 1) % 7
