@@ -9,18 +9,6 @@ export async function callSomtoday(action, body = {}) {
   return data
 }
 
-// Route through Netlify function (avoids browser CORS block)
-export async function searchSchools(q) {
-  return callSomtoday_GET(`action=schools&q=${encodeURIComponent(q || '')}`)
-}
-
-async function callSomtoday_GET(queryString) {
-  const res = await fetch(`/.netlify/functions/somtoday?${queryString}`)
-  const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(data.error || 'SOMtoday fout')
-  return data
-}
-
 export const somtodayKey = (userId) => `somtoday_credentials_${userId}`
 
 // Returns valid creds (refreshing token if needed), or null

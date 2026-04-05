@@ -3,7 +3,7 @@ import { BookOpen, ClipboardList, RefreshCw, Settings, ChevronDown, ChevronUp, A
 import { supabase } from '../supabaseClient'
 import { matchVak } from '../utils/alleVakken'
 import { callMagister, clearStoredTokens } from '../utils/magisterApi'
-import { callSomtoday, searchSchools, somtodayKey } from '../utils/somtodayApi'
+import { callSomtoday, somtodayKey } from '../utils/somtodayApi'
 
 const storageKey = (userId) => `magister_credentials_${userId}`
 
@@ -81,9 +81,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
   })
   // SOMtoday login form state
   const [stProvider, setStProvider] = useState('magister')  // 'magister' | 'somtoday'
-  const [stSchoolQuery, setStSchoolQuery] = useState('')
-  const [stSchoolResults, setStSchoolResults] = useState([])
-  const [stSelectedSchool, setStSelectedSchool] = useState(null)  // { name, uuid }
+  const [stSchoolName, setStSchoolName] = useState('')
   const [stUsername, setStUsername] = useState('')
   const [stPassword, setStPassword] = useState('')
   const [stLoading, setStLoading] = useState(false)
@@ -230,25 +228,14 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
     setFormCreds({ school: '', username: '', password: '' })
   }
 
-  // SOMtoday: search schools with debounce
-  const searchSomtodaySchools = async (q) => {
-    setStSchoolQuery(q)
-    setStSelectedSchool(null)
-    if (q.length < 2) { setStSchoolResults([]); return }
-    try {
-      const results = await searchSchools(q)
-      setStSchoolResults(results)
-    } catch { setStSchoolResults([]) }
-  }
-
   const loginSomtoday = async () => {
-    if (!stSelectedSchool || !stUsername || !stPassword) return
+    if (!stSchoolName || !stUsername || !stPassword) return
     setStLoading(true); setStError(null)
     try {
       const tokenData = await callSomtoday('token', {
+        schoolName: stSchoolName,
         username: stUsername,
         password: stPassword,
-        schoolUuid: stSelectedSchool.uuid,
       })
       // Fetch student info
       const me = await callSomtoday('me', {
@@ -256,8 +243,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
         somtodayApiUrl: tokenData.somtoday_api_url,
       })
       const stored = {
-        schoolUuid: stSelectedSchool.uuid,
-        schoolName: stSelectedSchool.name,
+        schoolName: stSchoolName,
         somtodayApiUrl: tokenData.somtoday_api_url,
         accessToken: tokenData.access_token,
         refreshToken: tokenData.refresh_token,
@@ -269,8 +255,7 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
       setSomtodayCreds(stored)
       setShowSettings(false)
       window.dispatchEvent(new Event('somtodayLogin'))
-      // Reset form
-      setStUsername(''); setStPassword(''); setStSchoolQuery(''); setStSelectedSchool(null); setStSchoolResults([])
+      setStUsername(''); setStPassword(''); setStSchoolName('')
     } catch (e) {
       setStError(e.message)
     }
@@ -474,24 +459,9 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                 <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', margin: 0 }}>
                   Log in met je SOMtoday-account voor rooster en lessen.
                 </p>
-                {/* School search */}
-                <div style={{ position: 'relative' }}>
-                  <input className="glass-input" placeholder="Zoek je school..." value={stSelectedSchool ? stSelectedSchool.name : stSchoolQuery}
-                    onChange={e => { if (stSelectedSchool) setStSelectedSchool(null); searchSomtodaySchools(e.target.value) }}
-                    autoComplete="off" style={{ fontSize: '12px', width: '100%' }} />
-                  {stSchoolResults.length > 0 && !stSelectedSchool && (
-                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, marginTop: 2, maxHeight: 180, overflowY: 'auto' }}>
-                      {stSchoolResults.map(s => (
-                        <div key={s.uuid} onClick={() => { setStSelectedSchool(s); setStSchoolQuery(s.name); setStSchoolResults([]) }}
-                          style={{ padding: '8px 12px', fontSize: 12, cursor: 'pointer', color: 'var(--text-1)', borderBottom: '1px solid var(--border)' }}
-                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                          {s.name}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <input className="glass-input" placeholder="Schoolnaam (bijv. Het Baken Almere)" value={stSchoolName}
+                  onChange={e => setStSchoolName(e.target.value)}
+                  autoComplete="off" style={{ fontSize: '12px' }} />
                 <input className="glass-input" placeholder="Gebruikersnaam (bijv. 123456@school.nl)" value={stUsername}
                   onChange={e => setStUsername(e.target.value)}
                   autoComplete="off" style={{ fontSize: '12px' }} />
@@ -511,8 +481,8 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                       Ontkoppelen
                     </button>
                   )}
-                  <button onClick={loginSomtoday} disabled={stLoading || !stSelectedSchool || !stUsername || !stPassword}
-                    style={{ flex: 2, padding: '7px', borderRadius: '8px', border: '1px solid rgba(251,191,36,0.4)', background: 'rgba(251,191,36,0.1)', color: '#FBBF24', cursor: 'pointer', fontSize: '12px', fontWeight: 600, opacity: (!stSelectedSchool || !stUsername || !stPassword) ? 0.4 : 1 }}>
+                  <button onClick={loginSomtoday} disabled={stLoading || !stSchoolName || !stUsername || !stPassword}
+                    style={{ flex: 2, padding: '7px', borderRadius: '8px', border: '1px solid rgba(251,191,36,0.4)', background: 'rgba(251,191,36,0.1)', color: '#FBBF24', cursor: 'pointer', fontSize: '12px', fontWeight: 600, opacity: (!stSchoolName || !stUsername || !stPassword) ? 0.4 : 1 }}>
                     {stLoading ? 'Bezig...' : somtodayCreds ? 'Opnieuw inloggen' : 'Inloggen & opslaan'}
                   </button>
                 </div>
