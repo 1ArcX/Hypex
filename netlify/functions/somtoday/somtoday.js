@@ -24,18 +24,30 @@ exports.handler = async (event) => {
   // ── schools: search organisaties.json ────────────────────────────────────────
   if (action === 'schools') {
     const q = (event.queryStringParameters?.q || '').toLowerCase().trim()
-    try {
-      const res = await fetch('https://servers.somtoday.nl/organisaties.json')
-      if (!res.ok) return fail('Kan scholen niet laden')
-      const json = await res.json()
-      const orgs = json[0]?.instellingen || []
-      const filtered = q
-        ? orgs.filter(o => o.naam.toLowerCase().includes(q))
-        : orgs
-      return ok(filtered.slice(0, 25).map(o => ({ name: o.naam, uuid: o.uuid })))
-    } catch (e) {
-      return fail('Fout bij ophalen scholen: ' + e.message)
+    // Try both known endpoints
+    const urls = [
+      'https://servers.somtoday.nl/organisaties.json',
+      'https://inloggen.somtoday.nl/organisaties.json',
+    ]
+    for (const url of urls) {
+      try {
+        const res = await fetch(url, {
+          headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
+        })
+        if (!res.ok) continue
+        const json = await res.json()
+        // Structure: array with first element having 'instellingen'
+        const orgs = Array.isArray(json)
+          ? (json[0]?.instellingen || json.flatMap(x => x.instellingen || []))
+          : (json.instellingen || [])
+        if (!orgs.length) continue
+        const filtered = q
+          ? orgs.filter(o => (o.naam || '').toLowerCase().includes(q))
+          : orgs
+        return ok(filtered.slice(0, 25).map(o => ({ name: o.naam, uuid: o.uuid })))
+      } catch { /* try next */ }
     }
+    return fail('Kan scholen niet laden — SOMtoday API onbereikbaar')
   }
 
   // ── token: password grant ─────────────────────────────────────────────────────
