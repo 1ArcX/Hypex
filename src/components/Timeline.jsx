@@ -877,11 +877,17 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
                   })}
                 </div>
               )}
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                 {EVENT_COLORS.map(c => (
                   <button key={c} type="button" onClick={() => setForm(p => ({ ...p, color: c }))}
-                    style={{ width: '24px', height: '24px', borderRadius: '50%', background: c, border: form.color === c ? '2px solid white' : '2px solid transparent', cursor: 'pointer', boxSizing: 'border-box', transform: form.color === c ? 'scale(1.2)' : 'scale(1)', transition: 'transform 0.1s' }} />
+                    style={{ width: '24px', height: '24px', borderRadius: '50%', background: c, border: form.color === c ? '2px solid white' : '2px solid transparent', cursor: 'pointer', boxSizing: 'border-box', transform: form.color === c ? 'scale(1.2)' : 'scale(1)', transition: 'transform 0.1s', flexShrink: 0 }} />
                 ))}
+                {/* Custom color picker */}
+                <label title="Eigen kleur" style={{ width: 24, height: 24, borderRadius: '50%', overflow: 'hidden', cursor: 'pointer', flexShrink: 0, border: !EVENT_COLORS.includes(form.color) ? '2px solid white' : '2px solid transparent', boxSizing: 'border-box', transform: !EVENT_COLORS.includes(form.color) ? 'scale(1.2)' : 'scale(1)', transition: 'transform 0.1s', background: form.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <input type="color" value={form.color} onChange={e => setForm(p => ({ ...p, color: e.target.value }))}
+                    style={{ opacity: 0, position: 'absolute', width: 1, height: 1, pointerEvents: 'none' }} />
+                  {EVENT_COLORS.includes(form.color) && <span style={{ fontSize: 12, lineHeight: 1, color: 'rgba(255,255,255,0.7)', pointerEvents: 'none' }}>+</span>}
+                </label>
               </div>
             </div>
             <div style={{ display: 'flex', gap: '8px', marginTop: '20px' }}>
