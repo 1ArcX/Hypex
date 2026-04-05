@@ -133,7 +133,7 @@ function WeekStrip({ selectedDay, onSelectDay, onPrevWeek, onNextWeek, tasks, ca
 }
 
 // ─── Month calendar ───────────────────────────────────────────────────────────
-function MonthCalendar({ selectedDay, onSelectDay }) {
+function MonthCalendar({ selectedDay, onSelectDay, tasks, calendarEvents, magisterLessons }) {
   const now   = new Date()
   const year  = selectedDay.getFullYear()
   const month = selectedDay.getMonth()
@@ -170,14 +170,16 @@ function MonthCalendar({ selectedDay, onSelectDay }) {
           const isToday    = isSameDay(day, now)
           const isSelected = isSameDay(day, selectedDay)
           const inMonth    = day.getMonth() === month
+          const density    = getDayDensity(day, tasks, calendarEvents, magisterLessons)
+          const dotColor   = densityColor(density)
 
           return (
             <div
               key={i}
               onClick={() => onSelectDay(day)}
               style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                height: 38, borderRadius: 8, cursor: 'pointer',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                height: 38, borderRadius: 8, cursor: 'pointer', gap: 2,
                 background: isToday
                   ? 'var(--accent)'
                   : isSelected && !isToday ? 'var(--bg-card-2)' : 'transparent',
@@ -188,6 +190,11 @@ function MonthCalendar({ selectedDay, onSelectDay }) {
               }}
             >
               {day.getDate()}
+              <div style={{
+                width: 4, height: 4, borderRadius: '50%',
+                background: density > 0 ? (isToday ? 'rgba(0,0,0,0.4)' : dotColor) : 'transparent',
+                flexShrink: 0,
+              }} />
             </div>
           )
         })}
@@ -309,6 +316,9 @@ export default function AgendaPage({
             <MonthCalendar
               selectedDay={new Date(monthAnchor.getFullYear(), monthAnchor.getMonth(), selectedDay.getDate())}
               onSelectDay={handleSelectDay}
+              tasks={tasks}
+              calendarEvents={calendarEvents}
+              magisterLessons={magisterLessons}
             />
           </div>
         )}
