@@ -74,6 +74,8 @@ function layoutOverlaps(items) {
 const emptyForm = (date, hour) => ({
   title: '', description: '',
   date: toDateStr(date || new Date()),
+  endDate: '',
+  allDay: false,
   startTime: hour !== undefined ? `${pad(hour)}:00` : '09:00',
   endTime: hour !== undefined ? `${pad(Math.min(hour+1,23))}:00` : '10:00',
   color: '#818CF8', recurrence: '', recurrence_days: []
@@ -177,7 +179,11 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
 
   const getEventsForDay = (date) => events.filter(ev => {
     const start = new Date(ev.start_time)
-    if (isSameDay(start, date)) return true
+    const end = new Date(ev.end_time)
+    const startD = new Date(start.getFullYear(), start.getMonth(), start.getDate())
+    const endD = new Date(end.getFullYear(), end.getMonth(), end.getDate())
+    const checkD = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+    if (checkD >= startD && checkD <= endD) return true
     if (ev.recurrence === 'daily') return start <= date
     if (ev.recurrence === 'weekly' && ev.recurrence_days?.includes(date.getDay())) return start <= date
     if (ev.recurrence === 'monthly' && start.getDate() === date.getDate()) return start <= date
@@ -198,11 +204,15 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
   const openEditEvent = (ev, e) => {
     e?.stopPropagation()
     const s = new Date(ev.start_time), en = new Date(ev.end_time)
+    const isAllDay = s.getHours() === 0 && s.getMinutes() === 0 && en.getHours() === 23 && en.getMinutes() === 59
+    const startDs = toDateStr(s), endDs = toDateStr(en)
     setForm({
       title: ev.title, description: ev.description || '',
-      date: toDateStr(s),
-      startTime: `${pad(s.getHours())}:${pad(s.getMinutes())}`,
-      endTime: `${pad(en.getHours())}:${pad(en.getMinutes())}`,
+      date: startDs,
+      endDate: endDs !== startDs ? endDs : '',
+      allDay: isAllDay,
+      startTime: isAllDay ? '09:00' : `${pad(s.getHours())}:${pad(s.getMinutes())}`,
+      endTime: isAllDay ? '10:00' : `${pad(en.getHours())}:${pad(en.getMinutes())}`,
       color: ev.color || '#818CF8',
       recurrence: ev.recurrence || '', recurrence_days: ev.recurrence_days || []
     })
@@ -212,9 +222,16 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
   const handleSave = async () => {
     if (!form.title.trim()) return
     setSaving(true)
-    const start = new Date(`${form.date}T${form.startTime}`)
-    const end = new Date(`${form.date}T${form.endTime}`)
-    if (end <= start) end.setTime(start.getTime() + 3600000)
+    const endDateStr = form.endDate || form.date
+    let start, end
+    if (form.allDay) {
+      start = new Date(`${form.date}T00:00`)
+      end = new Date(`${endDateStr}T23:59`)
+    } else {
+      start = new Date(`${form.date}T${form.startTime}`)
+      end = new Date(`${endDateStr}T${form.endTime}`)
+      if (!form.endDate && end <= start) end.setTime(start.getTime() + 3600000)
+    }
     const payload = {
       user_id: userId, title: form.title, description: form.description,
       start_time: start.toISOString(), end_time: end.toISOString(),
@@ -292,6 +309,32 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
             })}
           </div>
         )}
+
+        {/* All-day events strip */}
+        {(() => {
+          const allDayByDay = days.map(d => getEventsForDay(d).filter(ev => {
+            const s = new Date(ev.start_time)
+            return s.getHours() === 0 && s.getMinutes() === 0
+          }))
+          if (allDayByDay.every(arr => arr.length === 0)) return null
+          return (
+            <div style={{ display: 'grid', gridTemplateColumns: `${TIME_COL}px repeat(${N}, 1fr)`, borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0, padding: '4px 0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 8 }}>
+                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.22)', letterSpacing: '0.06em', textTransform: 'uppercase', userSelect: 'none' }}>dag</span>
+              </div>
+              {allDayByDay.map((dayEvs, di) => (
+                <div key={di} style={{ padding: '0 2px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {dayEvs.map(ev => (
+                    <div key={ev.id} onClick={e => openEditEvent(ev, e)}
+                      style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, cursor: 'pointer', background: ev.color + '28', borderLeft: `3px solid ${ev.color}`, color: ev.color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {ev.title}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )
+        })()}
 
         {/* Scrollable grid body */}
         <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', position: 'relative' }}>
@@ -385,7 +428,10 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
                   const endMins = Math.max(startMins + 30, en.getHours()*60 + en.getMinutes())
                   return { type: 'lesson', key: `les-${di}-${li}`, startMins, endMins, data: les }
                 }),
-                ...colEvents.map(ev => {
+                ...colEvents.filter(ev => {
+                  const s = new Date(ev.start_time)
+                  return !(s.getHours() === 0 && s.getMinutes() === 0)
+                }).map(ev => {
                   const s = new Date(ev.start_time), en = new Date(ev.end_time)
                   const startMins = s.getHours()*60 + s.getMinutes()
                   const endMins = Math.max(startMins + 30, en.getHours()*60 + en.getMinutes())
@@ -762,14 +808,36 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
               <textarea className="glass-input" placeholder="Beschrijving" value={form.description}
                 onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
                 style={{ resize: 'vertical', minHeight: '56px' }} />
-              <input type="date" className="glass-input" value={form.date}
-                onChange={e => setForm(p => ({ ...p, date: e.target.value }))} />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                <input type="time" className="glass-input" value={form.startTime}
-                  onChange={e => setForm(p => ({ ...p, startTime: e.target.value }))} />
-                <input type="time" className="glass-input" value={form.endTime}
-                  onChange={e => setForm(p => ({ ...p, endTime: e.target.value }))} />
+              {/* Hele dag toggle */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <button type="button" onClick={() => setForm(p => ({ ...p, allDay: !p.allDay }))}
+                  style={{ width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', background: form.allDay ? 'var(--accent, #00FFD1)' : 'rgba(255,255,255,0.14)', position: 'relative', transition: 'background 0.2s', flexShrink: 0, padding: 0 }}>
+                  <span style={{ position: 'absolute', top: 2, left: form.allDay ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: form.allDay ? '#000' : 'rgba(255,255,255,0.7)', transition: 'left 0.2s' }} />
+                </button>
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>Hele dag</span>
               </div>
+              {/* Date range */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginBottom: 4, letterSpacing: '0.05em' }}>Van</div>
+                  <input type="date" className="glass-input" value={form.date}
+                    onChange={e => setForm(p => ({ ...p, date: e.target.value }))} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginBottom: 4, letterSpacing: '0.05em' }}>Tot</div>
+                  <input type="date" className="glass-input" value={form.endDate || form.date} min={form.date}
+                    onChange={e => { const v = e.target.value; setForm(p => ({ ...p, endDate: v === p.date ? '' : v })) }} />
+                </div>
+              </div>
+              {/* Times (only when not all-day) */}
+              {!form.allDay && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <input type="time" className="glass-input" value={form.startTime}
+                    onChange={e => setForm(p => ({ ...p, startTime: e.target.value }))} />
+                  <input type="time" className="glass-input" value={form.endTime}
+                    onChange={e => setForm(p => ({ ...p, endTime: e.target.value }))} />
+                </div>
+              )}
               <select className="glass-input" value={form.recurrence}
                 onChange={e => setForm(p => ({ ...p, recurrence: e.target.value }))}>
                 <option value="">Geen herhaling</option>

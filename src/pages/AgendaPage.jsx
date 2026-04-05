@@ -38,7 +38,11 @@ function getDayDensity(day, tasks, calendarEvents, magisterLessons) {
   count += (tasks || []).filter(t => t.date === ds && !t.completed).length
   // Agenda-events
   count += (calendarEvents || []).filter(ev => {
-    try { return new Date(ev.start_time).toISOString().slice(0, 10) === ds } catch { return false }
+    try {
+      const startDs = new Date(ev.start_time).toISOString().slice(0, 10)
+      const endDs = new Date(ev.end_time).toISOString().slice(0, 10)
+      return ds >= startDs && ds <= endDs
+    } catch { return false }
   }).length
   // Magister lessen
   count += (magisterLessons || []).filter(l => {
