@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head><meta charset="utf-8"><title>SOMtoday verbinden...</title></head>
+<body>
+<script>
+  var p = new URLSearchParams(location.search);
+  var code = p.get('code');
+  var error = p.get('error');
+  if (window.opener) {
+    window.opener.postMessage({ somtodayOAuth: { code: code, error: error } }, location.origin);
+    window.close();
+  } else {
+    document.body.innerText = 'Dit venster kan worden gesloten.';
+  }
+</script>
+<p style="font-family:sans-serif;color:#888;padding:20px">Verbinden met SOMtoday...</p>
+</body>
+</html>

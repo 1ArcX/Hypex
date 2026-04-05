@@ -184,7 +184,40 @@ exports.handler = async (event) => {
   let body = {}
   if (event.body) { try { body = JSON.parse(event.body) } catch {} }
 
-  // ── token: full Wicket login flow ──────────────────────────────────────────
+  // ── exchange: PKCE auth code → token (browser popup flow) ─────────────────
+  if (action === 'exchange') {
+    const { code, codeVerifier, redirectUri } = body
+    if (!code || !codeVerifier || !redirectUri) return fail('Ontbrekende velden')
+    try {
+      const res = await fetch(AUTH_BASE + '/oauth2/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': UA },
+        body: new URLSearchParams({
+          grant_type: 'authorization_code',
+          code,
+          code_verifier: codeVerifier,
+          redirect_uri: redirectUri,
+          client_id: CLIENT_ID,
+        }).toString(),
+      })
+      const text = await res.text()
+      if (!res.ok) {
+        if (text.includes('redirect') || text.includes('client') || res.status === 400) {
+          return fail('REDIRECT_URI_REJECTED', 400)
+        }
+        return fail(`Token uitwisseling mislukt: ${res.status}`)
+      }
+      const data = JSON.parse(text)
+      return ok({
+        access_token:     data.access_token,
+        refresh_token:    data.refresh_token,
+        expires_in:       data.expires_in || 3600,
+        somtoday_api_url: data.somtoday_api_url || 'https://production.somtoday.nl',
+      })
+    } catch (e) { return fail(e.message) }
+  }
+
+  // ── token: full Wicket login flow (legacy, fallback) ───────────────────────
   if (action === 'token') {
     const { schoolName, username, password } = body
     if (!schoolName || !username || !password) return fail('Vul alle velden in')

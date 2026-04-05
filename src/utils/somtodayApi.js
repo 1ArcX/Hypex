@@ -1,3 +1,65 @@
+const ST_CLIENT_ID = 'somtoday-leerling-redirect-web'
+const ST_AUTH_BASE = 'https://inloggen.somtoday.nl'
+
+export async function loginWithPopup() {
+  // Generate PKCE in browser
+  const array = crypto.getRandomValues(new Uint8Array(32))
+  const verifier = btoa(String.fromCharCode(...array))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+  const encoded = new TextEncoder().encode(verifier)
+  const digest = await crypto.subtle.digest('SHA-256', encoded)
+  const challenge = btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+
+  sessionStorage.setItem('somtoday_pkce_verifier', verifier)
+
+  const redirectUri = `${window.location.origin}/oauth/somtoday`
+  const authUrl = ST_AUTH_BASE + '/oauth2/authorize?' + new URLSearchParams({
+    client_id: ST_CLIENT_ID,
+    redirect_uri: redirectUri,
+    response_type: 'code',
+    scope: 'openid',
+    code_challenge: challenge,
+    code_challenge_method: 'S256',
+  })
+
+  return new Promise((resolve, reject) => {
+    const popup = window.open(authUrl, 'somtoday-login', 'width=600,height=700,left=200,top=100')
+    if (!popup) { reject(new Error('Popup geblokkeerd door browser')); return }
+
+    const onMsg = async (e) => {
+      if (e.origin !== window.location.origin || !e.data?.somtodayOAuth) return
+      window.removeEventListener('message', onMsg)
+      const { code, error } = e.data.somtodayOAuth
+      if (error) return reject(new Error(error))
+      if (!code) return reject(new Error('Geen code ontvangen'))
+      try {
+        const codeVerifier = sessionStorage.getItem('somtoday_pkce_verifier')
+        sessionStorage.removeItem('somtoday_pkce_verifier')
+        const data = await callSomtoday('exchange', { code, codeVerifier, redirectUri })
+        resolve(data)
+      } catch (err) { reject(err) }
+    }
+    window.addEventListener('message', onMsg)
+
+    const timer = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(timer)
+        window.removeEventListener('message', onMsg)
+        sessionStorage.removeItem('somtoday_pkce_verifier')
+        reject(new Error('Popup gesloten'))
+      }
+    }, 500)
+
+    setTimeout(() => {
+      clearInterval(timer)
+      window.removeEventListener('message', onMsg)
+      sessionStorage.removeItem('somtoday_pkce_verifier')
+      reject(new Error('Timeout'))
+    }, 300000)
+  })
+}
+
 export async function callSomtoday(action, body = {}) {
   const res = await fetch(`/.netlify/functions/somtoday?action=${action}`, {
     method: 'POST',

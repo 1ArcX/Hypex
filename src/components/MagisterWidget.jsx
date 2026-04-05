@@ -3,7 +3,7 @@ import { BookOpen, ClipboardList, RefreshCw, Settings, ChevronDown, ChevronUp, A
 import { supabase } from '../supabaseClient'
 import { matchVak } from '../utils/alleVakken'
 import { callMagister, clearStoredTokens } from '../utils/magisterApi'
-import { callSomtoday, somtodayKey } from '../utils/somtodayApi'
+import { callSomtoday, loginWithPopup, somtodayKey } from '../utils/somtodayApi'
 
 const storageKey = (userId) => `magister_credentials_${userId}`
 
@@ -79,11 +79,8 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
       return !JSON.parse(localStorage.getItem(storageKey(userId))) && !JSON.parse(localStorage.getItem(somtodayKey(userId)))
     } catch { return true }
   })
-  // SOMtoday login form state
+  // SOMtoday login state
   const [stProvider, setStProvider] = useState('magister')  // 'magister' | 'somtoday'
-  const [stSchoolName, setStSchoolName] = useState('')
-  const [stUsername, setStUsername] = useState('')
-  const [stPassword, setStPassword] = useState('')
   const [stLoading, setStLoading] = useState(false)
   const [stError, setStError] = useState(null)
   const [tab, setTab] = useState('vakken')
@@ -229,33 +226,25 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
   }
 
   const loginSomtoday = async () => {
-    if (!stSchoolName || !stUsername || !stPassword) return
     setStLoading(true); setStError(null)
     try {
-      const tokenData = await callSomtoday('token', {
-        schoolName: stSchoolName,
-        username: stUsername,
-        password: stPassword,
-      })
-      // Fetch student info
+      const tokenData = await loginWithPopup()
       const me = await callSomtoday('me', {
         accessToken: tokenData.access_token,
         somtodayApiUrl: tokenData.somtoday_api_url,
       })
       const stored = {
-        schoolName: stSchoolName,
         somtodayApiUrl: tokenData.somtoday_api_url,
         accessToken: tokenData.access_token,
         refreshToken: tokenData.refresh_token,
         expiresAt: Math.floor(Date.now() / 1000) + (tokenData.expires_in || 3600),
         studentId: me.id,
-        displayName: me.roepnaam || stUsername,
+        displayName: me.roepnaam || me.achternaam || 'Leerling',
       }
       localStorage.setItem(somtodayKey(userId), JSON.stringify(stored))
       setSomtodayCreds(stored)
       setShowSettings(false)
       window.dispatchEvent(new Event('somtodayLogin'))
-      setStUsername(''); setStPassword(''); setStSchoolName('')
     } catch (e) {
       setStError(e.message)
     }
@@ -457,18 +446,8 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
               {/* SOMtoday form */}
               {stProvider === 'somtoday' && (<>
                 <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', margin: 0 }}>
-                  Log in met je SOMtoday-account voor rooster en lessen.
+                  Log in via een popup — werkt ook met Microsoft-aanmelding van je school.
                 </p>
-                <input className="glass-input" placeholder="Schoolnaam (bijv. Het Baken Almere)" value={stSchoolName}
-                  onChange={e => setStSchoolName(e.target.value)}
-                  autoComplete="off" style={{ fontSize: '12px' }} />
-                <input className="glass-input" placeholder="Gebruikersnaam (bijv. 123456@school.nl)" value={stUsername}
-                  onChange={e => setStUsername(e.target.value)}
-                  autoComplete="off" style={{ fontSize: '12px' }} />
-                <input className="glass-input" type="password" placeholder="Wachtwoord" value={stPassword}
-                  onChange={e => setStPassword(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && loginSomtoday()}
-                  autoComplete="new-password" style={{ fontSize: '12px' }} />
                 {stError && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ff6b6b', fontSize: '11px' }}>
                     <AlertCircle size={12} /> {stError}
@@ -481,14 +460,14 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
                       Ontkoppelen
                     </button>
                   )}
-                  <button onClick={loginSomtoday} disabled={stLoading || !stSchoolName || !stUsername || !stPassword}
-                    style={{ flex: 2, padding: '7px', borderRadius: '8px', border: '1px solid rgba(251,191,36,0.4)', background: 'rgba(251,191,36,0.1)', color: '#FBBF24', cursor: 'pointer', fontSize: '12px', fontWeight: 600, opacity: (!stSchoolName || !stUsername || !stPassword) ? 0.4 : 1 }}>
-                    {stLoading ? 'Bezig...' : somtodayCreds ? 'Opnieuw inloggen' : 'Inloggen & opslaan'}
+                  <button onClick={loginSomtoday} disabled={stLoading}
+                    style={{ flex: 2, padding: '7px', borderRadius: '8px', border: '1px solid rgba(251,191,36,0.4)', background: 'rgba(251,191,36,0.1)', color: '#FBBF24', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                    {stLoading ? 'Popup geopend...' : somtodayCreds ? 'Opnieuw inloggen' : 'Inloggen via SOMtoday'}
                   </button>
                 </div>
                 {somtodayCreds && (
                   <p style={{ margin: 0, fontSize: 11, color: '#4ADE80' }}>
-                    ✓ Gekoppeld als {somtodayCreds.displayName} ({somtodayCreds.schoolName})
+                    ✓ Gekoppeld als {somtodayCreds.displayName}
                   </p>
                 )}
               </>)}
