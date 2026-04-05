@@ -9,11 +9,29 @@ export async function callSomtoday(action, body = {}) {
   return data
 }
 
+// Fetched directly from browser — SOMtoday's public endpoint has CORS headers
 export async function searchSchools(q) {
-  const res = await fetch(`/.netlify/functions/somtoday?action=schools&q=${encodeURIComponent(q)}`)
-  const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(data.error || 'Scholen ophalen mislukt')
-  return data
+  const query = (q || '').toLowerCase().trim()
+  const urls = [
+    'https://servers.somtoday.nl/organisaties.json',
+    'https://inloggen.somtoday.nl/organisaties.json',
+  ]
+  for (const url of urls) {
+    try {
+      const res = await fetch(url)
+      if (!res.ok) continue
+      const json = await res.json()
+      const orgs = Array.isArray(json)
+        ? (json[0]?.instellingen || json.flatMap(x => x.instellingen || []))
+        : (json.instellingen || [])
+      if (!orgs.length) continue
+      const filtered = query
+        ? orgs.filter(o => (o.naam || '').toLowerCase().includes(query))
+        : orgs
+      return filtered.slice(0, 25).map(o => ({ name: o.naam, uuid: o.uuid }))
+    } catch { /* try next */ }
+  }
+  throw new Error('Kan scholen niet laden')
 }
 
 export const somtodayKey = (userId) => `somtoday_credentials_${userId}`
