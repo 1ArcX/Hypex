@@ -77,6 +77,7 @@ export default function SpotifyWidget() {
   const [queueTracks, setQueueTracks] = useState([])
   const [recentTracks, setRecentTracks] = useState(null)
   const [recentError, setRecentError] = useState(false)
+  const [authError, setAuthError] = useState(false)
   const [tab, setTab] = useState('nu')
   const [trackMenu, setTrackMenu] = useState(null) // { uri, x, y }
   const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 768)
@@ -202,11 +203,13 @@ export default function SpotifyWidget() {
       if (!newToken) return
       res = await doFetch(newToken)
     }
+    if (res.status === 403) { setAuthError(true); return }
     if (res.status === 204 || !res.ok) return
 
     const data = await res.json()
     if (!data?.item) return
 
+    setAuthError(false)
     const prevTrackId = trackRef.current?.id
     const newTrackId = data.item.id
 
@@ -258,14 +261,21 @@ export default function SpotifyWidget() {
   const fetchRecent = useCallback(async () => {
     const res = await fetch('https://api.spotify.com/v1/me/player/recently-played?limit=10',
       { headers: { Authorization: `Bearer ${getToken()}` } })
-    if (res.status === 401 || res.status === 403) { setRecentError(true); return }
+    if (res.status === 403) { setAuthError(true); setRecentError(true); return }
+    if (res.status === 401) { setRecentError(true); return }
     const data = await res.json()
     setRecentTracks(data.items || [])
+    setAuthError(false)
   }, [])
 
   useEffect(() => {
     if (tab === 'recent' && recentTracks === null && !recentError) fetchRecent()
   }, [tab, recentTracks, recentError, fetchRecent])
+
+  // Auto-switch naar Recent als niets speelt en er wel history is
+  useEffect(() => {
+    if (!track && !authError && recentTracks?.length > 0 && tab === 'nu') setTab('recent')
+  }, [track, authError, recentTracks])
 
   // --- Bediening ---
   const control = async (action) => {
@@ -461,6 +471,19 @@ export default function SpotifyWidget() {
               </div>
             )}
           </>
+        ) : authError ? (
+          <div style={{ textAlign: 'center', padding: '14px 8px' }}>
+            <p style={{ fontSize: 12, color: 'rgba(255,100,100,0.85)', marginBottom: 6, lineHeight: 1.5 }}>
+              Spotify account niet geautoriseerd.
+            </p>
+            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 12, lineHeight: 1.4 }}>
+              Vraag de beheerder om je account toe te voegen, of koppel opnieuw.
+            </p>
+            <button onClick={handleLogout}
+              style={{ fontSize: 11, padding: '5px 14px', borderRadius: 8, border: '1px solid rgba(255,100,100,0.3)', background: 'rgba(255,100,100,0.08)', color: 'rgba(255,100,100,0.8)', cursor: 'pointer' }}>
+              Ontkoppelen
+            </button>
+          </div>
         ) : (
           <p className="text-xs text-center py-2" style={{ color: 'rgba(255,255,255,0.3)' }}>
             Niets aan het afspelen...
