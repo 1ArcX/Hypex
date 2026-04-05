@@ -301,13 +301,20 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
     ? { display: 'flex', flexDirection: 'column', overflow: 'hidden' }
     : { marginBottom: 16 }
 
+  const widgetStyle = tabless ? {} : {
+    borderLeft: '3px solid rgba(129,140,248,0.45)',
+    background: 'linear-gradient(135deg, rgba(129,140,248,0.05) 0%, transparent 60%)',
+  }
+
   return (
-    <div className={tabless ? '' : 'glass-card p-4'} style={gridLayout ? { height: '100%', display: 'flex', flexDirection: 'column' } : {}}>
+    <div className={tabless ? '' : 'glass-card p-4'} style={{ ...(gridLayout ? { height: '100%', display: 'flex', flexDirection: 'column' } : {}), ...widgetStyle }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: expanded ? '12px' : 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '16px' }}>🎓</span>
-          <span style={{ color: 'white', fontWeight: 600, fontSize: '13px' }}>Magister</span>
+          <div style={{ width: 24, height: 24, borderRadius: 8, background: 'rgba(129,140,248,0.15)', border: '1px solid rgba(129,140,248,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <BookOpen size={12} style={{ color: '#818CF8' }} />
+          </div>
+          <span style={{ fontSize: 10, color: '#818CF8', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Magister</span>
           {creds && (
             <span style={{ background: accentBg(10), border: accentBorder(25), borderRadius: '20px', padding: '1px 8px', fontSize: '10px', color: 'var(--accent)' }}>
               {creds.school}

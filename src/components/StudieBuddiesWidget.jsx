@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { Users } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 
 const MODE_EMOJI = { work: '🍅', break: '☕', longBreak: '🌙' }
@@ -68,10 +69,17 @@ export default function StudieBuddiesWidget({ profiles = [] }) {
   }
 
   return (
-    <div className="card" style={{ padding: '14px 16px' }}>
-      <p style={{ fontSize: 10, color: 'var(--text-3)', margin: '0 0 10px', letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 600 }}>
-        👥 StudieBuddies
-      </p>
+    <div className="card" style={{
+      padding: '14px 16px',
+      borderLeft: '3px solid rgba(167,139,250,0.45)',
+      background: 'linear-gradient(135deg, rgba(167,139,250,0.05) 0%, transparent 60%)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
+        <div style={{ width: 22, height: 22, borderRadius: 7, background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Users size={11} style={{ color: '#A78BFA' }} />
+        </div>
+        <span style={{ fontSize: 10, color: '#A78BFA', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700 }}>StudieBuddies</span>
+      </div>
 
       {onlineUsers.length === 0 ? (
         <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0 }}>Nog niemand aan het studeren</p>
@@ -82,12 +90,12 @@ export default function StudieBuddiesWidget({ profiles = [] }) {
             const emoji = MODE_EMOJI[u.mode] || '🍅'
             return (
               <div key={`${u.userId}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 8, color: '#22c55e', lineHeight: 1 }}>●</span>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#A78BFA', boxShadow: '0 0 6px rgba(167,139,250,0.6)', flexShrink: 0, display: 'inline-block' }} />
                 <span style={{ fontSize: 13, color: 'var(--text-1)', flex: 1, fontWeight: 500 }}>
                   {emoji} {u.name}
                 </span>
                 {remaining && (
-                  <span style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'monospace' }}>
+                  <span style={{ fontSize: 11, color: '#A78BFA', fontFamily: 'monospace', fontWeight: 600 }}>
                     {remaining}
                   </span>
                 )}

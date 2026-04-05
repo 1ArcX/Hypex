@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useCallback, useReducer, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Play, Pause, RotateCcw, SkipForward, Settings, X, Bell, BellOff, Volume2, VolumeX, Coffee, Zap, Maximize2 } from 'lucide-react'
+import { Play, Pause, RotateCcw, SkipForward, Settings, X, Bell, BellOff, Volume2, VolumeX, Coffee, Zap, Maximize2, Timer } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import FocusMode from './FocusMode'
 import useAmbientSound from '../hooks/useAmbientSound'
@@ -986,16 +986,22 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
         className="glass-card transition-all duration-700"
         style={{
           padding: '18px',
+          borderLeft: `3px solid rgba(${modeRgb},0.45)`,
+          background: `linear-gradient(135deg, rgba(${modeRgb},0.06) 0%, transparent 60%)`,
           boxShadow: running
             ? `0 0 40px rgba(${modeRgb},0.18), inset 0 0 30px rgba(${modeRgb},0.04)`
             : undefined,
           borderColor: running ? `rgba(${modeRgb},0.3)` : undefined,
+          transition: 'border-color 0.6s, background 0.6s, box-shadow 0.6s',
         }}
       >
         {/* ── Header ── */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.35)' }}>
+            <div style={{ width: 22, height: 22, borderRadius: 6, background: `rgba(${modeRgb},0.15)`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.6s' }}>
+              <Timer size={12} style={{ color: modeColor }} />
+            </div>
+            <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: modeColor, transition: 'color 0.6s' }}>
               POMODORO
             </span>
             {/* Compact time display always visible in header */}

@@ -72,7 +72,7 @@ function DayLog({ label, sessions }) {
   const totalStr = h > 0 ? `${h}u ${m}m` : `${totalMins}m`
 
   return (
-    <div className="card" style={{ padding: '14px 16px' }}>
+    <div className="card" style={{ padding: '14px 16px', borderLeft: '3px solid rgba(0,255,209,0.25)', background: 'linear-gradient(135deg, rgba(0,255,209,0.02) 0%, transparent 60%)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <p style={{ fontSize: 10, color: 'var(--text-3)', margin: 0, letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 600 }}>
           {label}

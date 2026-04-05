@@ -84,6 +84,7 @@ export default function TakenPage({
         display: 'flex',
         gap: 6,
         scrollbarWidth: 'none',
+        borderTop: '2px solid rgba(0,255,209,0.2)',
       }}>
         {FILTERS.map(f => {
           const active = filter === f.id

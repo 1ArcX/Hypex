@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import ReactDOM from 'react-dom'
 import { supabase } from '../supabaseClient'
-import { Plus, X, Trash2, Flame, Pencil, ChevronDown, ChevronUp, Minus, Trophy } from 'lucide-react'
+import { Plus, X, Trash2, Flame, Pencil, ChevronDown, ChevronUp, Minus, Trophy, Leaf } from 'lucide-react'
 
 const EMOJIS = [
   '🏃','📚','💧','🧘','🥗','😴','💪','🎯','✍️','🎨',
@@ -712,11 +712,13 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
   // ── Compact mode ───────────────────────────────────────────────────────────
   if (compact) {
     return (
-      <div className="glass-card" style={{ padding: '14px 16px' }}>
+      <div className="glass-card" style={{ padding: '14px 16px', borderLeft: '3px solid rgba(34,197,94,0.45)', background: 'linear-gradient(135deg, rgba(34,197,94,0.05) 0%, transparent 60%)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Flame size={13} color="#FF8C42" />
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'white' }}>Gewoontes</span>
+            <div style={{ width: 20, height: 20, borderRadius: 6, background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Leaf size={10} style={{ color: '#22C55E' }} />
+            </div>
+            <span style={{ fontSize: 10, color: '#22C55E', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Gewoontes</span>
           </div>
           {todayHabits.length > 0 && (
             <span style={{ fontSize: 11, color: doneToday === todayHabits.length ? 'var(--accent)' : 'rgba(255,255,255,0.3)', fontWeight: 600 }}>
@@ -772,16 +774,21 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0 
   // ── Full render ────────────────────────────────────────────────────────────
   return (
     <>
-      <div className="glass-card p-4">
+      <div className="glass-card p-4" style={{
+        borderLeft: '3px solid rgba(34,197,94,0.45)',
+        background: 'linear-gradient(135deg, rgba(34,197,94,0.05) 0%, transparent 60%)',
+      }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <Flame size={15} color="#FF8C42" />
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'white' }}>Gewoontes</span>
+            <div style={{ width: 24, height: 24, borderRadius: 8, background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Leaf size={12} style={{ color: '#22C55E' }} />
+            </div>
+            <span style={{ fontSize: 10, color: '#22C55E', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Gewoontes</span>
             {todayHabits.length > 0 && (
               <span style={{
-                fontSize: 11, fontWeight: 600,
-                color: doneToday === todayHabits.length ? 'var(--accent)' : 'rgba(255,255,255,0.3)',
+                fontSize: 11, fontWeight: 700,
+                color: doneToday === todayHabits.length ? '#22C55E' : 'rgba(255,255,255,0.3)',
               }}>
                 {doneToday}/{todayHabits.length}
               </span>

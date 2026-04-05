@@ -429,8 +429,8 @@ export default function StatsPage({ tasks, userId }) {
     <div style={{ height: '100%', overflowY: 'auto', padding: '20px 16px 100px' }}>
       <div style={{ maxWidth: 600, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Statistieken</h1>
-          <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '4px 0 0' }}>Jouw voortgang deze week</p>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: '#00FFD1', margin: 0, borderLeft: '3px solid rgba(0,255,209,0.5)', paddingLeft: 12 }}>Statistieken</h1>
+          <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '4px 0 0', paddingLeft: 15 }}>Jouw voortgang deze week</p>
         </div>
 
         <FocusCard />

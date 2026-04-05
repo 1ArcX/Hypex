@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { BarChart2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 
 const LS_STATS = 'pomodoro_stats'
@@ -68,13 +69,22 @@ export default function PomodoroStats({ refreshKey, userId }) {
   const BAR_MAX_H = 52
 
   return (
-    <div className="card" style={{ padding: '14px 16px' }}>
+    <div className="card" style={{
+      padding: '14px 16px',
+      borderLeft: '3px solid rgba(0,255,209,0.4)',
+      background: 'linear-gradient(135deg, rgba(0,255,209,0.04) 0%, transparent 60%)',
+    }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-        <span style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>
-          Focus deze week
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <div style={{ width: 22, height: 22, borderRadius: 7, background: 'rgba(0,255,209,0.12)', border: '1px solid rgba(0,255,209,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <BarChart2 size={11} style={{ color: 'var(--accent)' }} />
+          </div>
+          <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase' }}>
+            Focus deze week
+          </span>
+        </div>
         {total > 0 && (
-          <span style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 700 }}>
+          <span style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 800 }}>
             {fmtMins(total)}
           </span>
         )}

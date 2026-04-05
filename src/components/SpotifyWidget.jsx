@@ -365,12 +365,17 @@ export default function SpotifyWidget() {
   const btnBase = { background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 4 }
 
   return (
-    <div className="glass-card p-4">
+    <div className="glass-card p-4" style={{
+      borderLeft: '3px solid rgba(29,185,84,0.4)',
+      background: 'linear-gradient(135deg, rgba(29,185,84,0.05) 0%, transparent 60%)',
+    }}>
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Music size={14} color="#1DB954" />
-          <span className="text-xs font-semibold text-white">Spotify</span>
+          <div style={{ width: 24, height: 24, borderRadius: 8, background: 'rgba(29,185,84,0.15)', border: '1px solid rgba(29,185,84,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Music size={12} color="#1DB954" />
+          </div>
+          <span style={{ fontSize: 10, color: '#1DB954', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Spotify</span>
         </div>
         <button onClick={handleLogout} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', fontSize: '11px' }}>
           Uitloggen
@@ -410,11 +415,13 @@ export default function SpotifyWidget() {
             </div>
 
             {/* Voortgangsbalk */}
-            <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.1)', margin: '8px 0' }}>
+            <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', margin: '8px 0', cursor: 'pointer' }}>
               <div style={{
-                height: '100%', borderRadius: 2, background: '#1DB954',
+                height: '100%', borderRadius: 2,
+                background: 'linear-gradient(90deg, #1DB954, #22c55e)',
                 width: `${durationMs > 0 ? (progressMs / durationMs) * 100 : 0}%`,
-                transition: 'width 0.5s linear'
+                transition: 'width 0.5s linear',
+                boxShadow: '0 0 6px rgba(29,185,84,0.4)',
               }} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>

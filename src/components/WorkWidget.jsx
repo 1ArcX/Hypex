@@ -188,12 +188,17 @@ export default function WorkWidget({ userId = null }) {
   const showForm = !creds || showSettings
 
   return (
-    <div className="glass-card p-4">
+    <div className="glass-card p-4" style={{
+      borderLeft: '3px solid rgba(245,158,11,0.45)',
+      background: 'linear-gradient(135deg, rgba(245,158,11,0.05) 0%, transparent 60%)',
+    }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: expanded ? '12px' : 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '16px' }}>💼</span>
-          <span style={{ color: 'white', fontWeight: 600, fontSize: '13px' }}>Jumbo Rooster</span>
+          <div style={{ width: 24, height: 24, borderRadius: 8, background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Briefcase size={12} style={{ color: '#F59E0B' }} />
+          </div>
+          <span style={{ fontSize: 10, color: '#F59E0B', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Werkdiensten</span>
           {creds && (
             <span style={{ background: accentBg(10), border: accentBorder(25), borderRadius: '20px', padding: '1px 8px', fontSize: '10px', color: 'var(--accent)' }}>
               PMT

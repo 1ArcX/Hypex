@@ -34,7 +34,7 @@ function SwipeableRow({ onSwipeRight, onSwipeLeft, children }) {
     </div>
   )
 }
-import { Plus, GripVertical, Trash2, CheckCircle2, Circle, X, AlertCircle, Flag, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, GripVertical, Trash2, CheckCircle2, Circle, X, AlertCircle, Flag, ChevronDown, ChevronRight, CheckSquare } from 'lucide-react'
 
 const PRIORITY_DOT = {
   1: '#FF6B6B',
@@ -137,12 +137,18 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
     .sort((a, b) => (b.updated_at || b.date || '').localeCompare(a.updated_at || a.date || ''))
 
   return (
-    <div className="glass-card p-4">
+    <div className="glass-card p-4" style={{
+      borderLeft: '3px solid rgba(0,255,209,0.4)',
+      background: 'linear-gradient(135deg, rgba(0,255,209,0.04) 0%, transparent 60%)',
+    }}>
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-          <span style={{ color: 'var(--accent)' }}>✅</span> Taken
-        </h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <div style={{ width: 24, height: 24, borderRadius: 8, background: 'rgba(0,255,209,0.12)', border: '1px solid rgba(0,255,209,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <CheckSquare size={12} style={{ color: 'var(--accent)' }} />
+          </div>
+          <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Taken</span>
+        </div>
         <button
           onClick={() => { if (onNew) { onNew() } else { setAdding(!adding); setNewTitle('') } }}
           style={{ background: 'color-mix(in srgb, var(--accent) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', borderRadius: '8px', padding: '4px 8px', cursor: 'pointer', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>

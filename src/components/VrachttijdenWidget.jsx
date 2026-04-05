@@ -538,12 +538,17 @@ export default function VrachttijdenWidget() {
     : []
 
   return (
-    <div className="glass-card p-4">
+    <div className="glass-card p-4" style={{
+      borderLeft: '3px solid rgba(255,140,66,0.45)',
+      background: 'linear-gradient(135deg, rgba(255,140,66,0.05) 0%, transparent 60%)',
+    }}>
       {/* Header */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px' }}>
         <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
-          <Truck size={15} style={{ color:'var(--accent)', opacity:0.8 }} />
-          <span style={{ color:'white', fontWeight:600, fontSize:'13px' }}>Vrachttijden</span>
+          <div style={{ width: 24, height: 24, borderRadius: 8, background: 'rgba(255,140,66,0.15)', border: '1px solid rgba(255,140,66,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Truck size={12} style={{ color:'#FF8C42' }} />
+          </div>
+          <span style={{ fontSize: 10, color: '#FF8C42', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Vrachttijden</span>
           {lastUpdate && selectedDate === today && <span style={{ fontSize:'10px', color:'rgba(255,255,255,0.3)' }}>{lastUpdate.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})}</span>}
         </div>
         <div style={{ display:'flex', gap:'4px', alignItems:'center' }}>
