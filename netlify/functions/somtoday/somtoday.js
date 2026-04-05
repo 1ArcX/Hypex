@@ -24,26 +24,34 @@ exports.handler = async (event) => {
   // ── schools: search organisaties.json ────────────────────────────────────────
   if (action === 'schools') {
     const q = (event.queryStringParameters?.q || '').toLowerCase().trim()
-    // Try both known endpoints
-    const urls = [
-      'https://servers.somtoday.nl/organisaties.json',
-      'https://inloggen.somtoday.nl/organisaties.json',
+    const ORGS_URL = 'https://servers.somtoday.nl/organisaties.json'
+    const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+    const attempts = [
+      // 1. Direct with browser-like headers
+      () => fetch(ORGS_URL, {
+        headers: {
+          'User-Agent': BROWSER_UA,
+          'Accept': 'application/json, */*',
+          'Accept-Language': 'nl-NL,nl;q=0.9',
+          'Referer': 'https://leerling.somtoday.nl/',
+          'Origin': 'https://leerling.somtoday.nl',
+        },
+      }),
+      // 2. Via allorigins proxy (adds CORS headers, works from any IP)
+      () => fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(ORGS_URL)}`),
+      // 3. Via corsproxy.io
+      () => fetch(`https://corsproxy.io/?${encodeURIComponent(ORGS_URL)}`),
     ]
-    for (const url of urls) {
+    for (const attempt of attempts) {
       try {
-        const res = await fetch(url, {
-          headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
-        })
+        const res = await attempt()
         if (!res.ok) continue
         const json = await res.json()
-        // Structure: array with first element having 'instellingen'
         const orgs = Array.isArray(json)
           ? (json[0]?.instellingen || json.flatMap(x => x.instellingen || []))
           : (json.instellingen || [])
         if (!orgs.length) continue
-        const filtered = q
-          ? orgs.filter(o => (o.naam || '').toLowerCase().includes(q))
-          : orgs
+        const filtered = q ? orgs.filter(o => (o.naam || '').toLowerCase().includes(q)) : orgs
         return ok(filtered.slice(0, 25).map(o => ({ name: o.naam, uuid: o.uuid })))
       } catch { /* try next */ }
     }
