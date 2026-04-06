@@ -2,10 +2,24 @@
 // Supports native SOMtoday password auth. Schools using Microsoft/Azure SSO
 // cannot be automated server-side (returns MICROSOFT_SSO error).
 const crypto = require('crypto')
-let blobStore = null
-async function getTokenStore() {
-  if (blobStore) return blobStore
-  try { const { getStore } = require('@netlify/blobs'); blobStore = getStore('somtoday'); return blobStore } catch { return null }
+
+const SB_KEY = '__somtoday_token__'
+async function dbGetToken() {
+  try {
+    const url = process.env.SUPABASE_URL + `/rest/v1/subject_links?vak_naam=eq.${SB_KEY}&select=url`
+    const r = await fetch(url, { headers: { apikey: process.env.SUPABASE_SERVICE_KEY, Authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_KEY } })
+    const rows = await r.json()
+    return rows?.[0]?.url || null
+  } catch { return null }
+}
+async function dbSetToken(token) {
+  try {
+    await fetch(process.env.SUPABASE_URL + '/rest/v1/subject_links', {
+      method: 'POST',
+      headers: { apikey: process.env.SUPABASE_SERVICE_KEY, Authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_KEY, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
+      body: JSON.stringify({ vak_naam: SB_KEY, url: token }),
+    })
+  } catch {}
 }
 
 const AUTH_BASE  = 'https://inloggen.somtoday.nl'
@@ -367,52 +381,31 @@ exports.handler = async (event) => {
     catch (e) { return fail(e.message || 'Inloggen mislukt') }
   }
 
-  // ── autologin: refresh via Blobs (auto-rotating) with env var as seed ────
+  // ── autologin: Supabase-backed auto-rotating refresh ─────────────────────
   if (action === 'autologin') {
     const apiUrl = process.env.SOMTODAY_API_URL || 'https://api.somtoday.nl'
     try {
-      // Try Blobs first (always up-to-date after first use), fall back to env var seed
-      const store = await getTokenStore()
-      const storedToken = store ? await store.get('refresh_token', { type: 'text' }).catch(() => null) : null
+      const storedToken = await dbGetToken()
       const refreshToken = storedToken || process.env.SOMTODAY_REFRESH_TOKEN
       if (!refreshToken) return fail('Autologin niet geconfigureerd', 500)
-
       const res = await fetch(AUTH_BASE + '/oauth2/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': UA },
-        body: new URLSearchParams({
-          grant_type: 'refresh_token',
-          refresh_token: refreshToken,
-          client_id: 'somtoday-leerling-web',
-        }).toString(),
+        body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken, client_id: 'somtoday-leerling-web' }).toString(),
       })
-      if (!res.ok) {
-        const err = await res.text()
-        return fail(`Autologin mislukt: ${res.status} — ${err.slice(0, 200)}`)
-      }
+      if (!res.ok) { const err = await res.text(); return fail(`Autologin mislukt: ${res.status} — ${err.slice(0, 200)}`) }
       const data = await res.json()
-      // Persist the new refresh_token so it auto-rotates
-      if (store && data.refresh_token) {
-        await store.set('refresh_token', data.refresh_token).catch(() => {})
-      }
-      return ok({
-        access_token:     data.access_token,
-        refresh_token:    data.refresh_token,
-        expires_in:       data.expires_in || 3600,
-        somtoday_api_url: data.somtoday_api_url || apiUrl,
-      })
+      if (data.refresh_token) await dbSetToken(data.refresh_token)
+      return ok({ access_token: data.access_token, refresh_token: data.refresh_token, expires_in: data.expires_in || 3600, somtoday_api_url: data.somtoday_api_url || apiUrl })
     } catch (e) { return fail(e.message || 'Autologin mislukt') }
   }
 
-  // ── savetoken: persist refresh_token to Blobs (called after wizard login) ─
+  // ── savetoken: persist refresh_token to Supabase ──────────────────────────
   if (action === 'savetoken') {
     const { refreshToken } = body
     if (!refreshToken) return fail('refreshToken vereist')
-    try {
-      const store = await getTokenStore()
-      if (store) await store.set('refresh_token', refreshToken)
-      return ok({ saved: true })
-    } catch (e) { return fail(e.message) }
+    try { await dbSetToken(refreshToken); return ok({ saved: true }) }
+    catch (e) { return fail(e.message) }
   }
 
   // ── refresh: refresh_token grant ──────────────────────────────────────────
