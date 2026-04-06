@@ -171,7 +171,9 @@ export default function WeatherWidget({ stacked = false, userId, onRequestPwaIns
   const [weekly, setWeekly]         = useState(null)
   const [rain, setRain]             = useState(null)
   const [coords, setCoords]         = useState(null)
-  const [city, setCity]             = useState('Dronten')
+  const [city, setCity]             = useState(() => {
+    try { const s = JSON.parse(localStorage.getItem('weather_coords')); return s?.city || 'Dronten' } catch { return 'Dronten' }
+  })
   const [loading, setLoading]       = useState(false)
   const [rainLoading, setRainLoading] = useState(false)
   const [error, setError]           = useState('')
@@ -205,7 +207,7 @@ export default function WeatherWidget({ stacked = false, userId, onRequestPwaIns
       if (!geoData.results?.length) { setError('Stad niet gevonden'); setLoading(false); return }
       const { latitude, longitude, name } = geoData.results[0]
       setCoords({ lat: latitude, lon: longitude })
-      localStorage.setItem('weather_coords', JSON.stringify({ lat: latitude, lon: longitude }))
+      localStorage.setItem('weather_coords', JSON.stringify({ lat: latitude, lon: longitude, city: name }))
 
       // Current + daily in one call
       const wRes = await fetch(

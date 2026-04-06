@@ -272,9 +272,12 @@ export default function App() {
     navigator.serviceWorker.ready.then(async (reg) => {
       try {
         const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC) })
-        const { data: existing } = await supabase.from('push_subscriptions').select('id').eq('user_id', user.id).maybeSingle()
-        if (existing) {
-          await supabase.from('push_subscriptions').update({ subscription: sub.toJSON() }).eq('user_id', user.id)
+        const { data: rows } = await supabase.from('push_subscriptions').select('id').eq('user_id', user.id)
+        if (rows && rows.length > 0) {
+          await supabase.from('push_subscriptions').update({ subscription: sub.toJSON() }).eq('id', rows[0].id)
+          if (rows.length > 1) {
+            await supabase.from('push_subscriptions').delete().in('id', rows.slice(1).map(r => r.id))
+          }
         } else {
           await supabase.from('push_subscriptions').insert({ user_id: user.id, subscription: sub.toJSON() })
         }

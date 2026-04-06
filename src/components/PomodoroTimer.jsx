@@ -22,9 +22,12 @@ async function registerPushSubscription(userId) {
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC),
     })
-    const { data: existing } = await supabase.from('push_subscriptions').select('id').eq('user_id', userId).maybeSingle()
-    if (existing) {
-      await supabase.from('push_subscriptions').update({ subscription: sub.toJSON() }).eq('user_id', userId)
+    const { data: rows } = await supabase.from('push_subscriptions').select('id').eq('user_id', userId)
+    if (rows && rows.length > 0) {
+      await supabase.from('push_subscriptions').update({ subscription: sub.toJSON() }).eq('id', rows[0].id)
+      if (rows.length > 1) {
+        await supabase.from('push_subscriptions').delete().in('id', rows.slice(1).map(r => r.id))
+      }
     } else {
       await supabase.from('push_subscriptions').insert({ user_id: userId, subscription: sub.toJSON() })
     }
@@ -352,7 +355,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       registerPushSubscription(userId)
     }
-  }, [userId])
+  }, [userId, state.notifEnabled])
 
   // ── Load stats from cloud on mount ────────────────────────────────────────
   useEffect(() => {

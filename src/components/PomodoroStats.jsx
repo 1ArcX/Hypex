@@ -40,10 +40,10 @@ export default function PomodoroStats({ refreshKey, userId }) {
     const from = weekDays[0]
     supabase
       .from('pomodoro_sessions')
-      .select('date, duration_mins')
+      .select('completed_at, duration_minutes')
       .eq('user_id', userId)
       .eq('mode', 'work')
-      .gte('date', from)
+      .gte('completed_at', from)
       .then(({ data }) => {
         if (!data || data.length === 0) {
           setStatsMap(loadLocalStats())
@@ -52,7 +52,8 @@ export default function PomodoroStats({ refreshKey, userId }) {
         // Sommeer minuten per dag
         const map = {}
         for (const row of data) {
-          map[row.date] = (map[row.date] || 0) + (row.duration_mins || 0)
+          const day = row.completed_at.slice(0, 10)
+          map[day] = (map[day] || 0) + (row.duration_minutes || 0)
         }
         // Merge met localStorage (neem max per dag)
         const local = loadLocalStats()
