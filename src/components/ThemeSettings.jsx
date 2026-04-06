@@ -12,6 +12,14 @@ const PRESETS = [
 
 export default function ThemeSettings({ onClose, theme, setTheme, onLogout }) {
   const [customAccent, setCustomAccent] = useState(theme.accent)
+  const [somtodayColor, setSomtodayColorState] = useState(() => {
+    try { return localStorage.getItem('somtoday_lesson_color') || '#FACC15' } catch { return '#FACC15' }
+  })
+
+  const applySomtodayColor = (color) => {
+    setSomtodayColorState(color)
+    try { localStorage.setItem('somtoday_lesson_color', color) } catch {}
+  }
 
   const applyPreset = (preset) => {
     setTheme({ ...theme, ...preset })
@@ -77,6 +85,20 @@ export default function ThemeSettings({ onClose, theme, setTheme, onLogout }) {
             <input type="color" value={customAccent} onChange={e => applyCustomAccent(e.target.value)}
               style={{ width: '40px', height: '40px', borderRadius: '10px', border: 'none', cursor: 'pointer', background: 'none' }} />
             <span className="text-sm font-mono" style={{ color: 'rgba(255,255,255,0.6)' }}>{customAccent}</span>
+          </div>
+        </div>
+
+        {/* SOMtoday leskleur */}
+        <div className="mb-5">
+          <p className="text-xs font-medium mb-2" style={{ color: 'rgba(255,255,255,0.5)' }}>SOMtoday leskleur</p>
+          <div className="flex items-center gap-3">
+            <input type="color" value={somtodayColor} onChange={e => applySomtodayColor(e.target.value)}
+              style={{ width: '40px', height: '40px', borderRadius: '10px', border: 'none', cursor: 'pointer', background: 'none' }} />
+            <span className="text-sm font-mono" style={{ color: 'rgba(255,255,255,0.6)' }}>{somtodayColor}</span>
+            <button onClick={() => applySomtodayColor('#FACC15')}
+              style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}>
+              reset
+            </button>
           </div>
         </div>
 

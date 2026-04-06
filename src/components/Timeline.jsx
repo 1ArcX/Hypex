@@ -527,17 +527,31 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
                     if (item.type === 'lesson') {
                       const les = item.data
                       const cancelled = les.uitgevallen || les.cancelled
-                      const color = cancelled ? '#FF6B6B' : '#FACC15'
+                      const isSomtoday = les._source === 'somtoday'
+                      const somtodayColor = (() => { try { return localStorage.getItem('somtoday_lesson_color') || '#FACC15' } catch { return '#FACC15' } })()
+                      const baseColor = isSomtoday ? somtodayColor : '#FACC15'
+                      const color = cancelled ? '#FF6B6B' : baseColor
+                      const borderColor = cancelled ? '#FF6B6B99' : baseColor + '99'
+                      // Voor SOMtoday: gebruik volledige vaknaam als die beschikbaar is
+                      const lesTitle = les.vak || les.description || les.title || 'Les'
+                      // Filter lesgroep-code uit docenten (docentAfkortingen bevat soms vakcode)
+                      const teachers = isSomtoday
+                        ? (les.teachers || []).filter(t => t !== les.title)
+                        : null
+                      const subLabel = [
+                        les.lokaal || les.location,
+                        les.docent || (teachers ? teachers.join(', ') : les.teachers?.join(', ')),
+                      ].filter(Boolean).join(' · ')
                       return (
                         <div key={item.key}
                           onClick={e => { e.stopPropagation(); setLessonDetail(les) }}
-                          style={{ position: 'absolute', top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, background: color + '18', borderLeft: `3px solid ${cancelled ? '#FF6B6B99' : '#FACC1599'}`, borderRadius: '5px', padding: '3px 7px', overflow: 'hidden', cursor: 'pointer', zIndex: 1, boxSizing: 'border-box', marginLeft: '2px', opacity: cancelled ? 0.5 : 0.85 }}>
+                          style={{ position: 'absolute', top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, background: color + '18', borderLeft: `3px solid ${borderColor}`, borderRadius: '5px', padding: '3px 7px', overflow: 'hidden', cursor: 'pointer', zIndex: 1, boxSizing: 'border-box', marginLeft: '2px', opacity: cancelled ? 0.5 : 0.85 }}>
                           <div style={{ fontSize: '11px', fontWeight: 600, color, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: cancelled ? 'line-through' : 'none' }}>
-                            🎓 {les.vak || les.title || 'Les'}
+                            🎓 {lesTitle}
                           </div>
-                          {showDetail && (
+                          {showDetail && subLabel && (
                             <div style={{ fontSize: '10px', color: color + 'aa', lineHeight: 1.3, marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {[les.lokaal || les.location, les.docent || les.teachers?.join(', ')].filter(Boolean).join(' · ')}
+                              {subLabel}
                             </div>
                           )}
                         </div>
