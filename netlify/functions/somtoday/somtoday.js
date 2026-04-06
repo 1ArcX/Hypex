@@ -13,13 +13,12 @@ async function dbGetToken() {
   } catch { return null }
 }
 async function dbSetToken(token) {
-  try {
-    await fetch(process.env.SUPABASE_URL + '/rest/v1/subject_links', {
-      method: 'POST',
-      headers: { apikey: process.env.SUPABASE_SERVICE_KEY, Authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_KEY, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
-      body: JSON.stringify({ vak_naam: SB_KEY, url: token }),
-    })
-  } catch {}
+  const r = await fetch(process.env.SUPABASE_URL + '/rest/v1/subject_links?on_conflict=vak_naam', {
+    method: 'POST',
+    headers: { apikey: process.env.SUPABASE_SERVICE_KEY, Authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_KEY, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ vak_naam: SB_KEY, url: token }),
+  })
+  if (!r.ok) throw new Error(`Supabase set failed: ${r.status} ${await r.text()}`)
 }
 
 const AUTH_BASE  = 'https://inloggen.somtoday.nl'
