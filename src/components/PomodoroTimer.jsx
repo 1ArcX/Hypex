@@ -664,7 +664,6 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
     dispatch({ type: 'RESET' })
     broadcastState({ ...state, running: false, seconds: getMins(state) * 60 }, null, true)
     clearTimerSession(userIdRef.current)
-    buddiesChannelRef.current?.untrack()
   }
 
   const skip = () => {
@@ -676,7 +675,6 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
     setTimeout(() => onModeChange?.(next !== 'work'), 0)
     broadcastState({ ...state, running: false, sessionsInCycle: newSIC }, null, true)
     clearTimerSession(userIdRef.current)
-    buddiesChannelRef.current?.untrack()
   }
 
   const switchMode = (mode) => {
