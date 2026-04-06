@@ -3,7 +3,7 @@ import { BookOpen, ClipboardList, RefreshCw, Settings, ChevronDown, ChevronUp, A
 import { supabase } from '../supabaseClient'
 import { matchVak } from '../utils/alleVakken'
 import { callMagister, clearStoredTokens } from '../utils/magisterApi'
-import { callSomtoday, loginWithPopup, somtodayKey } from '../utils/somtodayApi'
+import { callSomtoday, somtodayKey } from '../utils/somtodayApi'
 
 const storageKey = (userId) => `magister_credentials_${userId}`
 
@@ -86,6 +86,7 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
   const [stProvider, setStProvider] = useState('magister')  // 'magister' | 'somtoday'
   const [stLoading, setStLoading] = useState(false)
   const [stError, setStError] = useState(null)
+  const [stTokenPaste, setStTokenPaste] = useState('')
   const [tab, setTab] = useState('vakken')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -98,25 +99,6 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
   const [swDetail, setSwDetail] = useState(null)        // { sw, topics, loading, error }
   const [bronLoading, setBronLoading] = useState({})
   const [expandedTopics, setExpandedTopics] = useState({})
-  // Auto-connect SOMtoday for specific account if not yet connected
-  useEffect(() => {
-    if (!somtodayEnabled || somtodayCreds) return
-    setStLoading(true)
-    callSomtoday('autologin', {}).then(async tokenData => {
-      const me = await callSomtoday('me', { accessToken: tokenData.access_token, somtodayApiUrl: tokenData.somtoday_api_url })
-      const stored = {
-        somtodayApiUrl: tokenData.somtoday_api_url,
-        accessToken: tokenData.access_token,
-        refreshToken: tokenData.refresh_token,
-        expiresAt: Math.floor(Date.now() / 1000) + (tokenData.expires_in || 3600),
-        studentId: me.id,
-        displayName: me.roepnaam || me.achternaam || 'Leerling',
-      }
-      localStorage.setItem(somtodayKey(userId), JSON.stringify(stored))
-      setSomtodayCreds(stored)
-      window.dispatchEvent(new Event('somtodayLogin'))
-    }).catch(e => setStError(e.message)).finally(() => setStLoading(false))
-  }, [somtodayEnabled, userId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch all Magister data at once on mount (no lazy loading per tab)
   useEffect(() => {
@@ -248,24 +230,42 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
     setFormCreds({ school: '', username: '', password: '' })
   }
 
-  const loginSomtoday = async () => {
+  const connectFromPaste = async () => {
     setStLoading(true); setStError(null)
     try {
-      const tokenData = await loginWithPopup()
-      const me = await callSomtoday('me', {
-        accessToken: tokenData.access_token,
-        somtodayApiUrl: tokenData.somtoday_api_url,
-      })
+      let parsed
+      try { parsed = JSON.parse(stTokenPaste.trim()) } catch { throw new Error('Ongeldig JSON — kopieer het resultaat opnieuw') }
+
+      // Find access_token: either direct field or inside an oidc.user:* key
+      let accessToken, refreshToken, expiresAt, somtodayApiUrl
+      const oidcKey = Object.keys(parsed).find(k => k.startsWith('oidc.user:'))
+      if (oidcKey) {
+        const oidc = typeof parsed[oidcKey] === 'string' ? JSON.parse(parsed[oidcKey]) : parsed[oidcKey]
+        accessToken = oidc.access_token
+        refreshToken = oidc.refresh_token
+        expiresAt = oidc.expires_at
+        somtodayApiUrl = oidc.profile?.somtodayApiUrl || oidc.profile?.som_url || null
+      } else {
+        accessToken = parsed.access_token
+        refreshToken = parsed.refresh_token
+        expiresAt = parsed.expires_at
+        somtodayApiUrl = parsed.somtoday_api_url || null
+      }
+      if (!accessToken) throw new Error('Geen access_token gevonden — probeer het commando opnieuw')
+
+      const apiUrl = somtodayApiUrl || 'https://production.somtoday.nl'
+      const me = await callSomtoday('me', { accessToken, somtodayApiUrl: apiUrl })
       const stored = {
-        somtodayApiUrl: tokenData.somtoday_api_url,
-        accessToken: tokenData.access_token,
-        refreshToken: tokenData.refresh_token,
-        expiresAt: Math.floor(Date.now() / 1000) + (tokenData.expires_in || 3600),
+        somtodayApiUrl: apiUrl,
+        accessToken,
+        refreshToken,
+        expiresAt: expiresAt || Math.floor(Date.now() / 1000) + 3600,
         studentId: me.id,
         displayName: me.roepnaam || me.achternaam || 'Leerling',
       }
       localStorage.setItem(somtodayKey(userId), JSON.stringify(stored))
       setSomtodayCreds(stored)
+      setStTokenPaste('')
       setShowSettings(false)
       window.dispatchEvent(new Event('somtodayLogin'))
     } catch (e) {
@@ -466,32 +466,65 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
                 </div>
               </>)}
 
-              {/* SOMtoday form */}
+              {/* SOMtoday form — token wizard */}
               {stProvider === 'somtoday' && (<>
-                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', margin: 0 }}>
-                  Log in via een popup — werkt ook met Microsoft-aanmelding van je school.
-                </p>
-                {stError && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ff6b6b', fontSize: '11px' }}>
-                    <AlertCircle size={12} /> {stError}
-                  </div>
-                )}
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  {somtodayCreds && (
+                {somtodayCreds ? (
+                  <>
+                    <p style={{ margin: 0, fontSize: 11, color: '#4ADE80' }}>✓ Gekoppeld als {somtodayCreds.displayName}</p>
                     <button onClick={logoutSomtoday}
-                      style={{ flex: 1, padding: '7px', borderRadius: '8px', border: '1px solid rgba(255,80,80,0.3)', background: 'rgba(255,80,80,0.08)', color: '#ff6b6b', cursor: 'pointer', fontSize: '12px' }}>
+                      style={{ padding: '7px', borderRadius: '8px', border: '1px solid rgba(255,80,80,0.3)', background: 'rgba(255,80,80,0.08)', color: '#ff6b6b', cursor: 'pointer', fontSize: '12px' }}>
                       Ontkoppelen
                     </button>
-                  )}
-                  <button onClick={loginSomtoday} disabled={stLoading}
-                    style={{ flex: 2, padding: '7px', borderRadius: '8px', border: '1px solid rgba(251,191,36,0.4)', background: 'rgba(251,191,36,0.1)', color: '#FBBF24', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
-                    {stLoading ? 'Popup geopend...' : somtodayCreds ? 'Opnieuw inloggen' : 'Inloggen via SOMtoday'}
-                  </button>
-                </div>
-                {somtodayCreds && (
-                  <p style={{ margin: 0, fontSize: 11, color: '#4ADE80' }}>
-                    ✓ Gekoppeld als {somtodayCreds.displayName}
-                  </p>
+                  </>
+                ) : (
+                  <>
+                    <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
+                      Eenmalige koppeling via je browser. Volg de 3 stappen:
+                    </p>
+                    {/* Step 1 */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>① Open leerling.somtoday.nl en log in</span>
+                      <a href="https://leerling.somtoday.nl" target="_blank" rel="noopener noreferrer"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(251,191,36,0.35)', background: 'rgba(251,191,36,0.08)', color: '#FBBF24', textDecoration: 'none', fontSize: 12, fontWeight: 600, width: 'fit-content' }}>
+                        <ExternalLink size={12} /> leerling.somtoday.nl
+                      </a>
+                    </div>
+                    {/* Step 2 */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>② Open de console (F12 → Console) en plak dit commando:</span>
+                      <div style={{ position: 'relative' }}>
+                        <code style={{ display: 'block', padding: '7px 32px 7px 8px', borderRadius: 7, background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.1)', fontSize: 10, color: '#A5F3FC', wordBreak: 'break-all', lineHeight: 1.4 }}>
+                          {`copy(JSON.stringify(Object.fromEntries(Object.entries(localStorage).filter(([k])=>/oidc|token|somtoday/i.test(k)))))`}
+                        </code>
+                        <button onClick={() => {
+                          navigator.clipboard.writeText(`copy(JSON.stringify(Object.fromEntries(Object.entries(localStorage).filter(([k])=>/oidc|token|somtoday/i.test(k)))))`)
+                        }} style={{ position: 'absolute', top: 5, right: 5, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 5, padding: '2px 6px', cursor: 'pointer', color: 'rgba(255,255,255,0.5)', fontSize: 9 }}>
+                          Kopieer
+                        </button>
+                      </div>
+                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>Druk Enter — het commando kopieert het resultaat automatisch.</span>
+                    </div>
+                    {/* Step 3 */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>③ Plak het resultaat hier:</span>
+                      <textarea
+                        value={stTokenPaste}
+                        onChange={e => setStTokenPaste(e.target.value)}
+                        placeholder='{"oidc.user:...": "..."}'
+                        rows={3}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '7px 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.8)', fontSize: 11, fontFamily: 'monospace', resize: 'vertical', outline: 'none' }}
+                      />
+                    </div>
+                    {stError && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#ff6b6b', fontSize: 11 }}>
+                        <AlertCircle size={12} /> {stError}
+                      </div>
+                    )}
+                    <button onClick={connectFromPaste} disabled={stLoading || !stTokenPaste.trim()}
+                      style={{ padding: '7px', borderRadius: '8px', border: '1px solid rgba(251,191,36,0.4)', background: 'rgba(251,191,36,0.1)', color: '#FBBF24', cursor: stTokenPaste.trim() ? 'pointer' : 'not-allowed', fontSize: '12px', fontWeight: 600, opacity: stTokenPaste.trim() ? 1 : 0.4 }}>
+                      {stLoading ? 'Verbinden...' : 'Verbinden'}
+                    </button>
+                  </>
                 )}
               </>)}
             </div>
@@ -499,18 +532,6 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
 
           {!showSettings && (
             <>
-              {/* SOMtoday auto-login error banner */}
-              {somtodayEnabled && !somtodayCreds && stError && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 10px', borderRadius: 8, background: 'rgba(255,80,80,0.08)', border: '1px solid rgba(255,80,80,0.2)', marginBottom: 10, fontSize: 11, color: '#ff6b6b' }}>
-                  <AlertCircle size={12} /> {stError}
-                </div>
-              )}
-              {somtodayEnabled && !somtodayCreds && stLoading && (
-                <div style={{ padding: '7px 10px', borderRadius: 8, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.15)', marginBottom: 10, fontSize: 11, color: '#FBBF24' }}>
-                  SOMtoday verbinden...
-                </div>
-              )}
-
               {/* SOMtoday status banner (when connected) */}
               {somtodayCreds && (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', borderRadius: 8, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', marginBottom: 10 }}>
