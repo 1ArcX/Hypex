@@ -17,7 +17,7 @@ export default function NotitiesPage({ userId, syncTrigger }) {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', padding: isDesktop ? '24px 28px' : '12px 16px 100px' }}>
       {isDesktop && <h2 style={{ margin: '0 0 16px', fontSize: 20, fontWeight: 700, color: '#F59E0B', flexShrink: 0, borderLeft: '3px solid rgba(245,158,11,0.5)', paddingLeft: 12 }}>Notities</h2>}
-      <div style={{ flex: 1, overflow: 'hidden' }}>
+      <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
         <NotesWidget userId={userId} syncTrigger={syncTrigger} fullHeight seamless={!isDesktop} />
       </div>
     </div>
