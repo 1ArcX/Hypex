@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "20": "^3.1.9",
+    "@netlify/blobs": "^10.7.4",
     "@supabase/supabase-js": "^2.39.0",
     "git": "^0.1.5",
     "lucide-react": "^0.344.0",
