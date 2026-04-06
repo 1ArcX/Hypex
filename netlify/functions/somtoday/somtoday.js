@@ -465,8 +465,10 @@ exports.handler = async (event) => {
     try {
       // Fetch afspraken + vakken list in parallel
       const authHdr = { Authorization: `Bearer ${accessToken}`, Accept: 'application/json', 'User-Agent': UA }
+      // Use separate additional params (comma-separated may not work on all SOMtoday servers)
+      const afsprakenUrl = `${somtodayApiUrl}/rest/v1/afspraken?begindatum=${from}&einddatum=${to}&additional=vak&additional=docentAfkortingen&additional=locatie`
       const [res, vakRes] = await Promise.all([
-        fetch(`${somtodayApiUrl}/rest/v1/afspraken?begindatum=${from}&einddatum=${to}&additional=vak,docentAfkortingen,locatie`, { headers: authHdr }),
+        fetch(afsprakenUrl, { headers: authHdr }),
         fetch(`${somtodayApiUrl}/rest/v1/vakken`, { headers: authHdr }).catch(() => null),
       ])
       if (!res.ok) return fail(`Rooster mislukt: ${res.status}`, res.status)
@@ -485,9 +487,7 @@ exports.handler = async (event) => {
       // Extract vak abbreviation from codes like "a5.ak1" → "ak"
       function resolveVakNaam(subjectCode) {
         if (!subjectCode) return ''
-        // Direct lookup first (e.g. if subjectCode is already just "ak")
         if (vakkenMap[subjectCode.toLowerCase()]) return vakkenMap[subjectCode.toLowerCase()]
-        // Format: {klas}.{vakAfkorting}{groepNr}  e.g. "a5.ak1"
         const m = subjectCode.match(/^[a-z0-9]+\.([a-z]+)\d*$/i)
         if (m) return vakkenMap[m[1].toLowerCase()] || ''
         return ''
@@ -496,16 +496,33 @@ exports.handler = async (event) => {
       const data = await res.json()
       const lessons = (data.items || []).map(a => {
         const locatie = (typeof a.locatie === 'string' ? a.locatie : a.locatie?.naam) || ''
-        const docenten = a.docentAfkortingen || []
         const omschrijving = a.omschrijving || ''
 
-        // Parse omschrijving: format is "lokaal - groepscode - docent"
+        // Parse omschrijving: "lokaal - groepscode - docent"
+        // Strip lokaal prefix, then split off trailing teacher abbreviation
         let subjectCode = a.vak?.afkorting || ''
+        let docenten = a.docentAfkortingen || []
+
         if (!subjectCode && omschrijving) {
           let s = omschrijving
           if (locatie && s.startsWith(locatie + ' - ')) s = s.slice(locatie.length + 3)
-          for (const doc of docenten) {
-            if (s.endsWith(' - ' + doc)) s = s.slice(0, -(doc.length + 3))
+
+          // If docentAfkortingen is empty, try to extract teacher from the end of omschrijving
+          // Format after lokaal strip: "a5.ak1 - Heo" → subject="a5.ak1", teacher="Heo"
+          if (docenten.length === 0) {
+            const lastDash = s.lastIndexOf(' - ')
+            if (lastDash > 0) {
+              const possibleTeacher = s.slice(lastDash + 3).trim()
+              // Teacher abbreviation: short (≤8 chars), no digits, starts uppercase
+              if (possibleTeacher.length <= 8 && /^[A-Z]/.test(possibleTeacher) && !/\d/.test(possibleTeacher)) {
+                docenten = [possibleTeacher]
+                s = s.slice(0, lastDash).trim()
+              }
+            }
+          } else {
+            for (const doc of docenten) {
+              if (s.endsWith(' - ' + doc)) s = s.slice(0, -(doc.length + 3))
+            }
           }
           subjectCode = s.trim()
         }
