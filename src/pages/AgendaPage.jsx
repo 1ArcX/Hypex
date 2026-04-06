@@ -39,14 +39,17 @@ function getDayDensity(day, tasks, calendarEvents, magisterLessons) {
   // Agenda-events
   count += (calendarEvents || []).filter(ev => {
     try {
-      const startDs = new Date(ev.start_time).toISOString().slice(0, 10)
-      const endDs = new Date(ev.end_time).toISOString().slice(0, 10)
+      const startDs = toDateStr(new Date(ev.start_time))
+      const endDs = toDateStr(new Date(ev.end_time))
       return ds >= startDs && ds <= endDs
     } catch { return false }
   }).length
-  // Magister lessen
+  // Magister/SOMtoday lessen (alleen niet-geannuleerd)
   count += (magisterLessons || []).filter(l => {
-    try { return new Date(l.start).toISOString().slice(0, 10) === ds } catch { return false }
+    try {
+      if (l.cancelled || l.uitgevallen) return false
+      return toDateStr(new Date(l.start)) === ds
+    } catch { return false }
   }).length
   return count
 }
