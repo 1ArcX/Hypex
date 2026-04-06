@@ -469,15 +469,33 @@ exports.handler = async (event) => {
       })
       if (!res.ok) return fail(`Rooster mislukt: ${res.status}`, res.status)
       const data = await res.json()
-      const lessons = (data.items || []).map(a => ({
-        id: a.links?.[0]?.id, start: a.beginDatumTijd, end: a.eindDatumTijd,
-        title: a.vak?.afkorting || a.omschrijving || '?',
-        description: a.vak?.naam || a.omschrijving || '',
-        location: (typeof a.locatie === 'string' ? a.locatie : a.locatie?.naam) || '',
-        teachers: a.docentAfkortingen || [],
-        cancelled: a.afspraakStatus === 'GEANNULEERD', lessonHour: a.lesuurVanaf,
-        _source: 'somtoday',
-      }))
+      const lessons = (data.items || []).map(a => {
+        const locatie = (typeof a.locatie === 'string' ? a.locatie : a.locatie?.naam) || ''
+        const docenten = a.docentAfkortingen || []
+        const omschrijving = a.omschrijving || ''
+
+        // Parse omschrijving: format is "lokaal - groepscode - docent"
+        // Extract subject code by removing known locatie and docent parts
+        let subjectCode = a.vak?.afkorting || ''
+        if (!subjectCode && omschrijving) {
+          let s = omschrijving
+          if (locatie && s.startsWith(locatie + ' - ')) s = s.slice(locatie.length + 3)
+          for (const doc of docenten) {
+            if (s.endsWith(' - ' + doc)) s = s.slice(0, -(doc.length + 3))
+          }
+          subjectCode = s.trim()
+        }
+
+        return {
+          id: a.links?.[0]?.id, start: a.beginDatumTijd, end: a.eindDatumTijd,
+          title: subjectCode || omschrijving || '?',
+          description: a.vak?.naam || subjectCode || '',
+          location: locatie,
+          teachers: docenten.filter(t => t !== subjectCode),
+          cancelled: a.afspraakStatus === 'GEANNULEERD', lessonHour: a.lesuurVanaf,
+          _source: 'somtoday',
+        }
+      })
       return ok(lessons)
     } catch (e) { return fail(e.message) }
   }
