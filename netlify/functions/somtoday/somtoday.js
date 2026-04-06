@@ -4,19 +4,22 @@
 const crypto = require('crypto')
 
 const SB_KEY = '__somtoday_token__'
+// Stored as JSON: { refreshToken, accessToken, expiresAt, apiUrl }
 async function dbGetToken() {
   try {
     const url = process.env.SUPABASE_URL + `/rest/v1/subject_links?vak_naam=eq.${SB_KEY}&select=url`
     const r = await fetch(url, { headers: { apikey: process.env.SUPABASE_SERVICE_KEY, Authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_KEY } })
     const rows = await r.json()
-    return rows?.[0]?.url || null
+    const raw = rows?.[0]?.url || null
+    if (!raw) return null
+    try { return JSON.parse(raw) } catch { return { refreshToken: raw } }  // backwards compat
   } catch { return null }
 }
-async function dbSetToken(token) {
+async function dbSetToken(obj) {
   const r = await fetch(process.env.SUPABASE_URL + '/rest/v1/subject_links?on_conflict=vak_naam', {
     method: 'POST',
     headers: { apikey: process.env.SUPABASE_SERVICE_KEY, Authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_KEY, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify({ vak_naam: SB_KEY, url: token }),
+    body: JSON.stringify({ vak_naam: SB_KEY, url: typeof obj === 'string' ? obj : JSON.stringify(obj) }),
   })
   if (!r.ok) throw new Error(`Supabase set failed: ${r.status} ${await r.text()}`)
 }
@@ -382,11 +385,17 @@ exports.handler = async (event) => {
 
   // ── autologin: Supabase-backed auto-rotating refresh ─────────────────────
   if (action === 'autologin') {
-    const apiUrl = process.env.SOMTODAY_API_URL || 'https://api.somtoday.nl'
+    const fallbackApiUrl = process.env.SOMTODAY_API_URL || 'https://production.somtoday.nl'
     try {
-      const storedToken = await dbGetToken()
-      const refreshToken = storedToken || process.env.SOMTODAY_REFRESH_TOKEN
+      const stored = await dbGetToken()
+      const refreshToken = stored?.refreshToken || process.env.SOMTODAY_REFRESH_TOKEN
       if (!refreshToken) return fail('Autologin niet geconfigureerd', 500)
+
+      // Return cached access_token if still valid (with 60s buffer)
+      if (stored?.accessToken && stored?.expiresAt && Date.now() / 1000 < stored.expiresAt - 60) {
+        return ok({ access_token: stored.accessToken, refresh_token: stored.refreshToken, expires_in: Math.floor(stored.expiresAt - Date.now() / 1000), somtoday_api_url: stored.apiUrl || fallbackApiUrl })
+      }
+
       const res = await fetch(AUTH_BASE + '/oauth2/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': UA },
@@ -394,17 +403,21 @@ exports.handler = async (event) => {
       })
       if (!res.ok) { const err = await res.text(); return fail(`Autologin mislukt: ${res.status} — ${err.slice(0, 200)}`) }
       const data = await res.json()
-      if (data.refresh_token) await dbSetToken(data.refresh_token)
-      return ok({ access_token: data.access_token, refresh_token: data.refresh_token, expires_in: data.expires_in || 3600, somtoday_api_url: data.somtoday_api_url || apiUrl })
+      const expiresAt = Math.floor(Date.now() / 1000) + (data.expires_in || 3600)
+      const apiUrl = data.somtoday_api_url || fallbackApiUrl
+      await dbSetToken({ refreshToken: data.refresh_token, accessToken: data.access_token, expiresAt, apiUrl })
+      return ok({ access_token: data.access_token, refresh_token: data.refresh_token, expires_in: data.expires_in || 3600, somtoday_api_url: apiUrl })
     } catch (e) { return fail(e.message || 'Autologin mislukt') }
   }
 
   // ── savetoken: persist refresh_token to Supabase ──────────────────────────
   if (action === 'savetoken') {
-    const { refreshToken } = body
+    const { refreshToken, accessToken, expiresAt, apiUrl } = body
     if (!refreshToken) return fail('refreshToken vereist')
-    try { await dbSetToken(refreshToken); return ok({ saved: true }) }
-    catch (e) { return fail(e.message) }
+    try {
+      await dbSetToken({ refreshToken, accessToken: accessToken || null, expiresAt: expiresAt || null, apiUrl: apiUrl || null })
+      return ok({ saved: true })
+    } catch (e) { return fail(e.message) }
   }
 
   // ── refresh: refresh_token grant ──────────────────────────────────────────

@@ -287,8 +287,8 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
       setStTokenPaste('')
       setShowSettings(false)
       window.dispatchEvent(new Event('somtodayLogin'))
-      // Seed Blobs so auto-login works for all future visitors
-      callSomtoday('savetoken', { refreshToken }).catch(() => {})
+      // Seed Supabase so auto-login works for all future visitors/devices
+      callSomtoday('savetoken', { refreshToken, accessToken, expiresAt: stored.expiresAt, apiUrl }).catch(() => {})
     } catch (e) {
       setStError(e.message)
     }
