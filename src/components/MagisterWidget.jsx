@@ -100,6 +100,25 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
   const [bronLoading, setBronLoading] = useState({})
   const [expandedTopics, setExpandedTopics] = useState({})
 
+  // Auto-connect SOMtoday via env var refresh token (no user action needed)
+  useEffect(() => {
+    if (!somtodayEnabled || somtodayCreds) return
+    callSomtoday('autologin', {}).then(async tokenData => {
+      const me = await callSomtoday('me', { accessToken: tokenData.access_token, somtodayApiUrl: tokenData.somtoday_api_url })
+      const stored = {
+        somtodayApiUrl: tokenData.somtoday_api_url,
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token,
+        expiresAt: Math.floor(Date.now() / 1000) + (tokenData.expires_in || 3600),
+        studentId: me.id,
+        displayName: me.roepnaam || me.achternaam || 'Leerling',
+      }
+      localStorage.setItem(somtodayKey(userId), JSON.stringify(stored))
+      setSomtodayCreds(stored)
+      window.dispatchEvent(new Event('somtodayLogin'))
+    }).catch(() => {}) // silent — wizard is fallback
+  }, [somtodayEnabled, userId]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Fetch all Magister data at once on mount (no lazy loading per tab)
   useEffect(() => {
     if (creds) fetchAllData(creds)

@@ -362,14 +362,33 @@ exports.handler = async (event) => {
     catch (e) { return fail(e.message || 'Inloggen mislukt') }
   }
 
-  // ── autologin: server-side login via env vars ─────────────────────────────
+  // ── autologin: bootstrap via stored refresh_token env var ────────────────
   if (action === 'autologin') {
-    const username   = process.env.SOMTODAY_USERNAME
-    const password   = process.env.SOMTODAY_PASSWORD
-    const schoolName = process.env.SOMTODAY_SCHOOL || ''
-    if (!username || !password) return fail('Autologin niet geconfigureerd', 500)
-    try { return ok(await doFullLogin(schoolName, username, password)) }
-    catch (e) { return fail(e.message || 'Autologin mislukt') }
+    const refreshToken = process.env.SOMTODAY_REFRESH_TOKEN
+    const apiUrl       = process.env.SOMTODAY_API_URL || 'https://api.somtoday.nl'
+    if (!refreshToken) return fail('Autologin niet geconfigureerd', 500)
+    try {
+      const res = await fetch(AUTH_BASE + '/oauth2/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': UA },
+        body: new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: refreshToken,
+          client_id: 'somtoday-leerling-web',
+        }).toString(),
+      })
+      if (!res.ok) {
+        const err = await res.text()
+        return fail(`Autologin mislukt: ${res.status} — ${err.slice(0, 200)}`)
+      }
+      const data = await res.json()
+      return ok({
+        access_token:     data.access_token,
+        refresh_token:    data.refresh_token,
+        expires_in:       data.expires_in || 3600,
+        somtoday_api_url: data.somtoday_api_url || apiUrl,
+      })
+    } catch (e) { return fail(e.message || 'Autologin mislukt') }
   }
 
   // ── refresh: refresh_token grant ──────────────────────────────────────────
