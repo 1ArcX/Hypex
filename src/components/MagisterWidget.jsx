@@ -68,7 +68,7 @@ const SOMTODAY_EMAIL = 'jbrugman.prive@gmail.com'
 export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabless = false, gridLayout = false, seamless = false }) {
   const somtodayEnabled = userEmail === SOMTODAY_EMAIL
   const [creds, setCreds] = useState(() => {
-    if (!userId) return null
+    if (!userId || somtodayEnabled) return null
     try { return JSON.parse(localStorage.getItem(storageKey(userId))) || null } catch { return null }
   })
   const [somtodayCreds, setSomtodayCreds] = useState(() => {
@@ -446,7 +446,7 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
             <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '14px', marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {/* Provider selector — SOMtoday only for specific account */}
               <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 3, border: '1px solid rgba(255,255,255,0.08)' }}>
-                {(somtodayEnabled ? ['magister', 'somtoday'] : ['magister']).map(p => (
+                {(somtodayEnabled ? ['somtoday'] : ['magister']).map(p => (
                   <button key={p} onClick={() => setStProvider(p)}
                     style={{ flex: 1, padding: '5px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: stProvider === p ? 700 : 400,
                       background: stProvider === p ? (p === 'somtoday' ? 'rgba(251,191,36,0.15)' : accentBg(15)) : 'transparent',
@@ -563,7 +563,7 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
                 <div className="magister-tabs" style={{ display: 'flex', gap: '4px', marginBottom: '10px', overflowX: 'auto', paddingBottom: 2 }}>
                   {[
                     { id: 'vakken', label: 'Vakken', icon: <BookMarked size={11} /> },
-                    ...(creds ? [
+                    ...(!somtodayEnabled && creds ? [
                       { id: 'cijfers', label: 'Cijfers', icon: <BookOpen size={11} /> },
                       { id: 'voorspeller', label: 'Voorspeller', icon: <span style={{ fontSize: 11 }}>🎯</span> },
                       { id: 'studiewijzer', label: 'Studiewijzer', icon: <BookOpen size={11} /> },

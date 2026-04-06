@@ -187,7 +187,7 @@ export default function App() {
       } catch {}
     }
 
-    syncMagister()
+    if (session?.user?.email !== 'jbrugman.prive@gmail.com') syncMagister()
     syncPMT()
   }, [session?.user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 

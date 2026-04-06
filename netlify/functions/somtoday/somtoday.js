@@ -531,8 +531,8 @@ exports.handler = async (event) => {
             const lastDash = s.lastIndexOf(' - ')
             if (lastDash > 0) {
               const possibleTeacher = s.slice(lastDash + 3).trim()
-              // Teacher abbreviation: short (≤8 chars), no digits, starts uppercase
-              if (possibleTeacher.length <= 8 && /^[A-Z]/.test(possibleTeacher) && !/\d/.test(possibleTeacher)) {
+              // Teacher abbreviation: 2-8 letters only (case-insensitive, e.g. "Heo", "pro")
+              if (possibleTeacher.length >= 2 && possibleTeacher.length <= 8 && /^[a-zA-Z]+$/.test(possibleTeacher)) {
                 docenten = [possibleTeacher]
                 s = s.slice(0, lastDash).trim()
               }
