@@ -120,22 +120,15 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
     return () => window.removeEventListener('magisterLogin', handler)
   }, [])
 
-  // Listen for SOMtoday login → re-fetch schedule
+  // Listen for SOMtoday login → clear cache + re-fetch
   useEffect(() => {
     const handler = () => {
-      const days = view === 'week' ? getWeekDays(current) : [current]
-      const from = toDateStr(days[0])
-      const to = toDateStr(days[days.length - 1])
-      getSomtodayCreds(userId).then(creds => {
-        if (!creds) return
-        callSomtoday('schedule', { accessToken: creds.accessToken, somtodayApiUrl: creds.somtodayApiUrl, from, to })
-          .then(data => { if (Array.isArray(data)) setSomtodayLessons(data) })
-          .catch(() => {})
-      })
+      Object.keys(sessionStorage).filter(k => k.startsWith('somtoday_sched_')).forEach(k => sessionStorage.removeItem(k))
+      setScheduleVersion(v => v + 1)
     }
     window.addEventListener('somtodayLogin', handler)
     return () => window.removeEventListener('somtodayLogin', handler)
-  }, [view, current])
+  }, [])
 
   // Fetch Magister schedule for visible range, cached per range in sessionStorage
   useEffect(() => {
@@ -179,16 +172,26 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
     }).finally(() => setMagisterSyncing(false))
   }, [view, toDateStr(current), scheduleVersion])
 
-  // Fetch SOMtoday schedule for visible range
+  // Fetch SOMtoday schedule for visible range (with sessionStorage cache)
   useEffect(() => {
     const days = view === 'week' ? getWeekDays(current) : [current]
     const from = toDateStr(days[0])
     const to = toDateStr(days[days.length - 1])
+    const cacheKey = `somtoday_sched_${from}_${to}`
+    const cached = sessionStorage.getItem(cacheKey)
+    if (cached) {
+      try { setSomtodayLessons(JSON.parse(cached)); return } catch {}
+    }
     ensureSomtodayCreds(userId)
       .then(creds => callSomtoday('schedule', { accessToken: creds.accessToken, somtodayApiUrl: creds.somtodayApiUrl, from, to }))
-      .then(data => { if (Array.isArray(data)) setSomtodayLessons(data) })
+      .then(data => {
+        if (Array.isArray(data)) {
+          sessionStorage.setItem(cacheKey, JSON.stringify(data))
+          setSomtodayLessons(data)
+        }
+      })
       .catch(() => {})
-  }, [view, toDateStr(current)])
+  }, [view, toDateStr(current), scheduleVersion])
 
   const fetchEvents = async () => {
     const { data } = await supabase.from('calendar_events').select('*').eq('user_id', userId)
