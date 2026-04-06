@@ -2,6 +2,11 @@
 // Supports native SOMtoday password auth. Schools using Microsoft/Azure SSO
 // cannot be automated server-side (returns MICROSOFT_SSO error).
 const crypto = require('crypto')
+let blobStore = null
+async function getTokenStore() {
+  if (blobStore) return blobStore
+  try { const { getStore } = require('@netlify/blobs'); blobStore = getStore('somtoday'); return blobStore } catch { return null }
+}
 
 const AUTH_BASE  = 'https://inloggen.somtoday.nl'
 const CLIENT_ID  = 'somtoday-leerling-redirect-web'
@@ -362,12 +367,16 @@ exports.handler = async (event) => {
     catch (e) { return fail(e.message || 'Inloggen mislukt') }
   }
 
-  // ── autologin: bootstrap via stored refresh_token env var ────────────────
+  // ── autologin: refresh via Blobs (auto-rotating) with env var as seed ────
   if (action === 'autologin') {
-    const refreshToken = process.env.SOMTODAY_REFRESH_TOKEN
-    const apiUrl       = process.env.SOMTODAY_API_URL || 'https://api.somtoday.nl'
-    if (!refreshToken) return fail('Autologin niet geconfigureerd', 500)
+    const apiUrl = process.env.SOMTODAY_API_URL || 'https://api.somtoday.nl'
     try {
+      // Try Blobs first (always up-to-date after first use), fall back to env var seed
+      const store = await getTokenStore()
+      const storedToken = store ? await store.get('refresh_token', { type: 'text' }).catch(() => null) : null
+      const refreshToken = storedToken || process.env.SOMTODAY_REFRESH_TOKEN
+      if (!refreshToken) return fail('Autologin niet geconfigureerd', 500)
+
       const res = await fetch(AUTH_BASE + '/oauth2/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': UA },
@@ -382,6 +391,10 @@ exports.handler = async (event) => {
         return fail(`Autologin mislukt: ${res.status} — ${err.slice(0, 200)}`)
       }
       const data = await res.json()
+      // Persist the new refresh_token so it auto-rotates
+      if (store && data.refresh_token) {
+        await store.set('refresh_token', data.refresh_token).catch(() => {})
+      }
       return ok({
         access_token:     data.access_token,
         refresh_token:    data.refresh_token,
