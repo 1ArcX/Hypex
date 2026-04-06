@@ -555,13 +555,8 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
             <>
               {/* SOMtoday status banner (when connected) */}
               {somtodayCreds && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', borderRadius: 8, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', marginBottom: 10 }}>
-                  <span style={{ fontSize: 11, color: '#FBBF24' }}>
-                    📅 SOMtoday rooster geladen — zichtbaar in Agenda
-                  </span>
-                  <button onClick={logoutSomtoday} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,80,80,0.6)', fontSize: 10, padding: '0 2px' }}>
-                    Ontkoppelen
-                  </button>
+                <div style={{ padding: '7px 10px', borderRadius: 8, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', marginBottom: 10 }}>
+                  <span style={{ fontSize: 11, color: '#FBBF24' }}>📅 SOMtoday rooster geladen — zichtbaar in Agenda</span>
                 </div>
               )}
 
