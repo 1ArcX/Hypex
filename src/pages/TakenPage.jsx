@@ -247,7 +247,7 @@ export default function TakenPage({
         }}>
           <span style={{ fontSize: 13, color: 'var(--text-1)' }}>✓ Afgerond</span>
           <button
-            onClick={() => { onToggle(undoTask); setUndoTask(null); clearTimeout(undoTimerRef.current) }}
+            onClick={() => { onToggle({ ...undoTask, completed: true }); setUndoTask(null); clearTimeout(undoTimerRef.current) }}
             style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 35%, transparent)', color: 'var(--accent)', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
           >
             Ongedaan maken

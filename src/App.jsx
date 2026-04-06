@@ -312,11 +312,17 @@ export default function App() {
 
   useEffect(() => {
     if (!user?.id) return
-    const channel = supabase.channel('studiebuddies')
+    // Use userId as presence key → prevents duplicates when refreshing / multiple tabs
+    const channel = supabase.channel('studiebuddies', {
+      config: { presence: { key: user.id } },
+    })
+    const syncUsers = () => {
+      setStudieBuddiesOnline(Object.values(channel.presenceState()).flat())
+    }
     channel
-      .on('presence', { event: 'sync' }, () => {
-        setStudieBuddiesOnline(Object.values(channel.presenceState()).flat())
-      })
+      .on('presence', { event: 'sync' },  syncUsers)
+      .on('presence', { event: 'join' },  syncUsers)
+      .on('presence', { event: 'leave' }, syncUsers)
       .subscribe()
     const iv = setInterval(() => {
       try {
