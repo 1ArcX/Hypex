@@ -172,14 +172,14 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
     }).finally(() => setMagisterSyncing(false))
   }, [view, toDateStr(current), scheduleVersion])
 
-  // Fetch SOMtoday schedule for visible range (with sessionStorage cache)
+  // Fetch SOMtoday schedule — always full week (same as Magister), filter per day client-side
   useEffect(() => {
-    const days = view === 'week' ? getWeekDays(current) : [current]
-    const from = toDateStr(days[0])
-    const to = toDateStr(days[days.length - 1])
+    const weekDays = getWeekDays(current)
+    const from = toDateStr(weekDays[0])
+    const to = toDateStr(weekDays[6])
     const cacheKey = `somtoday_sched_${from}_${to}`
     const cached = sessionStorage.getItem(cacheKey)
-    if (cached) {
+    if (cached && scheduleVersion === 0) {
       try { setSomtodayLessons(JSON.parse(cached)); return } catch {}
     }
     ensureSomtodayCreds(userId)
@@ -191,7 +191,7 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
         }
       })
       .catch(() => {})
-  }, [view, toDateStr(current), scheduleVersion])
+  }, [toDateStr(getWeekDays(current)[0]), scheduleVersion])
 
   const fetchEvents = async () => {
     const { data } = await supabase.from('calendar_events').select('*').eq('user_id', userId)
