@@ -115,7 +115,7 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
       localStorage.setItem(somtodayKey(userId), JSON.stringify(stored))
       setSomtodayCreds(stored)
       window.dispatchEvent(new Event('somtodayLogin'))
-    }).catch(() => {}).finally(() => setStLoading(false))
+    }).catch(e => setStError(e.message)).finally(() => setStLoading(false))
   }, [somtodayEnabled, userId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch all Magister data at once on mount (no lazy loading per tab)
@@ -499,6 +499,18 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
 
           {!showSettings && (
             <>
+              {/* SOMtoday auto-login error banner */}
+              {somtodayEnabled && !somtodayCreds && stError && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 10px', borderRadius: 8, background: 'rgba(255,80,80,0.08)', border: '1px solid rgba(255,80,80,0.2)', marginBottom: 10, fontSize: 11, color: '#ff6b6b' }}>
+                  <AlertCircle size={12} /> {stError}
+                </div>
+              )}
+              {somtodayEnabled && !somtodayCreds && stLoading && (
+                <div style={{ padding: '7px 10px', borderRadius: 8, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.15)', marginBottom: 10, fontSize: 11, color: '#FBBF24' }}>
+                  SOMtoday verbinden...
+                </div>
+              )}
+
               {/* SOMtoday status banner (when connected) */}
               {somtodayCreds && (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', borderRadius: 8, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', marginBottom: 10 }}>
