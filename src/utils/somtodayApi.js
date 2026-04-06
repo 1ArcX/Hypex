@@ -94,3 +94,32 @@ export async function getSomtodayCreds(userId) {
     return null
   }
 }
+
+// Singleton autologin — meerdere gelijktijdige aanroepen delen dezelfde promise
+let _autologinPromise = null
+export function ensureSomtodayCreds(userId) {
+  // Already have valid creds? Return immediately without a server call
+  try {
+    const stored = JSON.parse(localStorage.getItem(somtodayKey(userId)))
+    if (stored?.accessToken && stored?.expiresAt && Date.now() / 1000 < stored.expiresAt - 60) {
+      return Promise.resolve(stored)
+    }
+  } catch {}
+
+  // Share in-flight autologin promise across all callers
+  if (!_autologinPromise) {
+    _autologinPromise = callSomtoday('autologin', {})
+      .then(tokenData => ({
+        somtodayApiUrl: tokenData.somtoday_api_url,
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token,
+        expiresAt: Math.floor(Date.now() / 1000) + (tokenData.expires_in || 3600),
+      }))
+      .finally(() => { _autologinPromise = null })
+  }
+
+  return _autologinPromise.then(creds => {
+    localStorage.setItem(somtodayKey(userId), JSON.stringify(creds))
+    return creds
+  })
+}

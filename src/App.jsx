@@ -17,7 +17,7 @@ import OnboardingModal from './components/OnboardingModal'
 import Sidebar from './components/Sidebar'
 import VersionChecker from './components/VersionChecker'
 import { callMagister } from './utils/magisterApi'
-import { callSomtoday, getSomtodayCreds, somtodayKey } from './utils/somtodayApi'
+import { ensureSomtodayCreds } from './utils/somtodayApi'
 import BottomNav from './components/BottomNav'
 import DashboardPage from './pages/DashboardPage'
 import PomodoroPage from './pages/PomodoroPage'
@@ -240,20 +240,10 @@ export default function App() {
     if (!done) setShowOnboarding(true)
   }, [user])
 
-  // SOMtoday autologin: zorg dat creds in localStorage staan bij elke app-start
+  // SOMtoday: zorg dat creds in localStorage staan bij elke app-start (singleton)
   useEffect(() => {
     if (!user?.id) return
-    getSomtodayCreds(user.id).then(creds => {
-      if (creds) return
-      callSomtoday('autologin', {}).then(tokenData => {
-        localStorage.setItem(somtodayKey(user.id), JSON.stringify({
-          somtodayApiUrl: tokenData.somtoday_api_url,
-          accessToken: tokenData.access_token,
-          refreshToken: tokenData.refresh_token,
-          expiresAt: Math.floor(Date.now() / 1000) + (tokenData.expires_in || 3600),
-        }))
-      }).catch(() => {})
-    })
+    ensureSomtodayCreds(user.id).catch(() => {})
   }, [user?.id])
 
   useEffect(() => {

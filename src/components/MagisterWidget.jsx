@@ -3,7 +3,7 @@ import { BookOpen, ClipboardList, RefreshCw, Settings, ChevronDown, ChevronUp, A
 import { supabase } from '../supabaseClient'
 import { matchVak } from '../utils/alleVakken'
 import { callMagister, clearStoredTokens } from '../utils/magisterApi'
-import { callSomtoday, somtodayKey } from '../utils/somtodayApi'
+import { callSomtoday, somtodayKey, ensureSomtodayCreds } from '../utils/somtodayApi'
 
 const storageKey = (userId) => `magister_credentials_${userId}`
 
@@ -100,23 +100,25 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
   const [bronLoading, setBronLoading] = useState({})
   const [expandedTopics, setExpandedTopics] = useState({})
 
-  // Auto-connect SOMtoday via env var refresh token (no user action needed)
+  // Auto-connect SOMtoday via server-side autologin (singleton — deelt promise met App)
   useEffect(() => {
     if (!somtodayEnabled || somtodayCreds) return
-    callSomtoday('autologin', {}).then(async tokenData => {
-      const me = await callSomtoday('me', { accessToken: tokenData.access_token, somtodayApiUrl: tokenData.somtoday_api_url })
-      const stored = {
-        somtodayApiUrl: tokenData.somtoday_api_url,
-        accessToken: tokenData.access_token,
-        refreshToken: tokenData.refresh_token,
-        expiresAt: Math.floor(Date.now() / 1000) + (tokenData.expires_in || 3600),
-        studentId: me.id,
-        displayName: me.roepnaam || me.achternaam || 'Leerling',
+    ensureSomtodayCreds(userId).then(async creds => {
+      // Fetch displayName if not stored yet
+      if (!creds.displayName) {
+        const me = await callSomtoday('me', { accessToken: creds.accessToken, somtodayApiUrl: creds.somtodayApiUrl }).catch(() => null)
+        if (me) {
+          const updated = { ...creds, studentId: me.id, displayName: me.roepnaam || me.achternaam || 'Leerling' }
+          localStorage.setItem(somtodayKey(userId), JSON.stringify(updated))
+          setSomtodayCreds(updated)
+        } else {
+          setSomtodayCreds(creds)
+        }
+      } else {
+        setSomtodayCreds(creds)
       }
-      localStorage.setItem(somtodayKey(userId), JSON.stringify(stored))
-      setSomtodayCreds(stored)
       window.dispatchEvent(new Event('somtodayLogin'))
-    }).catch(() => {}) // silent — wizard is fallback
+    }).catch(() => {})
   }, [somtodayEnabled, userId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch all Magister data at once on mount (no lazy loading per tab)
