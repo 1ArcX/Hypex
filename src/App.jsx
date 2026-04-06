@@ -305,6 +305,7 @@ export default function App() {
 
   // ── StudieBuddies altijd-aan presence (werkt ook buiten Pomodoro pagina) ──
   const presenceNameRef = useRef('Student')
+  const [studieBuddiesOnline, setStudieBuddiesOnline] = useState([])
   useEffect(() => {
     presenceNameRef.current = userProfile?.full_name || user?.email?.split('@')[0] || 'Student'
   }, [userProfile, user])
@@ -312,7 +313,11 @@ export default function App() {
   useEffect(() => {
     if (!user?.id) return
     const channel = supabase.channel('studiebuddies')
-    channel.subscribe()
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        setStudieBuddiesOnline(Object.values(channel.presenceState()).flat())
+      })
+      .subscribe()
     const iv = setInterval(() => {
       try {
         const saved = JSON.parse(localStorage.getItem('pomodoro_v3'))
@@ -596,6 +601,7 @@ export default function App() {
                 onFocusModeChange={setFocusMode}
                 userId={user?.id}
                 profiles={profiles}
+                onlineUsers={studieBuddiesOnline}
               />
             )}
 

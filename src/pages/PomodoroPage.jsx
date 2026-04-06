@@ -93,7 +93,7 @@ function DayLog({ label, sessions }) {
   )
 }
 
-export default function PomodoroPage({ onModeChange, onFocusModeChange, userId, profiles }) {
+export default function PomodoroPage({ onModeChange, onFocusModeChange, userId, profiles, onlineUsers = [] }) {
   const [sessions, setSessions] = useState(loadSessions)
 
   const handleSessionComplete = (session) => {
@@ -116,7 +116,7 @@ export default function PomodoroPage({ onModeChange, onFocusModeChange, userId, 
     <div style={{ height: '100%', overflowY: 'auto', background: 'var(--bg-base)' }}>
       {/* Full-page timer */}
       <div style={{ maxWidth: 480, margin: '0 auto' }}>
-        <StudieBuddiesWidget profiles={profiles} />
+        <StudieBuddiesWidget profiles={profiles} onlineUsers={onlineUsers} />
         <PomodoroTimer
           onModeChange={onModeChange}
           onFocusModeChange={onFocusModeChange}

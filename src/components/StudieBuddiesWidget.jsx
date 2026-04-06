@@ -20,26 +20,13 @@ function fmtMins(mins) {
   return h > 0 ? `${h}u ${m}m` : `${m}m`
 }
 
-export default function StudieBuddiesWidget({ profiles = [] }) {
-  const [onlineUsers, setOnlineUsers] = useState([])
+export default function StudieBuddiesWidget({ profiles = [], onlineUsers = [] }) {
   const [dailyStats, setDailyStats] = useState([])
   const [, forceUpdate] = useState(0)
 
   useEffect(() => {
-    const channel = supabase.channel('studiebuddies')
-    channel
-      .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState()
-        setOnlineUsers(Object.values(state).flat())
-      })
-      .subscribe()
-
     const iv = setInterval(() => forceUpdate(n => n + 1), 1000)
-
-    return () => {
-      supabase.removeChannel(channel)
-      clearInterval(iv)
-    }
+    return () => clearInterval(iv)
   }, [])
 
   useEffect(() => {
