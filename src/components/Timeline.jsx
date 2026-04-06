@@ -184,14 +184,12 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
     const days = view === 'week' ? getWeekDays(current) : [current]
     const from = toDateStr(days[0])
     const to = toDateStr(days[days.length - 1])
-    const doFetch = (creds) => {
+
+    const fetchWithCreds = (creds) =>
       callSomtoday('schedule', { accessToken: creds.accessToken, somtodayApiUrl: creds.somtodayApiUrl, from, to })
         .then(data => { if (Array.isArray(data)) setSomtodayLessons(data) })
-        .catch(() => {})
-    }
-    getSomtodayCreds(userId).then(creds => {
-      if (creds) { doFetch(creds); return }
-      // No creds in localStorage → try server-side autologin (works on any device)
+
+    const autologinAndFetch = () =>
       callSomtoday('autologin', {}).then(tokenData => {
         const stored = {
           somtodayApiUrl: tokenData.somtoday_api_url,
@@ -200,8 +198,18 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
           expiresAt: Math.floor(Date.now() / 1000) + (tokenData.expires_in || 3600),
         }
         localStorage.setItem(somtodayKey(userId), JSON.stringify(stored))
-        doFetch(stored)
-      }).catch(() => {})
+        return fetchWithCreds(stored)
+      })
+
+    getSomtodayCreds(userId).then(creds => {
+      if (!creds) return autologinAndFetch().catch(() => {})
+      // Try with stored creds; on 401 clear cache and retry via autologin
+      fetchWithCreds(creds).catch(err => {
+        if (err?.message?.includes('401') || err?.message?.includes('Unauthorized') || err?.message?.includes('mislukt: 401')) {
+          localStorage.removeItem(somtodayKey(userId))
+          autologinAndFetch().catch(() => {})
+        }
+      })
     })
   }, [view, toDateStr(current)])
 
