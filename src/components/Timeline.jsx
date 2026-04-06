@@ -96,6 +96,7 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
   const [magisterSyncing, setMagisterSyncing] = useState(false)
   const [magisterError, setMagisterError] = useState(null)
   const scrollRef = useRef(null)
+  const autoScrollKeyRef = useRef('')
   const now = new Date()
 
   useEffect(() => { fetchEvents() }, [])
@@ -103,10 +104,41 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
   useEffect(() => { onEventsChange?.(events) }, [events])
 
   useLayoutEffect(() => {
-    if (scrollRef.current) {
+    if (!scrollRef.current) return
+    const isToday = view === 'day' && isSameDay(current, now)
+    if (isToday) {
       scrollRef.current.scrollTop = Math.max(0, now.getHours() - 1) * HOUR_H
+      return
     }
-  }, [view])
+    // Scroll naar eerste event/les/werk, maar niet opnieuw als data al geladen was
+    const dataKey = `${view}-${toDateStr(current)}-${magisterLessons.length}-${somtodayLessons.length}`
+    if (autoScrollKeyRef.current === dataKey) return
+    autoScrollKeyRef.current = dataKey
+
+    const days = view === 'week' ? getWeekDays(current) : [current]
+    let minMins = Infinity
+    for (const d of days) {
+      for (const les of getMagisterLessonsForDay(d)) {
+        const s = new Date(les.start)
+        minMins = Math.min(minMins, s.getHours() * 60 + s.getMinutes())
+      }
+      for (const sh of getWorkShiftsForDay(d)) {
+        const m = timeStrToMins(sh.start); if (m > 0) minMins = Math.min(minMins, m)
+      }
+      for (const ev of getEventsForDay(d)) {
+        const s = new Date(ev.start_time)
+        if (s.getHours() === 0 && s.getMinutes() === 0) continue
+        minMins = Math.min(minMins, s.getHours() * 60 + s.getMinutes())
+      }
+      for (const task of getTasksForDay(d)) {
+        const timeStr = task.start_time || task.time
+        if (timeStr) minMins = Math.min(minMins, timeStrToMins(timeStr))
+      }
+    }
+    scrollRef.current.scrollTop = minMins === Infinity
+      ? 7 * HOUR_H
+      : Math.max(0, (minMins / 60 - 0.5) * HOUR_H)
+  }, [view, toDateStr(current), magisterLessons.length, somtodayLessons.length])
 
   // Listen for Magister login → clear cache and re-fetch schedule
   useEffect(() => {
