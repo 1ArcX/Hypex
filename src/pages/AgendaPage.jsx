@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import Timeline from '../components/Timeline'
 
@@ -211,12 +211,24 @@ function MonthCalendar({ selectedDay, onSelectDay, tasks, calendarEvents, magist
 }
 
 // ─── Main AgendaPage ──────────────────────────────────────────────────────────
+function useIsDesktop() {
+  const [v, setV] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 768)
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)')
+    const h = e => setV(e.matches)
+    mq.addEventListener('change', h)
+    return () => mq.removeEventListener('change', h)
+  }, [])
+  return v
+}
+
 export default function AgendaPage({
   userId, tasks, subjects,
   calendarEvents, magisterLessons,
   onToggleTask, onEditTask, onViewDetail, isAdmin,
   onLessonsChange, onEventsChange, onMagisterError,
 }) {
+  const isDesktop = useIsDesktop()
   const today = new Date()
   const [mobileView, setMobileView] = useState('dag')          // 'dag' | 'maand'
   const [selectedDay, setSelectedDay] = useState(today)
@@ -248,12 +260,14 @@ export default function AgendaPage({
         <h2 style={{ margin: '0 0 16px', fontSize: 20, fontWeight: 700, color: 'var(--text-1)', flexShrink: 0 }}>Agenda</h2>
         <div className="card" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <div style={{ flex: 1, overflow: 'hidden', padding: '16px' }}>
-            <Timeline
-              userId={userId} tasks={tasks} subjects={subjects}
-              onToggleTask={onToggleTask} onEditTask={onEditTask} onViewDetail={onViewDetail} isAdmin={isAdmin}
-              onLessonsChange={onLessonsChange} onEventsChange={onEventsChange}
-              onMagisterError={onMagisterError}
-            />
+            {isDesktop && (
+              <Timeline
+                userId={userId} tasks={tasks} subjects={subjects}
+                onToggleTask={onToggleTask} onEditTask={onEditTask} onViewDetail={onViewDetail} isAdmin={isAdmin}
+                onLessonsChange={onLessonsChange} onEventsChange={onEventsChange}
+                onMagisterError={onMagisterError}
+              />
+            )}
           </div>
         </div>
       </div>
