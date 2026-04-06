@@ -790,7 +790,7 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '18px' }}>🎓</span>
                 <span style={{ color: 'white', fontWeight: 700, fontSize: '15px' }}>
-                  {lessonDetail.vak || lessonDetail.title || 'Les'}
+                  {lessonDetail.description || lessonDetail.vak || lessonDetail.title || 'Les'}
                 </span>
                 {(lessonDetail.uitgevallen || lessonDetail.cancelled) && (
                   <span style={{ fontSize: '10px', color: '#FF6B6B', background: 'rgba(255,80,80,0.15)', border: '1px solid rgba(255,80,80,0.3)', borderRadius: '6px', padding: '1px 6px' }}>

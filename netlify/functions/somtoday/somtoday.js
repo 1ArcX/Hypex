@@ -504,6 +504,10 @@ exports.handler = async (event) => {
             if (rest.startsWith(abbr)) return vakkenMap[abbr]
           }
         }
+        // Fallback: no klas prefix (pure letters like "schk") → try direct and prefix match
+        for (const abbr of sortedVakKeys) {
+          if (code.startsWith(abbr)) return vakkenMap[abbr]
+        }
         return ''
       }
 
