@@ -504,7 +504,7 @@ export default function App() {
   }
 
   return (
-    <div style={{ height: '100dvh', overflow: 'hidden', position: 'relative', background: 'var(--bg-base)' }}>
+    <div style={{ height: 'var(--app-height, 100dvh)', overflow: 'hidden', position: 'relative', background: 'var(--bg-base)' }}>
       {/* Blur wrapper voor focus mode */}
       <div style={{
         display: 'flex',
