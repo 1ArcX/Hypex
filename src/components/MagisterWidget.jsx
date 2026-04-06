@@ -287,6 +287,8 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
       setStTokenPaste('')
       setShowSettings(false)
       window.dispatchEvent(new Event('somtodayLogin'))
+      // Seed Blobs so auto-login works for all future visitors
+      callSomtoday('savetoken', { refreshToken }).catch(() => {})
     } catch (e) {
       setStError(e.message)
     }

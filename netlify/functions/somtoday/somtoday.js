@@ -404,6 +404,17 @@ exports.handler = async (event) => {
     } catch (e) { return fail(e.message || 'Autologin mislukt') }
   }
 
+  // ── savetoken: persist refresh_token to Blobs (called after wizard login) ─
+  if (action === 'savetoken') {
+    const { refreshToken } = body
+    if (!refreshToken) return fail('refreshToken vereist')
+    try {
+      const store = await getTokenStore()
+      if (store) await store.set('refresh_token', refreshToken)
+      return ok({ saved: true })
+    } catch (e) { return fail(e.message) }
+  }
+
   // ── refresh: refresh_token grant ──────────────────────────────────────────
   if (action === 'refresh') {
     const { refreshToken } = body
