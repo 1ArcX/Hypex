@@ -7,6 +7,19 @@ const AUTH_BASE  = 'https://inloggen.somtoday.nl'
 const CLIENT_ID  = 'somtoday-leerling-redirect-web'
 const REDIR_URI  = 'https://leerling.somtoday.nl/redirect'
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+const BROWSER_HEADERS = {
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+  'Accept-Language': 'nl-NL,nl;q=0.9,en-US;q=0.8,en;q=0.7',
+  'Cache-Control': 'max-age=0',
+  'Sec-Ch-Ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+  'Sec-Ch-Ua-Mobile': '?0',
+  'Sec-Ch-Ua-Platform': '"Windows"',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'none',
+  'Sec-Fetch-User': '?1',
+  'Upgrade-Insecure-Requests': '1',
+}
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -38,7 +51,7 @@ function updateJar(jar, res) {
 function jarStr(jar) { return Object.entries(jar).map(([k, v]) => `${k}=${v}`).join('; ') }
 
 async function go(url, opts, jar) {
-  const h = { 'User-Agent': UA, 'Origin': AUTH_BASE, 'Referer': AUTH_BASE + '/' }
+  const h = { ...BROWSER_HEADERS, 'User-Agent': UA, 'Origin': AUTH_BASE, 'Referer': AUTH_BASE + '/' }
   if (jar && Object.keys(jar).length) h['Cookie'] = jarStr(jar)
   if (opts?.headers) Object.assign(h, opts.headers)
   const res = await fetch(url, { ...opts, headers: h, redirect: 'manual' })
@@ -112,20 +125,119 @@ async function submitUsername(signAction, username, jar) {
 
   const loc = res.headers.get('location') || ''
 
-  // Microsoft SSO → cannot automate
+  // Microsoft SSO → return URL for caller to handle
   if (loc.includes('microsoftonline.com') || loc.includes('microsoft.com') || loc.includes('/oidc?iss=')) {
-    throw new Error('MICROSOFT_SSO')
+    return { microsoftUrl: loc.startsWith('http') ? loc : AUTH_BASE + loc }
   }
 
   const full = loc.startsWith('http') ? loc : AUTH_BASE + loc
   const res2 = await go(full, {}, jar)
   const html = await res2.text?.() || ''
 
-  if (html.includes('microsoftonline.com')) throw new Error('MICROSOFT_SSO')
+  if (html.includes('microsoftonline.com')) {
+    const m = html.match(/href="(https:\/\/[^"]*microsoftonline[^"]*)"/)
+    return { microsoftUrl: m ? m[1] : 'MICROSOFT_SSO' }
+  }
 
   const pwdM = html.match(/action="([^"]*passwordForm[^"]*|[^"]*signInForm[^"]*)"/)
   if (!pwdM) throw new Error('Gebruikersnaam niet gevonden')
   return { pwdAction: pwdM[1].replace(/&amp;/g, '&'), html }
+}
+
+// ─── Microsoft SSO automation ─────────────────────────────────────────────────
+function parseMsConfig(html) {
+  const idx = html.indexOf('$Config=')
+  if (idx < 0) return null
+  let depth = 0, i = idx + 8
+  while (i < html.length) {
+    if (html[i] === '{') depth++
+    else if (html[i] === '}') { depth--; if (depth === 0) break }
+    i++
+  }
+  try { return JSON.parse(html.slice(idx + 8, i + 1)) } catch { return null }
+}
+
+async function loginWithMicrosoft(msUrl, username, password, somtodayJar) {
+  // Step 1: GET Microsoft login page
+  const msRes = await fetch(msUrl, {
+    headers: { ...BROWSER_HEADERS, 'User-Agent': UA },
+    redirect: 'follow',
+  })
+  const html1 = await msRes.text()
+  const origin = new URL(msRes.url).origin
+
+  const cfg = parseMsConfig(html1)
+  if (!cfg?.sFT) throw new Error('Microsoft login pagina niet herkend')
+
+  const postUrl = (cfg.urlPost || '').replace(/\\\//g, '/')
+  if (!postUrl) throw new Error('Microsoft POST URL niet gevonden')
+  const fullPost = postUrl.startsWith('http') ? postUrl : origin + postUrl
+
+  // Step 2: Submit credentials
+  let res = await fetch(fullPost, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': UA, 'Referer': msRes.url, 'Origin': origin,
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    },
+    body: new URLSearchParams({
+      login: username, loginfmt: username, passwd: password,
+      ctx: cfg.sCtx || '', flowToken: cfg.sFT, canary: cfg.canary || '',
+      type: '11', LoginOptions: '3', ps: '2', i13: '0',
+      lrt: '', lrtPartial: '', PPSX: '', NewUser: '1', FoundMSAs: '',
+      fspost: '0', i21: '0', CookieDisclosure: '0',
+      IsFidoSupported: '1', isSignupPost: '0', DontShowSignIn: '1',
+      hpgrequestid: '', psRNGCDefaultType: '', psRNGCEntropy: '', psRNGCSLK: '',
+    }).toString(),
+    redirect: 'manual',
+  })
+
+  // Step 3: Follow redirects until code= reaches SOMtoday
+  for (let hop = 0; hop < 15; hop++) {
+    const loc = res.headers.get('location') || ''
+
+    if (loc.includes('code=')) return loc  // auth code in redirect
+
+    if (!loc) {
+      const body = await res.text()
+      // KMSI page ("Stay signed in?")
+      const kc = parseMsConfig(body)
+      if (kc?.urlPost && (body.includes('kmsi') || body.includes('Stay signed in') || body.includes('Aangemeld'))) {
+        const kmsiUrl = kc.urlPost.replace(/\\\//g, '/')
+        res = await fetch(kmsiUrl.startsWith('http') ? kmsiUrl : origin + kmsiUrl, {
+          method: 'POST', redirect: 'manual',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': UA },
+          body: new URLSearchParams({
+            ctx: kc.sCtx || '', flowToken: kc.sFT || '', canary: kc.canary || '',
+            LoginOptions: '0', type: '28',
+          }).toString(),
+        })
+        continue
+      }
+      if (body.includes('AADSTS') || body.includes('nvalid') || body.includes('Onjuist')) {
+        throw new Error('Microsoft inloggegevens onjuist')
+      }
+      throw new Error('Microsoft login vastgelopen — geen redirect ontvangen')
+    }
+
+    const fullLoc = loc.startsWith('http') ? loc : origin + loc
+
+    if (fullLoc.includes('inloggen.somtoday.nl') || fullLoc.includes('somtoday.nl')) {
+      // Back at SOMtoday — follow with cookie jar
+      const stRes = await follow(fullLoc, somtodayJar)
+      const stLoc = stRes.headers?.get?.('location') || stRes._external || ''
+      if (stLoc.includes('code=')) return stLoc
+      throw new Error('Auth code niet ontvangen na Microsoft login')
+    }
+
+    res = await fetch(fullLoc, {
+      headers: { 'User-Agent': UA, 'Accept': 'text/html,*/*;q=0.8' },
+      redirect: 'manual',
+    })
+  }
+
+  throw new Error('Microsoft login: te veel redirects')
 }
 
 // ─── Step 4: Submit password, get auth code ───────────────────────────────────
@@ -217,33 +329,47 @@ exports.handler = async (event) => {
     } catch (e) { return fail(e.message) }
   }
 
-  // ── token: full Wicket login flow (legacy, fallback) ───────────────────────
+  // ── token / autologin: full Wicket + optionele Microsoft login ────────────
+  async function doFullLogin(schoolName, username, password) {
+    const { verifier, formAction, jar } = await startSession()
+    const { signAction }                = await submitSchool(formAction, schoolName, jar)
+    const step3                         = await submitUsername(signAction, username, jar)
+
+    let codeUrl
+    if (step3.microsoftUrl) {
+      codeUrl = await loginWithMicrosoft(step3.microsoftUrl, username, password, jar)
+    } else {
+      codeUrl = await submitPassword(step3.pwdAction, password, jar)
+    }
+
+    const params = new URLSearchParams(new URL(codeUrl).search)
+    const code   = params.get('code')
+    if (!code) throw new Error('Geen auth code ontvangen')
+
+    const tokenData = await exchangeCode(code, verifier)
+    return {
+      access_token:     tokenData.access_token,
+      refresh_token:    tokenData.refresh_token,
+      expires_in:       tokenData.expires_in || 3600,
+      somtoday_api_url: tokenData.somtoday_api_url || 'https://production.somtoday.nl',
+    }
+  }
+
   if (action === 'token') {
     const { schoolName, username, password } = body
     if (!schoolName || !username || !password) return fail('Vul alle velden in')
-    try {
-      const { verifier, formAction, jar } = await startSession()
-      const { signAction }                = await submitSchool(formAction, schoolName, jar)
-      const { pwdAction }                 = await submitUsername(signAction, username, jar)
-      const codeUrl                       = await submitPassword(pwdAction, password, jar)
+    try { return ok(await doFullLogin(schoolName, username, password)) }
+    catch (e) { return fail(e.message || 'Inloggen mislukt') }
+  }
 
-      const params    = new URLSearchParams(new URL(codeUrl).search)
-      const code      = params.get('code')
-      if (!code) return fail('Geen auth code ontvangen')
-
-      const tokenData = await exchangeCode(code, verifier)
-      return ok({
-        access_token:    tokenData.access_token,
-        refresh_token:   tokenData.refresh_token,
-        expires_in:      tokenData.expires_in || 3600,
-        somtoday_api_url: tokenData.somtoday_api_url || 'https://production.somtoday.nl',
-      })
-    } catch (e) {
-      if (e.message === 'MICROSOFT_SSO') {
-        return fail('Jouw school gebruikt Microsoft-aanmelding. Gebruik de SOMtoday-app of leerling.somtoday.nl om in te loggen.', 403)
-      }
-      return fail(e.message || 'Inloggen mislukt')
-    }
+  // ── autologin: server-side login via env vars ─────────────────────────────
+  if (action === 'autologin') {
+    const username   = process.env.SOMTODAY_USERNAME
+    const password   = process.env.SOMTODAY_PASSWORD
+    const schoolName = process.env.SOMTODAY_SCHOOL || ''
+    if (!username || !password) return fail('Autologin niet geconfigureerd', 500)
+    try { return ok(await doFullLogin(schoolName, username, password)) }
+    catch (e) { return fail(e.message || 'Autologin mislukt') }
   }
 
   // ── refresh: refresh_token grant ──────────────────────────────────────────

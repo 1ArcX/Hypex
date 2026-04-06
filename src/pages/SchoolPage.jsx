@@ -12,7 +12,7 @@ function useIsDesktop() {
   return v
 }
 
-export default function SchoolPage({ userId, onSubjectsSync }) {
+export default function SchoolPage({ userId, userEmail, onSubjectsSync }) {
   const isDesktop = useIsDesktop()
   return (
     <div style={{
@@ -26,6 +26,7 @@ export default function SchoolPage({ userId, onSubjectsSync }) {
       <div style={{ flex: 1, overflow: isDesktop ? 'hidden' : 'visible' }}>
         <MagisterWidget
           userId={userId}
+          userEmail={userEmail}
           onSubjectsSync={onSubjectsSync}
           tabless={isDesktop}
           gridLayout={isDesktop}

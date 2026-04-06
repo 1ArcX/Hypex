@@ -63,7 +63,10 @@ async function openBook(url, creds) {
   }
 }
 
-export default function MagisterWidget({ userId, onSubjectsSync, tabless = false, gridLayout = false, seamless = false }) {
+const SOMTODAY_EMAIL = 'jbrugman.prive@gmail.com'
+
+export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabless = false, gridLayout = false, seamless = false }) {
+  const somtodayEnabled = userEmail === SOMTODAY_EMAIL
   const [creds, setCreds] = useState(() => {
     if (!userId) return null
     try { return JSON.parse(localStorage.getItem(storageKey(userId))) || null } catch { return null }
@@ -95,6 +98,26 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
   const [swDetail, setSwDetail] = useState(null)        // { sw, topics, loading, error }
   const [bronLoading, setBronLoading] = useState({})
   const [expandedTopics, setExpandedTopics] = useState({})
+  // Auto-connect SOMtoday for specific account if not yet connected
+  useEffect(() => {
+    if (!somtodayEnabled || somtodayCreds) return
+    setStLoading(true)
+    callSomtoday('autologin', {}).then(async tokenData => {
+      const me = await callSomtoday('me', { accessToken: tokenData.access_token, somtodayApiUrl: tokenData.somtoday_api_url })
+      const stored = {
+        somtodayApiUrl: tokenData.somtoday_api_url,
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token,
+        expiresAt: Math.floor(Date.now() / 1000) + (tokenData.expires_in || 3600),
+        studentId: me.id,
+        displayName: me.roepnaam || me.achternaam || 'Leerling',
+      }
+      localStorage.setItem(somtodayKey(userId), JSON.stringify(stored))
+      setSomtodayCreds(stored)
+      window.dispatchEvent(new Event('somtodayLogin'))
+    }).catch(() => {}).finally(() => setStLoading(false))
+  }, [somtodayEnabled, userId]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Fetch all Magister data at once on mount (no lazy loading per tab)
   useEffect(() => {
     if (creds) fetchAllData(creds)
@@ -398,9 +421,9 @@ export default function MagisterWidget({ userId, onSubjectsSync, tabless = false
           {/* Login/instellingen form */}
           {showSettings && (
             <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '14px', marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {/* Provider selector */}
+              {/* Provider selector — SOMtoday only for specific account */}
               <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 3, border: '1px solid rgba(255,255,255,0.08)' }}>
-                {['magister', 'somtoday'].map(p => (
+                {(somtodayEnabled ? ['magister', 'somtoday'] : ['magister']).map(p => (
                   <button key={p} onClick={() => setStProvider(p)}
                     style={{ flex: 1, padding: '5px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: stProvider === p ? 700 : 400,
                       background: stProvider === p ? (p === 'somtoday' ? 'rgba(251,191,36,0.15)' : accentBg(15)) : 'transparent',

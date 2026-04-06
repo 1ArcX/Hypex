@@ -607,6 +607,7 @@ export default function App() {
             {activePage === 'school' && (
               <SchoolPage
                 userId={user.id}
+                userEmail={user.email}
                 onSubjectsSync={handleSubjectsSync}
               />
             )}
