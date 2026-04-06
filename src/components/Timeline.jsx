@@ -177,7 +177,7 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
     const weekDays = getWeekDays(current)
     const from = toDateStr(weekDays[0])
     const to = toDateStr(weekDays[6])
-    const cacheKey = `somtoday_sched_v5_${from}_${to}`
+    const cacheKey = `somtoday_sched_v6_${from}_${to}`
     const cached = sessionStorage.getItem(cacheKey)
     if (cached && scheduleVersion === 0) {
       try { setSomtodayLessons(JSON.parse(cached)); return } catch {}

@@ -484,12 +484,26 @@ exports.handler = async (event) => {
         } catch {}
       }
 
-      // Extract vak abbreviation from codes like "a5.ak1" → "ak"
+      // Resolve subject code to full name using vakkenMap
+      // Handles formats: "a5.ak1" (dot) and "a5cnetl" (no dot)
+      const sortedVakKeys = Object.keys(vakkenMap).sort((a, b) => b.length - a.length)
       function resolveVakNaam(subjectCode) {
         if (!subjectCode) return ''
-        if (vakkenMap[subjectCode.toLowerCase()]) return vakkenMap[subjectCode.toLowerCase()]
-        const m = subjectCode.match(/^[a-z0-9]+\.([a-z]+)\d*$/i)
-        if (m) return vakkenMap[m[1].toLowerCase()] || ''
+        const code = subjectCode.toLowerCase()
+        // Direct match
+        if (vakkenMap[code]) return vakkenMap[code]
+        // Dot format: "a5.ak1" → letters after dot before trailing digits
+        const dotM = code.match(/^[a-z0-9]+\.([a-z]+)\d*$/)
+        if (dotM && vakkenMap[dotM[1]]) return vakkenMap[dotM[1]]
+        // No-dot format: "a5cnetl" → strip klas prefix (letter + digits + optional letter)
+        // then match longest vak abbreviation as prefix of remainder
+        const klasM = code.match(/^([a-z]\d+[a-z]?)(.+)$/)
+        if (klasM) {
+          const rest = klasM[2]
+          for (const abbr of sortedVakKeys) {
+            if (rest.startsWith(abbr)) return vakkenMap[abbr]
+          }
+        }
         return ''
       }
 
