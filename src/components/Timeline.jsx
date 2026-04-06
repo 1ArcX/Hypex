@@ -2,7 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { supabase } from '../supabaseClient'
 import { Plus, ChevronLeft, ChevronRight, X, Save, Trash2 } from 'lucide-react'
 import { callMagister } from '../utils/magisterApi'
-import { callSomtoday, getSomtodayCreds } from '../utils/somtodayApi'
+import { callSomtoday, getSomtodayCreds, somtodayKey } from '../utils/somtodayApi'
 
 const HOUR_H = 56
 const TIME_COL = 48
@@ -184,11 +184,24 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
     const days = view === 'week' ? getWeekDays(current) : [current]
     const from = toDateStr(days[0])
     const to = toDateStr(days[days.length - 1])
-    getSomtodayCreds(userId).then(creds => {
-      if (!creds) return
+    const doFetch = (creds) => {
       callSomtoday('schedule', { accessToken: creds.accessToken, somtodayApiUrl: creds.somtodayApiUrl, from, to })
         .then(data => { if (Array.isArray(data)) setSomtodayLessons(data) })
         .catch(() => {})
+    }
+    getSomtodayCreds(userId).then(creds => {
+      if (creds) { doFetch(creds); return }
+      // No creds in localStorage → try server-side autologin (works on any device)
+      callSomtoday('autologin', {}).then(tokenData => {
+        const stored = {
+          somtodayApiUrl: tokenData.somtoday_api_url,
+          accessToken: tokenData.access_token,
+          refreshToken: tokenData.refresh_token,
+          expiresAt: Math.floor(Date.now() / 1000) + (tokenData.expires_in || 3600),
+        }
+        localStorage.setItem(somtodayKey(userId), JSON.stringify(stored))
+        doFetch(stored)
+      }).catch(() => {})
     })
   }, [view, toDateStr(current)])
 
