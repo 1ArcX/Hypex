@@ -457,10 +457,7 @@ export default function App() {
   }
 
   const handleToggleTask = async (task) => {
-    await supabase.from('tasks').update({
-      completed: !task.completed,
-      updated_at: new Date().toISOString()
-    }).eq('id', task.id)
+    await supabase.from('tasks').update({ completed: !task.completed }).eq('id', task.id)
     fetchTasks()
   }
 
@@ -711,6 +708,10 @@ export default function App() {
           onDelete={(id) => { setDetailTask(null); handleDeleteTask(id) }}
           onClose={() => setDetailTask(null)}
           onStartPomodoro={() => { setDetailTask(null); setActivePage('pomodoro') }}
+          onSaveDescription={async (id, description) => {
+            await supabase.from('tasks').update({ description }).eq('id', id)
+            fetchTasks()
+          }}
         />
       )}
 

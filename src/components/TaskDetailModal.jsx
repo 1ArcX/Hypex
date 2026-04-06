@@ -15,7 +15,7 @@ function fmtDate(dateStr) {
   return `${DAYS_NL[d.getDay()]} ${d.getDate()} ${MONTHS_NL[d.getMonth()]}`
 }
 
-export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onEdit, onDelete, onClose, onStartPomodoro }) {
+export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onEdit, onDelete, onClose, onStartPomodoro, onSaveDescription }) {
   const [closing, setClosing] = useState(false)
   const handleClose = () => {
     setClosing(true)
@@ -23,6 +23,8 @@ export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onE
   }
   const [editingBook, setEditingBook] = useState(false)
   const [bookInput, setBookInput] = useState('')
+  const [desc, setDesc] = useState(task?.description || '')
+  const [descDirty, setDescDirty] = useState(false)
 
   if (!task) return null
   const subject = subjects.find(s => s.id === task.subject_id)
@@ -97,16 +99,38 @@ export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onE
           )}
         </div>
 
-        {/* Description */}
-        {task.description && (
-          <div style={{ marginBottom:16,padding:'12px',background:'rgba(255,255,255,0.04)',borderRadius:10,border:'1px solid rgba(255,255,255,0.07)' }}>
-            <div style={{ display:'flex',alignItems:'center',gap:6,marginBottom:6 }}>
-              <FileText size={11} style={{ color:'rgba(255,255,255,0.3)' }} />
-              <span style={{ fontSize:10,color:'rgba(255,255,255,0.3)',letterSpacing:'0.06em',textTransform:'uppercase' }}>Beschrijving</span>
-            </div>
-            <p style={{ fontSize:13,color:'rgba(255,255,255,0.7)',margin:0,lineHeight:1.5,whiteSpace:'pre-wrap' }}>{task.description}</p>
+        {/* Duration */}
+        {task.duration_minutes > 0 && (
+          <div style={{ display:'flex',alignItems:'center',gap:8,marginBottom:12 }}>
+            <Clock size={13} style={{ color:'rgba(255,255,255,0.35)',flexShrink:0 }} />
+            <span style={{ fontSize:13,color:'rgba(255,255,255,0.7)' }}>
+              {task.duration_minutes >= 60
+                ? `${Math.floor(task.duration_minutes/60)}u${task.duration_minutes%60>0?' '+task.duration_minutes%60+'min':''}`
+                : `${task.duration_minutes} min`}
+            </span>
           </div>
         )}
+
+        {/* Description — editable */}
+        <div style={{ marginBottom:16,padding:'10px 12px',background:'rgba(255,255,255,0.04)',borderRadius:10,border:'1px solid rgba(255,255,255,0.07)' }}>
+          <div style={{ display:'flex',alignItems:'center',gap:6,marginBottom:6 }}>
+            <FileText size={11} style={{ color:'rgba(255,255,255,0.3)' }} />
+            <span style={{ fontSize:10,color:'rgba(255,255,255,0.3)',letterSpacing:'0.06em',textTransform:'uppercase' }}>Beschrijving</span>
+            {descDirty && <span style={{ marginLeft:'auto',fontSize:10,color:'var(--accent)' }}>opgeslagen</span>}
+          </div>
+          <textarea
+            value={desc}
+            onChange={e => { setDesc(e.target.value); setDescDirty(false) }}
+            onBlur={() => { if (onSaveDescription) { onSaveDescription(task.id, desc); setDescDirty(true) } }}
+            placeholder="Voeg een beschrijving toe..."
+            rows={3}
+            style={{
+              width:'100%', background:'transparent', border:'none', outline:'none',
+              color:'rgba(255,255,255,0.7)', fontSize:13, lineHeight:1.5,
+              fontFamily:'inherit', resize:'vertical', boxSizing:'border-box',
+            }}
+          />
+        </div>
 
         {/* Online book */}
         {subject && (

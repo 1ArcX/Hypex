@@ -3,17 +3,33 @@ import React, { useState, useRef } from 'react'
 function SwipeableRow({ onSwipeRight, onSwipeLeft, children }) {
   const [offset, setOffset] = useState(0)
   const startX = useRef(null)
+  const startY = useRef(null)
+  const isScrolling = useRef(null)
 
-  const onTouchStart = (e) => { startX.current = e.touches[0].clientX }
+  const onTouchStart = (e) => {
+    startX.current = e.touches[0].clientX
+    startY.current = e.touches[0].clientY
+    isScrolling.current = null
+  }
   const onTouchMove = (e) => {
     if (startX.current === null) return
-    setOffset(Math.max(-100, Math.min(100, e.touches[0].clientX - startX.current)))
+    const dx = e.touches[0].clientX - startX.current
+    const dy = e.touches[0].clientY - startY.current
+    if (isScrolling.current === null) {
+      isScrolling.current = Math.abs(dy) > Math.abs(dx)
+    }
+    if (isScrolling.current) { setOffset(0); return }
+    setOffset(Math.max(-100, Math.min(100, dx)))
   }
   const onTouchEnd = () => {
-    if (offset > 60) onSwipeRight()
-    else if (offset < -60) onSwipeLeft()
+    if (!isScrolling.current) {
+      if (offset > 60) onSwipeRight()
+      else if (offset < -60) onSwipeLeft()
+    }
     setOffset(0)
     startX.current = null
+    startY.current = null
+    isScrolling.current = null
   }
 
   const actionBg = offset > 20
@@ -342,9 +358,15 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                         {(task.start_time || task.time) ? ` · ${task.start_time || task.time}` : ''}
                         {task.end_time ? `–${task.end_time}` : ''}
                         {subject ? ` · ${subject.name}` : ''}
+                        {task.duration_minutes ? ` · ${task.duration_minutes}min` : ''}
                         {task.due_date && task.due_date !== task.date ? ` · ⏰ ${new Date(task.due_date + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}` : ''}
                       </span>
                     </p>
+                    {task.description ? (
+                      <p style={{ fontSize: 11, margin: '2px 0 0', color: 'rgba(255,255,255,0.35)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {task.description}
+                      </p>
+                    ) : null}
                   </div>
                   <button
                     onClick={e => { e.stopPropagation(); onDelete(task.id) }}
