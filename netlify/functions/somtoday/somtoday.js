@@ -416,7 +416,7 @@ exports.handler = async (event) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': UA },
         body: new URLSearchParams({
-          grant_type: 'refresh_token', refresh_token: refreshToken, client_id: CLIENT_ID,
+          grant_type: 'refresh_token', refresh_token: refreshToken, client_id: 'somtoday-leerling-web',
         }).toString(),
       })
       if (!res.ok) return fail(`Token refresh mislukt: ${res.status}`, 401)

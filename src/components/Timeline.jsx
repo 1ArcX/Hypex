@@ -469,7 +469,7 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
                   return { type: 'work', key: `work-${di}-${si}`, startMins, endMins, data: sh }
                 }),
                 ...colLessons.map((les, li) => {
-                  const s = new Date(les.start), en = new Date(les.einde || les.start)
+                  const s = new Date(les.start), en = new Date(les.einde || les.end || les.start)
                   const startMins = s.getHours()*60 + s.getMinutes()
                   const endMins = Math.max(startMins + 30, en.getHours()*60 + en.getMinutes())
                   return { type: 'lesson', key: `les-${di}-${li}`, startMins, endMins, data: les }
@@ -525,18 +525,18 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
 
                     if (item.type === 'lesson') {
                       const les = item.data
-                      const cancelled = les.uitgevallen
+                      const cancelled = les.uitgevallen || les.cancelled
                       const color = cancelled ? '#FF6B6B' : '#FACC15'
                       return (
                         <div key={item.key}
                           onClick={e => { e.stopPropagation(); setLessonDetail(les) }}
                           style={{ position: 'absolute', top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, background: color + '18', borderLeft: `3px solid ${cancelled ? '#FF6B6B99' : '#FACC1599'}`, borderRadius: '5px', padding: '3px 7px', overflow: 'hidden', cursor: 'pointer', zIndex: 1, boxSizing: 'border-box', marginLeft: '2px', opacity: cancelled ? 0.5 : 0.85 }}>
                           <div style={{ fontSize: '11px', fontWeight: 600, color, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: cancelled ? 'line-through' : 'none' }}>
-                            🎓 {les.vak || 'Les'}
+                            🎓 {les.vak || les.title || 'Les'}
                           </div>
                           {showDetail && (
                             <div style={{ fontSize: '10px', color: color + 'aa', lineHeight: 1.3, marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {[les.lokaal, les.docent].filter(Boolean).join(' · ')}
+                              {[les.lokaal || les.location, les.docent || les.teachers?.join(', ')].filter(Boolean).join(' · ')}
                             </div>
                           )}
                         </div>
@@ -775,9 +775,9 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '18px' }}>🎓</span>
                 <span style={{ color: 'white', fontWeight: 700, fontSize: '15px' }}>
-                  {lessonDetail.vak || 'Les'}
+                  {lessonDetail.vak || lessonDetail.title || 'Les'}
                 </span>
-                {lessonDetail.uitgevallen && (
+                {(lessonDetail.uitgevallen || lessonDetail.cancelled) && (
                   <span style={{ fontSize: '10px', color: '#FF6B6B', background: 'rgba(255,80,80,0.15)', border: '1px solid rgba(255,80,80,0.3)', borderRadius: '6px', padding: '1px 6px' }}>
                     Uitgevallen
                   </span>
@@ -795,22 +795,22 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
                   <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', width: '60px', flexShrink: 0 }}>Tijd</span>
                   <span style={{ fontSize: '13px', color: 'white', fontWeight: 500 }}>
                     {fmtTime(new Date(lessonDetail.start))}
-                    {lessonDetail.einde ? ` – ${fmtTime(new Date(lessonDetail.einde))}` : ''}
+                    {(lessonDetail.einde || lessonDetail.end) ? ` – ${fmtTime(new Date(lessonDetail.einde || lessonDetail.end))}` : ''}
                   </span>
                 </div>
               )}
               {/* Lokaal */}
-              {lessonDetail.lokaal && (
+              {(lessonDetail.lokaal || lessonDetail.location) && (
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                   <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', width: '60px', flexShrink: 0 }}>Lokaal</span>
-                  <span style={{ fontSize: '13px', color: 'white', fontWeight: 500 }}>{lessonDetail.lokaal}</span>
+                  <span style={{ fontSize: '13px', color: 'white', fontWeight: 500 }}>{lessonDetail.lokaal || lessonDetail.location}</span>
                 </div>
               )}
               {/* Docent */}
-              {lessonDetail.docent && (
+              {(lessonDetail.docent || lessonDetail.teachers?.length > 0) && (
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                   <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', width: '60px', flexShrink: 0 }}>Docent</span>
-                  <span style={{ fontSize: '13px', color: 'white', fontWeight: 500 }}>{lessonDetail.docent}</span>
+                  <span style={{ fontSize: '13px', color: 'white', fontWeight: 500 }}>{lessonDetail.docent || lessonDetail.teachers?.join(', ')}</span>
                 </div>
               )}
               {/* Huiswerk */}
