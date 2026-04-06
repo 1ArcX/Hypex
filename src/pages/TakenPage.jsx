@@ -19,6 +19,7 @@ const FILTERS = [
   { id: 'morgen',    label: 'Morgen'   },
   { id: 'week',      label: 'Week'     },
   { id: 'urgent',    label: 'Urgent'   },
+  { id: 'telaat',    label: 'Te laat'  },
   { id: 'ongepland', label: 'Ongepland' },
 ]
 
@@ -35,11 +36,13 @@ function weekEndStr() {
 export default function TakenPage({
   tasks, subjects,
   onAdd, onEdit, onDelete, onToggle, onViewDetail, onNew,
+  highlightFilter, onClearHighlight,
 }) {
   const isDesktop = useIsDesktop()
   const [filter, setFilter] = useState('alles')
   const [undoTask, setUndoTask] = useState(null)
   const undoTimerRef = React.useRef(null)
+  const [highlightedIds, setHighlightedIds] = useState(new Set())
 
   const handleToggleWithUndo = (task) => {
     onToggle(task)
@@ -65,6 +68,7 @@ export default function TakenPage({
       morgen:    tasks.filter(t => !t.completed && t.date === tom).length,
       week:      tasks.filter(t => !t.completed && t.date && t.date >= ts && t.date <= wEnd).length,
       urgent:    tasks.filter(t => !t.completed && (t.priority ?? 2) === 1).length,
+      telaat:    tasks.filter(t => !t.completed && t.date && t.date < ts).length,
       ongepland: tasks.filter(t => !t.completed && !t.date).length,
     }
     for (const g of groups) base[`group:${g}`] = tasks.filter(t => !t.completed && t.group_name === g).length
@@ -81,10 +85,31 @@ export default function TakenPage({
       case 'morgen':    return tasks.filter(t => t.date === tom)
       case 'week':      return tasks.filter(t => t.date && t.date >= ts && t.date <= wEnd)
       case 'urgent':    return tasks.filter(t => (t.priority ?? 2) === 1)
+      case 'telaat':    return tasks.filter(t => t.date && t.date < ts)
       case 'ongepland': return tasks.filter(t => !t.date)
       default:          return tasks
     }
   }, [tasks, filter, ts, tom, wEnd])
+
+  useEffect(() => {
+    if (!highlightFilter) return
+    // Navigeer naar de juiste filter
+    const filterMap = { urgent: 'urgent', telaat: 'telaat', open: 'alles' }
+    setFilter(filterMap[highlightFilter] ?? 'alles')
+    // Bepaal welke taken gehighlight worden
+    const matchFn = {
+      urgent: t => !t.completed && (t.priority ?? 2) === 1,
+      telaat: t => !t.completed && t.date && t.date < ts,
+      open:   t => !t.completed,
+    }[highlightFilter]
+    if (matchFn) {
+      const ids = new Set(tasks.filter(matchFn).map(t => t.id))
+      setHighlightedIds(ids)
+      const timer = setTimeout(() => { setHighlightedIds(new Set()); onClearHighlight?.() }, 1000)
+      return () => clearTimeout(timer)
+    }
+    onClearHighlight?.()
+  }, [highlightFilter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -208,6 +233,7 @@ export default function TakenPage({
           onViewDetail={onViewDetail}
           onNew={onNew}
           seamless={!isDesktop}
+          highlightedIds={highlightedIds}
         />
       </div>
 

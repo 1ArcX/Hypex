@@ -70,6 +70,7 @@ export default function App() {
   const [profiles, setProfiles] = useState([])
   const [showAdmin, setShowAdmin] = useState(false)
   const [activePage, setActivePage] = useState('dashboard')
+  const [taskHighlight, setTaskHighlight] = useState(null)
   const [magisterLessons, setMagisterLessons] = useState([])
   const [calendarEvents, setCalendarEvents] = useState([])
   const [magisterError, setMagisterError] = useState(null)
@@ -580,6 +581,7 @@ export default function App() {
                 displayName={displayName}
                 homeRain={homeRain}
                 onNavigate={handleSetActivePage}
+                onNavigateToTasks={(filter) => { setTaskHighlight(filter); setActivePage('taken') }}
                 setDetailTask={setDetailTask}
                 openNewTask={openNewTask}
                 onRequestPwaInstall={() => setShowPwaPrompt(true)}
@@ -632,6 +634,8 @@ export default function App() {
                 onToggle={handleToggleTask}
                 onViewDetail={setDetailTask}
                 onNew={() => openNewTask()}
+                highlightFilter={taskHighlight}
+                onClearHighlight={() => setTaskHighlight(null)}
               />
             )}
 

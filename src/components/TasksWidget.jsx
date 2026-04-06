@@ -74,7 +74,7 @@ function getTimeStatus(dateStr, startTime, endTime) {
   return { label: 'Vandaag', overdue: false }
 }
 
-export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle, onEdit, onDragStart, onViewDetail, onNew, seamless = false }) {
+export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle, onEdit, onDragStart, onViewDetail, onNew, seamless = false, highlightedIds = new Set() }) {
   const [adding, setAdding] = useState(false)
   const [collapsedGroups, setCollapsedGroups] = useState(new Set())
   const [newTitle, setNewTitle] = useState('')
@@ -295,7 +295,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                     onDragStart?.(task)
                   }}
                   onClick={() => onViewDetail ? onViewDetail(task) : onEdit?.(task)}
-                  className={isUrgent ? 'urgent-task' : undefined}
+                  className={[isUrgent ? 'urgent-task' : '', highlightedIds.has(task.id) ? 'task-flash' : ''].filter(Boolean).join(' ') || undefined}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 12,
                     padding: isUrgent ? '13px 14px' : '12px 14px',

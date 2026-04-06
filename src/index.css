@@ -531,6 +531,16 @@ select {
 .magister-tabs::-webkit-scrollbar { display: none; }
 .magister-tabs { -ms-overflow-style: none; scrollbar-width: none; }
 
+/* ===== TASK HIGHLIGHT FLASH ===== */
+@keyframes task-flash {
+  0%   { box-shadow: 0 0 0 0px rgba(0,255,209,0.0); }
+  20%  { box-shadow: 0 0 0 3px rgba(0,255,209,0.7); }
+  100% { box-shadow: 0 0 0 0px rgba(0,255,209,0.0); }
+}
+.task-flash {
+  animation: task-flash 1s ease-out forwards;
+}
+
 /* ===== URGENT TASK PULSE ===== */
 @keyframes urgentPulse {
   0%, 100% { box-shadow: 0 2px 16px rgba(255,50,50,0.12); }

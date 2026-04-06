@@ -133,7 +133,7 @@ function useNextEvent({ tasks, calendarEvents, magisterLessons, skip }) {
 // ── Main ──────────────────────────────��───────────────────────────���────────────
 export default function DashboardPage({
   isBreak, tasks, subjects, calendarEvents, magisterLessons,
-  magisterError, displayName, homeRain, onNavigate,
+  magisterError, displayName, homeRain, onNavigate, onNavigateToTasks,
   setDetailTask, openNewTask, onRequestPwaInstall, profiles, userId,
 }) {
   const [skip, setSkip] = useState(0)
@@ -232,29 +232,32 @@ export default function DashboardPage({
       {/* ── STATS ROW ── */}
       {openCount > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-          <div style={{
+          <div onClick={() => onNavigateToTasks?.('urgent')} style={{
             background: urgentCount > 0 ? 'rgba(255,60,60,0.08)' : 'rgba(255,255,255,0.03)',
             border: `1px solid ${urgentCount > 0 ? 'rgba(255,60,60,0.25)' : 'rgba(255,255,255,0.07)'}`,
             borderRadius: 12, padding: '10px 12px',
             display: 'flex', alignItems: 'center', gap: 8,
+            cursor: 'pointer',
           }}>
             <span style={{ fontSize: 18, fontWeight: 800, color: urgentCount > 0 ? '#ff6b6b' : 'var(--text-2)', lineHeight: 1 }}>{urgentCount}</span>
             <span style={{ fontSize: 11, color: urgentCount > 0 ? 'rgba(255,107,107,0.65)' : 'var(--text-3)', fontWeight: 600 }}>Urgent</span>
           </div>
-          <div style={{
+          <div onClick={() => onNavigateToTasks?.('telaat')} style={{
             background: overdueCount > 0 ? 'rgba(255,120,50,0.07)' : 'rgba(255,255,255,0.03)',
             border: `1px solid ${overdueCount > 0 ? 'rgba(255,120,50,0.2)' : 'rgba(255,255,255,0.07)'}`,
             borderRadius: 12, padding: '10px 12px',
             display: 'flex', alignItems: 'center', gap: 8,
+            cursor: 'pointer',
           }}>
             <span style={{ fontSize: 18, fontWeight: 800, color: overdueCount > 0 ? '#FF8C42' : 'var(--text-2)', lineHeight: 1 }}>{overdueCount}</span>
             <span style={{ fontSize: 11, color: overdueCount > 0 ? 'rgba(255,140,66,0.65)' : 'var(--text-3)', fontWeight: 600 }}>Te laat</span>
           </div>
-          <div style={{
+          <div onClick={() => onNavigateToTasks?.('open')} style={{
             background: 'rgba(0,255,209,0.05)',
             border: '1px solid rgba(0,255,209,0.12)',
             borderRadius: 12, padding: '10px 12px',
             display: 'flex', alignItems: 'center', gap: 8,
+            cursor: 'pointer',
           }}>
             <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}>{openCount}</span>
             <span style={{ fontSize: 11, color: 'rgba(0,255,209,0.55)', fontWeight: 600 }}>Open</span>
