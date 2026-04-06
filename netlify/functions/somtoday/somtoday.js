@@ -472,7 +472,8 @@ exports.handler = async (event) => {
       const lessons = (data.items || []).map(a => ({
         id: a.links?.[0]?.id, start: a.beginDatumTijd, end: a.eindDatumTijd,
         title: a.vak?.afkorting || a.omschrijving || '?',
-        description: a.vak?.naam || '', location: a.locatie || '',
+        description: a.vak?.naam || a.omschrijving || '',
+        location: (typeof a.locatie === 'string' ? a.locatie : a.locatie?.naam) || '',
         teachers: a.docentAfkortingen || [],
         cancelled: a.afspraakStatus === 'GEANNULEERD', lessonHour: a.lesuurVanaf,
         _source: 'somtoday',
