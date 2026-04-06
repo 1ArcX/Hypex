@@ -69,7 +69,7 @@ export default function App() {
   const [focusMode, setFocusMode] = useState(false)
   const [profiles, setProfiles] = useState([])
   const [showAdmin, setShowAdmin] = useState(false)
-  const [activePage, setActivePage] = useState('dashboard')
+  const [activePage, setActivePage] = useState(() => localStorage.getItem('activePage') || 'dashboard')
   const [taskHighlight, setTaskHighlight] = useState(null)
   const [magisterLessons, setMagisterLessons] = useState([])
   const [calendarEvents, setCalendarEvents] = useState([])
@@ -481,6 +481,7 @@ export default function App() {
   const handleSetActivePage = (page) => {
     if (page !== 'pomodoro') setFocusMode(false)
     setActivePage(page)
+    localStorage.setItem('activePage', page)
   }
 
   if (loading) return (
