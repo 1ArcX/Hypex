@@ -492,10 +492,6 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
                 {somtodayCreds ? (
                   <>
                     <p style={{ margin: 0, fontSize: 11, color: '#4ADE80' }}>✓ Gekoppeld als {somtodayCreds.displayName}</p>
-                    <button onClick={logoutSomtoday}
-                      style={{ padding: '7px', borderRadius: '8px', border: '1px solid rgba(255,80,80,0.3)', background: 'rgba(255,80,80,0.08)', color: '#ff6b6b', cursor: 'pointer', fontSize: '12px' }}>
-                      Ontkoppelen
-                    </button>
                   </>
                 ) : (
                   <>
