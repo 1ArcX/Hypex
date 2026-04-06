@@ -463,11 +463,36 @@ exports.handler = async (event) => {
     const { accessToken, somtodayApiUrl, from, to } = body
     if (!accessToken || !somtodayApiUrl || !from || !to) return fail('Ontbrekende velden')
     try {
-      const url = `${somtodayApiUrl}/rest/v1/afspraken?begindatum=${from}&einddatum=${to}&additional=vak,docentAfkortingen,locatie`
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json', 'User-Agent': UA },
-      })
+      // Fetch afspraken + vakken list in parallel
+      const authHdr = { Authorization: `Bearer ${accessToken}`, Accept: 'application/json', 'User-Agent': UA }
+      const [res, vakRes] = await Promise.all([
+        fetch(`${somtodayApiUrl}/rest/v1/afspraken?begindatum=${from}&einddatum=${to}&additional=vak,docentAfkortingen,locatie`, { headers: authHdr }),
+        fetch(`${somtodayApiUrl}/rest/v1/vakken`, { headers: authHdr }).catch(() => null),
+      ])
       if (!res.ok) return fail(`Rooster mislukt: ${res.status}`, res.status)
+
+      // Build afkorting→naam map from vakken list
+      const vakkenMap = {}
+      if (vakRes?.ok) {
+        try {
+          const vd = await vakRes.json()
+          for (const v of (vd.items || [])) {
+            if (v.afkorting && v.naam) vakkenMap[v.afkorting.toLowerCase()] = v.naam
+          }
+        } catch {}
+      }
+
+      // Extract vak abbreviation from codes like "a5.ak1" → "ak"
+      function resolveVakNaam(subjectCode) {
+        if (!subjectCode) return ''
+        // Direct lookup first (e.g. if subjectCode is already just "ak")
+        if (vakkenMap[subjectCode.toLowerCase()]) return vakkenMap[subjectCode.toLowerCase()]
+        // Format: {klas}.{vakAfkorting}{groepNr}  e.g. "a5.ak1"
+        const m = subjectCode.match(/^[a-z0-9]+\.([a-z]+)\d*$/i)
+        if (m) return vakkenMap[m[1].toLowerCase()] || ''
+        return ''
+      }
+
       const data = await res.json()
       const lessons = (data.items || []).map(a => {
         const locatie = (typeof a.locatie === 'string' ? a.locatie : a.locatie?.naam) || ''
@@ -475,7 +500,6 @@ exports.handler = async (event) => {
         const omschrijving = a.omschrijving || ''
 
         // Parse omschrijving: format is "lokaal - groepscode - docent"
-        // Extract subject code by removing known locatie and docent parts
         let subjectCode = a.vak?.afkorting || ''
         if (!subjectCode && omschrijving) {
           let s = omschrijving
@@ -486,10 +510,12 @@ exports.handler = async (event) => {
           subjectCode = s.trim()
         }
 
+        const vakNaam = a.vak?.naam || resolveVakNaam(subjectCode) || subjectCode
+
         return {
           id: a.links?.[0]?.id, start: a.beginDatumTijd, end: a.eindDatumTijd,
           title: subjectCode || omschrijving || '?',
-          description: a.vak?.naam || subjectCode || '',
+          description: vakNaam,
           location: locatie,
           teachers: docenten.filter(t => t !== subjectCode),
           cancelled: a.afspraakStatus === 'GEANNULEERD', lessonHour: a.lesuurVanaf,
