@@ -270,7 +270,7 @@ function useIsDesktop() {
 }
 
 export default function AgendaPage({
-  userId, tasks, subjects,
+  userId, userEmail, tasks, subjects,
   calendarEvents, magisterLessons,
   onToggleTask, onEditTask, onViewDetail, isAdmin,
   onLessonsChange, onEventsChange, onMagisterError,
@@ -303,7 +303,7 @@ export default function AgendaPage({
           <div style={{ flex: 1, overflow: 'hidden', padding: '16px' }}>
             {isDesktop && (
               <Timeline
-                userId={userId} tasks={tasks} subjects={subjects}
+                userId={userId} userEmail={userEmail} tasks={tasks} subjects={subjects}
                 onToggleTask={onToggleTask} onEditTask={onEditTask} onViewDetail={onViewDetail} isAdmin={isAdmin}
                 onLessonsChange={onLessonsChange} onEventsChange={onEventsChange}
                 onMagisterError={onMagisterError}
@@ -343,7 +343,7 @@ export default function AgendaPage({
             <div style={{ flex: 1, overflow: 'hidden' }}>
               <Timeline
                 key={selectedDay.toDateString()}
-                userId={userId} tasks={tasks} subjects={subjects}
+                userId={userId} userEmail={userEmail} tasks={tasks} subjects={subjects}
                 onToggleTask={onToggleTask} onEditTask={onEditTask} onViewDetail={onViewDetail} isAdmin={isAdmin}
                 onLessonsChange={onLessonsChange} onEventsChange={onEventsChange}
                 onMagisterError={onMagisterError}

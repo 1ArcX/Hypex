@@ -82,7 +82,9 @@ const emptyForm = (date, hour) => ({
   color: '#818CF8', recurrence: '', recurrence_days: []
 })
 
-export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDetail, defaultView = 'week', initialDate, isMobile = false, hideToolbar = false, onLessonsChange, onEventsChange, onMagisterError, onDateChange }) {
+const SOMTODAY_EMAIL = 'jbrugman.prive@gmail.com'
+
+export default function Timeline({ userId, userEmail, tasks, subjects, onEditTask, onViewDetail, defaultView = 'week', initialDate, isMobile = false, hideToolbar = false, onLessonsChange, onEventsChange, onMagisterError, onDateChange }) {
   const [view, setView] = useState(defaultView)
   const [current, setCurrent] = useState(initialDate || new Date())
   const [events, setEvents] = useState([])
@@ -245,8 +247,9 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
     }).finally(() => setMagisterSyncing(false))
   }, [view, toDateStr(current), scheduleVersion])
 
-  // Fetch SOMtoday schedule — always full week (same as Magister), filter per day client-side
+  // Fetch SOMtoday schedule — only for the designated account
   useEffect(() => {
+    if (userEmail !== SOMTODAY_EMAIL) return
     const weekDays = getWeekDays(current)
     const from = toDateStr(weekDays[0])
     const to = toDateStr(weekDays[6])

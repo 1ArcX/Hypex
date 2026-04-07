@@ -10,7 +10,9 @@ const PRESETS = [
   { name: 'Sky Blue', accent: '#60A5FA', bg1: '#0a0f1a', bg2: '#0d1420' },
 ]
 
-export default function ThemeSettings({ onClose, theme, setTheme, onLogout }) {
+const SOMTODAY_EMAIL = 'jbrugman.prive@gmail.com'
+
+export default function ThemeSettings({ onClose, theme, setTheme, onLogout, userEmail }) {
   const [customAccent, setCustomAccent] = useState(theme.accent)
   const [somtodayColor, setSomtodayColorState] = useState(() => {
     try { return localStorage.getItem('somtoday_lesson_color') || '#FACC15' } catch { return '#FACC15' }
@@ -88,19 +90,21 @@ export default function ThemeSettings({ onClose, theme, setTheme, onLogout }) {
           </div>
         </div>
 
-        {/* SOMtoday leskleur */}
-        <div className="mb-5">
-          <p className="text-xs font-medium mb-2" style={{ color: 'rgba(255,255,255,0.5)' }}>SOMtoday leskleur</p>
-          <div className="flex items-center gap-3">
-            <input type="color" value={somtodayColor} onChange={e => applySomtodayColor(e.target.value)}
-              style={{ width: '40px', height: '40px', borderRadius: '10px', border: 'none', cursor: 'pointer', background: 'none' }} />
-            <span className="text-sm font-mono" style={{ color: 'rgba(255,255,255,0.6)' }}>{somtodayColor}</span>
-            <button onClick={() => applySomtodayColor('#FACC15')}
-              style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}>
-              reset
-            </button>
+        {/* SOMtoday leskleur — alleen voor het SOMtoday-account */}
+        {userEmail === SOMTODAY_EMAIL && (
+          <div className="mb-5">
+            <p className="text-xs font-medium mb-2" style={{ color: 'rgba(255,255,255,0.5)' }}>SOMtoday leskleur</p>
+            <div className="flex items-center gap-3">
+              <input type="color" value={somtodayColor} onChange={e => applySomtodayColor(e.target.value)}
+                style={{ width: '40px', height: '40px', borderRadius: '10px', border: 'none', cursor: 'pointer', background: 'none' }} />
+              <span className="text-sm font-mono" style={{ color: 'rgba(255,255,255,0.6)' }}>{somtodayColor}</span>
+              <button onClick={() => applySomtodayColor('#FACC15')}
+                style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}>
+                reset
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         <button onClick={resetTheme}
           className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-sm"

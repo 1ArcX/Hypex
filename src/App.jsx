@@ -612,6 +612,7 @@ export default function App() {
             {activePage === 'agenda' && (
               <AgendaPage
                 userId={user.id}
+                userEmail={user.email}
                 tasks={tasks}
                 subjects={subjects}
                 calendarEvents={calendarEvents}
@@ -688,6 +689,7 @@ export default function App() {
           theme={theme}
           setTheme={setTheme}
           onLogout={() => supabase.auth.signOut()}
+          userEmail={user?.email}
         />
       )}
 
