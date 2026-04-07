@@ -169,7 +169,7 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
 
   // ─── Editor view ─────────────────────────────────────────────
   if (activeNote) return (
-    <div className="glass-card p-4" style={{ minHeight: 220, display: 'flex', flexDirection: 'column' }}>
+    <div className="glass-card p-4" style={{ display: 'flex', flexDirection: 'column' }}>
       {/* Editor header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, flexShrink: 0 }}>
         <button onClick={goBack} style={{ ...btnBase, color: 'rgba(255,255,255,0.45)', gap: 3 }}>

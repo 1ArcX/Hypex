@@ -17,11 +17,13 @@ document.addEventListener('focusout', () => {
   setTimeout(() => window.scrollTo(0, 0), 50)
 })
 
-// Houd --app-height up-to-date met de visuele viewport (krimpt als toetsenbord opengaat).
-// interactive-widget=resizes-visual laat het layout-viewport ongewijzigd, dus 100dvh
-// krimpt niet mee — inner scroll containers kunnen dan niet scrollen. Door --app-height
-// te updaten via visualViewport krimpt de app-container wel correct mee.
+// Houd --app-height up-to-date met de visuele viewport.
+// Als een input/textarea gefocust is (toetsenbord open), NIET updaten:
+// het toetsenbord overlapt de app zodat de layout niet samenperst.
+// Bij geen focus (toetsenbord dicht) wél updaten zodat de app correct past.
 function updateAppHeight() {
+  const active = document.activeElement
+  if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return
   const h = window.visualViewport ? window.visualViewport.height : window.innerHeight
   document.documentElement.style.setProperty('--app-height', `${h}px`)
 }
