@@ -227,9 +227,15 @@ export default function App() {
     else {
       const rows = data || []
       setProfiles(rows)
-      if (user?.id && !rows.find(p => p.id === user.id)) {
-        await supabase.from('profiles').upsert({ id: user.id, full_name: user.email?.split('@')[0] || 'Student' })
-        fetchProfiles()
+      if (user?.id) {
+        const existing = rows.find(p => p.id === user.id)
+        if (!existing) {
+          await supabase.from('profiles').upsert({ id: user.id, full_name: user.email?.split('@')[0] || 'Student', email: user.email })
+          fetchProfiles()
+        } else if (!existing.email && user.email) {
+          await supabase.from('profiles').update({ email: user.email }).eq('id', user.id)
+          fetchProfiles()
+        }
       }
     }
   }
@@ -529,7 +535,7 @@ export default function App() {
           <Sidebar
             activePage={activePage}
             setActivePage={handleSetActivePage}
-            isAdmin={isAdmin}
+            isAdmin={isAdmin || !!userProfile?.werk_tab}
             user={user}
             onShowSettings={() => setShowThemeSettings(true)}
             onShowAdmin={() => setShowAdmin(true)}
@@ -662,7 +668,7 @@ export default function App() {
               <StatsPage tasks={tasks} userId={user.id} />
             )}
 
-            {activePage === 'jumbo' && isAdmin && (
+            {activePage === 'jumbo' && (isAdmin || userProfile?.werk_tab) && (
               <JumboPage isAdmin={isAdmin} userId={user?.id} />
             )}
 
@@ -674,14 +680,14 @@ export default function App() {
             <BottomNav
               activePage={activePage}
               setActivePage={handleSetActivePage}
-              isAdmin={isAdmin}
+              isAdmin={isAdmin || !!userProfile?.werk_tab}
             />
           </div>
         </div>
       </div>
 
       {/* Modals / Overlays */}
-      {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
+      {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} profiles={profiles} onProfilesChange={fetchProfiles} />}
 
       {showThemeSettings && (
         <ThemeSettings
