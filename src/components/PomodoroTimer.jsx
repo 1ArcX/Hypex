@@ -520,7 +520,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
   useEffect(() => {
     persist(state, state.running ? endTimeRef.current : null)
   }, [
-    state.running, state.mode, state.workMins, state.breakMins, state.longBreakMins,
+    state.running, state.mode, state.seconds, state.workMins, state.breakMins, state.longBreakMins,
     state.sessionsPerLong, state.sessionsInCycle, state.totalSessions,
     state.task, state.soundEnabled, state.notifEnabled,
   ])
