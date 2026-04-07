@@ -682,7 +682,7 @@ export default function App() {
             )}
 
             {activePage === 'jumbo' && (isAdmin || userProfile?.werk_tab) && (
-              <JumboPage isAdmin={isAdmin} userId={user?.id} />
+              <JumboPage isAdmin={isAdmin || !!userProfile?.werk_tab} userId={user?.id} />
             )}
 
           </div>
