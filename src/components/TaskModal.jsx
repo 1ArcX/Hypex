@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { X, Trash2, Save } from 'lucide-react'
 
 const EVENT_COLORS = ['#00FFD1','#818CF8','#FF8C42','#FF6B6B','#4ADE80','#FACC15','#38BDF8']
@@ -199,6 +199,7 @@ function getConflicts(dateStr, startMins, endMins, tasks, calendarEvents, exclud
 
 export default function TaskModal({ task, defaultTime, defaultDate, subjects, calendarEvents, tasks, allTasks, onSave, onDelete, onClose }) {
   const [closing, setClosing] = useState(false)
+  const mouseDownOnOverlay = useRef(false)
   const handleClose = () => {
     setClosing(true)
     setTimeout(() => { setClosing(false); onClose() }, 200)
@@ -290,10 +291,10 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
   return (
     <div className={closing ? 'modal-overlay modal-closing' : 'modal-overlay'}
       style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(10px)', padding: '16px' }}
-      onClick={handleClose}>
+      onMouseDown={e => { mouseDownOnOverlay.current = e.target === e.currentTarget }}
+      onMouseUp={e => { if (mouseDownOnOverlay.current && e.target === e.currentTarget) handleClose(); mouseDownOnOverlay.current = false }}>
       <div className={`glass-card modal-content${closing ? ' modal-closing' : ''}`}
-        style={{ width: '100%', maxWidth: '440px', padding: '24px', maxHeight: '90vh', overflowY: 'auto' }}
-        onClick={e => e.stopPropagation()}>
+        style={{ width: '100%', maxWidth: '440px', padding: '24px', maxHeight: '90vh', overflowY: 'auto' }}>
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
