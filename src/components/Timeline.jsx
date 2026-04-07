@@ -439,22 +439,35 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
 
           {/* All-day events strip — sticky inside scrollRef so it works regardless of outer layout */}
           {(() => {
-            const allDayByDay = days.map(d => getEventsForDay(d).filter(ev => {
-              const s = new Date(ev.start_time)
-              return s.getHours() === 0 && s.getMinutes() === 0
-            }))
+            const allDayByDay = days.map(d => {
+              const allDayEvs = getEventsForDay(d).filter(ev => {
+                const s = new Date(ev.start_time)
+                return s.getHours() === 0 && s.getMinutes() === 0
+              }).map(ev => ({ kind: 'event', key: ev.id, color: ev.color, title: ev.title, onClick: e => openEditEvent(ev, e) }))
+              const allDayLes = getMagisterLessonsForDay(d).filter(les => {
+                const s = new Date(les.start)
+                return s.getHours() === 0 && s.getMinutes() === 0
+              }).map((les, i) => {
+                const isSomtoday = les._source === 'somtoday'
+                const somtodayColor = (() => { try { return localStorage.getItem('somtoday_lesson_color') || '#FACC15' } catch { return '#FACC15' } })()
+                const color = (les.uitgevallen || les.cancelled) ? '#FF6B6B' : isSomtoday ? somtodayColor : '#FACC15'
+                const title = les.vak || les.description || les.title || 'Les'
+                return { kind: 'lesson', key: `les-allday-${i}`, color, title, onClick: e => { e.stopPropagation(); setLessonDetail(les) } }
+              })
+              return [...allDayEvs, ...allDayLes]
+            })
             if (allDayByDay.every(arr => arr.length === 0)) return null
             return (
               <div style={{ display: 'grid', gridTemplateColumns: `${TIME_COL}px repeat(${N}, 1fr)`, borderBottom: '1px solid rgba(255,255,255,0.07)', padding: '4px 0', position: 'sticky', top: 0, zIndex: 5, background: 'var(--bg-sidebar, #12121a)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 8 }}>
                   <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.22)', letterSpacing: '0.06em', textTransform: 'uppercase', userSelect: 'none' }}>dag</span>
                 </div>
-                {allDayByDay.map((dayEvs, di) => (
+                {allDayByDay.map((items, di) => (
                   <div key={di} style={{ padding: '0 2px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {dayEvs.map(ev => (
-                      <div key={ev.id} onClick={e => openEditEvent(ev, e)}
-                        style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, cursor: 'pointer', background: ev.color + '28', borderLeft: `3px solid ${ev.color}`, color: ev.color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {ev.title}
+                    {items.map(item => (
+                      <div key={item.key} onClick={item.onClick}
+                        style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, cursor: 'pointer', background: item.color + '28', borderLeft: `3px solid ${item.color}`, color: item.color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {item.title}
                       </div>
                     ))}
                   </div>
@@ -547,7 +560,10 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                   const endMins = Math.max(startMins + 30, timeStrToMins(sh.end))
                   return { type: 'work', key: `work-${di}-${si}`, startMins, endMins, data: sh }
                 }),
-                ...colLessons.map((les, li) => {
+                ...colLessons.filter(les => {
+                  const s = new Date(les.start)
+                  return !(s.getHours() === 0 && s.getMinutes() === 0)
+                }).map((les, li) => {
                   const s = new Date(les.start), en = new Date(les.einde || les.end || les.start)
                   const startMins = s.getHours()*60 + s.getMinutes()
                   const endMins = Math.max(startMins + 30, en.getHours()*60 + en.getMinutes())
