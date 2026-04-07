@@ -223,7 +223,7 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
           background: 'transparent', border: 'none', outline: 'none',
           color: 'rgba(255,255,255,0.7)', lineHeight: '1.6', fontSize: 13,
           fontFamily: 'inherit', resize: 'none', overflow: 'hidden',
-          minHeight: 200, width: '100%', boxSizing: 'border-box',
+          minHeight: 'calc(var(--app-height, 100vh) + 60px)', width: '100%', boxSizing: 'border-box',
         }}
       />
     </div>
