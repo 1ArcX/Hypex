@@ -97,6 +97,11 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
   const [magisterError, setMagisterError] = useState(null)
   const scrollRef = useRef(null)
   const autoScrollKeyRef = useRef('')
+  const swipeStartX = useRef(null)
+  const swipeStartY = useRef(null)
+  const swipeIntent = useRef(null) // 'h' | 'v' | null
+  const monthScrollRef = useRef(null)
+  const monthItemRefs = useRef({})
   const now = new Date()
 
   useEffect(() => { fetchEvents() }, [])
@@ -120,6 +125,7 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
     for (const d of days) {
       for (const les of getMagisterLessonsForDay(d)) {
         const s = new Date(les.start)
+        if (s.getHours() === 0 && s.getMinutes() === 0) continue
         minMins = Math.min(minMins, s.getHours() * 60 + s.getMinutes())
       }
       for (const sh of getWorkShiftsForDay(d)) {
@@ -139,6 +145,41 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
       ? 7 * HOUR_H
       : Math.max(0, (minMins / 60 - 0.5) * HOUR_H)
   }, [view, toDateStr(current), magisterLessons.length, somtodayLessons.length])
+
+  // Scroll to current month when in month view
+  useLayoutEffect(() => {
+    if (view !== 'month') return
+    const key = `${current.getFullYear()}-${current.getMonth()}`
+    const el = monthItemRefs.current[key]
+    if (el && monthScrollRef.current) el.scrollIntoView({ block: 'start', behavior: 'instant' })
+  }, [view, current.getFullYear(), current.getMonth()])
+
+  const handleSwipeStart = (e) => {
+    if (view === 'month') return
+    const t = e.touches[0]
+    swipeStartX.current = t.clientX
+    swipeStartY.current = t.clientY
+    swipeIntent.current = null
+  }
+  const handleSwipeMove = (e) => {
+    if (view === 'month' || swipeStartX.current === null) return
+    if (swipeIntent.current === null) {
+      const dx = Math.abs(e.touches[0].clientX - swipeStartX.current)
+      const dy = Math.abs(e.touches[0].clientY - swipeStartY.current)
+      if (dx < 6 && dy < 6) return
+      swipeIntent.current = dx > dy ? 'h' : 'v'
+    }
+    if (swipeIntent.current === 'h') e.preventDefault()
+  }
+  const handleSwipeEnd = (e) => {
+    if (view === 'month' || swipeStartX.current === null || swipeIntent.current !== 'h') {
+      swipeStartX.current = null; swipeIntent.current = null; return
+    }
+    const dx = e.changedTouches[0].clientX - swipeStartX.current
+    swipeStartX.current = null; swipeIntent.current = null
+    if (Math.abs(dx) < 40) return
+    navigate(dx < 0 ? 1 : -1)
+  }
 
   // Listen for Magister login → clear cache and re-fetch schedule
   useEffect(() => {
@@ -397,7 +438,7 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
           }))
           if (allDayByDay.every(arr => arr.length === 0)) return null
           return (
-            <div style={{ display: 'grid', gridTemplateColumns: `${TIME_COL}px repeat(${N}, 1fr)`, borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0, padding: '4px 0' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: `${TIME_COL}px repeat(${N}, 1fr)`, borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0, padding: '4px 0', position: 'sticky', top: 0, zIndex: 5, background: 'var(--bg-base, #0d0d0f)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 8 }}>
                 <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.22)', letterSpacing: '0.06em', textTransform: 'uppercase', userSelect: 'none' }}>dag</span>
               </div>
@@ -650,27 +691,32 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
   }
 
   // ─── MONTH VIEW ──────────────────────────────────────────────────────
-  const MonthView = () => {
-    const firstDay = new Date(current.getFullYear(), current.getMonth(), 1)
-    const lastDay = new Date(current.getFullYear(), current.getMonth()+1, 0)
+  const renderMonthGrid = (monthDate) => {
+    const firstDay = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1)
+    const lastDay = new Date(monthDate.getFullYear(), monthDate.getMonth()+1, 0)
     const startPad = (firstDay.getDay() + 6) % 7
     const cells = [...Array(startPad).fill(null)]
     for (let d = 1; d <= lastDay.getDate(); d++)
-      cells.push(new Date(current.getFullYear(), current.getMonth(), d))
+      cells.push(new Date(monthDate.getFullYear(), monthDate.getMonth(), d))
     while (cells.length % 7 !== 0) cells.push(null)
-
+    const key = `${monthDate.getFullYear()}-${monthDate.getMonth()}`
     return (
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
+      <div key={key} ref={el => { monthItemRefs.current[key] = el }} data-month={key}
+        style={{ flexShrink: 0 }}>
+        {/* Month label */}
+        <div style={{ padding: '12px 12px 6px', fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.85)', letterSpacing: '0.02em', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          {MONTHS_FULL[monthDate.getMonth()]} {monthDate.getFullYear()}
+        </div>
+        {/* Day-of-week header */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
           {['Ma','Di','Wo','Do','Vr','Za','Zo'].map(d => (
-            <div key={d} style={{ padding: '8px 4px', textAlign: 'center', fontSize: '11px', fontWeight: 500, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-              {d}
-            </div>
+            <div key={d} style={{ padding: '4px', textAlign: 'center', fontSize: '10px', fontWeight: 500, color: 'rgba(255,255,255,0.25)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{d}</div>
           ))}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', flex: 1 }}>
+        {/* Day cells */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
           {cells.map((date, i) => {
-            if (!date) return <div key={i} style={{ borderRight: '1px solid rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(0,0,0,0.1)' }} />
+            if (!date) return <div key={i} style={{ borderRight: '1px solid rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(0,0,0,0.1)', minHeight: '64px' }} />
             const evs = getEventsForDay(date)
             const tsks = getTasksForDay(date)
             const les = getMagisterLessonsForDay(date)
@@ -679,30 +725,43 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
             const isWeekend = date.getDay() === 0 || date.getDay() === 6
             return (
               <div key={i} onClick={() => { setCurrent(date); setView('day') }}
-                style={{ padding: '4px 5px', borderRight: '1px solid rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', background: isToday ? 'rgba(0,255,209,0.04)' : isWeekend ? 'rgba(255,255,255,0.01)' : 'transparent', minHeight: '72px' }}>
-                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '4px' }}>
+                style={{ padding: '4px 5px', borderRight: '1px solid rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', background: isToday ? 'rgba(0,255,209,0.04)' : isWeekend ? 'rgba(255,255,255,0.01)' : 'transparent', minHeight: '64px' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '3px' }}>
                   <div style={{ width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: isToday ? 'var(--accent, #00FFD1)' : 'transparent', color: isToday ? '#000' : isWeekend ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.75)', fontSize: '11px', fontWeight: isToday ? 700 : 400 }}>
                     {date.getDate()}
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  {all.slice(0, 3).map((item, idx) => {
+                  {all.slice(0, 2).map((item, idx) => {
                     const color = item.color || (item.vak ? '#FACC15' : subjects?.find(s => s.id === item.subject_id)?.color || '#818CF8')
                     const label = item.title || item.vak || '–'
                     return (
-                      <div key={item.id || idx} style={{ background: color + '28', borderLeft: `2px solid ${color}`, borderRadius: '3px', padding: '1px 5px', fontSize: '10px', color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>
+                      <div key={item.id || idx} style={{ background: color + '28', borderLeft: `2px solid ${color}`, borderRadius: '3px', padding: '1px 5px', fontSize: '9px', color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>
                         {label}
                       </div>
                     )
                   })}
-                  {all.length > 3 && (
-                    <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)', paddingLeft: '5px' }}>+{all.length - 3} meer</div>
+                  {all.length > 2 && (
+                    <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.25)', paddingLeft: '5px' }}>+{all.length - 2}</div>
                   )}
                 </div>
               </div>
             )
           })}
         </div>
+      </div>
+    )
+  }
+
+  const MonthView = () => {
+    // Render 25 months: 12 before to 12 after current
+    const months = []
+    for (let i = -12; i <= 12; i++) {
+      months.push(new Date(current.getFullYear(), current.getMonth() + i, 1))
+    }
+    return (
+      <div ref={monthScrollRef} style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+        {months.map(m => renderMonthGrid(m))}
       </div>
     )
   }
@@ -798,7 +857,12 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
       )}
 
       {/* View content — call as functions to prevent remount on re-render */}
-      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <div
+        style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}
+        onTouchStart={handleSwipeStart}
+        onTouchMove={handleSwipeMove}
+        onTouchEnd={handleSwipeEnd}
+      >
         {view === 'month' && MonthView({})}
         {view === 'week' && !isMobile && TimeGrid({ days: weekDays })}
         {view === 'week' && isMobile && (
