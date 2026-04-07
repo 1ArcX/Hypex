@@ -434,34 +434,35 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
           </div>
         )}
 
-        {/* All-day events strip */}
-        {(() => {
-          const allDayByDay = days.map(d => getEventsForDay(d).filter(ev => {
-            const s = new Date(ev.start_time)
-            return s.getHours() === 0 && s.getMinutes() === 0
-          }))
-          if (allDayByDay.every(arr => arr.length === 0)) return null
-          return (
-            <div style={{ display: 'grid', gridTemplateColumns: `${TIME_COL}px repeat(${N}, 1fr)`, borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0, padding: '4px 0', position: 'sticky', top: 0, zIndex: 5, background: 'var(--bg-base, #0d0d0f)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 8 }}>
-                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.22)', letterSpacing: '0.06em', textTransform: 'uppercase', userSelect: 'none' }}>dag</span>
-              </div>
-              {allDayByDay.map((dayEvs, di) => (
-                <div key={di} style={{ padding: '0 2px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {dayEvs.map(ev => (
-                    <div key={ev.id} onClick={e => openEditEvent(ev, e)}
-                      style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, cursor: 'pointer', background: ev.color + '28', borderLeft: `3px solid ${ev.color}`, color: ev.color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {ev.title}
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          )
-        })()}
-
-        {/* Scrollable grid body */}
+        {/* Scrollable grid body — all-day strip is sticky inside this scroller */}
         <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', position: 'relative' }}>
+
+          {/* All-day events strip — sticky inside scrollRef so it works regardless of outer layout */}
+          {(() => {
+            const allDayByDay = days.map(d => getEventsForDay(d).filter(ev => {
+              const s = new Date(ev.start_time)
+              return s.getHours() === 0 && s.getMinutes() === 0
+            }))
+            if (allDayByDay.every(arr => arr.length === 0)) return null
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: `${TIME_COL}px repeat(${N}, 1fr)`, borderBottom: '1px solid rgba(255,255,255,0.07)', padding: '4px 0', position: 'sticky', top: 0, zIndex: 5, background: 'var(--bg-sidebar, #12121a)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 8 }}>
+                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.22)', letterSpacing: '0.06em', textTransform: 'uppercase', userSelect: 'none' }}>dag</span>
+                </div>
+                {allDayByDay.map((dayEvs, di) => (
+                  <div key={di} style={{ padding: '0 2px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {dayEvs.map(ev => (
+                      <div key={ev.id} onClick={e => openEditEvent(ev, e)}
+                        style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, cursor: 'pointer', background: ev.color + '28', borderLeft: `3px solid ${ev.color}`, color: ev.color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {ev.title}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+
           <div style={{ position: 'relative', height: `${24 * HOUR_H}px` }}>
 
             {/* Ochtend / Middag / Avond achtergrondzones */}
