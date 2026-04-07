@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+// ChevronLeft/Right kept for WeekStrip
 import Timeline from '../components/Timeline'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -141,71 +142,86 @@ function WeekStrip({ selectedDay, onSelectDay, onPrevWeek, onNextWeek, tasks, ca
 
 // ─── Month calendar ───────────────────────────────────────────────────────────
 function MonthCalendar({ selectedDay, onSelectDay, tasks, calendarEvents, magisterLessons }) {
-  const now   = new Date()
-  const year  = selectedDay.getFullYear()
-  const month = selectedDay.getMonth()
+  const now = new Date()
+  const scrollRef = React.useRef(null)
+  const monthRefs = React.useRef({})
 
-  const firstOfMonth = new Date(year, month, 1)
-  const lastOfMonth  = new Date(year, month + 1, 0)
+  // Render 25 months centered on selectedDay's month
+  const months = React.useMemo(() => {
+    const result = []
+    for (let i = -12; i <= 12; i++) {
+      result.push(new Date(selectedDay.getFullYear(), selectedDay.getMonth() + i, 1))
+    }
+    return result
+  }, [selectedDay.getFullYear(), selectedDay.getMonth()])
 
-  // Pad to Monday
-  const startPad = new Date(firstOfMonth)
-  const dow = firstOfMonth.getDay()
-  startPad.setDate(firstOfMonth.getDate() - (dow === 0 ? 6 : dow - 1))
+  React.useLayoutEffect(() => {
+    const key = `${selectedDay.getFullYear()}-${selectedDay.getMonth()}`
+    const el = monthRefs.current[key]
+    if (el && scrollRef.current) el.scrollIntoView({ block: 'start', behavior: 'instant' })
+  }, [selectedDay.getFullYear(), selectedDay.getMonth()])
 
-  const cells = []
-  const cursor = new Date(startPad)
-  while (cells.length < 42 && (cursor <= lastOfMonth || cells.length % 7 !== 0)) {
-    cells.push(new Date(cursor))
-    cursor.setDate(cursor.getDate() + 1)
-  }
+  const renderMonth = (monthDate) => {
+    const year  = monthDate.getFullYear()
+    const month = monthDate.getMonth()
+    const key   = `${year}-${month}`
 
-  return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '8px 12px 16px' }}>
-      {/* Day headers */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: 2 }}>
-        {DAYS_SHORT.map(d => (
-          <div key={d} style={{ textAlign: 'center', fontSize: 10, color: 'var(--text-3)', padding: '6px 0', fontWeight: 600, letterSpacing: '0.04em' }}>
-            {d}
-          </div>
-        ))}
-      </div>
+    const firstOfMonth = new Date(year, month, 1)
+    const lastOfMonth  = new Date(year, month + 1, 0)
+    const dow = firstOfMonth.getDay()
+    const startPad = new Date(firstOfMonth)
+    startPad.setDate(firstOfMonth.getDate() - (dow === 0 ? 6 : dow - 1))
 
-      {/* Cells */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
-        {cells.map((day, i) => {
-          const isToday    = isSameDay(day, now)
-          const isSelected = isSameDay(day, selectedDay)
-          const inMonth    = day.getMonth() === month
-          const density    = getDayDensity(day, tasks, calendarEvents, magisterLessons)
-          const dotColor   = densityColor(density)
+    const cells = []
+    const cursor = new Date(startPad)
+    while (cells.length < 42 && (cursor <= lastOfMonth || cells.length % 7 !== 0)) {
+      cells.push(new Date(cursor))
+      cursor.setDate(cursor.getDate() + 1)
+    }
 
-          return (
-            <div
-              key={i}
-              onClick={() => onSelectDay(day)}
-              style={{
+    return (
+      <div key={key} ref={el => { monthRefs.current[key] = el }} style={{ flexShrink: 0, padding: '0 12px 16px' }}>
+        {/* Month label */}
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)', padding: '14px 0 6px', letterSpacing: '0.01em' }}>
+          {MONTHS_NL[month]} {year}
+        </div>
+        {/* Day headers */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: 2 }}>
+          {DAYS_SHORT.map(d => (
+            <div key={d} style={{ textAlign: 'center', fontSize: 10, color: 'var(--text-3)', padding: '4px 0', fontWeight: 600, letterSpacing: '0.04em' }}>{d}</div>
+          ))}
+        </div>
+        {/* Cells */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+          {cells.map((day, i) => {
+            const isToday    = isSameDay(day, now)
+            const isSelected = isSameDay(day, selectedDay)
+            const inMonth    = day.getMonth() === month
+            const density    = getDayDensity(day, tasks, calendarEvents, magisterLessons)
+            const dotColor   = densityColor(density)
+            return (
+              <div key={i} onClick={() => onSelectDay(day)} style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 height: 38, borderRadius: 8, cursor: 'pointer', gap: 2,
-                background: isToday
-                  ? 'var(--accent)'
-                  : isSelected && !isToday ? 'var(--bg-card-2)' : 'transparent',
+                background: isToday ? 'var(--accent)' : isSelected && !isToday ? 'var(--bg-card-2)' : 'transparent',
                 color: isToday ? '#000' : inMonth ? 'var(--text-1)' : 'var(--text-3)',
                 fontSize: 14, fontWeight: isToday ? 700 : isSelected ? 600 : 400,
                 border: isSelected && !isToday ? '1px solid var(--border)' : '1px solid transparent',
-                transition: 'background 0.12s',
-              }}
-            >
-              {day.getDate()}
-              <div style={{
-                width: 4, height: 4, borderRadius: '50%',
-                background: density > 0 ? (isToday ? 'rgba(0,0,0,0.4)' : dotColor) : 'transparent',
-                flexShrink: 0,
-              }} />
-            </div>
-          )
-        })}
+                transition: 'background 0.12s', opacity: inMonth ? 1 : 0.35,
+              }}>
+                {day.getDate()}
+                <div style={{ width: 4, height: 4, borderRadius: '50%', background: density > 0 ? (isToday ? 'rgba(0,0,0,0.4)' : dotColor) : 'transparent', flexShrink: 0 }} />
+              </div>
+            )
+          })}
+        </div>
       </div>
+    )
+  }
+
+  return (
+    <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+      {months.map(m => renderMonth(m))}
     </div>
   )
 }
@@ -232,19 +248,13 @@ export default function AgendaPage({
   const today = new Date()
   const [mobileView, setMobileView] = useState('dag')          // 'dag' | 'maand'
   const [selectedDay, setSelectedDay] = useState(today)
-  const [monthAnchor, setMonthAnchor] = useState(today)        // for month nav
-
   const handleSelectDay = (day) => {
     setSelectedDay(day)
-    setMonthAnchor(day)
     setMobileView('dag')
   }
 
   const prevWeek = () => setSelectedDay(d => { const n = new Date(d); n.setDate(n.getDate() - 7); return n })
   const nextWeek = () => setSelectedDay(d => { const n = new Date(d); n.setDate(n.getDate() + 7); return n })
-
-  const prevMonth = () => setMonthAnchor(d => { const n = new Date(d); n.setMonth(n.getMonth() - 1); return n })
-  const nextMonth = () => setMonthAnchor(d => { const n = new Date(d); n.setMonth(n.getMonth() + 1); return n })
 
   const tabStyle = (active) => ({
     fontSize: 13, padding: '5px 16px', borderRadius: 20, border: 'none', cursor: 'pointer',
@@ -310,6 +320,7 @@ export default function AgendaPage({
                 initialDate={selectedDay}
                 isMobile
                 hideToolbar
+                onDateChange={day => setSelectedDay(day)}
               />
             </div>
           </>
@@ -318,24 +329,8 @@ export default function AgendaPage({
         {/* ── Maand view ── */}
         {mobileView === 'maand' && (
           <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-            {/* Month nav header */}
-            <div style={{
-              flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '10px 16px', borderBottom: '1px solid var(--border)',
-            }}>
-              <button onClick={prevMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', padding: '4px 8px', borderRadius: 6 }}>
-                <ChevronLeft size={18} />
-              </button>
-              <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>
-                {MONTHS_NL[monthAnchor.getMonth()]} {monthAnchor.getFullYear()}
-              </span>
-              <button onClick={nextMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', padding: '4px 8px', borderRadius: 6 }}>
-                <ChevronRight size={18} />
-              </button>
-            </div>
-
             <MonthCalendar
-              selectedDay={new Date(monthAnchor.getFullYear(), monthAnchor.getMonth(), selectedDay.getDate())}
+              selectedDay={selectedDay}
               onSelectDay={handleSelectDay}
               tasks={tasks}
               calendarEvents={calendarEvents}

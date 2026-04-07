@@ -82,7 +82,7 @@ const emptyForm = (date, hour) => ({
   color: '#818CF8', recurrence: '', recurrence_days: []
 })
 
-export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDetail, defaultView = 'week', initialDate, isMobile = false, hideToolbar = false, onLessonsChange, onEventsChange, onMagisterError }) {
+export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDetail, defaultView = 'week', initialDate, isMobile = false, hideToolbar = false, onLessonsChange, onEventsChange, onMagisterError, onDateChange }) {
   const [view, setView] = useState(defaultView)
   const [current, setCurrent] = useState(initialDate || new Date())
   const [events, setEvents] = useState([])
@@ -378,6 +378,7 @@ export default function Timeline({ userId, tasks, subjects, onEditTask, onViewDe
     else if (view === 'week') d.setDate(d.getDate() + dir * 7)
     else d.setMonth(d.getMonth() + dir)
     setCurrent(d)
+    onDateChange?.(d)
   }
 
   const headerLabel = () => {
