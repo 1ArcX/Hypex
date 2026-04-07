@@ -47,15 +47,19 @@ export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onE
     setEditingBook(true)
   }
 
+  const mouseDownedInside = React.useRef(false)
+
   return (
     <div
       className={closing ? 'modal-overlay modal-closing' : 'modal-overlay'}
       style={{ position:'fixed',inset:0,zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.7)',backdropFilter:'blur(10px)',padding:'16px' }}
-      onClick={handleClose}
+      onMouseDown={() => { mouseDownedInside.current = false }}
+      onClick={() => { if (!mouseDownedInside.current) handleClose() }}
     >
       <div
         className={`glass-card modal-content${closing ? ' modal-closing' : ''}`}
         style={{ width:'100%',maxWidth:'420px',padding:'24px' }}
+        onMouseDown={e => { e.stopPropagation(); mouseDownedInside.current = true }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
