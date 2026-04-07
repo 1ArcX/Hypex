@@ -73,8 +73,39 @@ function WeekStrip({ selectedDay, onSelectDay, onPrevWeek, onNextWeek, tasks, ca
     ? `${MONTHS_NL[weekStart.getMonth()]} ${weekStart.getFullYear()}`
     : `${MONTHS_S[weekStart.getMonth()]} – ${MONTHS_S[weekEnd.getMonth()]} ${weekEnd.getFullYear()}`
 
+  const swipeStartX = React.useRef(null)
+  const swipeStartY = React.useRef(null)
+  const swipeIntent = React.useRef(null)
+
+  const handleTouchStart = e => {
+    swipeStartX.current = e.touches[0].clientX
+    swipeStartY.current = e.touches[0].clientY
+    swipeIntent.current = null
+  }
+  const handleTouchMove = e => {
+    if (swipeIntent.current === null) {
+      const dx = Math.abs(e.touches[0].clientX - swipeStartX.current)
+      const dy = Math.abs(e.touches[0].clientY - swipeStartY.current)
+      if (dx < 6 && dy < 6) return
+      swipeIntent.current = dx > dy ? 'h' : 'v'
+    }
+    if (swipeIntent.current === 'h') e.preventDefault()
+  }
+  const handleTouchEnd = e => {
+    if (swipeIntent.current !== 'h' || swipeStartX.current === null) { swipeStartX.current = null; return }
+    const dx = e.changedTouches[0].clientX - swipeStartX.current
+    swipeStartX.current = null; swipeIntent.current = null
+    if (Math.abs(dx) < 40) return
+    dx < 0 ? onNextWeek() : onPrevWeek()
+  }
+
   return (
-    <div style={{ flexShrink: 0, background: 'var(--bg-sidebar)', borderBottom: '1px solid var(--border)' }}>
+    <div
+      style={{ flexShrink: 0, background: 'var(--bg-sidebar)', borderBottom: '1px solid var(--border)' }}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
       {/* Month label + week nav */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 4px' }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>{monthLabel}</span>
