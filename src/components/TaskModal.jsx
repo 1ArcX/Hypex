@@ -29,16 +29,23 @@ function formatDutchDate(d) {
   return `${NL_DAYS[d.getDay()]} ${d.getDate()} ${NL_MONTHS[d.getMonth()]}`
 }
 
-function suggestFreeDay(durationMins, tasks, calendarEvents) {
-  const today = new Date()
-  for (let i = 0; i < 14; i++) {
-    const d = new Date(today)
-    d.setDate(today.getDate() + i)
+function suggestFreeSlots(durationMins, tasks, calendarEvents, maxResults = 8) {
+  const now = new Date()
+  const todayStr = now.toISOString().slice(0, 10)
+  const nowMins = now.getHours() * 60 + now.getMinutes() + 30 // 30 min buffer
+  const results = []
+  for (let i = 0; i < 14 && results.length < maxResults; i++) {
+    const d = new Date(now)
+    d.setDate(now.getDate() + i)
     const dateStr = d.toISOString().slice(0, 10)
     const slots = getFreeSlots(dateStr, durationMins, tasks, calendarEvents)
-    if (slots.length > 0) return { dateStr, slot: slots[0], d }
+    for (const slot of slots) {
+      if (dateStr === todayStr && timeStrToMins(slot.startStr) < nowMins) continue
+      results.push({ dateStr, slot, d: new Date(d) })
+      if (results.length >= maxResults) break
+    }
   }
-  return null
+  return results
 }
 
 function getFreeSlots(dateStr, durationMins, tasks, calendarEvents) {
@@ -262,10 +269,12 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
     return getFreeSlots(date, durationMinutes, tasks, calendarEvents)
   }, [date, durationMinutes, noDate, allDay, tasks, calendarEvents])
 
-  const daySuggestion = useMemo(() => {
-    if (!noDate) return null
-    return suggestFreeDay(durationMinutes, tasks, calendarEvents)
+  const [showSuggestCount, setShowSuggestCount] = useState(2)
+  const daySuggestions = useMemo(() => {
+    if (!noDate) return []
+    return suggestFreeSlots(durationMinutes, tasks, calendarEvents)
   }, [noDate, durationMinutes, tasks, calendarEvents])
+  useEffect(() => { setShowSuggestCount(2) }, [noDate, durationMinutes])
 
   const overlapConflicts = useMemo(() => {
     if (noDate || allDay || !date || !startTime || !endTime) return []
@@ -369,30 +378,38 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
             Nog in te plannen
           </button>
 
-          {/* Dagvoorstel bij "nog in te plannen" */}
-          {noDate && daySuggestion && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, background: 'rgba(250,204,21,0.06)', border: '1px solid rgba(250,204,21,0.22)' }}>
-              <span style={{ fontSize: 13 }}>📅</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, color: 'rgba(250,204,21,0.9)', fontWeight: 600 }}>
-                  {formatDutchDate(daySuggestion.d)}
+          {/* Dagvoorstellen bij "nog in te plannen" */}
+          {noDate && daySuggestions.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px' }}>📅 Beschikbare momenten</label>
+              {daySuggestions.slice(0, showSuggestCount).map((s, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, background: 'rgba(250,204,21,0.06)', border: '1px solid rgba(250,204,21,0.18)' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, color: 'rgba(250,204,21,0.9)', fontWeight: 600 }}>
+                      {formatDutchDate(s.d)}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'rgba(250,204,21,0.5)', marginTop: 1 }}>
+                      {s.slot.startStr}–{s.slot.endStr} · geen overlap
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setDate(s.dateStr); setStartTime(s.slot.startStr); setEndTime(s.slot.endStr); setNoDate(false) }}
+                    style={{ padding: '5px 12px', borderRadius: 8, border: '1px solid rgba(250,204,21,0.4)', background: 'rgba(250,204,21,0.12)', color: '#FACC15', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}
+                  >
+                    Inplannen
+                  </button>
                 </div>
-                <div style={{ fontSize: 11, color: 'rgba(250,204,21,0.55)', marginTop: 1 }}>
-                  {daySuggestion.slot.startStr}–{daySuggestion.slot.endStr} · geen overlap
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setDate(daySuggestion.dateStr)
-                  setStartTime(daySuggestion.slot.startStr)
-                  setEndTime(daySuggestion.slot.endStr)
-                  setNoDate(false)
-                }}
-                style={{ padding: '5px 12px', borderRadius: 8, border: '1px solid rgba(250,204,21,0.4)', background: 'rgba(250,204,21,0.12)', color: '#FACC15', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}
-              >
-                Inplannen
-              </button>
+              ))}
+              {showSuggestCount < daySuggestions.length && (
+                <button
+                  type="button"
+                  onClick={() => setShowSuggestCount(v => v + 2)}
+                  style={{ fontSize: 11, color: 'rgba(250,204,21,0.5)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0', textAlign: 'left' }}
+                >
+                  + Laad meer momenten
+                </button>
+              )}
             </div>
           )}
 
