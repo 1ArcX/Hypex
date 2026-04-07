@@ -335,13 +335,38 @@ export default function App() {
       config: { presence: { key: user.id } },
     })
     const syncUsers = () => {
-      setStudieBuddiesOnline(Object.values(channel.presenceState()).flat())
+      const seen = new Set()
+      const users = []
+      for (const entries of Object.values(channel.presenceState())) {
+        for (const entry of entries) {
+          if (!seen.has(entry.userId)) {
+            seen.add(entry.userId)
+            users.push(entry)
+          }
+        }
+      }
+      setStudieBuddiesOnline(users)
+    }
+    const trackNow = () => {
+      try {
+        const saved = JSON.parse(localStorage.getItem('pomodoro_v3'))
+        if (saved?.running && saved?.endTime && saved.endTime > Date.now()) {
+          channel.track({
+            userId: user.id,
+            name: presenceNameRef.current,
+            mode: saved.mode || 'work',
+            endTime: saved.endTime,
+          })
+          return
+        }
+      } catch {}
+      channel.untrack()
     }
     channel
       .on('presence', { event: 'sync' },  syncUsers)
       .on('presence', { event: 'join' },  syncUsers)
       .on('presence', { event: 'leave' }, syncUsers)
-      .subscribe()
+      .subscribe(status => { if (status === 'SUBSCRIBED') trackNow() })
     const iv = setInterval(() => {
       try {
         const saved = JSON.parse(localStorage.getItem('pomodoro_v3'))

@@ -95,32 +95,6 @@ const SOUND_TYPES = [
   { id: 'ocean', emoji: '🌊', label: 'Oceaan' },
 ]
 
-// ── Supabase stats storage (per account) ─────────────────────────────────────
-const STATS_BUCKET = 'user-data'
-
-async function saveStatsToCloud(userId, todayMins, totalSessions) {
-  if (!userId) return
-  try {
-    const key = getTodayKey()
-    const existing = JSON.parse(localStorage.getItem(LS_STATS)) || {}
-    existing[key] = todayMins
-    const payload = JSON.stringify({ stats: existing, totalSessions })
-    await supabase.storage.from(STATS_BUCKET)
-      .upload(`${userId}/pomodoro-stats.json`, payload, {
-        upsert: true, contentType: 'application/json',
-      })
-  } catch {}
-}
-
-async function loadStatsFromCloud(userId) {
-  if (!userId) return null
-  try {
-    const { data, error } = await supabase.storage.from(STATS_BUCKET)
-      .download(`${userId}/pomodoro-stats.json`)
-    if (error || !data) return null
-    return JSON.parse(await data.text())
-  } catch { return null }
-}
 
 function loadSaved() {
   try { return JSON.parse(localStorage.getItem(LS_KEY)) } catch { return null }
@@ -357,26 +331,6 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
     }
   }, [userId, state.notifEnabled])
 
-  // ── Load stats from cloud on mount ────────────────────────────────────────
-  useEffect(() => {
-    if (!userId) return
-    loadStatsFromCloud(userId).then(cloud => {
-      if (!cloud) return
-      // Merge cloud stats into localStorage (take max for each day)
-      try {
-        const local = JSON.parse(localStorage.getItem(LS_STATS)) || {}
-        let changed = false
-        for (const [day, mins] of Object.entries(cloud.stats || {})) {
-          if ((local[day] || 0) < mins) { local[day] = mins; changed = true }
-        }
-        if (changed) localStorage.setItem(LS_STATS, JSON.stringify(local))
-        const todayMins = local[getTodayKey()] || 0
-        const totalSessions = cloud.totalSessions ?? stateRef.current.totalSessions
-        dispatch({ type: 'RESTORE', payload: { ...stateRef.current, todayMins, totalSessions } })
-      } catch {}
-    })
-  }, [userId])
-
   // ── Restore saved state ──────────────────────────────────────────────────
   useEffect(() => {
     const s = loadSaved()
@@ -439,7 +393,6 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
       const todayMins = s.mode === 'work' ? addFocusMins(s.workMins) : getTodayMins()
       const nextMode  = calcNextMode(s.mode, s.sessionsInCycle, s.sessionsPerLong)
       const newTotal  = s.mode === 'work' ? s.totalSessions + 1 : s.totalSessions
-      saveStatsToCloud(userIdRef.current, todayMins, newTotal)
       // Remove session so the background cron doesn't double-fire a push
       clearTimerSession(userIdRef.current)
       onSessionComplete?.({
