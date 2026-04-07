@@ -15,7 +15,7 @@ const NAV_ITEMS = [
 
 export default function Sidebar({
   activePage, setActivePage,
-  isAdmin, user,
+  isAdmin, showJumbo, user,
   onShowSettings, onShowAdmin, onLogout,
   syncing, syncFlash, updateAvailable,
 }) {
@@ -24,7 +24,7 @@ export default function Sidebar({
 
   const navItems = [
     ...NAV_ITEMS,
-    ...(isAdmin ? [{ id: 'jumbo', Icon: Briefcase, label: 'Jumbo ★' }] : []),
+    ...(showJumbo ? [{ id: 'jumbo', Icon: Briefcase, label: 'Jumbo ★' }] : []),
   ]
 
   return (

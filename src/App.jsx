@@ -240,6 +240,18 @@ export default function App() {
     }
   }
 
+  // Realtime: herlaad profiel als admin werk_tab toggled
+  useEffect(() => {
+    if (!user?.id) return
+    const channel = supabase.channel('my-profile')
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'profiles',
+        filter: `id=eq.${user.id}`
+      }, () => fetchProfiles())
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [user?.id])
+
   // Onboarding: toon bij elke nieuwe login (eerste keer op dit apparaat)
   useEffect(() => {
     if (!user) return
@@ -535,7 +547,8 @@ export default function App() {
           <Sidebar
             activePage={activePage}
             setActivePage={handleSetActivePage}
-            isAdmin={isAdmin || !!userProfile?.werk_tab}
+            isAdmin={isAdmin}
+            showJumbo={isAdmin || !!userProfile?.werk_tab}
             user={user}
             onShowSettings={() => setShowThemeSettings(true)}
             onShowAdmin={() => setShowAdmin(true)}
@@ -680,7 +693,8 @@ export default function App() {
             <BottomNav
               activePage={activePage}
               setActivePage={handleSetActivePage}
-              isAdmin={isAdmin || !!userProfile?.werk_tab}
+              isAdmin={isAdmin}
+              showJumbo={isAdmin || !!userProfile?.werk_tab}
             />
           </div>
         </div>

@@ -15,13 +15,13 @@ const SHEET_BASE = [
   { id: 'notities',     Icon: FileText,      label: 'Notities' },
 ]
 
-export default function BottomNav({ activePage, setActivePage, isAdmin }) {
+export default function BottomNav({ activePage, setActivePage, isAdmin, showJumbo }) {
   const [showSheet, setShowSheet] = useState(false)
   const sheetRef = useRef(null)
 
   const sheetItems = [
     ...SHEET_BASE,
-    ...(isAdmin ? [{ id: 'jumbo', Icon: Briefcase, label: 'Jumbo' }] : []),
+    ...(showJumbo ? [{ id: 'jumbo', Icon: Briefcase, label: 'Jumbo' }] : []),
   ]
 
   const sheetActive = sheetItems.some(i => i.id === activePage)
