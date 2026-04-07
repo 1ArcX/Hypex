@@ -169,8 +169,8 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
 
   // ─── Editor view ─────────────────────────────────────────────
   if (activeNote) return (
-    <div className="glass-card p-4 flex flex-col" style={fullHeight ? { height: '100%' } : { minHeight: 220 }}>
-      {/* Editor header */}
+    <div className="glass-card p-4 flex flex-col" style={{ ...(fullHeight ? { height: '100%' } : { minHeight: 220 }), overflow: 'hidden' }}>
+      {/* Editor header — sticky */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, flexShrink: 0 }}>
         <button onClick={goBack} style={{ ...btnBase, color: 'rgba(255,255,255,0.45)', gap: 3 }}>
           <ChevronLeft size={15} />
@@ -193,31 +193,35 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
         </button>
       </div>
 
-      {/* Titel */}
-      <input
-        value={activeNote.title}
-        onChange={e => handleNoteChange('title', e.target.value)}
-        placeholder="Titel..."
-        style={{
-          background: 'transparent', border: 'none', outline: 'none',
-          color: 'white', fontWeight: 600, fontSize: 15, width: '100%',
-          marginBottom: 6, flexShrink: 0, fontFamily: 'inherit',
-        }}
-      />
-      <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', marginBottom: 8, flexShrink: 0 }} />
+      {/* Scrollable content — keyboard overlays, this area scrolls internally */}
+      <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'flex', flexDirection: 'column' }}>
+        {/* Titel */}
+        <input
+          value={activeNote.title}
+          onChange={e => handleNoteChange('title', e.target.value)}
+          placeholder="Titel..."
+          style={{
+            background: 'transparent', border: 'none', outline: 'none',
+            color: 'white', fontWeight: 600, fontSize: 15, width: '100%',
+            marginBottom: 6, flexShrink: 0, fontFamily: 'inherit',
+          }}
+        />
+        <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', marginBottom: 8, flexShrink: 0 }} />
 
-      {/* Inhoud */}
-      <textarea
-        value={activeNote.content}
-        onChange={e => handleNoteChange('content', e.target.value)}
-        placeholder="Begin met typen..."
-        className="flex-1 resize-none"
-        style={{
-          background: 'transparent', border: 'none', outline: 'none',
-          color: 'rgba(255,255,255,0.7)', lineHeight: '1.6', fontSize: 13,
-          fontFamily: 'inherit', minHeight: fullHeight ? 'unset' : 120,
-        }}
-      />
+        {/* Inhoud — grows with content, min fills visible area */}
+        <textarea
+          value={activeNote.content}
+          onChange={e => handleNoteChange('content', e.target.value)}
+          placeholder="Begin met typen..."
+          style={{
+            background: 'transparent', border: 'none', outline: 'none',
+            color: 'rgba(255,255,255,0.7)', lineHeight: '1.6', fontSize: 13,
+            fontFamily: 'inherit', resize: 'none',
+            minHeight: fullHeight ? '50vh' : 120,
+            width: '100%', boxSizing: 'border-box',
+          }}
+        />
+      </div>
     </div>
   )
 
