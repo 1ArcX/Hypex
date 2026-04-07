@@ -169,8 +169,8 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
 
   // ─── Editor view ─────────────────────────────────────────────
   if (activeNote) return (
-    <div className="glass-card p-4 flex flex-col" style={{ ...(fullHeight ? { height: '100%' } : { minHeight: 220 }), overflow: 'hidden' }}>
-      {/* Editor header — sticky */}
+    <div className="glass-card p-4" style={{ minHeight: 220, display: 'flex', flexDirection: 'column' }}>
+      {/* Editor header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, flexShrink: 0 }}>
         <button onClick={goBack} style={{ ...btnBase, color: 'rgba(255,255,255,0.45)', gap: 3 }}>
           <ChevronLeft size={15} />
@@ -179,7 +179,6 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
         <div style={{ flex: 1 }} />
         {saving && <Loader size={11} style={{ color: 'rgba(255,255,255,0.25)', animation: 'spin 1s linear infinite' }} />}
         {saved && !saving && <span style={{ fontSize: 9, color: '#1DB954', display: 'flex', alignItems: 'center', gap: 3 }}><Check size={10} />Opgeslagen</span>}
-        {/* Folder toewijzen */}
         <select
           value={activeNote.folder_id || ''}
           onChange={e => handleNoteChange('folder_id', e.target.value || null)}
@@ -193,35 +192,40 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
         </button>
       </div>
 
-      {/* Scrollable content — keyboard overlays, this area scrolls internally */}
-      <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'flex', flexDirection: 'column' }}>
-        {/* Titel */}
-        <input
-          value={activeNote.title}
-          onChange={e => handleNoteChange('title', e.target.value)}
-          placeholder="Titel..."
-          style={{
-            background: 'transparent', border: 'none', outline: 'none',
-            color: 'white', fontWeight: 600, fontSize: 15, width: '100%',
-            marginBottom: 6, flexShrink: 0, fontFamily: 'inherit',
-          }}
-        />
-        <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', marginBottom: 8, flexShrink: 0 }} />
+      {/* Titel */}
+      <input
+        value={activeNote.title}
+        onChange={e => handleNoteChange('title', e.target.value)}
+        placeholder="Titel..."
+        style={{
+          background: 'transparent', border: 'none', outline: 'none',
+          color: 'white', fontWeight: 600, fontSize: 15, width: '100%',
+          marginBottom: 6, flexShrink: 0, fontFamily: 'inherit',
+        }}
+      />
+      <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', marginBottom: 8, flexShrink: 0 }} />
 
-        {/* Inhoud — grows with content, min fills visible area */}
-        <textarea
-          value={activeNote.content}
-          onChange={e => handleNoteChange('content', e.target.value)}
-          placeholder="Begin met typen..."
-          style={{
-            background: 'transparent', border: 'none', outline: 'none',
-            color: 'rgba(255,255,255,0.7)', lineHeight: '1.6', fontSize: 13,
-            fontFamily: 'inherit', resize: 'none',
-            minHeight: fullHeight ? '50vh' : 120,
-            width: '100%', boxSizing: 'border-box',
-          }}
-        />
-      </div>
+      {/* Inhoud — groeit met content mee, page-scroll (niet inner scroll) */}
+      <textarea
+        value={activeNote.content}
+        onChange={e => {
+          handleNoteChange('content', e.target.value)
+          // auto-grow
+          e.target.style.height = 'auto'
+          e.target.style.height = e.target.scrollHeight + 'px'
+        }}
+        onFocus={e => {
+          e.target.style.height = 'auto'
+          e.target.style.height = e.target.scrollHeight + 'px'
+        }}
+        placeholder="Begin met typen..."
+        style={{
+          background: 'transparent', border: 'none', outline: 'none',
+          color: 'rgba(255,255,255,0.7)', lineHeight: '1.6', fontSize: 13,
+          fontFamily: 'inherit', resize: 'none', overflow: 'hidden',
+          minHeight: 200, width: '100%', boxSizing: 'border-box',
+        }}
+      />
     </div>
   )
 
