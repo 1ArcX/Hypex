@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Truck, RefreshCw, AlertCircle, ChevronDown, ChevronUp, LogIn, LogOut, Map as MapIcon, Bell, BellOff } from 'lucide-react'
+import { Truck, RefreshCw, AlertCircle, ChevronDown, ChevronUp, LogIn, Map as MapIcon, Bell, BellOff } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 
 const VAPID_PUBLIC = 'BCsu1QaHUead0cgQ23qUKIu3_MnSi0s21LaD_c9wBcqdP43A9ojEx-nWZ4_xUDYLVMQn0CqzqdhSuLQr6eOQqh4'
@@ -553,7 +553,6 @@ export default function VrachttijdenWidget() {
         </div>
         <div style={{ display:'flex', gap:'4px', alignItems:'center' }}>
           {tokens && <button onClick={() => fetchStops()} disabled={loading} style={{ background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.3)', padding:'3px', borderRadius:'6px' }} onMouseEnter={e=>e.currentTarget.style.color='var(--accent)'} onMouseLeave={e=>e.currentTarget.style.color='rgba(255,255,255,0.3)'}><RefreshCw size={13} style={{ animation:loading?'spin 1s linear infinite':'none' }} /></button>}
-          {tokens && <button onClick={() => { saveTokens(null); setStops(null); setError(null) }} className="hidden md:flex" style={{ background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'8px', padding:'3px 7px', cursor:'pointer', color:'rgba(255,255,255,0.4)', fontSize:'11px', alignItems:'center', gap:'4px' }} onMouseEnter={e=>e.currentTarget.style.color='#f87171'} onMouseLeave={e=>e.currentTarget.style.color='rgba(255,255,255,0.4)'}><LogOut size={11} /> Uitloggen</button>}
         </div>
       </div>
 
