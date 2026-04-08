@@ -382,31 +382,10 @@ export default function VrachttijdenWidget() {
       setStops(arr)
       setLastUpdate(new Date())
 
-      // ── Notificaties controleren (push) ───────────────────────────────────
+      // ── Staat bijhouden (push wordt uitsluitend door de cron verstuurd) ────
       for (const stop of arr) {
-        if (!notifyStopsRef.current.has(stop.id)) continue
-        const eta    = stop.actualStartTime || stop.eta || stop.plannedStartTime
-        const etaFmt = eta ? new Date(eta).toLocaleTimeString('nl-NL', { hour:'2-digit', minute:'2-digit' }) : '?'
-        const act    = stop.tripStatus?.activity
-        const delay  = stop.delay
-        const tripId = stop.trip?.tripId || 'Rit'
-        const prev   = prevStopStates.current.get(stop.id)
-
-        if (prev) {
-          if (prev.delay != null && delay != null && Math.abs(delay - prev.delay) >= 3) {
-            const more = delay > prev.delay
-            sendVrachtPush(userIdRef.current, '🚛 Vrachttijden',
-              more ? `${tripId} loopt meer uit (+${delay} min) — komt nu om ${etaFmt}`
-                   : `${tripId} loopt in (${delay > 0 ? '+' : ''}${delay} min) — komt om ${etaFmt}`,
-              `delay-${stop.id}`)
-          }
-          if (prev.activity !== 'AFGEROND' && act === 'AFGEROND') {
-            sendVrachtPush(userIdRef.current, '✅ Vracht aangekomen',
-              `${tripId} is aangekomen${stop.actualStartTime ? ' om ' + new Date(stop.actualStartTime).toLocaleTimeString('nl-NL', { hour:'2-digit', minute:'2-digit' }) : ''}`,
-              `arrived-${stop.id}`)
-          }
-        }
-        prevStopStates.current.set(stop.id, { delay, activity: act, eta })
+        const eta = stop.actualStartTime || stop.eta || stop.plannedStartTime
+        prevStopStates.current.set(stop.id, { delay: stop.delay, activity: stop.tripStatus?.activity, eta })
       }
 
       // Sla huidige staat op zodat de achtergrond-cron geen dubbele meldingen stuurt

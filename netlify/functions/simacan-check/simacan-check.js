@@ -120,27 +120,27 @@ async function simacanCheckHandler() {
       }
 
       const eta    = stop.actualStartTime || stop.eta || stop.plannedStartTime
-      const etaFmt = eta ? new Date(eta).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }) : '?'
+      const etaFmt = eta ? new Date(eta).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Amsterdam' }) : '?'
       const act    = stop.tripStatus?.activity
       const delay  = stop.delay
-      const tripId = stop.trip?.tripId || 'Rit'
+      const dc     = stop.tripStatus?.startLocation?.name || stop.trip?.tripId || 'Rit'
       const prev   = prevStates[stopId]
 
-      console.log(`[simacan-check] Stop ${stopId} (${tripId}) — delay: ${delay}, act: ${act}, prev:`, prev)
+      console.log(`[simacan-check] Stop ${stopId} (${dc}) — delay: ${delay}, act: ${act}, prev:`, prev)
 
       if (prev) {
         if (prev.delay != null && delay != null && Math.abs(delay - prev.delay) >= 3) {
           const more = delay > prev.delay
           console.log(`[simacan-check] Push: vertraging gewijzigd stop ${stopId}`)
           await sendPush(subs, '🚛 Vrachttijden',
-            more ? `${tripId} loopt meer uit (+${delay} min) — komt nu om ${etaFmt}`
-                 : `${tripId} loopt in (${delay > 0 ? '+' : ''}${delay} min) — komt om ${etaFmt}`,
+            more ? `${dc} loopt meer uit (+${delay} min) — komt nu om ${etaFmt}`
+                 : `${dc} loopt in (${delay > 0 ? '+' : ''}${delay} min) — komt om ${etaFmt}`,
             `delay-${stopId}`)
         }
         if (prev.activity !== 'AFGEROND' && act === 'AFGEROND') {
           console.log(`[simacan-check] Push: afgerond stop ${stopId}`)
           await sendPush(subs, '✅ Vracht aangekomen',
-            `${tripId} is aangekomen${stop.actualStartTime ? ' om ' + new Date(stop.actualStartTime).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }) : ''}`,
+            `${dc} is aangekomen${stop.actualStartTime ? ' om ' + new Date(stop.actualStartTime).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Amsterdam' }) : ''}`,
             `arrived-${stopId}`)
         }
       } else {
