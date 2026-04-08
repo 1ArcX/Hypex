@@ -103,19 +103,6 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
   const [stHwLoading, setStHwLoading] = useState(false)
   const [stHwError, setStHwError] = useState(null)
 
-  // Listen for expired token event → clear state + show reconnect prompt
-  useEffect(() => {
-    if (!somtodayEnabled) return
-    const handler = () => {
-      setSomtodayCreds(null)
-      setShowSettings(true)
-      setStHomework(null)
-      setStHwError('SOMtoday sessie verlopen — koppel opnieuw')
-    }
-    window.addEventListener('somtodayTokenExpired', handler)
-    return () => window.removeEventListener('somtodayTokenExpired', handler)
-  }, [somtodayEnabled])
-
   // Auto-connect SOMtoday via server-side autologin (singleton — deelt promise met App)
   useEffect(() => {
     if (!somtodayEnabled || somtodayCreds) return
