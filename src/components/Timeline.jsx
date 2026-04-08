@@ -310,7 +310,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
     return isSameDay(new Date(les.start), date)
   })
 
-  const getEventsForDay = (date) => events.filter(ev => {
+  const getEventsForDay = (date) => events.filter(ev => !ev.description?.startsWith('pmt:')).filter(ev => {
     const start = new Date(ev.start_time)
     const end = new Date(ev.end_time)
     const startD = new Date(start.getFullYear(), start.getMonth(), start.getDate())
