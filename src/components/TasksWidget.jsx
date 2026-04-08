@@ -90,9 +90,11 @@ function getTimeStatus(dateStr, startTime, endTime) {
   return { label: 'Vandaag', overdue: false }
 }
 
-export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle, onEdit, onDragStart, onViewDetail, onNew, seamless = false, highlightedIds = new Set() }) {
+export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle, onEdit, onDragStart, onViewDetail, onNew, onMoveToGroup, seamless = false, highlightedIds = new Set() }) {
   const [adding, setAdding] = useState(false)
   const [collapsedGroups, setCollapsedGroups] = useState(new Set())
+  const [dragTaskId, setDragTaskId] = useState(null)
+  const [dragOverGroup, setDragOverGroup] = useState(undefined) // undefined=none, null=no-group, string=group name
   const [newTitle, setNewTitle] = useState('')
   const [newDate, setNewDate] = useState(todayStr())
   const [newTime, setNewTime] = useState('09:00')
@@ -248,6 +250,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                     ? `${Math.floor(totalMins / 60)}u${totalMins % 60 > 0 ? ` ${totalMins % 60}m` : ''}`
                     : `${totalMins}m`)
                 : null
+              const isDropTarget = dragTaskId && dragOverGroup === section.name
               return (
                 <div
                   onClick={() => setCollapsedGroups(prev => {
@@ -256,12 +259,20 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                     else next.add(section.name)
                     return next
                   })}
-                  style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', padding: '8px 4px 4px', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', userSelect: 'none' }}
+                  onDragOver={e => { if (!dragTaskId) return; e.preventDefault(); setDragOverGroup(section.name) }}
+                  onDragLeave={() => setDragOverGroup(undefined)}
+                  onDrop={e => {
+                    e.preventDefault()
+                    const id = e.dataTransfer.getData('taskId')
+                    if (id && onMoveToGroup) onMoveToGroup(id, section.name)
+                    setDragOverGroup(undefined); setDragTaskId(null)
+                  }}
+                  style={{ fontSize: 11, color: isDropTarget ? 'var(--accent)' : 'rgba(255,255,255,0.35)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', padding: '8px 4px 4px', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', userSelect: 'none', borderRadius: 8, background: isDropTarget ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'transparent', transition: 'background 0.15s, color 0.15s' }}
                 >
                   {isCollapsed
                     ? <ChevronRight size={11} style={{ flexShrink: 0, color: 'rgba(255,255,255,0.25)' }} />
                     : <ChevronDown size={11} style={{ flexShrink: 0, color: 'rgba(255,255,255,0.25)' }} />}
-                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block', flexShrink: 0 }} />
+                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: isDropTarget ? 'var(--accent)' : 'var(--accent)', display: 'inline-block', flexShrink: 0 }} />
                   {section.name}
                   {durLabel && (
                     <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.2)', letterSpacing: 0, textTransform: 'none', marginLeft: 2 }}>
@@ -271,9 +282,26 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                   <span style={{ marginLeft: 'auto', fontSize: 10, color: 'rgba(255,255,255,0.18)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
                     {section.items.length} {section.items.length === 1 ? 'taak' : 'taken'}
                   </span>
+                  {isDropTarget && <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700 }}>↓</span>}
                 </div>
               )
             })()}
+            {/* Drop zone voor "geen groep" sectie */}
+            {section.name === null && dragTaskId && (
+              <div
+                onDragOver={e => { e.preventDefault(); setDragOverGroup(null) }}
+                onDragLeave={() => setDragOverGroup(undefined)}
+                onDrop={e => {
+                  e.preventDefault()
+                  const id = e.dataTransfer.getData('taskId')
+                  if (id && onMoveToGroup) onMoveToGroup(id, null)
+                  setDragOverGroup(undefined); setDragTaskId(null)
+                }}
+                style={{ fontSize: 10, color: dragOverGroup === null ? 'var(--accent)' : 'rgba(255,255,255,0.2)', padding: '5px 8px', borderRadius: 8, background: dragOverGroup === null ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'transparent', border: `1px dashed ${dragOverGroup === null ? 'color-mix(in srgb, var(--accent) 40%, transparent)' : 'rgba(255,255,255,0.1)'}`, marginBottom: 4, textAlign: 'center', transition: 'all 0.15s' }}
+              >
+                {dragOverGroup === null ? '↓ Verplaats naar geen groep' : 'Geen groep'}
+              </div>
+            )}
             {!collapsedGroups.has(section.name) && section.items.map(task => {
               const subject = subjects.find(s => s.id === task.subject_id)
               const dateInfo = getTimeStatus(task.date, task.start_time || task.time, task.end_time)
@@ -308,8 +336,10 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                   draggable
                   onDragStart={e => {
                     e.dataTransfer.setData('taskId', task.id)
+                    setDragTaskId(task.id)
                     onDragStart?.(task)
                   }}
+                  onDragEnd={() => { setDragTaskId(null); setDragOverGroup(undefined) }}
                   onClick={() => onViewDetail ? onViewDetail(task) : onEdit?.(task)}
                   className={[isUrgent ? 'urgent-task' : '', highlightedIds.has(task.id) ? 'task-flash' : ''].filter(Boolean).join(' ') || undefined}
                   style={{

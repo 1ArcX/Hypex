@@ -499,6 +499,11 @@ export default function App() {
     fetchTasks()
   }
 
+  const handleMoveToGroup = async (taskId, groupName) => {
+    await supabase.from('tasks').update({ group_name: groupName || null }).eq('id', taskId).eq('user_id', user.id)
+    fetchTasks()
+  }
+
   const handleDeleteTask = async (id) => {
     await supabase.from('tasks').delete().eq('id', id)
     setShowTaskModal(false)
@@ -693,6 +698,7 @@ export default function App() {
                 onToggle={handleToggleTask}
                 onViewDetail={setDetailTask}
                 onNew={() => openNewTask()}
+                onMoveToGroup={handleMoveToGroup}
                 highlightFilter={taskHighlight}
                 onClearHighlight={() => setTaskHighlight(null)}
               />
