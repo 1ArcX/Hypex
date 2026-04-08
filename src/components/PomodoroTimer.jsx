@@ -301,7 +301,7 @@ function CompletionPopup({ prevMode, nextMode, onStart, onSkip }) {
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusModeChange, userId, noFocusOverlay = false, fullPage = false, onSessionComplete }) {
+export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusModeChange, userId, noFocusOverlay = false, fullPage = false, onSessionComplete, onXPEarned }) {
   const [state, dispatch] = useReducer(reducer, INIT)
   const stateRef           = useRef(state)
   const endTimeRef         = useRef(null)
@@ -411,7 +411,9 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
           duration_minutes: getMins(s),
           mode: 'work',
         }).then(() => {})
-        awardXP(userIdRef.current, getMins(s))
+        const xpEarned = getMins(s)
+        awardXP(userIdRef.current, xpEarned)
+        onXPEarned?.(xpEarned)
       }
       startTimeRef.current = null
 

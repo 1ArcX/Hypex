@@ -665,18 +665,14 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
     broadcastValues(newVals)
 
     const target = cfg?.target || 1
-    const xpPerUnit = Math.max(1, Math.round(XP_PER_HABIT / target))
     const wasDone = current >= target
     const isDone = newCount >= target
 
-    // Award/remove XP per unit (within target range)
-    if (delta > 0 && current < target) {
-      const unitsGained = Math.min(newCount, target) - current
-      awardXP(unitsGained * xpPerUnit)
-    } else if (delta < 0 && newCount < target) {
-      const unitsLost = Math.min(current, target) - newCount
-      awardXP(-unitsLost * xpPerUnit)
-    }
+    // XP is proportional: floor(XP * progress) — guarantees exactly XP_PER_HABIT at target
+    const xpAtNew = Math.floor(XP_PER_HABIT * Math.min(newCount, target) / target)
+    const xpAtCur = Math.floor(XP_PER_HABIT * Math.min(current, target) / target)
+    const xpDelta = xpAtNew - xpAtCur
+    if (xpDelta !== 0) awardXP(xpDelta)
 
     // Track completion in DB (for streaks & gewoonte stats)
     if (!wasDone && isDone) {

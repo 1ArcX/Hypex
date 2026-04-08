@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import ReactDOM from 'react-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 
@@ -484,8 +485,101 @@ function LeaderboardCard({ userId, profiles }) {
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
-export default function StatsPage({ tasks, userId, profiles = [] }) {
+const LEVEL_TITLES = ['Beginner', 'Leerling', 'Studiebot', 'Focusmaster', 'Legende', 'Onverslaanbaar']
+
+function LevelUpPopup({ newLevel, onClose }) {
+  const title = LEVEL_TITLES[Math.min(newLevel - 1, LEVEL_TITLES.length - 1)]
+  useEffect(() => {
+    const t = setTimeout(onClose, 6000)
+    return () => clearTimeout(t)
+  }, [onClose])
+
+  return ReactDOM.createPortal(
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 99999,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(8px)',
+        animation: 'lvlBgIn 0.3s ease',
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: 'linear-gradient(145deg, rgba(10,10,26,0.98), rgba(20,15,40,0.98))',
+          border: '1px solid rgba(250,204,21,0.4)',
+          borderRadius: 24,
+          padding: '36px 40px',
+          textAlign: 'center',
+          maxWidth: 340,
+          width: '90vw',
+          boxShadow: '0 0 60px rgba(250,204,21,0.15), 0 24px 80px rgba(0,0,0,0.8)',
+          animation: 'lvlPopIn 0.5s cubic-bezier(0.34,1.56,0.64,1)',
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Glow ring */}
+        <div style={{
+          position: 'absolute', inset: -1,
+          borderRadius: 24,
+          background: 'linear-gradient(135deg, rgba(250,204,21,0.2), rgba(249,115,22,0.15), rgba(250,204,21,0.2))',
+          backgroundSize: '200% 200%',
+          animation: 'lvlGradient 3s linear infinite',
+          pointerEvents: 'none',
+        }} />
+
+        <div style={{ fontSize: 64, marginBottom: 8, animation: 'lvlBounce 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.2s both' }}>🏆</div>
+        <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(250,204,21,0.6)', margin: '0 0 6px' }}>Level Up!</p>
+        <h2 style={{
+          fontSize: 42, fontWeight: 900, margin: '0 0 4px',
+          background: 'linear-gradient(135deg, #FACC15, #F97316, #FACC15)',
+          backgroundSize: '200% 100%',
+          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+          animation: 'lvlGradient 2s linear infinite',
+        }}>
+          Level {newLevel}
+        </h2>
+        <p style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.75)', margin: '0 0 24px' }}>{title}</p>
+
+        <button
+          onClick={onClose}
+          style={{
+            padding: '10px 28px', borderRadius: 99, border: 'none', cursor: 'pointer',
+            background: 'linear-gradient(135deg, #FACC15, #F97316)',
+            color: '#000', fontWeight: 700, fontSize: 13,
+            boxShadow: '0 4px 20px rgba(250,204,21,0.3)',
+          }}
+        >
+          Doorgaan
+        </button>
+      </div>
+      <style>{`
+        @keyframes lvlBgIn   { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes lvlPopIn  { from { opacity: 0; transform: scale(0.7); } to { opacity: 1; transform: scale(1); } }
+        @keyframes lvlBounce { from { transform: scale(0.3) rotate(-20deg); } to { transform: scale(1) rotate(0deg); } }
+        @keyframes lvlGradient { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
+      `}</style>
+    </div>,
+    document.body
+  )
+}
+
+export default function StatsPage({ tasks, userId, profiles = [], onLevelUpSeen }) {
   const [weekOffset, setWeekOffset] = useState(0)
+  const [levelUpData, setLevelUpData] = useState(() => {
+    try {
+      const raw = localStorage.getItem('levelup_pending')
+      return raw ? JSON.parse(raw) : null
+    } catch { return null }
+  })
+
+  const handleLevelUpClose = () => {
+    localStorage.removeItem('levelup_pending')
+    setLevelUpData(null)
+    onLevelUpSeen?.()
+  }
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '20px 16px 100px' }}>
@@ -494,6 +588,7 @@ export default function StatsPage({ tasks, userId, profiles = [] }) {
           <h1 style={{ fontSize: 22, fontWeight: 700, color: '#00FFD1', margin: 0, borderLeft: '3px solid rgba(0,255,209,0.5)', paddingLeft: 12 }}>Statistieken</h1>
         </div>
 
+        {levelUpData && <LevelUpPopup newLevel={levelUpData.newLevel} onClose={handleLevelUpClose} />}
         <XPCard userId={userId} />
         <LeaderboardCard userId={userId} profiles={profiles} />
 

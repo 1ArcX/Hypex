@@ -15,7 +15,7 @@ const SHEET_BASE = [
   { id: 'notities',     Icon: FileText,      label: 'Notities' },
 ]
 
-export default function BottomNav({ activePage, setActivePage, isAdmin, showJumbo }) {
+export default function BottomNav({ activePage, setActivePage, isAdmin, showJumbo, hasLevelUp }) {
   const [showSheet, setShowSheet] = useState(false)
   const sheetRef = useRef(null)
 
@@ -64,6 +64,7 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
               {sheetItems.map(({ id, Icon, label }) => {
                 const active = activePage === id
+                const glowing = id === 'statistieken' && hasLevelUp && !active
                 return (
                   <button
                     key={id}
@@ -71,14 +72,29 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
                     style={{
                       display: 'flex', flexDirection: 'column', alignItems: 'center',
                       gap: 7, padding: '14px 8px', borderRadius: 18,
-                      background: active ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'var(--bg-card-2)',
-                      border: active ? '1px solid color-mix(in srgb, var(--accent) 35%, transparent)' : '1px solid var(--border)',
+                      background: active
+                        ? 'color-mix(in srgb, var(--accent) 12%, transparent)'
+                        : glowing ? 'rgba(250,204,21,0.08)' : 'var(--bg-card-2)',
+                      border: active
+                        ? '1px solid color-mix(in srgb, var(--accent) 35%, transparent)'
+                        : glowing ? '1px solid rgba(250,204,21,0.5)' : '1px solid var(--border)',
                       cursor: 'pointer',
-                      color: active ? 'var(--accent)' : 'var(--text-2)',
+                      color: active ? 'var(--accent)' : glowing ? '#FACC15' : 'var(--text-2)',
+                      animation: glowing ? 'sheetStatsGlow 2s ease-in-out infinite' : 'none',
+                      position: 'relative',
                     }}
                   >
-                    <Icon size={22} strokeWidth={active ? 2.2 : 1.7} />
-                    <span style={{ fontSize: 11, fontWeight: active ? 600 : 400 }}>{label}</span>
+                    <Icon size={22} strokeWidth={active || glowing ? 2.2 : 1.7} />
+                    <span style={{ fontSize: 11, fontWeight: active || glowing ? 600 : 400 }}>{label}</span>
+                    {glowing && (
+                      <span style={{
+                        position: 'absolute', top: 6, right: 6,
+                        width: 7, height: 7, borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #FACC15, #F97316)',
+                        boxShadow: '0 0 6px rgba(250,204,21,0.8)',
+                        animation: 'dotPulse 1.2s ease-in-out infinite',
+                      }} />
+                    )}
                   </button>
                 )
               })}
@@ -159,6 +175,14 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
         @keyframes pillIn {
           from { transform: scale(0.6); opacity: 0; }
           to   { transform: scale(1);   opacity: 1; }
+        }
+        @keyframes sheetStatsGlow {
+          0%, 100% { box-shadow: 0 0 0px rgba(250,204,21,0); }
+          50%       { box-shadow: 0 0 16px rgba(250,204,21,0.3); }
+        }
+        @keyframes dotPulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50%       { opacity: 0.5; transform: scale(0.7); }
         }
       `}</style>
     </>

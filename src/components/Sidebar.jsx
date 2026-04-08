@@ -17,7 +17,7 @@ export default function Sidebar({
   activePage, setActivePage,
   isAdmin, showJumbo, user,
   onShowSettings, onShowAdmin, onLogout,
-  syncing, syncFlash, updateAvailable,
+  syncing, syncFlash, updateAvailable, hasLevelUp,
 }) {
   const displayName = user?.email?.split('@')[0] || 'Student'
   const initial = displayName.charAt(0).toUpperCase()
@@ -28,6 +28,7 @@ export default function Sidebar({
   ]
 
   return (
+    <>
     <aside style={{
       width: 220,
       flexShrink: 0,
@@ -71,6 +72,8 @@ export default function Sidebar({
       <nav style={{ flex: 1, padding: '10px 8px', overflowY: 'auto' }}>
         {navItems.map(({ id, Icon, label }) => {
           const active = activePage === id
+          const isStats = id === 'statistieken'
+          const glowing = isStats && hasLevelUp && !active
           return (
             <button
               key={id}
@@ -81,24 +84,26 @@ export default function Sidebar({
                 padding: '8px 10px',
                 borderRadius: 8,
                 marginBottom: 2,
-                background: active ? 'var(--accent-dim)' : 'transparent',
+                background: active ? 'var(--accent-dim)' : glowing ? 'rgba(250,204,21,0.06)' : 'transparent',
                 border: 'none',
-                borderLeft: active ? '2px solid var(--accent)' : '2px solid transparent',
+                borderLeft: active ? '2px solid var(--accent)' : glowing ? '2px solid rgba(250,204,21,0.6)' : '2px solid transparent',
                 cursor: 'pointer',
-                color: active ? 'var(--accent)' : 'var(--text-2)',
+                color: active ? 'var(--accent)' : glowing ? '#FACC15' : 'var(--text-2)',
                 fontSize: 13,
-                fontWeight: active ? 600 : 400,
+                fontWeight: active || glowing ? 600 : 400,
                 textAlign: 'left',
                 transition: 'all 0.12s',
+                animation: glowing ? 'statsGlow 2s ease-in-out infinite' : 'none',
+                position: 'relative',
               }}
               onMouseEnter={e => {
-                if (!active) {
+                if (!active && !glowing) {
                   e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
                   e.currentTarget.style.color = 'var(--text-1)'
                 }
               }}
               onMouseLeave={e => {
-                if (!active) {
+                if (!active && !glowing) {
                   e.currentTarget.style.background = 'transparent'
                   e.currentTarget.style.color = 'var(--text-2)'
                 }
@@ -106,6 +111,15 @@ export default function Sidebar({
             >
               <Icon size={15} />
               {label}
+              {glowing && (
+                <span style={{
+                  marginLeft: 'auto', fontSize: 10, fontWeight: 700,
+                  background: 'linear-gradient(90deg, #FACC15, #F97316, #FACC15)',
+                  backgroundSize: '200% 100%',
+                  WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+                  animation: 'gradientShift 1.5s linear infinite',
+                }}>LEVEL UP</span>
+              )}
             </button>
           )
         })}
@@ -189,5 +203,16 @@ export default function Sidebar({
         </div>
       </div>
     </aside>
+    <style>{`
+      @keyframes statsGlow {
+        0%, 100% { box-shadow: none; }
+        50%       { box-shadow: 0 0 12px rgba(250,204,21,0.25); }
+      }
+      @keyframes gradientShift {
+        0%   { background-position: 0%   50%; }
+        100% { background-position: 200% 50%; }
+      }
+    `}</style>
+  </>
   )
 }

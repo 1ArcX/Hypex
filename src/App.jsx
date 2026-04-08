@@ -19,6 +19,7 @@ import VersionChecker from './components/VersionChecker'
 import { callMagister } from './utils/magisterApi'
 import { ensureSomtodayCreds } from './utils/somtodayApi'
 import { awardXP, XP_TASK } from './utils/xp'
+import XPToast from './components/XPToast'
 import BottomNav from './components/BottomNav'
 import DashboardPage from './pages/DashboardPage'
 import PomodoroPage from './pages/PomodoroPage'
@@ -86,6 +87,15 @@ export default function App() {
   const [syncing, setSyncing] = useState(false)
   const [syncFlash, setSyncFlash] = useState(false)
   const [updateAvailable, setUpdateAvailable] = useState(false)
+  const [xpToast, setXpToast] = useState(null) // { xp, icon }
+  const [hasLevelUp, setHasLevelUp] = useState(() => !!localStorage.getItem('levelup_pending'))
+
+  // Listen for level-up events dispatched by awardXP utility
+  useEffect(() => {
+    const handler = () => setHasLevelUp(true)
+    window.addEventListener('levelup', handler)
+    return () => window.removeEventListener('levelup', handler)
+  }, [])
 
   // Pull-to-refresh
   const pullStartY = useRef(null)
@@ -554,8 +564,12 @@ export default function App() {
   const handleToggleTask = async (task) => {
     const completing = !task.completed
     await supabase.from('tasks').update({ completed: completing, updated_at: new Date().toISOString() }).eq('id', task.id)
-    if (completing) awardXP(user?.id, XP_TASK)
-    else awardXP(user?.id, -XP_TASK)
+    if (completing) {
+      awardXP(user?.id, XP_TASK)
+      setXpToast({ xp: XP_TASK, icon: '✓' })
+    } else {
+      awardXP(user?.id, -XP_TASK)
+    }
     fetchTasks()
   }
 
@@ -630,6 +644,7 @@ export default function App() {
             syncing={syncing}
             syncFlash={syncFlash}
             updateAvailable={updateAvailable}
+            hasLevelUp={hasLevelUp}
           />
         </div>
 
@@ -700,6 +715,7 @@ export default function App() {
                 userId={user?.id}
                 profiles={profiles}
                 onlineUsers={studieBuddiesOnline}
+                onXPEarned={(xp) => setXpToast({ xp, icon: '🍅' })}
               />
             )}
 
@@ -759,7 +775,7 @@ export default function App() {
             )}
 
             {activePage === 'statistieken' && (
-              <StatsPage tasks={tasks} userId={user.id} profiles={profiles} />
+              <StatsPage tasks={tasks} userId={user.id} profiles={profiles} onLevelUpSeen={() => setHasLevelUp(false)} />
             )}
 
             {activePage === 'jumbo' && (isAdmin || userProfile?.werk_tab) && (
@@ -776,6 +792,7 @@ export default function App() {
               setActivePage={handleSetActivePage}
               isAdmin={isAdmin}
               showJumbo={isAdmin || !!userProfile?.werk_tab}
+              hasLevelUp={hasLevelUp}
             />
           </div>
         </div>
@@ -861,6 +878,14 @@ export default function App() {
             </button>
           </div>
         </div>
+      )}
+
+      {xpToast && (
+        <XPToast
+          xp={xpToast.xp}
+          icon={xpToast.icon}
+          onDone={() => setXpToast(null)}
+        />
       )}
     </div>
   )
