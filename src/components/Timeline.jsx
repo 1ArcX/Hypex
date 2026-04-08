@@ -84,7 +84,7 @@ const emptyForm = (date, hour) => ({
 
 const SOMTODAY_EMAIL = 'jbrugman.prive@gmail.com'
 
-export default function Timeline({ userId, userEmail, tasks, subjects, onEditTask, onViewDetail, defaultView = 'week', initialDate, isMobile = false, hideToolbar = false, onLessonsChange, onEventsChange, onMagisterError, onDateChange }) {
+export default function Timeline({ userId, userEmail, tasks, subjects, onEditTask, onViewDetail, defaultView = 'week', initialDate, isMobile = false, hideToolbar = false, onLessonsChange, onEventsChange, onMagisterError, onDateChange, highlightKey }) {
   const [view, setView] = useState(defaultView)
   const [current, setCurrent] = useState(initialDate || new Date())
   const [events, setEvents] = useState([])
@@ -104,7 +104,28 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
   const swipeIntent = useRef(null) // 'h' | 'v' | null
   const monthScrollRef = useRef(null)
   const monthItemRefs = useRef({})
+  const highlightRef = useRef(null)
   const now = new Date()
+
+  const getItemHighlightKey = (item) => {
+    const d = item.data
+    if (item.type === 'lesson') return `lesson:${d.start}`
+    if (item.type === 'event') return `event:${d.id}`
+    if (item.type === 'work') { const t = d.start_time || d.start || ''; return `work:${d.date?.slice(0,10)}:${t}` }
+    if (item.type === 'task') return `task:${d.id}`
+    return null
+  }
+
+  useEffect(() => {
+    if (!highlightKey) return
+    const timer = setTimeout(() => {
+      if (highlightRef.current && scrollRef.current) {
+        const el = highlightRef.current
+        scrollRef.current.scrollTo({ top: Math.max(0, el.offsetTop - 80), behavior: 'smooth' })
+      }
+    }, 150)
+    return () => clearTimeout(timer)
+  }, [highlightKey])
 
   useEffect(() => { fetchEvents() }, [])
   useEffect(() => { onLessonsChange?.([...magisterLessons, ...somtodayLessons]) }, [magisterLessons, somtodayLessons])
@@ -601,11 +622,13 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                     const widthPct = subFrac * 100
                     const leftStyle = `calc(${TIME_COL}px + ${leftPct}%)`
                     const widthStyle = `calc(${widthPct}% - 4px)`
+                    const isHL = highlightKey && getItemHighlightKey(item) === highlightKey
+                    const hlStyle = isHL ? { outline: '2px solid rgba(255,255,255,0.9)', outlineOffset: '1px', boxShadow: '0 0 0 4px rgba(255,255,255,0.18), 0 0 18px rgba(255,255,255,0.25)', zIndex: 20, opacity: 1 } : {}
 
                     if (item.type === 'work') {
                       const sh = item.data
                       return (
-                        <div key={item.key} style={{ position: 'absolute', top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, background: 'rgba(255,140,0,0.15)', borderLeft: '3px solid #FF8C42', borderRadius: '5px', padding: '3px 7px', overflow: 'hidden', zIndex: 1, boxSizing: 'border-box', marginLeft: '2px' }}>
+                        <div key={item.key} ref={isHL ? highlightRef : undefined} style={{ position: 'absolute', top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, background: 'rgba(255,140,0,0.15)', borderLeft: '3px solid #FF8C42', borderRadius: '5px', padding: '3px 7px', overflow: 'hidden', zIndex: 1, boxSizing: 'border-box', marginLeft: '2px', ...hlStyle }}>
                           <div style={{ fontSize: '11px', fontWeight: 600, color: '#FF8C42', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             💼 Jumbo
                           </div>
@@ -626,9 +649,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                       const baseColor = isSomtoday ? somtodayColor : '#FACC15'
                       const color = cancelled ? '#FF6B6B' : baseColor
                       const borderColor = cancelled ? '#FF6B6B99' : baseColor + '99'
-                      // Voor SOMtoday: gebruik volledige vaknaam als die beschikbaar is
                       const lesTitle = les.vak || les.description || les.title || 'Les'
-                      // Filter lesgroep-code uit docenten (docentAfkortingen bevat soms vakcode)
                       const teachers = isSomtoday
                         ? (les.teachers || []).filter(t => t !== les.title)
                         : null
@@ -638,8 +659,9 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                       ].filter(Boolean).join(' · ')
                       return (
                         <div key={item.key}
+                          ref={isHL ? highlightRef : undefined}
                           onClick={e => { e.stopPropagation(); setLessonDetail(les) }}
-                          style={{ position: 'absolute', top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, background: color + '18', borderLeft: `3px solid ${borderColor}`, borderRadius: '5px', padding: '3px 7px', overflow: 'hidden', cursor: 'pointer', zIndex: 1, boxSizing: 'border-box', marginLeft: '2px', opacity: cancelled ? 0.5 : 0.85 }}>
+                          style={{ position: 'absolute', top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, background: color + '18', borderLeft: `3px solid ${borderColor}`, borderRadius: '5px', padding: '3px 7px', overflow: 'hidden', cursor: 'pointer', zIndex: 1, boxSizing: 'border-box', marginLeft: '2px', opacity: cancelled ? 0.5 : 0.85, ...hlStyle }}>
                           <div style={{ fontSize: '11px', fontWeight: 600, color, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: cancelled ? 'line-through' : 'none' }}>
                             🎓 {lesTitle}
                           </div>
@@ -657,8 +679,9 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                       const s = new Date(ev.start_time), en = new Date(ev.end_time)
                       return (
                         <div key={item.key}
+                          ref={isHL ? highlightRef : undefined}
                           onClick={e => openEditEvent(ev, e)}
-                          style={{ position: 'absolute', top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, background: ev.color + '22', borderLeft: `3px solid ${ev.color}`, borderRadius: '5px', padding: '3px 7px', overflow: 'hidden', cursor: 'pointer', zIndex: 2, boxSizing: 'border-box', marginLeft: '2px' }}>
+                          style={{ position: 'absolute', top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, background: ev.color + '22', borderLeft: `3px solid ${ev.color}`, borderRadius: '5px', padding: '3px 7px', overflow: 'hidden', cursor: 'pointer', zIndex: 2, boxSizing: 'border-box', marginLeft: '2px', ...hlStyle }}>
                           <div style={{ fontSize: '11px', fontWeight: 600, color: ev.color, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {ev.title}
                           </div>
@@ -677,10 +700,11 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                       const color = task.completed ? '#4ADE80' : (subject?.color || '#818CF8')
                       return (
                         <div key={item.key}
+                          ref={isHL ? highlightRef : undefined}
                           draggable
                           onDragStart={e => e.dataTransfer.setData('taskId', task.id)}
                           onClick={e => { e.stopPropagation(); onViewDetail ? onViewDetail(task) : onEditTask?.(task) }}
-                          style={{ position: 'absolute', top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, background: color + '18', borderLeft: `3px solid ${color}`, borderRadius: '5px', padding: '3px 7px', overflow: 'hidden', cursor: 'pointer', zIndex: 3, boxSizing: 'border-box', marginLeft: '2px', opacity: task.completed ? 0.55 : 1 }}>
+                          style={{ position: 'absolute', top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, background: color + '18', borderLeft: `3px solid ${color}`, borderRadius: '5px', padding: '3px 7px', overflow: 'hidden', cursor: 'pointer', zIndex: 3, boxSizing: 'border-box', marginLeft: '2px', opacity: task.completed ? 0.55 : 1, ...hlStyle }}>
                           <div style={{ fontSize: '11px', fontWeight: 600, color, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: task.completed ? 'line-through' : 'none' }}>
                             {task.completed ? '✓ ' : ''}{task.title}
                           </div>

@@ -274,15 +274,28 @@ export default function AgendaPage({
   calendarEvents, magisterLessons,
   onToggleTask, onEditTask, onViewDetail, isAdmin,
   onLessonsChange, onEventsChange, onMagisterError,
+  jumpTo, onJumpHandled,
 }) {
   const isDesktop = useIsDesktop()
   const today = new Date()
   const [mobileView, setMobileView] = useState('dag')          // 'dag' | 'maand'
   const [selectedDay, setSelectedDay] = useState(today)
+  const [highlightKey, setHighlightKey] = useState(null)
   const handleSelectDay = (day) => {
     setSelectedDay(day)
     setMobileView('dag')
   }
+
+  useEffect(() => {
+    if (!jumpTo?.date) return
+    setSelectedDay(jumpTo.date)
+    setMobileView('dag')
+    setHighlightKey(jumpTo.highlightKey || null)
+    onJumpHandled?.()
+    // Clear highlight after 3s
+    const t = setTimeout(() => setHighlightKey(null), 3000)
+    return () => clearTimeout(t)
+  }, [jumpTo])
 
   const prevWeek = () => setSelectedDay(d => { const n = new Date(d); n.setDate(n.getDate() - 7); return n })
   const nextWeek = () => setSelectedDay(d => { const n = new Date(d); n.setDate(n.getDate() + 7); return n })
@@ -307,6 +320,8 @@ export default function AgendaPage({
                 onToggleTask={onToggleTask} onEditTask={onEditTask} onViewDetail={onViewDetail} isAdmin={isAdmin}
                 onLessonsChange={onLessonsChange} onEventsChange={onEventsChange}
                 onMagisterError={onMagisterError}
+                highlightKey={highlightKey}
+                initialDate={jumpTo?.date}
               />
             )}
           </div>
@@ -352,6 +367,7 @@ export default function AgendaPage({
                 isMobile
                 hideToolbar
                 onDateChange={day => setSelectedDay(day)}
+                highlightKey={highlightKey}
               />
             </div>
           </>

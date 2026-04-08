@@ -91,8 +91,8 @@ function useTodayItems(tasks, magisterLessons, calendarEvents) {
   }, [tasks, magisterLessons, calendarEvents])
 }
 
-// ── Next event hook ─────────────────────��───────────────���──────────────────────
-function useNextEvent({ tasks, calendarEvents, magisterLessons, skip }) {
+// ── Next event hook ──────────────────────────────────────────────────────────
+function useNextEvent({ tasks, calendarEvents, magisterLessons, skip, typeFilter }) {
   return useMemo(() => {
     const now = new Date()
     const fmt = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`
@@ -112,22 +112,35 @@ function useNextEvent({ tasks, calendarEvents, magisterLessons, skip }) {
     const nextCacheKey = `magister_sched_${fmt(nextWeekStart)}_${fmt(nextWeekEnd)}`
     const nextWeekLessons = (() => { try { return JSON.parse(sessionStorage.getItem(nextCacheKey)) || [] } catch { return [] } })()
     const allLessons = [...(cachedLessons.length ? cachedLessons : magisterLessons), ...nextWeekLessons]
+    const shifts = (() => { try { return JSON.parse(localStorage.getItem('pmt_work_shifts')) || [] } catch { return [] } })()
 
-    const items = [
+    let items = [
       ...tasks.filter(t => t.date && (t.time || t.start_time) && !t.completed)
-        .map(t => { const ts = (t.start_time || t.time || '').slice(0, 5); const d = new Date(t.date + 'T' + ts); return { label: t.title, ts: d, type: 'task', raw: t } })
+        .map(t => { const ts = (t.start_time || t.time || '').slice(0, 5); const d = new Date(t.date + 'T' + ts); return { label: t.title, ts: d, type: 'task', raw: t, highlightKey: `task:${t.id}` } })
         .filter(t => t.ts >= now),
       ...allLessons.filter(l => l.start && !l.uitgevallen && new Date(l.start) >= now)
-        .map(l => ({ label: l.vak || 'Les', ts: new Date(l.start), type: 'lesson' })),
+        .map(l => ({ label: l.vak || 'Les', ts: new Date(l.start), type: 'lesson', highlightKey: `lesson:${l.start}` })),
       ...calendarEvents.filter(ev => ev.start_time && new Date(ev.start_time) >= now)
-        .map(ev => ({ label: ev.title, ts: new Date(ev.start_time), type: 'event', raw: ev })),
+        .map(ev => ({ label: ev.title, ts: new Date(ev.start_time), type: 'event', raw: ev, highlightKey: `event:${ev.id}` })),
+      ...shifts.filter(s => s.date && (s.start_time || s.start))
+        .map(s => {
+          const timeStr = s.start_time || s.start || '09:00'
+          const d = new Date(s.date.slice(0, 10) + 'T' + timeStr)
+          return { label: 'Werk', ts: d, type: 'work', highlightKey: `work:${s.date?.slice(0,10)}:${timeStr}` }
+        })
+        .filter(s => s.ts >= now),
     ].sort((a, b) => a.ts - b.ts)
+
+    if (typeFilter && typeFilter !== 'alle') {
+      const typeMap = { school: 'lesson', event: 'event', werk: 'work', taak: 'task' }
+      items = items.filter(i => i.type === (typeMap[typeFilter] || typeFilter))
+    }
 
     const idx = Math.min(skip, items.length - 1)
     const next = items[Math.max(0, idx)] || null
     if (!next) return { item: null, hasMore: false }
     return { item: { ...next, timeStr: fmtLabel(next.ts) }, hasMore: idx < items.length - 1 }
-  }, [tasks, calendarEvents, magisterLessons, skip])
+  }, [tasks, calendarEvents, magisterLessons, skip, typeFilter])
 }
 
 // ── Main ──────────────────────────────��───────────────────────────���────────────
@@ -135,9 +148,12 @@ export default function DashboardPage({
   isBreak, tasks, subjects, calendarEvents, magisterLessons,
   magisterError, displayName, homeRain, onNavigate, onNavigateToTasks,
   setDetailTask, openNewTask, onRequestPwaInstall, profiles, userId,
+  onNavigateToAgenda,
 }) {
   const [skip, setSkip] = useState(0)
-  const { item: ev, hasMore } = useNextEvent({ tasks, calendarEvents, magisterLessons, skip })
+  const [nextEventFilter, setNextEventFilter] = useState(() => localStorage.getItem('nextEventFilter') || 'alle')
+  const setFilter = (f) => { setNextEventFilter(f); setSkip(0); localStorage.setItem('nextEventFilter', f) }
+  const { item: ev, hasMore } = useNextEvent({ tasks, calendarEvents, magisterLessons, skip, typeFilter: nextEventFilter })
   const todayItems = useTodayItems(tasks, magisterLessons, calendarEvents)
 
   const today = todayDateStr()
@@ -317,18 +333,45 @@ export default function DashboardPage({
           borderLeft: '3px solid rgba(129,140,248,0.5)',
           background: 'linear-gradient(135deg, rgba(129,140,248,0.05) 0%, transparent 70%)',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
             <p style={{ fontSize: 9, color: 'rgba(129,140,248,0.7)', margin: 0, letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700 }}>Volgende</p>
             {ev && hasMore && (
               <button onClick={() => setSkip(s => s + 1)}
                 style={{ background: 'rgba(129,140,248,0.1)', border: '1px solid rgba(129,140,248,0.2)', borderRadius: 6, cursor: 'pointer', color: 'rgba(129,140,248,0.8)', padding: '2px 7px', fontSize: 13, lineHeight: 1 }}>›</button>
             )}
           </div>
+          {/* Type filter pills */}
+          <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
+            {[
+              { key: 'alle',  label: 'Alle' },
+              { key: 'school', label: '📚' },
+              { key: 'event',  label: '📅' },
+              { key: 'werk',   label: '💼' },
+            ].map(f => {
+              const active = nextEventFilter === f.key
+              return (
+                <button key={f.key} onClick={() => setFilter(f.key)} style={{
+                  fontSize: 10, padding: '2px 7px', borderRadius: 10, cursor: 'pointer', border: '1px solid',
+                  borderColor: active ? 'rgba(129,140,248,0.5)' : 'rgba(255,255,255,0.1)',
+                  background: active ? 'rgba(129,140,248,0.15)' : 'transparent',
+                  color: active ? 'rgba(129,140,248,1)' : 'rgba(255,255,255,0.35)',
+                  fontWeight: active ? 600 : 400,
+                }}>
+                  {f.label}
+                </button>
+              )
+            })}
+          </div>
           {ev ? (
-            <div onClick={() => ev.type === 'task' && ev.raw && setDetailTask(ev.raw)}
-              style={{ cursor: ev.type === 'task' ? 'pointer' : 'default' }}>
+            <div
+              onClick={() => {
+                if (ev.type === 'task' && ev.raw) { setDetailTask(ev.raw); return }
+                onNavigateToAgenda?.(ev.ts, ev.highlightKey)
+              }}
+              style={{ cursor: 'pointer' }}
+            >
               <p style={{ fontSize: 13, color: 'var(--text-1)', fontWeight: 600, margin: '0 0 4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {ev.type === 'lesson' ? '📚 ' : ev.type === 'event' ? '📅 ' : '✅ '}{ev.label}
+                {ev.type === 'lesson' ? '📚 ' : ev.type === 'event' ? '📅 ' : ev.type === 'work' ? '💼 ' : '✅ '}{ev.label}
               </p>
               <p style={{ fontSize: 11, color: 'rgba(129,140,248,0.8)', margin: 0, fontWeight: 500 }}>{ev.timeStr}</p>
             </div>

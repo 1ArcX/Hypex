@@ -71,6 +71,7 @@ export default function App() {
   const [showAdmin, setShowAdmin] = useState(false)
   const [activePage, setActivePage] = useState(() => localStorage.getItem('activePage') || 'dashboard')
   const [taskHighlight, setTaskHighlight] = useState(null)
+  const [agendaJump, setAgendaJump] = useState(null)
   const [magisterLessons, setMagisterLessons] = useState([])
   const [calendarEvents, setCalendarEvents] = useState([])
   const [magisterError, setMagisterError] = useState(null)
@@ -635,6 +636,7 @@ export default function App() {
                 homeRain={homeRain}
                 onNavigate={handleSetActivePage}
                 onNavigateToTasks={(filter) => { setTaskHighlight(filter); setActivePage('taken') }}
+                onNavigateToAgenda={(date, highlightKey) => { setAgendaJump({ date, highlightKey }); handleSetActivePage('agenda') }}
                 setDetailTask={setDetailTask}
                 openNewTask={openNewTask}
                 onRequestPwaInstall={() => setShowPwaPrompt(true)}
@@ -668,6 +670,8 @@ export default function App() {
                 onLessonsChange={setMagisterLessons}
                 onEventsChange={setCalendarEvents}
                 onMagisterError={setMagisterError}
+                jumpTo={agendaJump}
+                onJumpHandled={() => setAgendaJump(null)}
               />
             )}
 
