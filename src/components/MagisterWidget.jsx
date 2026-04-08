@@ -99,23 +99,6 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
   const [swDetail, setSwDetail] = useState(null)        // { sw, topics, loading, error }
   const [bronLoading, setBronLoading] = useState({})
   const [expandedTopics, setExpandedTopics] = useState({})
-  const [stHomework, setStHomework] = useState(null)
-  const [stHwLoading, setStHwLoading] = useState(false)
-  const [stHwError, setStHwError] = useState(null)
-
-  // Listen for expired token event → clear state + show reconnect prompt
-  useEffect(() => {
-    if (!somtodayEnabled) return
-    const handler = () => {
-      setSomtodayCreds(null)
-      setShowSettings(true)
-      setStHomework(null)
-      setStHwError('SOMtoday sessie verlopen — koppel opnieuw')
-    }
-    window.addEventListener('somtodayTokenExpired', handler)
-    return () => window.removeEventListener('somtodayTokenExpired', handler)
-  }, [somtodayEnabled])
-
   // Auto-connect SOMtoday via server-side autologin (singleton — deelt promise met App)
   useEffect(() => {
     if (!somtodayEnabled || somtodayCreds) return
@@ -162,29 +145,12 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
     }
   }
 
-  const fetchSomtodayHomework = async () => {
-    setStHwLoading(true); setStHwError(null)
-    try {
-      const c = await ensureSomtodayCreds(userId)
-      if (c.accessToken !== somtodayCreds?.accessToken) setSomtodayCreds(prev => ({ ...prev, ...c }))
-      const from = new Date().toISOString().slice(0, 10)
-      const toDate = new Date(); toDate.setDate(toDate.getDate() + 30)
-      const to = toDate.toISOString().slice(0, 10)
-      const items = await callSomtoday('homework', { accessToken: c.accessToken, somtodayApiUrl: c.somtodayApiUrl, from, to })
-      setStHomework(items)
-    } catch (e) {
-      setStHwError(e.message)
-    }
-    setStHwLoading(false)
-  }
-
   useEffect(() => {
-    if (!somtodayEnabled) return
+    if (!somtodayEnabled || !somtodayCreds) return
     if (!sessionStorage.getItem('somtoday_synced')) {
       sessionStorage.setItem('somtoday_synced', '1')
       syncSomtodayVakken()
     }
-    fetchSomtodayHomework()
   }, [somtodayCreds]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch all Magister data at once on mount (no lazy loading per tab)
@@ -629,9 +595,6 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
                 <div className="magister-tabs" style={{ display: 'flex', gap: '4px', marginBottom: '10px', overflowX: 'auto', paddingBottom: 2 }}>
                   {[
                     { id: 'vakken', label: 'Vakken', icon: <BookMarked size={11} /> },
-                    ...(somtodayEnabled && somtodayCreds ? [
-                      { id: 'huiswerk', label: 'Huiswerk', icon: <ClipboardList size={11} /> },
-                    ] : []),
                     ...(!somtodayEnabled && creds ? [
                       { id: 'cijfers', label: 'Cijfers', icon: <BookOpen size={11} /> },
                       { id: 'voorspeller', label: 'Voorspeller', icon: <span style={{ fontSize: 11 }}>🎯</span> },
@@ -773,47 +736,6 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
                 {tab === 'voorspeller' && loading && (
                   <div style={{ display: 'flex', justifyContent: 'center', padding: '24px 0' }}>
                     <div style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid var(--accent)', borderTopColor: 'transparent', animation: 'spin 1s linear infinite' }} />
-                  </div>
-                )}
-
-                {/* SOMtoday Huiswerk skeleton */}
-                {somtodayEnabled && tab === 'huiswerk' && stHwLoading && (
-                  <div><Skeleton rows={5} compact /></div>
-                )}
-
-                {/* SOMtoday Huiswerk error */}
-                {somtodayEnabled && tab === 'huiswerk' && stHwError && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#ff6b6b', fontSize: 11, padding: '8px' }}>
-                    <AlertCircle size={12} /> {stHwError}
-                  </div>
-                )}
-
-                {/* SOMtoday Huiswerk */}
-                {somtodayEnabled && tab === 'huiswerk' && !stHwLoading && stHomework && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {stHomework.length === 0 && (
-                      <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '20px 0', margin: 0 }}>Geen huiswerk gevonden</p>
-                    )}
-                    {stHomework.map((hw, i) => (
-                      <div key={hw.id ?? i} className="stagger-item" style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 16px', borderBottom: i < stHomework.length - 1 ? '1px solid var(--border)' : 'none', animationDelay: `${i * 35}ms` }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: hw.omschrijving ? 3 : 0 }}>
-                            {hw.vak && (
-                              <span style={{ fontSize: 11, color: '#FBBF24', background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.25)', borderRadius: 20, padding: '1px 7px', flexShrink: 0 }}>{hw.vak}</span>
-                            )}
-                            {hw.klaar && <span style={{ fontSize: 10, color: '#4ADE80' }}>✓ Klaar</span>}
-                          </div>
-                          {hw.omschrijving && (
-                            <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '4px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                              {stripHtml(hw.omschrijving)}
-                            </p>
-                          )}
-                        </div>
-                        {hw.datum && (
-                          <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0, marginTop: 2 }}>{formatDate(hw.datum)}</span>
-                        )}
-                      </div>
-                    ))}
                   </div>
                 )}
 

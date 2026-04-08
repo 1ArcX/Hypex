@@ -115,12 +115,6 @@ export function ensureSomtodayCreds(userId) {
         refreshToken: tokenData.refresh_token,
         expiresAt: Math.floor(Date.now() / 1000) + (tokenData.expires_in || 3600),
       }))
-      .catch(e => {
-        // Refresh token expired — clear stale local creds and notify UI
-        localStorage.removeItem(somtodayKey(userId))
-        window.dispatchEvent(new CustomEvent('somtodayTokenExpired'))
-        throw e
-      })
       .finally(() => { _autologinPromise = null })
   }
 
