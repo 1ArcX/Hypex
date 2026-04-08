@@ -102,6 +102,13 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
   const [stReconnecting, setStReconnecting] = useState(false)
   const [stReconnectError, setStReconnectError] = useState(null)
   const [stTokenExpired, setStTokenExpired] = useState(false)
+  // SOMtoday data
+  const [stVakken, setStVakken] = useState(null)
+  const [stGrades, setStGrades] = useState(null)
+  const [stDataLoading, setStDataLoading] = useState(false)
+  const [stDataError, setStDataError] = useState(null)
+  const [stSwDetail, setStSwDetail] = useState(null)   // { vakNaam, loading, error, mappen, lossebestanden }
+  const [stSwLoading, setStSwLoading] = useState({})
 
   const reconnectSomtoday = async () => {
     setStReconnecting(true); setStReconnectError(null)
@@ -150,6 +157,51 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
       window.dispatchEvent(new Event('somtodayLogin'))
     }).catch(() => { setStTokenExpired(true) })
   }, [somtodayEnabled, userId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fetchSomtodayData = async () => {
+    setStDataLoading(true); setStDataError(null)
+    try {
+      const c = await ensureSomtodayCreds(userId)
+      if (!c.studentId) return
+      const [vakken, grades] = await Promise.all([
+        callSomtoday('vakkeuzes', { accessToken: c.accessToken, somtodayApiUrl: c.somtodayApiUrl, studentId: c.studentId }),
+        callSomtoday('grades', { accessToken: c.accessToken, somtodayApiUrl: c.somtodayApiUrl, studentId: c.studentId }),
+      ])
+      setStVakken(vakken)
+      setStGrades(grades)
+      // Sync vakken to Supabase subjects
+      if (vakken?.length && userId) {
+        const namen = vakken.map(v => matchVak(v.naam) || matchVak(v.afkorting)).filter(Boolean).filter((v, i, a) => a.indexOf(v) === i)
+        if (namen.length) {
+          const { data: existing } = await supabase.from('subjects').select('id, name').eq('user_id', userId)
+          const existingMap = Object.fromEntries((existing || []).map(s => [s.name, s.id]))
+          const toInsert = namen.filter(n => !existingMap[n])
+          if (toInsert.length) await supabase.from('subjects').insert(toInsert.map(name => ({ name, user_id: userId })))
+          await supabase.from('profiles').update({ vakken: namen }).eq('id', userId)
+          await fetchProfile()
+          onSubjectsSync?.()
+        }
+      }
+    } catch (e) {
+      setStDataError(e.message)
+    }
+    setStDataLoading(false)
+  }
+
+  const fetchSomtodayMateriaal = async (vak) => {
+    setStSwDetail({ vakNaam: vak.naam, loading: true, error: null, mappen: [], lossebestanden: [] })
+    try {
+      const c = await ensureSomtodayCreds(userId)
+      const result = await callSomtoday('studiemateriaal', { accessToken: c.accessToken, somtodayApiUrl: c.somtodayApiUrl, studentId: c.studentId, vakUuid: vak.uuid })
+      setStSwDetail({ vakNaam: vak.naam, loading: false, error: null, mappen: result.mappen, lossebestanden: result.lossebestanden })
+    } catch (e) {
+      setStSwDetail(prev => ({ ...prev, loading: false, error: e.message }))
+    }
+  }
+
+  useEffect(() => {
+    if (somtodayEnabled && somtodayCreds) fetchSomtodayData()
+  }, [somtodayCreds]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch all Magister data at once on mount (no lazy loading per tab)
   useEffect(() => {
@@ -607,6 +659,10 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
                 <div className="magister-tabs" style={{ display: 'flex', gap: '4px', marginBottom: '10px', overflowX: 'auto', paddingBottom: 2 }}>
                   {[
                     { id: 'vakken', label: 'Vakken', icon: <BookMarked size={11} /> },
+                    ...(somtodayEnabled && somtodayCreds ? [
+                      { id: 'cijfers', label: 'Cijfers', icon: <BookOpen size={11} /> },
+                      { id: 'studiewijzer', label: 'Studiewijzer', icon: <FileText size={11} /> },
+                    ] : []),
                     ...(!somtodayEnabled && creds ? [
                       { id: 'cijfers', label: 'Cijfers', icon: <BookOpen size={11} /> },
                       { id: 'voorspeller', label: 'Voorspeller', icon: <span style={{ fontSize: 11 }}>🎯</span> },
@@ -669,7 +725,7 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
                     <div className={tabless ? 'card' : ''} style={tabless ? { padding: '14px 16px', ...(gridLayout ? { flex: 1, overflowY: 'auto' } : {}) } : {}}>
                       {vakken.length === 0 ? (
                         <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '12px 0', margin: 0 }}>
-                          {creds ? 'Klik op "Sync" om vakken te laden' : 'Log in bij Magister om vakken te laden'}
+                          {somtodayEnabled ? (stDataLoading ? 'Laden…' : somtodayCreds ? 'Vakken worden geladen…' : 'Verbind SOMtoday') : creds ? 'Klik op "Sync" om vakken te laden' : 'Log in bij Magister om vakken te laden'}
                         </p>
                       ) : (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -725,6 +781,48 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
                         const color = isNaN(cijfer) ? '#818CF8' : cijfer >= 5.5 ? '#4ADE80' : '#FF6B6B'
                         return (
                           <div key={i} className="stagger-item" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: i < data.grades.length - 1 ? '1px solid var(--border)' : 'none', animationDelay: `${i * 35}ms` }}>
+                            <div style={{ width: 38, height: 38, borderRadius: 10, background: color + '18', border: `1px solid ${color}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <span style={{ fontSize: 14, fontWeight: 700, color }}>{g.cijfer ?? '–'}</span>
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p style={{ fontSize: 13, color: 'var(--text-1)', fontWeight: 500, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.vak || 'Onbekend vak'}</p>
+                              <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '2px 0 0' }}>
+                                {[g.omschrijving, g.weging ? `weging ${g.weging}` : null, g.datum ? formatDate(g.datum) : null].filter(Boolean).join(' · ')}
+                              </p>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* SOMtoday Cijfers skeleton */}
+                {(tabless || tab === 'cijfers') && somtodayEnabled && stDataLoading && (
+                  <div style={tabless ? secWrap : {}}>
+                    {tabless && <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}><span style={{ fontSize:16 }}>📊</span><span style={{ fontSize:14, fontWeight:700, color:'var(--text-1)' }}>Laatste cijfers</span></div>}
+                    <div className={tabless ? 'card' : ''}><Skeleton rows={4} /></div>
+                  </div>
+                )}
+
+                {/* SOMtoday Cijfers */}
+                {(tabless || tab === 'cijfers') && somtodayEnabled && !stDataLoading && stGrades && (
+                  <div style={tabless ? secWrap : {}}>
+                    {tabless && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexShrink: 0 }}>
+                        <span style={{ fontSize: 16 }}>📊</span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>Laatste cijfers</span>
+                      </div>
+                    )}
+                    <div className={tabless ? 'card' : ''} style={tabless ? { padding: '0', ...(gridLayout ? { flex: 1, overflowY: 'auto' } : {}) } : { display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {stGrades.length === 0 && (
+                        <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '20px 0', margin: 0 }}>Geen cijfers gevonden</p>
+                      )}
+                      {stGrades.map((g, i) => {
+                        const cijfer = parseFloat(g.cijfer)
+                        const color = isNaN(cijfer) ? '#818CF8' : g.isVoldoende !== false ? '#4ADE80' : '#FF6B6B'
+                        return (
+                          <div key={i} className="stagger-item" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: i < stGrades.length - 1 ? '1px solid var(--border)' : 'none', animationDelay: `${i * 35}ms` }}>
                             <div style={{ width: 38, height: 38, borderRadius: 10, background: color + '18', border: `1px solid ${color}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                               <span style={{ fontSize: 14, fontWeight: 700, color }}>{g.cijfer ?? '–'}</span>
                             </div>
@@ -905,6 +1003,116 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
                   </div>
                 )}
 
+                {/* SOMtoday Studiewijzer skeleton */}
+                {(tabless || tab === 'studiewijzer') && somtodayEnabled && stDataLoading && (
+                  <div style={tabless ? secWrap : {}}>
+                    {tabless && <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}><span style={{ fontSize:16 }}>📖</span><span style={{ fontSize:14, fontWeight:700, color:'var(--text-1)' }}>Studiewijzer</span></div>}
+                    <div className={tabless ? 'card' : ''}><Skeleton rows={4} compact /></div>
+                  </div>
+                )}
+
+                {/* SOMtoday Studiewijzer */}
+                {(tabless || tab === 'studiewijzer') && somtodayEnabled && !stDataLoading && stVakken && (
+                  <div style={tabless ? secWrap : {}}>
+                    {tabless && (
+                      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8, flexShrink:0 }}>
+                        <span style={{ fontSize:16 }}>📖</span>
+                        <span style={{ fontSize:14, fontWeight:700, color:'var(--text-1)' }}>Studiewijzer</span>
+                      </div>
+                    )}
+                    <div className={tabless ? 'card' : ''} style={tabless ? { padding:0, ...(gridLayout ? { flex:1, overflowY:'auto' } : {}) } : { display:'flex', flexDirection:'column', gap:4 }}>
+                      {/* Detail view */}
+                      {stSwDetail && (
+                        <div style={{ display:'flex', flexDirection:'column' }}>
+                          <button onClick={() => setStSwDetail(null)} style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, padding:'6px 12px', cursor:'pointer', color:'var(--text-1)', fontSize:12, fontWeight:600, margin:'10px 16px 8px', textAlign:'left' }}>
+                            <ChevronDown size={13} style={{ transform:'rotate(90deg)' }} /> {stSwDetail.vakNaam}
+                          </button>
+                          {stSwDetail.loading && (
+                            <div style={{ textAlign:'center', padding:'16px', color:'rgba(255,255,255,0.3)', fontSize:'12px' }}>
+                              <RefreshCw size={14} style={{ animation:'spin 1s linear infinite', display:'block', margin:'0 auto 4px' }} /> Laden...
+                            </div>
+                          )}
+                          {stSwDetail.error && (
+                            <div style={{ display:'flex', alignItems:'center', gap:6, color:'#ff6b6b', fontSize:'11px', padding:'8px 16px' }}>
+                              <AlertCircle size={12} /> {stSwDetail.error}
+                            </div>
+                          )}
+                          {!stSwDetail.loading && !stSwDetail.error && !(stSwDetail.mappen?.length) && !(stSwDetail.lossebestanden?.length) && (
+                            <p style={{ color:'rgba(255,255,255,0.25)', fontSize:'12px', textAlign:'center', padding:'20px 0', margin:0 }}>Geen materiaal gevonden</p>
+                          )}
+                          {(stSwDetail.mappen || []).map((map, i) => {
+                            const mapKey = `stmap-${i}`
+                            const open = !!expandedTopics[mapKey]
+                            return (
+                              <div key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                                <button onClick={() => setExpandedTopics(prev => ({ ...prev, [mapKey]: !prev[mapKey] }))}
+                                  style={{ width:'100%', display:'flex', alignItems:'center', gap:8, padding:'10px 16px', background:'none', border:'none', cursor:'pointer', textAlign:'left' }}
+                                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
+                                  onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                                  <span style={{ fontSize:14 }}>📁</span>
+                                  <span style={{ flex:1, fontWeight:600, fontSize:12, color:'var(--text-1)' }}>{map.naam}</span>
+                                  {map.bestanden?.length > 0 && <span style={{ fontSize:10, color:'var(--text-3)' }}>{map.bestanden.length}</span>}
+                                  <ChevronDown size={13} style={{ color:'var(--text-3)', transform: open ? 'rotate(0deg)' : 'rotate(-90deg)', transition:'transform 0.15s' }} />
+                                </button>
+                                {open && (
+                                  <div style={{ padding:'0 16px 10px 38px', display:'flex', flexDirection:'column', gap:4 }}>
+                                    {(!map.bestanden || map.bestanden.length === 0) && (
+                                      <span style={{ fontSize:11, color:'rgba(255,255,255,0.2)' }}>Geen bestanden</span>
+                                    )}
+                                    {(map.bestanden || []).map((b, j) => (
+                                      b.url
+                                        ? <a key={j} href={b.url} target="_blank" rel="noopener noreferrer" style={{ fontSize:11, color:'var(--accent)', display:'flex', alignItems:'center', gap:4, textDecoration:'none' }}>
+                                            <ExternalLink size={10} /> {b.naam}
+                                          </a>
+                                        : <span key={j} style={{ fontSize:11, color:'var(--text-3)' }}>{b.naam}</span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+                          {(stSwDetail.lossebestanden || []).length > 0 && (
+                            <div style={{ padding:'8px 16px', display:'flex', flexDirection:'column', gap:4 }}>
+                              <span style={{ fontSize:11, color:'var(--text-3)', fontWeight:600, letterSpacing:'0.05em', textTransform:'uppercase', marginBottom:2 }}>Losse bestanden</span>
+                              {stSwDetail.lossebestanden.map((b, j) => (
+                                b.url
+                                  ? <a key={j} href={b.url} target="_blank" rel="noopener noreferrer" style={{ fontSize:11, color:'var(--accent)', display:'flex', alignItems:'center', gap:4, textDecoration:'none' }}>
+                                      <ExternalLink size={10} /> {b.naam}
+                                    </a>
+                                  : <span key={j} style={{ fontSize:11, color:'var(--text-3)' }}>{b.naam}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {/* Vakken lijst */}
+                      {!stSwDetail && (
+                        <>
+                          {stVakken.length === 0 && (
+                            <p style={{ color:'rgba(255,255,255,0.25)', fontSize:'12px', textAlign:'center', padding:'20px 0', margin:0 }}>Geen vakken gevonden</p>
+                          )}
+                          {stVakken.map((vak, i) => (
+                            <div key={i} className="stagger-item"
+                              onClick={() => fetchSomtodayMateriaal(vak)}
+                              style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 16px', borderBottom: i < stVakken.length-1 ? '1px solid var(--border)' : 'none', cursor:'pointer', animationDelay:`${i * 35}ms` }}
+                              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                              <div style={{ flex:1, minWidth:0 }}>
+                                <p style={{ fontSize:12, color:'var(--text-1)', margin:0 }}>{vak.naam}</p>
+                                {vak.afkorting && <p style={{ fontSize:11, color:'var(--text-3)', margin:'2px 0 0' }}>{vak.afkorting}</p>}
+                              </div>
+                              {stSwLoading[vak.uuid]
+                                ? <RefreshCw size={13} style={{ animation:'spin 1s linear infinite', color:'var(--text-3)', flexShrink:0 }} />
+                                : <ChevronDown size={14} style={{ transform:'rotate(-90deg)', color:'var(--text-3)', flexShrink:0 }} />
+                              }
+                            </div>
+                          ))}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Opdrachten skeleton */}
                 {(tabless || tab === 'opdrachten') && loading && (
                   <div style={tabless ? secWrap : {}}>
@@ -968,7 +1176,7 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
                   </div>
                 )}
 
-                {!creds && tab !== 'vakken' && (
+                {!creds && !somtodayEnabled && tab !== 'vakken' && (
                   <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>
                     Klik op "Inloggen" om te beginnen
                   </p>

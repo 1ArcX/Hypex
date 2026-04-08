@@ -561,5 +561,98 @@ exports.handler = async (event) => {
     } catch (e) { return fail(e.message) }
   }
 
+  // ── vakkeuzes: leerling-specifieke vakkenlijst ────────────────────────────
+  if (action === 'vakkeuzes') {
+    const { accessToken, somtodayApiUrl, studentId } = body
+    if (!accessToken || !somtodayApiUrl || !studentId) return fail('Ontbrekende velden')
+    try {
+      const today = new Date().toISOString().slice(0, 10)
+      const res = await fetch(`${somtodayApiUrl}/rest/v1/vakkeuzes?actiefOpPeildatum=${today}&leerling=${studentId}`, {
+        headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json', 'User-Agent': UA },
+      })
+      if (!res.ok) return fail(`Vakkeuzes mislukt: ${res.status}`, res.status)
+      const data = await res.json()
+      return ok((data.items || []).map(v => ({
+        naam: v.vak?.naam || '',
+        afkorting: v.vak?.afkorting || '',
+        uuid: v.vak?.UUID || '',
+      })))
+    } catch (e) { return fail(e.message) }
+  }
+
+  // ── grades: voortgangsdossier cijfers ─────────────────────────────────────
+  if (action === 'grades') {
+    const { accessToken, somtodayApiUrl, studentId } = body
+    if (!accessToken || !somtodayApiUrl || !studentId) return fail('Ontbrekende velden')
+    try {
+      const params = new URLSearchParams([
+        ['type', 'Toetskolom'], ['type', 'DeeltoetsKolom'],
+        ['type', 'Werkstukcijferkolom'], ['type', 'Advieskolom'],
+        ['additional', 'vaknaam'], ['additional', 'resultaatkolom'],
+        ['additional', 'naamalternatiefniveau'], ['additional', 'vakuuid'],
+        ['additional', 'lichtinguuid'],
+        ['sort', 'desc-geldendResultaatCijferInvoer'],
+      ])
+      const res = await fetch(`${somtodayApiUrl}/rest/v1/geldendvoortgangsdossierresultaten/leerling/${studentId}?${params}`, {
+        headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json', 'User-Agent': UA },
+      })
+      if (!res.ok) return fail(`Cijfers mislukt: ${res.status}`, res.status)
+      const data = await res.json()
+      return ok((data.items || []).map(g => ({
+        id: g.links?.[0]?.id,
+        vak: g.additionalObjects?.vaknaam || '',
+        vakUuid: g.additionalObjects?.vakuuid || '',
+        cijfer: g.isCijfer ? g.formattedResultaat : null,
+        label: g.isLabel && !g.isCijfer ? g.formattedResultaat : null,
+        omschrijving: g.omschrijving || '',
+        weging: g.weging || null,
+        periode: g.periode,
+        datum: g.datumInvoerEerstePoging || null,
+        isVoldoende: g.isVoldoende,
+        toetssoort: g.toetssoort || null,
+        isCijfer: g.isCijfer,
+      })))
+    } catch (e) { return fail(e.message) }
+  }
+
+  // ── studiemateriaal: bestanden per vak ───────────────────────────────────
+  if (action === 'studiemateriaal') {
+    const { accessToken, somtodayApiUrl, studentId, vakUuid } = body
+    if (!accessToken || !somtodayApiUrl || !studentId || !vakUuid) return fail('Ontbrekende velden')
+    try {
+      const res = await fetch(`${somtodayApiUrl}/rest/v1/studiemateriaal/${studentId}/vak/${vakUuid}`, {
+        headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json', 'User-Agent': UA },
+      })
+      if (!res.ok) return fail(`Studiemateriaal mislukt: ${res.status}`, res.status)
+      const data = await res.json()
+      // Group bijlagen by map
+      const mappen = {}
+      for (const m of (data.jaarBijlagenMappen || [])) {
+        mappen[m.links?.[0]?.id] = { naam: m.naam, bestanden: [] }
+      }
+      const lossebestanden = []
+      for (const b of (data.jaarBijlagen || [])) {
+        const file = {
+          id: b.links?.[0]?.id,
+          naam: b.omschrijving || '',
+          url: b.assemblyResults?.[0]?.sslUrl || b.assemblyResults?.[0]?.fileUrl || null,
+          type: b.assemblyResults?.[0]?.fileType || null,
+          ext: b.assemblyResults?.[0]?.fileExtension || null,
+        }
+        const mapId = b.jaarbijlageMap?.links?.[0]?.id
+        if (mapId && mappen[mapId]) {
+          mappen[mapId].bestanden.push(file)
+        } else {
+          lossebestanden.push(file)
+        }
+      }
+      return ok({
+        naam: data.studiewijzer?.naam || '',
+        mappen: Object.values(mappen),
+        lossebestanden,
+      })
+    } catch (e) { return fail(e.message) }
+  }
+
   return fail('Onbekende actie', 404)
 }
