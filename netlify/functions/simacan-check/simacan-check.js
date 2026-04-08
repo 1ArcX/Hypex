@@ -63,7 +63,8 @@ async function sendPush(subs, title, body, tag) {
       await webpush.sendNotification(sub.subscription, payload)
     } catch (e) {
       if (e.statusCode === 410 || e.statusCode === 404) {
-        await supabase.from('push_subscriptions').delete().eq('id', sub.id)
+        // Subscription is gone — clear it but keep the row so vracht settings survive
+        await supabase.from('push_subscriptions').update({ subscription: null, vracht_enabled: false }).eq('id', sub.id)
       }
     }
   }

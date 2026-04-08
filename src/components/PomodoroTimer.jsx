@@ -22,9 +22,12 @@ async function registerPushSubscription(userId) {
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC),
     })
-    const { data: rows } = await supabase.from('push_subscriptions').select('id').eq('user_id', userId)
+    const { data: rows } = await supabase.from('push_subscriptions').select('id, vracht_enabled, vracht_notify_stops').eq('user_id', userId)
     if (rows && rows.length > 0) {
-      await supabase.from('push_subscriptions').update({ subscription: sub.toJSON() }).eq('id', rows[0].id)
+      const existing = rows[0]
+      const update = { subscription: sub.toJSON() }
+      if (existing.vracht_notify_stops?.length) update.vracht_enabled = true
+      await supabase.from('push_subscriptions').update(update).eq('id', existing.id)
       if (rows.length > 1) {
         await supabase.from('push_subscriptions').delete().in('id', rows.slice(1).map(r => r.id))
       }
