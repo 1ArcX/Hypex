@@ -606,6 +606,8 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
       const oldLevel = getLevel(current)
       const newLevel = getLevel(newXp)
       if (newLevel > oldLevel) {
+        localStorage.setItem('levelup_pending', JSON.stringify({ newLevel, oldLevel }))
+        window.dispatchEvent(new Event('levelup'))
         const ach = ACHIEVEMENTS.find(a => a.key === `level_${newLevel}`)
         if (ach && !seenAchievementsRef.current.has(ach.key)) {
           seenAchievementsRef.current.add(ach.key)
