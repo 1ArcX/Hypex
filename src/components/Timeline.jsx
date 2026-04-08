@@ -277,10 +277,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
     const cacheKey = `somtoday_sched_v6_${from}_${to}`
     const cached = sessionStorage.getItem(cacheKey)
     if (cached && scheduleVersion === 0) {
-      try {
-        const parsed = JSON.parse(cached)
-        if (Array.isArray(parsed) && parsed.length > 0) { setSomtodayLessons(parsed); return }
-      } catch {}
+      try { setSomtodayLessons(JSON.parse(cached)); return } catch {}
     }
     ensureSomtodayCreds(userId)
       .then(creds => callSomtoday('schedule', { accessToken: creds.accessToken, somtodayApiUrl: creds.somtodayApiUrl, from, to }))
@@ -290,7 +287,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
           setSomtodayLessons(data)
         }
       })
-      .catch(e => console.warn('[SOMtoday schedule]', e.message))
+      .catch(() => {})
   }, [toDateStr(getWeekDays(current)[0]), scheduleVersion])
 
   const fetchEvents = async () => {

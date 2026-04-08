@@ -124,11 +124,9 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
     }).catch(() => {})
   }, [somtodayEnabled, userId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const syncSomtodayVakken = async () => {
-    if (!userId) return
+  const syncSomtodayVakken = async (c) => {
+    if (!userId || !c) return
     try {
-      const c = await ensureSomtodayCreds(userId)
-      if (c.accessToken !== somtodayCreds?.accessToken) setSomtodayCreds(prev => ({ ...prev, ...c }))
       const vakken = await callSomtoday('subjects', { accessToken: c.accessToken, somtodayApiUrl: c.somtodayApiUrl })
       const namen = vakken
         .map(v => matchVak(v.naam) || matchVak(v.afkorting))
@@ -149,11 +147,10 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
     }
   }
 
-  const fetchSomtodayHomework = async () => {
+  const fetchSomtodayHomework = async (c) => {
+    if (!c) return
     setStHwLoading(true); setStHwError(null)
     try {
-      const c = await ensureSomtodayCreds(userId)
-      if (c.accessToken !== somtodayCreds?.accessToken) setSomtodayCreds(prev => ({ ...prev, ...c }))
       const from = new Date().toISOString().slice(0, 10)
       const toDate = new Date(); toDate.setDate(toDate.getDate() + 30)
       const to = toDate.toISOString().slice(0, 10)
@@ -166,12 +163,12 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
   }
 
   useEffect(() => {
-    if (!somtodayEnabled) return
+    if (!somtodayCreds) return
     if (!sessionStorage.getItem('somtoday_synced')) {
       sessionStorage.setItem('somtoday_synced', '1')
-      syncSomtodayVakken()
+      syncSomtodayVakken(somtodayCreds)
     }
-    fetchSomtodayHomework()
+    fetchSomtodayHomework(somtodayCreds)
   }, [somtodayCreds]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch all Magister data at once on mount (no lazy loading per tab)
