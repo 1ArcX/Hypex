@@ -16,6 +16,16 @@ const CONTROL_TOWER = 'https://sct-web-api-prod.simacan.com'
 const SHIPPER       = 'jumbo_sc'
 const LOCATION_ID   = '7044'
 
+// ── Shared token via simacan_config (id=1) ────────────────────────────────────
+async function getSharedTokens() {
+  const { data } = await supabase.from('simacan_config').select('tokens').eq('id', 1).maybeSingle()
+  return data?.tokens || null
+}
+
+async function saveSharedTokens(tokens) {
+  await supabase.from('simacan_config').upsert({ id: 1, tokens, updated_at: new Date().toISOString() }, { onConflict: 'id' })
+}
+
 async function refreshToken(refreshTok) {
   const res = await fetch(KC_TOKEN_URL, {
     method: 'POST',
@@ -76,29 +86,31 @@ async function simacanCheckHandler() {
 
   if (rowsErr) { console.error('[simacan-check] Supabase fout:', rowsErr.message); return { statusCode: 500 } }
   console.log(`[simacan-check] Gebruikers met vracht_enabled: ${rows?.length ?? 0}`)
+  if (!rows?.length) return { statusCode: 200 }
 
-  for (const row of rows || []) {
+  // ── Fetch stops ONCE with shared token ────────────────────────────────────
+  const sharedTokens = await getSharedTokens()
+  if (!sharedTokens?.accessToken) {
+    console.log('[simacan-check] Geen gedeeld Simacan token in simacan_config')
+    return { statusCode: 200 }
+  }
+
+  const { stops, newTokens } = await fetchStops(sharedTokens.accessToken, sharedTokens.refreshToken)
+  console.log(`[simacan-check] Stops opgehaald: ${stops.length}`)
+
+  // Save refreshed token back to simacan_config
+  if (newTokens) {
+    await saveSharedTokens(newTokens)
+    console.log('[simacan-check] Gedeeld token vernieuwd')
+  }
+
+  if (!stops.length) return { statusCode: 200 }
+
+  // ── Per-user notification logic ───────────────────────────────────────────
+  for (const row of rows) {
     const notifyStops = (Array.isArray(row.vracht_notify_stops) ? row.vracht_notify_stops : []).map(String)
     console.log(`[simacan-check] Gebruiker ${row.user_id} — notifyStops:`, notifyStops)
     if (!notifyStops.length) continue
-
-    // Get Simacan tokens from user metadata
-    const { data: { user } } = await supabase.auth.admin.getUserById(row.user_id)
-    const tokens = user?.user_metadata?.simacan_tokens
-    if (!tokens?.accessToken) { console.log(`[simacan-check] Geen Simacan tokens voor ${row.user_id}`); continue }
-
-    // Fetch today's stops
-    const { stops, newTokens } = await fetchStops(tokens.accessToken, tokens.refreshToken)
-    console.log(`[simacan-check] Stops opgehaald: ${stops.length}`)
-
-    // Update tokens if refreshed
-    if (newTokens) {
-      await supabase.auth.admin.updateUserById(row.user_id, {
-        user_metadata: { ...user.user_metadata, simacan_tokens: newTokens }
-      })
-    }
-
-    if (!stops.length) continue
 
     // Load previous state
     const { data: stateRow } = await supabase
@@ -114,7 +126,6 @@ async function simacanCheckHandler() {
     for (const stop of stops) {
       const stopId = String(stop.id)
       if (!notifyStops.includes(stopId)) {
-        // Still track state for all stops, even if not monitored
         newStates[stopId] = { delay: stop.delay, activity: stop.tripStatus?.activity, eta: stop.actualStartTime || stop.eta || stop.plannedStartTime }
         continue
       }
@@ -128,7 +139,6 @@ async function simacanCheckHandler() {
 
       console.log(`[simacan-check] Stop ${stopId} (${dc}) — delay: ${delay}, act: ${act}, prev:`, prev)
 
-      // lastNotifiedDelay bijhouden: alleen updaten als er een push verstuurd is
       const lastNotifiedDelay = prev?.lastNotifiedDelay ?? prev?.delay ?? null
 
       if (prev) {
@@ -141,7 +151,6 @@ async function simacanCheckHandler() {
             `delay-${stopId}`)
           newStates[stopId] = { delay, activity: act, eta, lastNotifiedDelay: delay }
         } else {
-          // Geen push — lastNotifiedDelay ongewijzigd laten zodat vergelijking cumulatief blijft
           newStates[stopId] = { delay, activity: act, eta, lastNotifiedDelay }
         }
         if (prev.activity !== 'AFGEROND' && act === 'AFGEROND') {
