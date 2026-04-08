@@ -2,6 +2,19 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Truck, RefreshCw, AlertCircle, ChevronDown, ChevronUp, LogIn, Map as MapIcon, Bell, BellOff } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 
+/*
+  Voer dit SQL uit in Supabase → SQL Editor:
+
+  create table if not exists simacan_config (
+    id int primary key default 1,
+    tokens jsonb,
+    updated_at timestamptz default now()
+  );
+  alter table simacan_config enable row level security;
+  create policy "Authenticated users can read" on simacan_config for select using (auth.uid() is not null);
+  create policy "Authenticated users can write" on simacan_config for all using (auth.uid() is not null);
+*/
+
 const VAPID_PUBLIC = 'BCsu1QaHUead0cgQ23qUKIu3_MnSi0s21LaD_c9wBcqdP43A9ojEx-nWZ4_xUDYLVMQn0CqzqdhSuLQr6eOQqh4'
 
 function urlBase64ToUint8Array(b64) {
@@ -344,6 +357,8 @@ export default function VrachttijdenWidget() {
     if (t) localStorage.setItem(STORAGE_KEY, JSON.stringify(t))
     else   localStorage.removeItem(STORAGE_KEY)
     supabase.auth.updateUser({ data: { simacan_tokens: t || null } }).catch(() => {})
+    // Sla ook op in gedeelde tabel zodat werk_tab gebruikers automatisch ingelogd zijn
+    if (t) supabase.from('simacan_config').upsert({ id: 1, tokens: t, updated_at: new Date().toISOString() }, { onConflict: 'id' }).catch(() => {})
   }, [])
 
   // ─── Ritten ophalen ───────────────────────────────────────────────────────
@@ -464,10 +479,25 @@ export default function VrachttijdenWidget() {
   // ─── Start ────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (tokens) { fetchStops(tokens); return }
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      const t = user?.user_metadata?.simacan_tokens
-      if (t?.accessToken) { localStorage.setItem(STORAGE_KEY, JSON.stringify(t)); tokensRef.current = t; setTokens(t); fetchStops(t) }
-    }).catch(() => {})
+    const tryLoad = async () => {
+      // 1. Probeer eigen user_metadata
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        const t = user?.user_metadata?.simacan_tokens
+        if (t?.accessToken) { localStorage.setItem(STORAGE_KEY, JSON.stringify(t)); tokensRef.current = t; setTokens(t); fetchStops(t); return }
+      } catch {}
+      // 2. Fallback: gedeelde simacan_config tabel (voor werk_tab gebruikers)
+      try {
+        const { data } = await supabase.from('simacan_config').select('tokens').eq('id', 1).maybeSingle()
+        if (data?.tokens?.accessToken) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data.tokens))
+          tokensRef.current = data.tokens
+          setTokens(data.tokens)
+          fetchStops(data.tokens)
+        }
+      } catch {}
+    }
+    tryLoad()
   }, [])
 
   useEffect(() => {
