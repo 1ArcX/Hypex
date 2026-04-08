@@ -551,7 +551,7 @@ export default function App() {
   }
 
   const handleToggleTask = async (task) => {
-    await supabase.from('tasks').update({ completed: !task.completed }).eq('id', task.id)
+    await supabase.from('tasks').update({ completed: !task.completed, updated_at: new Date().toISOString() }).eq('id', task.id)
     fetchTasks()
   }
 
@@ -755,7 +755,7 @@ export default function App() {
             )}
 
             {activePage === 'statistieken' && (
-              <StatsPage tasks={tasks} userId={user.id} />
+              <StatsPage tasks={tasks} userId={user.id} profiles={profiles} />
             )}
 
             {activePage === 'jumbo' && (isAdmin || userProfile?.werk_tab) && (

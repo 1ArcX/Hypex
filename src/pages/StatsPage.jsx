@@ -65,10 +65,11 @@ function BarChart({ days, values, todayStr, formatLabel, color = 'var(--accent)'
   )
 }
 
-// ── Level / XP ────────────────────────────────────────────────────────────────
+// ── Level / XP (module-level so all components can use) ───────────────────────
 const LEVEL_XP = 100
 const LEVEL_NAMES = ['Beginner', 'Leerling', 'Gevorderd', 'Expert', 'Meester', 'Legende']
 function getLevel(xp) { return Math.floor(xp / LEVEL_XP) + 1 }
+function getLevelName(xp) { return LEVEL_NAMES[Math.min(getLevel(xp) - 1, LEVEL_NAMES.length - 1)] }
 
 function XPCard({ userId }) {
   const [xp, setXp] = useState(() => { try { return parseInt(localStorage.getItem('habit_xp') || '0') } catch { return 0 } })
@@ -85,7 +86,7 @@ function XPCard({ userId }) {
 
   const level = getLevel(xp)
   const xpIn = xp % LEVEL_XP
-  const levelName = LEVEL_NAMES[Math.min(level - 1, LEVEL_NAMES.length - 1)] || `Level ${level}`
+  const levelName = getLevelName(xp)
   const labelMap = { streak_7:'🔥 7d', streak_14:'🔥 14d', streak_30:'🔥 30d', perfect_3:'💎 3d', perfect_7:'💎 7d', level_5:'⭐ Lvl5', level_10:'🌟 Lvl10' }
 
   return (
@@ -175,19 +176,20 @@ function TakenCard({ tasks, weekOffset }) {
   const days = getWeekDays(weekOffset)
   const todayStr = new Date().toISOString().slice(0, 10)
 
-  // Completed tasks: those where updated_at falls in the selected week (completed = true)
-  // Also include tasks whose date is in the week (completed or not, for total)
+  // A task counts as "completed this week" if:
+  // - completed=true AND updated_at is in this week's range
+  // - fallback: date is in this week (for tasks without updated_at)
   const completedThisWeek = tasks.filter(t => {
     if (!t.completed) return false
-    const completedOn = t.updated_at?.slice(0, 10) || t.date
-    return completedOn && days.includes(completedOn)
+    const completedOn = t.updated_at?.slice(0, 10)
+    if (completedOn) return days.includes(completedOn)
+    return t.date && days.includes(t.date)
   })
   const scheduledThisWeek = tasks.filter(t => t.date && days.includes(t.date))
   const incompleteDue = scheduledThisWeek.filter(t => !t.completed)
   const completedPerDay = days.map(d =>
     completedThisWeek.filter(t => (t.updated_at?.slice(0, 10) || t.date) === d).length
   )
-  const maxBar = Math.max(...completedPerDay, 1)
 
   return (
     <div className="card" style={{ padding: '18px 20px' }}>
@@ -407,22 +409,94 @@ function WeekNav({ weekOffset, onChange }) {
   )
 }
 
+// ── Leaderboard ───────────────────────────────────────────────────────────────
+function LeaderboardCard({ userId, profiles }) {
+  const [xpMap, setXpMap] = useState({})
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    supabase.from('habit_achievements').select('user_id, xp')
+      .then(({ data }) => {
+        const map = {}
+        for (const r of (data || [])) map[r.user_id] = r.xp || 0
+        setXpMap(map)
+        setLoading(false)
+      })
+  }, [])
+
+  const entries = profiles
+    .filter(p => p.id)
+    .map(p => ({
+      id: p.id,
+      name: p.full_name || p.email?.split('@')[0] || 'Gebruiker',
+      xp: xpMap[p.id] ?? p.xp ?? 0,
+    }))
+    .sort((a, b) => b.xp - a.xp)
+
+  const MEDALS = ['🥇', '🥈', '🥉']
+
+  return (
+    <div className="card" style={{ padding: '18px 20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>🏆 Leaderboard</span>
+        <span style={{ fontSize: 10, color: 'var(--text-3)' }}>Gewoontes XP</span>
+      </div>
+      {loading ? (
+        <div style={{ color: 'var(--text-3)', fontSize: 12 }}>Laden…</div>
+      ) : entries.length === 0 ? (
+        <div style={{ color: 'var(--text-3)', fontSize: 12 }}>Geen gebruikers gevonden</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+          {entries.map((e, i) => {
+            const isMe = e.id === userId
+            const level = getLevel(e.xp)
+            const xpIn = e.xp % LEVEL_XP
+            return (
+              <div key={e.id} style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '9px 12px', borderRadius: 12,
+                background: isMe ? 'color-mix(in srgb, var(--accent) 7%, transparent)' : 'rgba(255,255,255,0.02)',
+                border: isMe ? '1px solid color-mix(in srgb, var(--accent) 28%, transparent)' : '1px solid rgba(255,255,255,0.06)',
+              }}>
+                <span style={{ fontSize: i < 3 ? 18 : 12, width: 26, textAlign: 'center', flexShrink: 0, color: i >= 3 ? 'var(--text-3)' : undefined, fontWeight: i >= 3 ? 600 : undefined }}>
+                  {MEDALS[i] ?? (i + 1)}
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <span style={{ fontSize: 13, fontWeight: isMe ? 700 : 500, color: isMe ? 'var(--accent)' : 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {e.name}{isMe ? ' · jij' : ''}
+                    </span>
+                    <span style={{ fontSize: 10, color: '#FACC15', fontWeight: 700, flexShrink: 0 }}>Lvl {level}</span>
+                    <span style={{ fontSize: 10, color: 'var(--text-3)', flexShrink: 0 }}>{getLevelName(e.xp)}</span>
+                  </div>
+                  <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${xpIn}%`, borderRadius: 2, background: isMe ? 'linear-gradient(90deg,var(--accent),rgba(0,255,209,0.6))' : 'linear-gradient(90deg,#FACC15,#F59E0B)', transition: 'width 0.5s ease' }} />
+                  </div>
+                </div>
+                <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>{e.xp} XP</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
-export default function StatsPage({ tasks, userId }) {
+export default function StatsPage({ tasks, userId, profiles = [] }) {
   const [weekOffset, setWeekOffset] = useState(0)
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '20px 16px 100px' }}>
       <div style={{ maxWidth: 600, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {/* Header */}
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: '#00FFD1', margin: 0, borderLeft: '3px solid rgba(0,255,209,0.5)', paddingLeft: 12 }}>Statistieken</h1>
         </div>
 
-        {/* Level altijd bovenaan */}
         <XPCard userId={userId} />
+        <LeaderboardCard userId={userId} profiles={profiles} />
 
-        {/* Week navigator — gedeeld voor alle kaarten */}
         <WeekNav weekOffset={weekOffset} onChange={setWeekOffset} />
 
         <FocusCard userId={userId} weekOffset={weekOffset} />

@@ -78,14 +78,16 @@ async function loadAchievementsCloud(userId) {
 
 async function saveAchievementsCloud(userId, xp, seenAchievements, perfectDays) {
   if (!userId) return
+  const safeXp = Math.max(0, xp)
   try {
     await supabase.from('habit_achievements').upsert({
-      user_id: userId,
-      xp: Math.max(0, xp),
+      user_id: userId, xp: safeXp,
       seen_achievements: [...seenAchievements],
       perfect_days: [...perfectDays],
       updated_at: new Date().toISOString(),
     }, { onConflict: 'user_id' })
+    // Sync XP to profiles so leaderboard works without special RLS
+    supabase.from('profiles').update({ xp: safeXp }).eq('id', userId).then(() => {})
   } catch {}
 }
 
