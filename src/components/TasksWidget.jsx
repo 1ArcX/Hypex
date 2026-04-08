@@ -248,7 +248,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
   })()
 
   const complete = tasks.filter(t => t.completed)
-    .sort((a, b) => (b.updated_at || b.date || '').localeCompare(a.updated_at || a.date || ''))
+    .sort((a, b) => (b.updated_at || '0000').localeCompare(a.updated_at || '0000'))
 
   return (
     <div className={seamless ? '' : 'glass-card p-4'} style={seamless ? {} : {

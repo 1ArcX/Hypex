@@ -18,6 +18,7 @@ import Sidebar from './components/Sidebar'
 import VersionChecker from './components/VersionChecker'
 import { callMagister } from './utils/magisterApi'
 import { ensureSomtodayCreds } from './utils/somtodayApi'
+import { awardXP, XP_TASK } from './utils/xp'
 import BottomNav from './components/BottomNav'
 import DashboardPage from './pages/DashboardPage'
 import PomodoroPage from './pages/PomodoroPage'
@@ -551,7 +552,10 @@ export default function App() {
   }
 
   const handleToggleTask = async (task) => {
-    await supabase.from('tasks').update({ completed: !task.completed, updated_at: new Date().toISOString() }).eq('id', task.id)
+    const completing = !task.completed
+    await supabase.from('tasks').update({ completed: completing, updated_at: new Date().toISOString() }).eq('id', task.id)
+    if (completing) awardXP(user?.id, XP_TASK)
+    else awardXP(user?.id, -XP_TASK)
     fetchTasks()
   }
 

@@ -4,6 +4,7 @@ import { Play, Pause, RotateCcw, SkipForward, Settings, X, Bell, BellOff, Volume
 import { supabase } from '../supabaseClient'
 import FocusMode from './FocusMode'
 import useAmbientSound from '../hooks/useAmbientSound'
+import { awardXP } from '../utils/xp'
 
 const VAPID_PUBLIC = 'BCsu1QaHUead0cgQ23qUKIu3_MnSi0s21LaD_c9wBcqdP43A9ojEx-nWZ4_xUDYLVMQn0CqzqdhSuLQr6eOQqh4'
 
@@ -410,6 +411,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
           duration_minutes: getMins(s),
           mode: 'work',
         }).then(() => {})
+        awardXP(userIdRef.current, getMins(s))
       }
       startTimeRef.current = null
 
