@@ -583,7 +583,7 @@ export default function App() {
             user={user}
             onShowSettings={() => setShowThemeSettings(true)}
             onShowAdmin={() => setShowAdmin(true)}
-            onLogout={() => supabase.auth.signOut({ scope: 'local' })}
+            onLogout={() => supabase.auth.signOut()}
             syncing={syncing}
             syncFlash={syncFlash}
             updateAvailable={updateAvailable}
@@ -743,7 +743,7 @@ export default function App() {
           onClose={() => setShowThemeSettings(false)}
           theme={theme}
           setTheme={setTheme}
-          onLogout={() => supabase.auth.signOut({ scope: 'local' })}
+          onLogout={() => supabase.auth.signOut()}
           userEmail={user?.email}
         />
       )}
