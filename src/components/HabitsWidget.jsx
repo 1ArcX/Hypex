@@ -663,10 +663,21 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
     broadcastValues(newVals)
 
     const target = cfg?.target || 1
+    const xpPerUnit = Math.max(1, Math.round(XP_PER_HABIT / target))
     const wasDone = current >= target
     const isDone = newCount >= target
+
+    // Award/remove XP per unit (within target range)
+    if (delta > 0 && current < target) {
+      const unitsGained = Math.min(newCount, target) - current
+      awardXP(unitsGained * xpPerUnit)
+    } else if (delta < 0 && newCount < target) {
+      const unitsLost = Math.min(current, target) - newCount
+      awardXP(-unitsLost * xpPerUnit)
+    }
+
+    // Track completion in DB (for streaks & gewoonte stats)
     if (!wasDone && isDone) {
-      awardXP(XP_PER_HABIT)
       supabase.from('habit_completions').insert({ habit_id: habit.id, user_id: userId, date: today }).then(() => {})
       setCompletions(c => {
         const s = new Set(c[habit.id] || [])
@@ -674,7 +685,6 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
         return { ...c, [habit.id]: s }
       })
     } else if (wasDone && !isDone) {
-      awardXP(-XP_PER_HABIT)
       supabase.from('habit_completions').delete().eq('habit_id', habit.id).eq('user_id', userId).eq('date', today).then(() => {})
       setCompletions(c => {
         const s = new Set(c[habit.id] || [])
