@@ -161,8 +161,16 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
   const fetchSomtodayData = async () => {
     setStDataLoading(true); setStDataError(null)
     try {
-      const c = await ensureSomtodayCreds(userId)
-      if (!c.studentId) return
+      let c = await ensureSomtodayCreds(userId)
+      if (!c.studentId) {
+        // studentId missing — fetch it now via 'me'
+        const me = await callSomtoday('me', { accessToken: c.accessToken, somtodayApiUrl: c.somtodayApiUrl }).catch(() => null)
+        if (!me?.id) { setStDataLoading(false); return }
+        const updated = { ...c, studentId: me.id, displayName: me.roepnaam || me.achternaam || 'Leerling' }
+        localStorage.setItem(somtodayKey(userId), JSON.stringify(updated))
+        setSomtodayCreds(updated)
+        c = updated
+      }
       const [vakken, grades] = await Promise.all([
         callSomtoday('vakkeuzes', { accessToken: c.accessToken, somtodayApiUrl: c.somtodayApiUrl, studentId: c.studentId }),
         callSomtoday('grades', { accessToken: c.accessToken, somtodayApiUrl: c.somtodayApiUrl, studentId: c.studentId }),
