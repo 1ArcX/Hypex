@@ -1,50 +1,66 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 
 function SwipeableRow({ onSwipeRight, onSwipeLeft, children }) {
   const [offset, setOffset] = useState(0)
-  const startX = useRef(null)
-  const startY = useRef(null)
-  const isScrolling = useRef(null)
+  const containerRef = useRef(null)
+  // Keep callbacks and state in refs so native listeners don't go stale
+  const s = useRef({ startX: null, startY: null, isScrolling: null, offset: 0 })
+  const cbRef = useRef({ onSwipeRight, onSwipeLeft })
+  cbRef.current = { onSwipeRight, onSwipeLeft }
 
-  const onTouchStart = (e) => {
-    startX.current = e.touches[0].clientX
-    startY.current = e.touches[0].clientY
-    isScrolling.current = null
-  }
-  const onTouchMove = (e) => {
-    if (startX.current === null) return
-    const dx = e.touches[0].clientX - startX.current
-    const dy = e.touches[0].clientY - startY.current
-    if (isScrolling.current === null) {
-      isScrolling.current = Math.abs(dy) > Math.abs(dx)
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const onTouchStart = (e) => {
+      s.current.startX = e.touches[0].clientX
+      s.current.startY = e.touches[0].clientY
+      s.current.isScrolling = null
     }
-    if (isScrolling.current) { setOffset(0); return }
-    setOffset(Math.max(-100, Math.min(100, dx)))
-  }
-  const onTouchEnd = () => {
-    if (!isScrolling.current) {
-      if (offset > 60) onSwipeRight()
-      else if (offset < -60) onSwipeLeft()
+    const onTouchMove = (e) => {
+      if (s.current.startX === null) return
+      const dx = e.touches[0].clientX - s.current.startX
+      const dy = e.touches[0].clientY - s.current.startY
+      if (s.current.isScrolling === null) s.current.isScrolling = Math.abs(dy) > Math.abs(dx)
+      if (s.current.isScrolling) { setOffset(0); return }
+      e.preventDefault() // lock scroll during horizontal swipe
+      const next = Math.max(-110, Math.min(110, dx))
+      s.current.offset = next
+      setOffset(next)
     }
-    setOffset(0)
-    startX.current = null
-    startY.current = null
-    isScrolling.current = null
-  }
+    const onTouchEnd = () => {
+      if (!s.current.isScrolling) {
+        if (s.current.offset > 60) cbRef.current.onSwipeRight()
+        else if (s.current.offset < -60) cbRef.current.onSwipeLeft()
+      }
+      s.current.offset = 0
+      setOffset(0)
+      s.current.startX = null
+      s.current.isScrolling = null
+    }
+    el.addEventListener('touchstart', onTouchStart, { passive: true })
+    el.addEventListener('touchmove', onTouchMove, { passive: false })
+    el.addEventListener('touchend', onTouchEnd, { passive: true })
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove', onTouchMove)
+      el.removeEventListener('touchend', onTouchEnd)
+    }
+  }, [])
 
-  const actionBg = offset > 20
-    ? `rgba(74,222,128,${Math.min(0.35, (offset - 20) / 80)})`
-    : offset < -20
-    ? `rgba(255,107,107,${Math.min(0.35, (-offset - 20) / 80)})`
+  const pct = Math.abs(offset) / 110
+  const actionBg = offset > 10
+    ? `rgba(74,222,128,${Math.min(0.4, (offset - 10) / 60)})`
+    : offset < -10
+    ? `rgba(255,107,107,${Math.min(0.4, (-offset - 10) / 60)})`
     : 'transparent'
+  const icon = offset > 30 ? '✓' : offset < -30 ? '✕' : ''
 
   return (
-    <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden' }}>
-      <div style={{ position: 'absolute', inset: 0, background: actionBg, transition: 'background 0.1s' }} />
-      <div
-        style={{ transform: `translateX(${offset}px)`, transition: offset === 0 ? 'transform 0.25s ease' : 'none', position: 'relative' }}
-        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
-      >
+    <div ref={containerRef} style={{ position: 'relative', borderRadius: 10, overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', inset: 0, background: actionBg, transition: 'background 0.08s', display: 'flex', alignItems: 'center', justifyContent: offset > 0 ? 'flex-start' : 'flex-end', padding: '0 16px' }}>
+        {icon && <span style={{ fontSize: 14, fontWeight: 700, color: offset > 0 ? '#4ADE80' : '#FF6B6B', opacity: Math.min(1, pct * 2) }}>{icon}</span>}
+      </div>
+      <div style={{ transform: `translateX(${offset}px)`, transition: offset === 0 ? 'transform 0.22s cubic-bezier(0.25,0.46,0.45,0.94)' : 'none', position: 'relative' }}>
         {children}
       </div>
     </div>
@@ -90,11 +106,12 @@ function getTimeStatus(dateStr, startTime, endTime) {
   return { label: 'Vandaag', overdue: false }
 }
 
-export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle, onEdit, onDragStart, onViewDetail, onNew, onMoveToGroup, seamless = false, highlightedIds = new Set() }) {
+export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle, onEdit, onDragStart, onViewDetail, onNew, onMoveToGroup, onReorder, seamless = false, highlightedIds = new Set() }) {
   const [adding, setAdding] = useState(false)
   const [collapsedGroups, setCollapsedGroups] = useState(new Set())
-  const [dragTaskId, setDragTaskId] = useState(null)
-  const [dragOverGroup, setDragOverGroup] = useState(undefined) // undefined=none, null=no-group, string=group name
+  const [dragId, setDragId] = useState(null)
+  const [dropTarget, setDropTarget] = useState(null)   // { id: taskId, pos: 'before'|'after' }
+  const [dropGroup, setDropGroup] = useState(undefined) // undefined=none, null=no-group, string=group name
   const [newTitle, setNewTitle] = useState('')
   const [newDate, setNewDate] = useState(todayStr())
   const [newTime, setNewTime] = useState('09:00')
@@ -125,11 +142,41 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
   }
 
   const sortFn = (a, b) => {
+    // sort_order takes priority when set (user-defined order)
+    const sa = a.sort_order ?? Infinity, sb = b.sort_order ?? Infinity
+    if (sa !== sb) return sa - sb
     const pa = a.priority ?? 2, pb = b.priority ?? 2
     if (pa !== pb) return pa - pb
     const da = a.due_date || a.date || '9999-99-99'
     const db = b.due_date || b.date || '9999-99-99'
     return da.localeCompare(db)
+  }
+
+  const clearDrag = () => { setDragId(null); setDropTarget(null); setDropGroup(undefined) }
+
+  const startDrag = (e, task) => {
+    e.dataTransfer.setData('taskId', String(task.id))
+    e.dataTransfer.effectAllowed = 'move'
+    requestAnimationFrame(() => setDragId(task.id))
+    onDragStart?.(task)
+  }
+
+  const overTask = (e, taskId) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const rect = e.currentTarget.getBoundingClientRect()
+    const pos = e.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+    setDropTarget(prev => (prev?.id === taskId && prev?.pos === pos ? prev : { id: taskId, pos }))
+    setDropGroup(undefined)
+  }
+
+  const dropOnTask = (e, taskId) => {
+    e.preventDefault()
+    const srcId = e.dataTransfer.getData('taskId')
+    if (srcId && String(taskId) && srcId !== String(taskId)) {
+      onReorder?.(srcId, String(taskId), dropTarget?.pos || 'after')
+    }
+    clearDrag()
   }
   const incomplete = tasks.filter(t => !t.completed).sort(sortFn)
 
@@ -250,7 +297,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                     ? `${Math.floor(totalMins / 60)}u${totalMins % 60 > 0 ? ` ${totalMins % 60}m` : ''}`
                     : `${totalMins}m`)
                 : null
-              const isDropTarget = dragTaskId && dragOverGroup === section.name
+              const isDropTarget = dragId && dropGroup === section.name
               return (
                 <div
                   onClick={() => setCollapsedGroups(prev => {
@@ -259,13 +306,13 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                     else next.add(section.name)
                     return next
                   })}
-                  onDragOver={e => { if (!dragTaskId) return; e.preventDefault(); setDragOverGroup(section.name) }}
-                  onDragLeave={() => setDragOverGroup(undefined)}
+                  onDragOver={e => { if (!dragId) return; e.preventDefault(); setDropGroup(section.name); setDropTarget(null) }}
+                  onDragLeave={() => setDropGroup(undefined)}
                   onDrop={e => {
                     e.preventDefault()
                     const id = e.dataTransfer.getData('taskId')
                     if (id && onMoveToGroup) onMoveToGroup(id, section.name)
-                    setDragOverGroup(undefined); setDragTaskId(null)
+                    clearDrag()
                   }}
                   style={{ fontSize: 11, color: isDropTarget ? 'var(--accent)' : 'rgba(255,255,255,0.35)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', padding: '8px 4px 4px', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', userSelect: 'none', borderRadius: 8, background: isDropTarget ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'transparent', transition: 'background 0.15s, color 0.15s' }}
                 >
@@ -286,23 +333,23 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                 </div>
               )
             })()}
-            {/* Drop zone voor "geen groep" sectie */}
-            {section.name === null && dragTaskId && (
+            {/* Drop zone voor "geen groep" sectie (alleen tonen als er ook named groups zijn) */}
+            {section.name === null && dragId && groupedSections.some(s => s.name !== null) && (
               <div
-                onDragOver={e => { e.preventDefault(); setDragOverGroup(null) }}
-                onDragLeave={() => setDragOverGroup(undefined)}
+                onDragOver={e => { e.preventDefault(); setDropGroup(null); setDropTarget(null) }}
+                onDragLeave={() => setDropGroup(undefined)}
                 onDrop={e => {
                   e.preventDefault()
                   const id = e.dataTransfer.getData('taskId')
                   if (id && onMoveToGroup) onMoveToGroup(id, null)
-                  setDragOverGroup(undefined); setDragTaskId(null)
+                  clearDrag()
                 }}
-                style={{ fontSize: 10, color: dragOverGroup === null ? 'var(--accent)' : 'rgba(255,255,255,0.2)', padding: '5px 8px', borderRadius: 8, background: dragOverGroup === null ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'transparent', border: `1px dashed ${dragOverGroup === null ? 'color-mix(in srgb, var(--accent) 40%, transparent)' : 'rgba(255,255,255,0.1)'}`, marginBottom: 4, textAlign: 'center', transition: 'all 0.15s' }}
+                style={{ fontSize: 10, color: dropGroup === null ? 'var(--accent)' : 'rgba(255,255,255,0.2)', padding: '5px 8px', borderRadius: 8, background: dropGroup === null ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'transparent', border: `1px dashed ${dropGroup === null ? 'color-mix(in srgb, var(--accent) 40%, transparent)' : 'rgba(255,255,255,0.1)'}`, marginBottom: 4, textAlign: 'center', transition: 'all 0.15s' }}
               >
-                {dragOverGroup === null ? '↓ Verplaats naar geen groep' : 'Geen groep'}
+                {dropGroup === null ? '↓ Verplaats naar geen groep' : 'Geen groep'}
               </div>
             )}
-            {!collapsedGroups.has(section.name) && section.items.map(task => {
+            {!collapsedGroups.has(section.name) && section.items.map((task, _idx) => {
               const subject = subjects.find(s => s.id === task.subject_id)
               const dateInfo = getTimeStatus(task.date, task.start_time || task.time, task.end_time)
               const isUrgent = (task.priority ?? 2) === 1
@@ -330,16 +377,19 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                 : isLow ? 'rgba(255,255,255,0.12)'
                 : 'rgba(255,255,255,0.2)'
 
+              const isDragging = dragId === task.id
+              const isDropBefore = dropTarget?.id === task.id && dropTarget.pos === 'before'
+              const isDropAfter  = dropTarget?.id === task.id && dropTarget.pos === 'after'
               return (
-                <SwipeableRow key={task.id} onSwipeRight={() => onToggle(task)} onSwipeLeft={() => onDelete(task.id)}>
+                <React.Fragment key={task.id}>
+                {isDropBefore && <div style={{ height: 2, borderRadius: 2, background: 'var(--accent)', margin: '2px 8px', opacity: 0.85, transition: 'opacity 0.1s' }} />}
+                <SwipeableRow onSwipeRight={() => onToggle(task)} onSwipeLeft={() => onDelete(task.id)}>
                 <div
                   draggable
-                  onDragStart={e => {
-                    e.dataTransfer.setData('taskId', task.id)
-                    setDragTaskId(task.id)
-                    onDragStart?.(task)
-                  }}
-                  onDragEnd={() => { setDragTaskId(null); setDragOverGroup(undefined) }}
+                  onDragStart={e => startDrag(e, task)}
+                  onDragEnd={clearDrag}
+                  onDragOver={e => overTask(e, task.id)}
+                  onDrop={e => dropOnTask(e, task.id)}
                   onClick={() => onViewDetail ? onViewDetail(task) : onEdit?.(task)}
                   className={[isUrgent ? 'urgent-task' : '', highlightedIds.has(task.id) ? 'task-flash' : ''].filter(Boolean).join(' ') || undefined}
                   style={{
@@ -348,12 +398,14 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                     borderRadius: 14,
                     border: cardBorder,
                     borderLeft: isUrgent ? '3px solid rgba(255,60,60,0.75)' : cardBorder,
-                    cursor: 'pointer',
+                    cursor: 'grab',
                     background: cardBg,
-                    transition: 'background 0.15s',
+                    transition: 'background 0.15s, opacity 0.15s, transform 0.15s',
                     marginBottom: 3,
+                    opacity: isDragging ? 0.3 : 1,
+                    transform: isDragging ? 'scale(0.98)' : 'scale(1)',
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = cardBgHover}
+                  onMouseEnter={e => { if (!isDragging) e.currentTarget.style.background = cardBgHover }}
                   onMouseLeave={e => e.currentTarget.style.background = cardBg}>
                   <GripVertical size={13} style={{ color: 'rgba(255,255,255,0.12)', flexShrink: 0 }} />
                   <button onClick={e => { e.stopPropagation(); onToggle(task) }}
@@ -408,6 +460,8 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                   </button>
                 </div>
                 </SwipeableRow>
+                {isDropAfter && <div style={{ height: 2, borderRadius: 2, background: 'var(--accent)', margin: '2px 8px', opacity: 0.85, transition: 'opacity 0.1s' }} />}
+                </React.Fragment>
               )
             })}
           </div>

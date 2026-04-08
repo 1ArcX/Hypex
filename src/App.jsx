@@ -441,7 +441,7 @@ export default function App() {
 
   const fetchTasks = async () => {
     if (!user?.id) return
-    const { data, error } = await supabase.from('tasks').select('*').eq('user_id', user.id).order('date', { ascending: true })
+    const { data, error } = await supabase.from('tasks').select('*').eq('user_id', user.id).order('sort_order', { ascending: true, nullsFirst: false }).order('date', { ascending: true })
     if (error) console.error(error)
     setTasks(data || [])
   }
@@ -506,6 +506,29 @@ export default function App() {
   const handleMoveToGroup = async (taskId, groupName) => {
     await supabase.from('tasks').update({ group_name: groupName || null }).eq('id', taskId).eq('user_id', user.id)
     fetchTasks()
+  }
+
+  const handleReorder = async (sourceId, targetId, position) => {
+    const src = tasks.find(t => String(t.id) === String(sourceId))
+    const tgt = tasks.find(t => String(t.id) === String(targetId))
+    if (!src || !tgt) return
+    const destGroup = tgt.group_name || null
+    // Build new ordered list for destination group, remove source first
+    const destTasks = tasks
+      .filter(t => !t.completed && (t.group_name || null) === destGroup && String(t.id) !== String(sourceId))
+      .sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999))
+    const tgtIdx = destTasks.findIndex(t => String(t.id) === String(targetId))
+    destTasks.splice(position === 'before' ? tgtIdx : tgtIdx + 1, 0, { ...src, group_name: destGroup })
+    const updates = destTasks.map((t, i) => ({ id: t.id, sort_order: i * 10, group_name: destGroup }))
+    // Optimistic update
+    setTasks(prev => {
+      const map = Object.fromEntries(updates.map(u => [u.id, u]))
+      return prev.map(t => map[t.id] ? { ...t, ...map[t.id] } : t)
+    })
+    // Persist
+    await Promise.all(updates.map(u =>
+      supabase.from('tasks').update({ sort_order: u.sort_order, group_name: u.group_name }).eq('id', u.id).eq('user_id', user.id)
+    ))
   }
 
   const handleDeleteTask = async (id) => {
@@ -703,6 +726,7 @@ export default function App() {
                 onViewDetail={setDetailTask}
                 onNew={() => openNewTask()}
                 onMoveToGroup={handleMoveToGroup}
+                onReorder={handleReorder}
                 highlightFilter={taskHighlight}
                 onClearHighlight={() => setTaskHighlight(null)}
               />
