@@ -118,7 +118,12 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
         setSomtodayCreds(creds)
       }
       window.dispatchEvent(new Event('somtodayLogin'))
-    }).catch(() => {})
+    }).catch(() => {
+      // Autologin mislukt (refresh token verlopen) — toon wizard opnieuw
+      localStorage.removeItem(somtodayKey(userId))
+      setSomtodayCreds(null)
+      setShowSettings(true)
+    })
   }, [somtodayEnabled, userId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch all Magister data at once on mount (no lazy loading per tab)
