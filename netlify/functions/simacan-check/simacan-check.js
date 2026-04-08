@@ -128,14 +128,21 @@ async function simacanCheckHandler() {
 
       console.log(`[simacan-check] Stop ${stopId} (${dc}) — delay: ${delay}, act: ${act}, prev:`, prev)
 
+      // lastNotifiedDelay bijhouden: alleen updaten als er een push verstuurd is
+      const lastNotifiedDelay = prev?.lastNotifiedDelay ?? prev?.delay ?? null
+
       if (prev) {
-        if (prev.delay != null && delay != null && Math.abs(delay - prev.delay) >= 3) {
-          const more = delay > prev.delay
-          console.log(`[simacan-check] Push: vertraging gewijzigd stop ${stopId}`)
+        if (delay != null && lastNotifiedDelay != null && Math.abs(delay - lastNotifiedDelay) >= 5) {
+          const more = delay > lastNotifiedDelay
+          console.log(`[simacan-check] Push: vertraging gewijzigd stop ${stopId} (was ${lastNotifiedDelay}, nu ${delay})`)
           await sendPush(subs, '🚛 Vrachttijden',
             more ? `${dc} loopt meer uit (+${delay} min) — komt nu om ${etaFmt}`
                  : `${dc} loopt in (${delay > 0 ? '+' : ''}${delay} min) — komt om ${etaFmt}`,
             `delay-${stopId}`)
+          newStates[stopId] = { delay, activity: act, eta, lastNotifiedDelay: delay }
+        } else {
+          // Geen push — lastNotifiedDelay ongewijzigd laten zodat vergelijking cumulatief blijft
+          newStates[stopId] = { delay, activity: act, eta, lastNotifiedDelay }
         }
         if (prev.activity !== 'AFGEROND' && act === 'AFGEROND') {
           console.log(`[simacan-check] Push: afgerond stop ${stopId}`)
@@ -145,9 +152,8 @@ async function simacanCheckHandler() {
         }
       } else {
         console.log(`[simacan-check] Stop ${stopId} — geen vorige staat, eerste run`)
+        newStates[stopId] = { delay, activity: act, eta, lastNotifiedDelay: delay }
       }
-
-      newStates[stopId] = { delay, activity: act, eta }
     }
 
     // Update stored state
