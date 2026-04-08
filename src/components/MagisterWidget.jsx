@@ -3,7 +3,7 @@ import { BookOpen, ClipboardList, RefreshCw, Settings, ChevronDown, ChevronUp, A
 import { supabase } from '../supabaseClient'
 import { matchVak } from '../utils/alleVakken'
 import { callMagister, clearStoredTokens } from '../utils/magisterApi'
-import { callSomtoday, somtodayKey, ensureSomtodayCreds } from '../utils/somtodayApi'
+import { callSomtoday, somtodayKey, ensureSomtodayCreds, loginWithPopup } from '../utils/somtodayApi'
 
 const storageKey = (userId) => `magister_credentials_${userId}`
 
@@ -99,6 +99,35 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
   const [swDetail, setSwDetail] = useState(null)        // { sw, topics, loading, error }
   const [bronLoading, setBronLoading] = useState({})
   const [expandedTopics, setExpandedTopics] = useState({})
+  const [stReconnecting, setStReconnecting] = useState(false)
+  const [stReconnectError, setStReconnectError] = useState(null)
+  const [stTokenExpired, setStTokenExpired] = useState(false)
+
+  const reconnectSomtoday = async () => {
+    setStReconnecting(true); setStReconnectError(null)
+    try {
+      const tokenData = await loginWithPopup()
+      const apiUrl = tokenData.somtoday_api_url || 'https://production.somtoday.nl'
+      const me = await callSomtoday('me', { accessToken: tokenData.access_token, somtodayApiUrl: apiUrl }).catch(() => null)
+      const stored = {
+        somtodayApiUrl: apiUrl,
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token,
+        expiresAt: Math.floor(Date.now() / 1000) + (tokenData.expires_in || 3600),
+        studentId: me?.id,
+        displayName: me?.roepnaam || me?.achternaam || 'Leerling',
+      }
+      localStorage.setItem(somtodayKey(userId), JSON.stringify(stored))
+      // Sla refresh token op in Supabase voor autologin
+      callSomtoday('savetoken', { refreshToken: tokenData.refresh_token, accessToken: tokenData.access_token, expiresAt: stored.expiresAt, apiUrl }).catch(() => {})
+      setSomtodayCreds(stored)
+      setStTokenExpired(false)
+      window.dispatchEvent(new Event('somtodayLogin'))
+    } catch (e) {
+      setStReconnectError(e.message)
+    }
+    setStReconnecting(false)
+  }
 
   // Auto-connect SOMtoday via server-side autologin (singleton — deelt promise met App)
   useEffect(() => {
@@ -117,8 +146,9 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
       } else {
         setSomtodayCreds(creds)
       }
+      setStTokenExpired(false)
       window.dispatchEvent(new Event('somtodayLogin'))
-    }).catch(() => {})
+    }).catch(() => { setStTokenExpired(true) })
   }, [somtodayEnabled, userId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch all Magister data at once on mount (no lazy loading per tab)
@@ -551,6 +581,20 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
 
           {!showSettings && (
             <>
+              {/* SOMtoday token verlopen banner */}
+              {somtodayEnabled && stTokenExpired && !somtodayCreds && (
+                <div style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,80,80,0.08)', border: '1px solid rgba(255,80,80,0.25)', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <span style={{ fontSize: 11, color: '#ff6b6b' }}>SOMtoday sessie verlopen</span>
+                  <button onClick={reconnectSomtoday} disabled={stReconnecting}
+                    style={{ flexShrink: 0, padding: '4px 10px', borderRadius: 7, border: '1px solid rgba(255,80,80,0.4)', background: 'rgba(255,80,80,0.12)', color: '#ff6b6b', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+                    {stReconnecting ? 'Bezig...' : 'Herverbinden'}
+                  </button>
+                </div>
+              )}
+              {stReconnectError && (
+                <div style={{ fontSize: 11, color: '#ff6b6b', marginBottom: 8 }}>{stReconnectError}</div>
+              )}
+
               {/* SOMtoday status banner (when connected) */}
               {somtodayCreds && (
                 <div style={{ padding: '7px 10px', borderRadius: 8, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', marginBottom: 10 }}>
