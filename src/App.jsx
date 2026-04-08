@@ -52,6 +52,7 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [passwordRecovery, setPasswordRecovery] = useState(false)
   const [tasks, setTasks] = useState([])
+  const [groupOrder, setGroupOrder] = useState([])
   const [subjects, setSubjects] = useState([])
   const [isBreak, setIsBreak] = useState(false)
   const [showTaskModal, setShowTaskModal] = useState(false)
@@ -237,6 +238,7 @@ export default function App() {
           await supabase.from('profiles').update({ email: user.email }).eq('id', user.id)
           fetchProfiles()
         }
+        if (existing?.group_order?.length) setGroupOrder(existing.group_order)
       }
     }
   }
@@ -531,6 +533,16 @@ export default function App() {
     ))
   }
 
+  const handleReorderGroups = async (srcGroup, tgtGroup, position) => {
+    const allGroupNames = [...new Set(tasks.filter(t => t.group_name).map(t => t.group_name))]
+    const current = [...groupOrder.filter(g => allGroupNames.includes(g)), ...allGroupNames.filter(g => !groupOrder.includes(g))]
+    const withoutSrc = current.filter(g => g !== srcGroup)
+    const tgtIdx = withoutSrc.indexOf(tgtGroup)
+    withoutSrc.splice(position === 'before' ? tgtIdx : tgtIdx + 1, 0, srcGroup)
+    setGroupOrder(withoutSrc)
+    await supabase.from('profiles').update({ group_order: withoutSrc }).eq('id', user.id)
+  }
+
   const handleDeleteTask = async (id) => {
     await supabase.from('tasks').delete().eq('id', id)
     setShowTaskModal(false)
@@ -727,6 +739,8 @@ export default function App() {
                 onNew={() => openNewTask()}
                 onMoveToGroup={handleMoveToGroup}
                 onReorder={handleReorder}
+                onReorderGroups={handleReorderGroups}
+                groupOrder={groupOrder}
                 highlightFilter={taskHighlight}
                 onClearHighlight={() => setTaskHighlight(null)}
               />

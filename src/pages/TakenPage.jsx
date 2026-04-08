@@ -35,7 +35,7 @@ function weekEndStr() {
 
 export default function TakenPage({
   tasks, subjects,
-  onAdd, onEdit, onDelete, onToggle, onViewDetail, onNew, onMoveToGroup, onReorder,
+  onAdd, onEdit, onDelete, onToggle, onViewDetail, onNew, onMoveToGroup, onReorder, onReorderGroups, groupOrder,
   highlightFilter, onClearHighlight,
 }) {
   const isDesktop = useIsDesktop()
@@ -234,6 +234,8 @@ export default function TakenPage({
           onNew={onNew}
           onMoveToGroup={onMoveToGroup}
           onReorder={onReorder}
+          onReorderGroups={onReorderGroups}
+          groupOrder={groupOrder}
           seamless={!isDesktop}
           highlightedIds={highlightedIds}
         />

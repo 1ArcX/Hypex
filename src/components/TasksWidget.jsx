@@ -106,12 +106,17 @@ function getTimeStatus(dateStr, startTime, endTime) {
   return { label: 'Vandaag', overdue: false }
 }
 
-export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle, onEdit, onDragStart, onViewDetail, onNew, onMoveToGroup, onReorder, seamless = false, highlightedIds = new Set() }) {
+export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle, onEdit, onDragStart, onViewDetail, onNew, onMoveToGroup, onReorder, onReorderGroups, groupOrder = [], seamless = false, highlightedIds = new Set() }) {
   const [adding, setAdding] = useState(false)
   const [collapsedGroups, setCollapsedGroups] = useState(new Set())
+  // Task drag
   const [dragId, setDragId] = useState(null)
   const [dropTarget, setDropTarget] = useState(null)   // { id: taskId, pos: 'before'|'after' }
   const [dropGroup, setDropGroup] = useState(undefined) // undefined=none, null=no-group, string=group name
+  // Group drag
+  const [dragGroupName, setDragGroupName] = useState(null)
+  const [dropGroupTarget, setDropGroupTarget] = useState(null) // { name, pos: 'before'|'after' }
+  const [activeDragType, setActiveDragType] = useState(null) // 'task' | 'group'
   const [newTitle, setNewTitle] = useState('')
   const [newDate, setNewDate] = useState(todayStr())
   const [newTime, setNewTime] = useState('09:00')
@@ -152,16 +157,19 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
     return da.localeCompare(db)
   }
 
-  const clearDrag = () => { setDragId(null); setDropTarget(null); setDropGroup(undefined) }
+  const clearDrag = () => { setDragId(null); setDropTarget(null); setDropGroup(undefined); setActiveDragType(null) }
+  const clearGroupDrag = () => { setDragGroupName(null); setDropGroupTarget(null); setActiveDragType(null) }
 
   const startDrag = (e, task) => {
     e.dataTransfer.setData('taskId', String(task.id))
     e.dataTransfer.effectAllowed = 'move'
+    setActiveDragType('task')
     requestAnimationFrame(() => setDragId(task.id))
     onDragStart?.(task)
   }
 
   const overTask = (e, taskId) => {
+    if (activeDragType === 'group') return
     e.preventDefault()
     e.stopPropagation()
     const rect = e.currentTarget.getBoundingClientRect()
@@ -171,6 +179,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
   }
 
   const dropOnTask = (e, taskId) => {
+    if (activeDragType === 'group') return
     e.preventDefault()
     const srcId = e.dataTransfer.getData('taskId')
     if (srcId && String(taskId) && srcId !== String(taskId)) {
@@ -178,6 +187,41 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
     }
     clearDrag()
   }
+
+  const startGroupDrag = (e, name) => {
+    e.dataTransfer.effectAllowed = 'move'
+    e.stopPropagation()
+    setActiveDragType('group')
+    requestAnimationFrame(() => setDragGroupName(name))
+  }
+
+  const overGroup = (e, name) => {
+    e.preventDefault()
+    if (activeDragType === 'task') {
+      setDropGroup(name)
+      setDropTarget(null)
+      return
+    }
+    if (activeDragType !== 'group') return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const pos = e.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+    setDropGroupTarget(prev => (prev?.name === name && prev?.pos === pos ? prev : { name, pos }))
+  }
+
+  const dropOnGroup = (e, name) => {
+    e.preventDefault()
+    if (activeDragType === 'group') {
+      if (dragGroupName && name && dragGroupName !== name) {
+        onReorderGroups?.(dragGroupName, name, dropGroupTarget?.pos || 'after')
+      }
+      clearGroupDrag()
+    } else {
+      const id = e.dataTransfer.getData('taskId')
+      if (id && onMoveToGroup) onMoveToGroup(id, name)
+      clearDrag()
+    }
+  }
+
   const incomplete = tasks.filter(t => !t.completed).sort(sortFn)
 
   // Groepeer: taken met groep apart, taken zonder groep direct
@@ -192,8 +236,13 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
         noGroup.push(t)
       }
     }
+    // Sort named groups by groupOrder prop (user-defined order)
+    const allGroupNames = Object.keys(withGroup)
+    const ordered = groupOrder.length
+      ? [...groupOrder.filter(g => allGroupNames.includes(g)), ...allGroupNames.filter(g => !groupOrder.includes(g))]
+      : allGroupNames
     const sections = []
-    for (const [name, items] of Object.entries(withGroup)) sections.push({ name, items })
+    for (const name of ordered) sections.push({ name, items: withGroup[name] })
     if (noGroup.length) sections.push({ name: null, items: noGroup })
     return sections
   })()
@@ -289,37 +338,42 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
         {groupedSections.map(section => (
           <div key={section.name ?? '__none__'}>
+            {/* Drop indicator before this group (group drag) */}
+            {dropGroupTarget?.name === section.name && dropGroupTarget.pos === 'before' && (
+              <div style={{ height: 2, borderRadius: 2, background: 'var(--accent)', margin: '4px 4px 0', opacity: 0.85 }} />
+            )}
+
             {section.name && (() => {
               const isCollapsed = collapsedGroups.has(section.name)
+              const isDraggingThis = dragGroupName === section.name
+              const isTaskDropTarget = activeDragType === 'task' && dropGroup === section.name
               const totalMins = section.items.reduce((sum, t) => sum + (t.duration_minutes || 0), 0)
               const durLabel = totalMins > 0
                 ? (Math.floor(totalMins / 60) > 0
                     ? `${Math.floor(totalMins / 60)}u${totalMins % 60 > 0 ? ` ${totalMins % 60}m` : ''}`
                     : `${totalMins}m`)
                 : null
-              const isDropTarget = dragId && dropGroup === section.name
               return (
                 <div
+                  draggable
+                  onDragStart={e => startGroupDrag(e, section.name)}
+                  onDragEnd={clearGroupDrag}
                   onClick={() => setCollapsedGroups(prev => {
                     const next = new Set(prev)
                     if (next.has(section.name)) next.delete(section.name)
                     else next.add(section.name)
                     return next
                   })}
-                  onDragOver={e => { if (!dragId) return; e.preventDefault(); setDropGroup(section.name); setDropTarget(null) }}
-                  onDragLeave={() => setDropGroup(undefined)}
-                  onDrop={e => {
-                    e.preventDefault()
-                    const id = e.dataTransfer.getData('taskId')
-                    if (id && onMoveToGroup) onMoveToGroup(id, section.name)
-                    clearDrag()
-                  }}
-                  style={{ fontSize: 11, color: isDropTarget ? 'var(--accent)' : 'rgba(255,255,255,0.35)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', padding: '8px 4px 4px', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', userSelect: 'none', borderRadius: 8, background: isDropTarget ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'transparent', transition: 'background 0.15s, color 0.15s' }}
+                  onDragOver={e => overGroup(e, section.name)}
+                  onDragLeave={() => { setDropGroup(undefined); setDropGroupTarget(null) }}
+                  onDrop={e => dropOnGroup(e, section.name)}
+                  style={{ fontSize: 11, color: isTaskDropTarget ? 'var(--accent)' : 'rgba(255,255,255,0.35)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', padding: '8px 4px 4px', display: 'flex', alignItems: 'center', gap: 5, cursor: 'grab', userSelect: 'none', borderRadius: 8, background: isTaskDropTarget ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'transparent', transition: 'background 0.15s, color 0.15s, opacity 0.15s', opacity: isDraggingThis ? 0.3 : 1 }}
                 >
+                  <GripVertical size={11} style={{ flexShrink: 0, color: 'rgba(255,255,255,0.2)' }} />
                   {isCollapsed
                     ? <ChevronRight size={11} style={{ flexShrink: 0, color: 'rgba(255,255,255,0.25)' }} />
                     : <ChevronDown size={11} style={{ flexShrink: 0, color: 'rgba(255,255,255,0.25)' }} />}
-                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: isDropTarget ? 'var(--accent)' : 'var(--accent)', display: 'inline-block', flexShrink: 0 }} />
+                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block', flexShrink: 0 }} />
                   {section.name}
                   {durLabel && (
                     <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.2)', letterSpacing: 0, textTransform: 'none', marginLeft: 2 }}>
@@ -329,10 +383,15 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                   <span style={{ marginLeft: 'auto', fontSize: 10, color: 'rgba(255,255,255,0.18)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
                     {section.items.length} {section.items.length === 1 ? 'taak' : 'taken'}
                   </span>
-                  {isDropTarget && <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700 }}>↓</span>}
+                  {isTaskDropTarget && <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700 }}>↓</span>}
                 </div>
               )
             })()}
+
+            {/* Drop indicator after this group (group drag) */}
+            {dropGroupTarget?.name === section.name && dropGroupTarget.pos === 'after' && (
+              <div style={{ height: 2, borderRadius: 2, background: 'var(--accent)', margin: '0 4px 4px', opacity: 0.85 }} />
+            )}
             {/* Drop zone voor "geen groep" sectie (alleen tonen als er ook named groups zijn) */}
             {section.name === null && dragId && groupedSections.some(s => s.name !== null) && (
               <div
@@ -404,6 +463,9 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                     marginBottom: 3,
                     opacity: isDragging ? 0.3 : 1,
                     transform: isDragging ? 'scale(0.98)' : 'scale(1)',
+                    userSelect: 'none',
+                    WebkitUserSelect: 'none',
+                    WebkitTouchCallout: 'none',
                   }}
                   onMouseEnter={e => { if (!isDragging) e.currentTarget.style.background = cardBgHover }}
                   onMouseLeave={e => e.currentTarget.style.background = cardBg}>
