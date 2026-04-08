@@ -561,52 +561,5 @@ exports.handler = async (event) => {
     } catch (e) { return fail(e.message) }
   }
 
-  // ── subjects: fetch vakken list ───────────────────────────────────────────
-  if (action === 'subjects') {
-    const { accessToken, somtodayApiUrl } = body
-    if (!accessToken || !somtodayApiUrl) return fail('Ontbrekende velden')
-    try {
-      const res = await fetch(`${somtodayApiUrl}/rest/v1/vakken`, {
-        headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json', 'User-Agent': UA },
-      })
-      if (!res.ok) return fail(`Vakken mislukt: ${res.status}`, res.status)
-      const data = await res.json()
-      return ok((data.items || []).map(v => ({
-        id: v.links?.[0]?.id,
-        naam: v.naam || '',
-        afkorting: v.afkorting || '',
-      })))
-    } catch (e) { return fail(e.message) }
-  }
-
-  // ── homework: fetch studiewijzerItems (huiswerk) ──────────────────────────
-  if (action === 'homework') {
-    const { accessToken, somtodayApiUrl, from, to } = body
-    if (!accessToken || !somtodayApiUrl || !from || !to) return fail('Ontbrekende velden')
-    try {
-      const url = `${somtodayApiUrl}/rest/v1/studiewijzerItems?begindatum=${from}&einddatum=${to}&additional=studiewijzer`
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json', 'User-Agent': UA },
-      })
-      if (!res.ok) return fail(`Huiswerk mislukt: ${res.status}`, res.status)
-      const data = await res.json()
-      const items = (data.items || []).map(item => ({
-        id: item.links?.[0]?.id,
-        omschrijving: item.omschrijving || item.naam || '',
-        vak: item.studiewijzer?.vak?.naam || item.studiewijzer?.vak?.afkorting || '',
-        datum: item.datumTijd || item.datum || null,
-        klaar: item.gemaakt || item.ingeleverd || false,
-      }))
-      // Sort by datum ascending, nulls last
-      items.sort((a, b) => {
-        if (!a.datum && !b.datum) return 0
-        if (!a.datum) return 1
-        if (!b.datum) return -1
-        return a.datum < b.datum ? -1 : a.datum > b.datum ? 1 : 0
-      })
-      return ok(items)
-    } catch (e) { return fail(e.message) }
-  }
-
   return fail('Onbekende actie', 404)
 }
