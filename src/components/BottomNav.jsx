@@ -16,7 +16,7 @@ const SHEET_BASE = [
   { id: 'gym',          Icon: Dumbbell,      label: 'Gym'      },
 ]
 
-export default function BottomNav({ activePage, setActivePage, isAdmin, showJumbo, hasLevelUp }) {
+export default function BottomNav({ activePage, setActivePage, isAdmin, showJumbo, hasLevelUp, hasActiveGymWorkout }) {
   const [showSheet, setShowSheet] = useState(false)
   const sheetRef = useRef(null)
 
@@ -65,7 +65,13 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
               {sheetItems.map(({ id, Icon, label }) => {
                 const active = activePage === id
-                const glowing = id === 'statistieken' && hasLevelUp && !active
+                const glowingStats = id === 'statistieken' && hasLevelUp && !active
+                const glowingGym   = id === 'gym' && hasActiveGymWorkout && !active
+                const glowing = glowingStats || glowingGym
+                const glowColor = glowingGym ? '#F97316' : '#FACC15'
+                const glowBg    = glowingGym ? 'rgba(249,115,22,0.08)' : 'rgba(250,204,21,0.08)'
+                const glowBorder= glowingGym ? '1px solid rgba(249,115,22,0.5)' : '1px solid rgba(250,204,21,0.5)'
+                const glowAnim  = glowingGym ? 'sheetGymGlow 2s ease-in-out infinite' : 'sheetStatsGlow 2s ease-in-out infinite'
                 return (
                   <button
                     key={id}
@@ -75,13 +81,13 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
                       gap: 7, padding: '14px 8px', borderRadius: 18,
                       background: active
                         ? 'color-mix(in srgb, var(--accent) 12%, transparent)'
-                        : glowing ? 'rgba(250,204,21,0.08)' : 'var(--bg-card-2)',
+                        : glowing ? glowBg : 'var(--bg-card-2)',
                       border: active
                         ? '1px solid color-mix(in srgb, var(--accent) 35%, transparent)'
-                        : glowing ? '1px solid rgba(250,204,21,0.5)' : '1px solid var(--border)',
+                        : glowing ? glowBorder : '1px solid var(--border)',
                       cursor: 'pointer',
-                      color: active ? 'var(--accent)' : glowing ? '#FACC15' : 'var(--text-2)',
-                      animation: glowing ? 'sheetStatsGlow 2s ease-in-out infinite' : 'none',
+                      color: active ? 'var(--accent)' : glowing ? glowColor : 'var(--text-2)',
+                      animation: glowing ? glowAnim : 'none',
                       position: 'relative',
                     }}
                   >
@@ -91,8 +97,10 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
                       <span style={{
                         position: 'absolute', top: 6, right: 6,
                         width: 7, height: 7, borderRadius: '50%',
-                        background: 'linear-gradient(135deg, #FACC15, #F97316)',
-                        boxShadow: '0 0 6px rgba(250,204,21,0.8)',
+                        background: glowingGym
+                          ? 'linear-gradient(135deg, #F97316, #EF4444)'
+                          : 'linear-gradient(135deg, #FACC15, #F97316)',
+                        boxShadow: `0 0 6px ${glowingGym ? 'rgba(249,115,22,0.8)' : 'rgba(250,204,21,0.8)'}`,
                         animation: 'dotPulse 1.2s ease-in-out infinite',
                       }} />
                     )}
@@ -141,31 +149,45 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
         })}
 
         {/* Meer */}
-        <button
-          onClick={() => setShowSheet(v => !v)}
-          style={{
-            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-            justifyContent: 'center', gap: 4, padding: '10px 0',
-            background: 'none', border: 'none', cursor: 'pointer',
-            color: sheetActive || showSheet ? 'var(--accent)' : 'var(--text-3)',
-            transition: 'color 0.15s', position: 'relative',
-          }}
-        >
-          {(sheetActive || showSheet) && (
-            <div style={{
-              position: 'absolute', top: 6, width: 34, height: 34, borderRadius: '50%',
-              background: 'color-mix(in srgb, var(--accent) 12%, transparent)',
-              animation: 'pillIn 0.22s ease',
-            }} />
-          )}
-          {activeMeerItem && !showSheet
-            ? <activeMeerItem.Icon size={20} strokeWidth={2.2} style={{ position: 'relative' }} />
-            : <MoreHorizontal size={20} strokeWidth={showSheet ? 2.2 : 1.7} style={{ position: 'relative' }} />
-          }
-          <span style={{ fontSize: 10, fontWeight: sheetActive || showSheet ? 600 : 400, position: 'relative' }}>
-            {activeMeerItem && !showSheet ? activeMeerItem.label : 'Meer'}
-          </span>
-        </button>
+        {(() => {
+          const gymGlowing = hasActiveGymWorkout && !sheetActive && !showSheet
+          return (
+            <button
+              onClick={() => setShowSheet(v => !v)}
+              style={{
+                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+                justifyContent: 'center', gap: 4, padding: '10px 0',
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: sheetActive || showSheet ? 'var(--accent)' : gymGlowing ? '#F97316' : 'var(--text-3)',
+                transition: 'color 0.15s', position: 'relative',
+              }}
+            >
+              {(sheetActive || showSheet) && (
+                <div style={{
+                  position: 'absolute', top: 6, width: 34, height: 34, borderRadius: '50%',
+                  background: 'color-mix(in srgb, var(--accent) 12%, transparent)',
+                  animation: 'pillIn 0.22s ease',
+                }} />
+              )}
+              {activeMeerItem && !showSheet
+                ? <activeMeerItem.Icon size={20} strokeWidth={2.2} style={{ position: 'relative' }} />
+                : <MoreHorizontal size={20} strokeWidth={showSheet ? 2.2 : 1.7} style={{ position: 'relative' }} />
+              }
+              <span style={{ fontSize: 10, fontWeight: sheetActive || showSheet || gymGlowing ? 600 : 400, position: 'relative' }}>
+                {activeMeerItem && !showSheet ? activeMeerItem.label : 'Meer'}
+              </span>
+              {gymGlowing && (
+                <span style={{
+                  position: 'absolute', top: 6, right: 'calc(50% - 17px + 6px)',
+                  width: 7, height: 7, borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #F97316, #EF4444)',
+                  boxShadow: '0 0 6px rgba(249,115,22,0.8)',
+                  animation: 'dotPulse 1.2s ease-in-out infinite',
+                }} />
+              )}
+            </button>
+          )
+        })()}
       </nav>
 
       <style>{`
@@ -180,6 +202,10 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
         @keyframes sheetStatsGlow {
           0%, 100% { box-shadow: 0 0 0px rgba(250,204,21,0); }
           50%       { box-shadow: 0 0 16px rgba(250,204,21,0.3); }
+        }
+        @keyframes sheetGymGlow {
+          0%, 100% { box-shadow: 0 0 0px rgba(249,115,22,0); }
+          50%       { box-shadow: 0 0 16px rgba(249,115,22,0.4); }
         }
         @keyframes dotPulse {
           0%, 100% { opacity: 1; transform: scale(1); }

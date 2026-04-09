@@ -347,28 +347,40 @@ function ExerciseLibraryModal({ muscleGroup, favorites, onToggleFavorite, onAdd,
   )
 }
 
-function WorkoutModal({ schedule, dayIdx, userId, onClose, onSaved }) {
+const GYM_LS_KEY = 'gym_active_workout'
+
+function WorkoutModal({ schedule, dayIdx, userId, savedState, onMinimize, onCancel, onSaved }) {
   const daySchedule = schedule[dayIdx] || {}
   const mg = getMuscleGroupInfo(daySchedule.muscle_group)
-  const templateExercises = daySchedule.exercises || []
 
-  const [exercises, setExercises] = useState(() =>
-    templateExercises.map(ex => ({
+  const startTimeRef = useRef(savedState?.startTime || Date.now())
+
+  const [exercises, setExercises] = useState(() => {
+    if (savedState?.exercises?.length) return savedState.exercises
+    return (daySchedule.exercises || []).map(ex => ({
       ...ex,
       sets: Array.from({ length: ex.sets || 3 }, (_, i) => ({
-        id: i, reps: ex.reps || 10, weight: ex.lastWeight || '', done: false,
+        id: i, reps: ex.reps || 10, weight: ex.lastWeight ?? '', done: false,
       })),
     }))
-  )
-  const [timerSec, setTimerSec] = useState(0)
-  const [notes, setNotes] = useState('')
+  })
+  const [timerSec, setTimerSec] = useState(() => Math.floor((Date.now() - startTimeRef.current) / 1000))
+  const [notes, setNotes] = useState(savedState?.notes || '')
   const [saving, setSaving] = useState(false)
-  const intervalRef = useRef(null)
+  const [showDiscard, setShowDiscard] = useState(false)
 
+  // Live timer
   useEffect(() => {
-    intervalRef.current = setInterval(() => setTimerSec(s => s + 1), 1000)
-    return () => clearInterval(intervalRef.current)
+    const id = setInterval(() => setTimerSec(Math.floor((Date.now() - startTimeRef.current) / 1000)), 1000)
+    return () => clearInterval(id)
   }, [])
+
+  // Persist state to localStorage so switching tabs doesn't lose progress
+  useEffect(() => {
+    localStorage.setItem(GYM_LS_KEY, JSON.stringify({
+      startTime: startTimeRef.current, dayIdx, exercises, notes,
+    }))
+  }, [exercises, notes, dayIdx])
 
   const toggleSet = (exIdx, setIdx) => {
     setExercises(prev => prev.map((ex, i) => i !== exIdx ? ex : {
@@ -387,19 +399,20 @@ function WorkoutModal({ schedule, dayIdx, userId, onClose, onSaved }) {
   const addSet = (exIdx) => {
     setExercises(prev => prev.map((ex, i) => i !== exIdx ? ex : {
       ...ex,
-      sets: [...ex.sets, { id: ex.sets.length, reps: ex.sets.at(-1)?.reps || 10, weight: ex.sets.at(-1)?.weight || '', done: false }],
+      sets: [...ex.sets, { id: ex.sets.length, reps: ex.sets.at(-1)?.reps || 10, weight: ex.sets.at(-1)?.weight ?? '', done: false }],
     }))
   }
 
   const handleFinish = async () => {
     setSaving(true)
     const dateStr = getDayDateStr(dayIdx)
+    const durationMin = Math.max(1, Math.round(timerSec / 60))
     const logData = {
       user_id: userId,
       date: dateStr,
       muscle_group: daySchedule.muscle_group,
       notes,
-      duration_minutes: Math.round(timerSec / 60),
+      duration_minutes: durationMin,
       exercises: exercises.map(ex => ({
         name: ex.name,
         sets: ex.sets.map(s => ({ reps: s.reps, weight: s.weight, done: s.done })),
@@ -419,28 +432,28 @@ function WorkoutModal({ schedule, dayIdx, userId, onClose, onSaved }) {
       { onConflict: 'user_id,day_of_week' }
     )
 
-    // Sync to calendar (hele dag event)
-    await supabase.from('calendar_events')
-      .delete().eq('user_id', userId)
-      .gte('start_time', `${dateStr}T00:00:00`)
-      .lte('start_time', `${dateStr}T23:59:59`)
-      .like('description', 'gym:%')
+    // Sync to calendar (hele dag event) — delete by exact description to avoid timezone issues
+    await supabase.from('calendar_events').delete().eq('user_id', userId).eq('description', `gym:${dateStr}`)
     await supabase.from('calendar_events').insert({
       user_id: userId,
-      title: `${mg.emoji} ${daySchedule.muscle_group} workout`,
+      title: `${mg.emoji} ${daySchedule.muscle_group}`,
       description: `gym:${dateStr}`,
       start_time: new Date(`${dateStr}T00:00:00`).toISOString(),
       end_time:   new Date(`${dateStr}T23:59:00`).toISOString(),
       color: mg.color,
     })
 
+    localStorage.removeItem(GYM_LS_KEY)
+    window.dispatchEvent(new CustomEvent('gymWorkoutChange', { detail: { active: false } }))
     setSaving(false)
     onSaved()
-    onClose()
+    onMinimize() // close modal
   }
 
   const doneCount = exercises.reduce((acc, ex) => acc + ex.sets.filter(s => s.done).length, 0)
   const totalSets  = exercises.reduce((acc, ex) => acc + ex.sets.length, 0)
+  const totalVol   = exercises.reduce((acc, ex) =>
+    acc + ex.sets.filter(s => s.done).reduce((a, s) => a + (parseFloat(s.weight) || 0) * (parseInt(s.reps) || 0), 0), 0)
 
   return (
     <div style={{
@@ -451,19 +464,21 @@ function WorkoutModal({ schedule, dayIdx, userId, onClose, onSaved }) {
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 12,
-        padding: '16px 20px env(safe-area-inset-top)',
+        padding: '16px 20px',
+        paddingTop: 'max(16px, env(safe-area-inset-top))',
         background: 'var(--bg-sidebar)', borderBottom: '1px solid var(--border)',
         flexShrink: 0,
       }}>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer' }}>
-          <X size={22} />
+        {/* Minimize — keeps workout running */}
+        <button onClick={onMinimize} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: 4 }}>
+          <ChevronDown size={22} />
         </button>
         <div style={{ flex: 1 }}>
           <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-1)' }}>
             {mg.emoji} {daySchedule.muscle_group}
           </p>
           <p style={{ margin: 0, fontSize: 12, color: 'var(--text-3)' }}>
-            {doneCount}/{totalSets} sets klaar
+            {doneCount}/{totalSets} sets · {totalVol > 0 ? `${Math.round(totalVol).toLocaleString('nl-NL')} kg vol.` : ''}
           </p>
         </div>
         <div style={{
@@ -475,6 +490,11 @@ function WorkoutModal({ schedule, dayIdx, userId, onClose, onSaved }) {
           <Clock size={14} />
           {formatTime(timerSec)}
         </div>
+        <button onClick={() => setShowDiscard(true)} style={{
+          background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: 4,
+        }}>
+          <X size={20} />
+        </button>
       </div>
 
       {/* Progress bar */}
@@ -487,7 +507,7 @@ function WorkoutModal({ schedule, dayIdx, userId, onClose, onSaved }) {
       </div>
 
       {/* Exercise list */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 120px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 130px' }}>
         {exercises.map((ex, exIdx) => (
           <div key={ex.name} style={{
             background: 'var(--bg-card)', borderRadius: 16,
@@ -500,46 +520,54 @@ function WorkoutModal({ schedule, dayIdx, userId, onClose, onSaved }) {
             }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: mg.color, flexShrink: 0 }} />
               <p style={{ margin: 0, fontWeight: 700, fontSize: 15, color: 'var(--text-1)', flex: 1 }}>{ex.name}</p>
+              {/* Per-exercise volume */}
+              {(() => {
+                const vol = ex.sets.filter(s => s.done).reduce((a, s) => a + (parseFloat(s.weight) || 0) * (parseInt(s.reps) || 0), 0)
+                return vol > 0 ? <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{Math.round(vol)} kg</span> : null
+              })()}
             </div>
             {/* Set header */}
-            <div style={{ display: 'grid', gridTemplateColumns: '32px 1fr 1fr 36px', gap: 8, padding: '8px 14px', color: 'var(--text-3)', fontSize: 11, fontWeight: 600 }}>
-              <span>SET</span><span>REPS</span><span>KG</span><span />
+            <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 1fr 36px', gap: 8, padding: '8px 14px 4px', color: 'var(--text-3)', fontSize: 11, fontWeight: 600, letterSpacing: '0.04em' }}>
+              <span>#</span><span>REPS</span><span>KG</span><span />
             </div>
             {ex.sets.map((set, setIdx) => (
               <div key={set.id} style={{
-                display: 'grid', gridTemplateColumns: '32px 1fr 1fr 36px', gap: 8,
-                padding: '6px 14px', alignItems: 'center',
+                display: 'grid', gridTemplateColumns: '28px 1fr 1fr 36px', gap: 8,
+                padding: '5px 14px', alignItems: 'center',
                 background: set.done ? `color-mix(in srgb, ${mg.color} 8%, transparent)` : 'transparent',
                 transition: 'background 0.2s',
               }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-3)' }}>{setIdx + 1}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)' }}>{setIdx + 1}</span>
                 <input
-                  type="number" value={set.reps} min={1}
+                  type="number" inputMode="numeric" value={set.reps} min={1}
                   onChange={e => updateSet(exIdx, setIdx, 'reps', e.target.value)}
                   style={{
-                    padding: '7px 8px', borderRadius: 8, background: 'var(--bg-base)',
-                    border: '1px solid var(--border)', color: 'var(--text-1)',
-                    fontSize: 14, fontWeight: 600, textAlign: 'center', outline: 'none',
+                    padding: '8px 6px', borderRadius: 8, background: 'var(--bg-base)',
+                    border: `1px solid ${set.done ? mg.color : 'var(--border)'}`,
+                    color: 'var(--text-1)', fontSize: 15, fontWeight: 700,
+                    textAlign: 'center', outline: 'none', width: '100%', boxSizing: 'border-box',
                   }}
                 />
                 <input
-                  type="number" value={set.weight} min={0} step={0.5}
+                  type="number" inputMode="decimal" value={set.weight} min={0} step={2.5}
                   onChange={e => updateSet(exIdx, setIdx, 'weight', e.target.value)}
                   placeholder="—"
                   style={{
-                    padding: '7px 8px', borderRadius: 8, background: 'var(--bg-base)',
-                    border: '1px solid var(--border)', color: 'var(--text-1)',
-                    fontSize: 14, fontWeight: 600, textAlign: 'center', outline: 'none',
+                    padding: '8px 6px', borderRadius: 8, background: 'var(--bg-base)',
+                    border: `1px solid ${set.done ? mg.color : 'var(--border)'}`,
+                    color: 'var(--text-1)', fontSize: 15, fontWeight: 700,
+                    textAlign: 'center', outline: 'none', width: '100%', boxSizing: 'border-box',
                   }}
                 />
                 <button onClick={() => toggleSet(exIdx, setIdx)} style={{
-                  width: 32, height: 32, borderRadius: 8, border: 'none',
-                  background: set.done ? mg.color : 'var(--bg-base)',
+                  width: 34, height: 34, borderRadius: 8,
+                  background: set.done ? mg.color : 'transparent',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', transition: 'all 0.2s',
-                  border: `1px solid ${set.done ? mg.color : 'var(--border)'}`,
+                  cursor: 'pointer', transition: 'all 0.15s',
+                  border: `2px solid ${set.done ? mg.color : 'var(--border)'}`,
+                  flexShrink: 0,
                 }}>
-                  {set.done && <Check size={14} color="#fff" strokeWidth={2.5} />}
+                  {set.done && <Check size={15} color="#fff" strokeWidth={3} />}
                 </button>
               </div>
             ))}
@@ -566,23 +594,52 @@ function WorkoutModal({ schedule, dayIdx, userId, onClose, onSaved }) {
         />
       </div>
 
-      {/* Finish button */}
+      {/* Bottom bar */}
       <div style={{
         position: 'fixed', bottom: 0, left: 0, right: 0,
-        padding: '12px 20px calc(16px + env(safe-area-inset-bottom))',
+        padding: '10px 16px calc(16px + env(safe-area-inset-bottom))',
         background: 'var(--bg-sidebar)', borderTop: '1px solid var(--border)',
       }}>
         <button onClick={handleFinish} disabled={saving} style={{
-          width: '100%', padding: '14px', borderRadius: 16,
+          width: '100%', padding: '15px', borderRadius: 16,
           background: mg.color, border: 'none',
           color: '#000', fontSize: 16, fontWeight: 800,
           cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.7 : 1,
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
         }}>
           <Check size={18} strokeWidth={3} />
-          {saving ? 'Opslaan...' : 'Workout afronden'}
+          {saving ? 'Opslaan...' : `Workout afronden · ${formatTime(timerSec)}`}
         </button>
       </div>
+
+      {/* Discard confirm */}
+      {showDiscard && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 10,
+          background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+        }}>
+          <div style={{
+            background: 'var(--bg-sidebar)', borderRadius: 20, padding: 24,
+            border: '1px solid var(--border)', width: '100%', maxWidth: 320,
+          }}>
+            <p style={{ margin: '0 0 8px', fontSize: 17, fontWeight: 700, color: 'var(--text-1)' }}>Workout stoppen?</p>
+            <p style={{ margin: '0 0 20px', fontSize: 14, color: 'var(--text-3)' }}>Je voortgang van deze sessie gaat verloren.</p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setShowDiscard(false)} style={{
+                flex: 1, padding: '12px', borderRadius: 12,
+                background: 'var(--bg-card)', border: '1px solid var(--border)',
+                color: 'var(--text-1)', fontWeight: 600, cursor: 'pointer',
+              }}>Annuleren</button>
+              <button onClick={() => { localStorage.removeItem(GYM_LS_KEY); window.dispatchEvent(new CustomEvent('gymWorkoutChange', { detail: { active: false } })); onCancel() }} style={{
+                flex: 1, padding: '12px', borderRadius: 12,
+                background: '#EF4444', border: 'none',
+                color: '#fff', fontWeight: 700, cursor: 'pointer',
+              }}>Stoppen</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -595,12 +652,45 @@ export default function GymWidget({ userId }) {
   const [favorites, setFavorites] = useState(new Set())
   const [showMGModal, setShowMGModal] = useState(false)
   const [showExModal, setShowExModal] = useState(false)
-  const [showWorkout, setShowWorkout] = useState(false)
   const [showSplitModal, setShowSplitModal] = useState(false)
   const [logs, setLogs] = useState({}) // date -> log
   const [loading, setLoading] = useState(true)
   const [syncMsg, setSyncMsg] = useState('')
   const [tab, setTab] = useState('schema') // 'schema' | 'logs'
+
+  // ── Workout persistence ────────────────────────────────────────────────────
+  const getSavedWorkout = () => { try { return JSON.parse(localStorage.getItem(GYM_LS_KEY)) } catch { return null } }
+  const [savedWorkout, setSavedWorkout] = useState(getSavedWorkout)
+  const [showWorkout, setShowWorkout] = useState(() => !!getSavedWorkout())
+
+  // Restore selected day if there's a saved workout
+  useEffect(() => {
+    const s = getSavedWorkout()
+    if (s) { setSelectedDay(s.dayIdx); setShowWorkout(true) }
+  }, [])
+
+  const handleStartWorkout = () => {
+    const state = { startTime: Date.now(), dayIdx: selectedDay, exercises: null, notes: '' }
+    localStorage.setItem(GYM_LS_KEY, JSON.stringify(state))
+    setSavedWorkout(state)
+    setShowWorkout(true)
+    window.dispatchEvent(new CustomEvent('gymWorkoutChange', { detail: { active: true } }))
+  }
+
+  const handleWorkoutMinimize = () => {
+    setShowWorkout(false)
+    // workout still active in localStorage — glow will stay
+  }
+
+  const handleWorkoutCancel = () => {
+    setSavedWorkout(null)
+    setShowWorkout(false)
+  }
+
+  const handleWorkoutSaved = () => {
+    setSavedWorkout(null)
+    loadAll()
+  }
 
   // ── Load data ──────────────────────────────────────────────────────────────
   const loadAll = useCallback(async () => {
@@ -638,20 +728,9 @@ export default function GymWidget({ userId }) {
 
     // Remove calendar event for this day if changed to Rust or no group
     const dateStr = getDayDateStr(selectedDay)
-    if (!mg || mg === 'Rust') {
-      await supabase.from('calendar_events')
-        .delete().eq('user_id', userId)
-        .gte('start_time', `${dateStr}T00:00:00`)
-        .lte('start_time', `${dateStr}T23:59:59`)
-        .like('description', 'gym:%')
-    } else {
-      // Upsert calendar event with new muscle group
+    await supabase.from('calendar_events').delete().eq('user_id', userId).eq('description', `gym:${dateStr}`)
+    if (mg && mg !== 'Rust') {
       const info = getMuscleGroupInfo(mg)
-      await supabase.from('calendar_events')
-        .delete().eq('user_id', userId)
-        .gte('start_time', `${dateStr}T00:00:00`)
-        .lte('start_time', `${dateStr}T23:59:59`)
-        .like('description', 'gym:%')
       await supabase.from('calendar_events').insert({
         user_id: userId,
         title: `${info.emoji} ${mg}`,
@@ -720,14 +799,9 @@ export default function GymWidget({ userId }) {
       })
     })
     if (!events.length) { setSyncMsg('Geen trainingsdagen ingepland.'); setTimeout(() => setSyncMsg(''), 3000); return }
-    // Remove existing gym events for this week
-    const weekStart = new Date(today); weekStart.setDate(today.getDate() - todayNL)
-    const weekEnd   = new Date(today); weekEnd.setDate(today.getDate() + (6 - todayNL))
-    await supabase.from('calendar_events')
-      .delete().eq('user_id', userId)
-      .gte('start_time', weekStart.toISOString().slice(0, 10) + 'T00:00:00')
-      .lte('start_time', weekEnd.toISOString().slice(0, 10) + 'T23:59:59')
-      .like('description', 'gym:%')
+    // Delete by exact description to avoid timezone issues
+    const gymDescs = events.map(e => e.description)
+    await supabase.from('calendar_events').delete().eq('user_id', userId).in('description', gymDescs)
     await supabase.from('calendar_events').insert(events)
     setSyncMsg(`${events.length} workouts gesynchroniseerd ✓`)
     setTimeout(() => setSyncMsg(''), 3000)
@@ -759,7 +833,33 @@ export default function GymWidget({ userId }) {
         @keyframes gymSheetUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         @keyframes gymFadeIn  { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes spin       { to { transform: rotate(360deg); } }
+        @keyframes gymPulse   { 0%,100% { opacity: 1; } 50% { opacity: 0.75; } }
+        @keyframes gymGlow    { 0%,100% { box-shadow: 0 0 0px rgba(249,115,22,0); } 50% { box-shadow: 0 0 14px rgba(249,115,22,0.35); } }
       `}</style>
+
+      {/* ── Active workout banner ── */}
+      {savedWorkout && !showWorkout && (() => {
+        const s = schedule[savedWorkout.dayIdx] || {}
+        const bMg = getMuscleGroupInfo(s.muscle_group)
+        const elapsed = Math.floor((Date.now() - savedWorkout.startTime) / 1000)
+        return (
+          <button onClick={() => setShowWorkout(true)} style={{
+            display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+            padding: '11px 14px', borderRadius: 14, marginBottom: 12,
+            background: `color-mix(in srgb, ${bMg.color} 12%, transparent)`,
+            border: `1px solid color-mix(in srgb, ${bMg.color} 40%, transparent)`,
+            cursor: 'pointer', textAlign: 'left',
+            animation: 'gymPulse 2s ease-in-out infinite',
+          }}>
+            <span style={{ fontSize: 20 }}>{bMg.emoji}</span>
+            <div style={{ flex: 1 }}>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: bMg.color }}>Workout actief — {s.muscle_group}</p>
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--text-3)' }}>{formatTime(elapsed)} · Tik om te hervatten</p>
+            </div>
+            <ChevronRight size={16} color={bMg.color} />
+          </button>
+        )
+      })()}
 
       {/* ── Tab bar ── */}
       <div style={{ display: 'flex', gap: 4, padding: '0 0 16px', flexShrink: 0 }}>
@@ -883,15 +983,15 @@ export default function GymWidget({ userId }) {
                 <Plus size={16} /> Oefening toevoegen
               </button>
 
-              {/* Start workout */}
+              {/* Start workout / Resume */}
               {sortedExercises.length > 0 && (
-                <button onClick={() => setShowWorkout(true)} style={{
+                <button onClick={savedWorkout ? () => setShowWorkout(true) : handleStartWorkout} style={{
                   width: '100%', padding: '15px', borderRadius: 16, border: 'none',
                   background: mg.color, color: '#000', fontSize: 16, fontWeight: 800,
                   cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
                 }}>
                   <Play size={18} fill="#000" />
-                  Workout starten
+                  {savedWorkout && savedWorkout.dayIdx === selectedDay ? 'Workout hervatten' : 'Workout starten'}
                 </button>
               )}
 
@@ -1024,10 +1124,12 @@ export default function GymWidget({ userId }) {
       )}
       {showWorkout && (
         <WorkoutModal
-          schedule={schedule} dayIdx={selectedDay}
+          schedule={schedule} dayIdx={savedWorkout?.dayIdx ?? selectedDay}
           userId={userId}
-          onClose={() => setShowWorkout(false)}
-          onSaved={loadAll}
+          savedState={savedWorkout}
+          onMinimize={handleWorkoutMinimize}
+          onCancel={handleWorkoutCancel}
+          onSaved={handleWorkoutSaved}
         />
       )}
 

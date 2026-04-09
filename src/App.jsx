@@ -90,12 +90,20 @@ export default function App() {
   const [updateAvailable, setUpdateAvailable] = useState(false)
   const [xpToast, setXpToast] = useState(null) // { xp, icon }
   const [hasLevelUp, setHasLevelUp] = useState(() => !!localStorage.getItem('levelup_pending'))
+  const [hasActiveGymWorkout, setHasActiveGymWorkout] = useState(() => !!localStorage.getItem('gym_active_workout'))
 
   // Listen for level-up events dispatched by awardXP utility
   useEffect(() => {
     const handler = () => setHasLevelUp(true)
     window.addEventListener('levelup', handler)
     return () => window.removeEventListener('levelup', handler)
+  }, [])
+
+  // Listen for gym workout start/stop events
+  useEffect(() => {
+    const handler = (e) => setHasActiveGymWorkout(e.detail.active)
+    window.addEventListener('gymWorkoutChange', handler)
+    return () => window.removeEventListener('gymWorkoutChange', handler)
   }, [])
 
   // Pull-to-refresh
@@ -646,6 +654,7 @@ export default function App() {
             syncFlash={syncFlash}
             updateAvailable={updateAvailable}
             hasLevelUp={hasLevelUp}
+            hasActiveGymWorkout={hasActiveGymWorkout}
           />
         </div>
 
@@ -798,6 +807,7 @@ export default function App() {
               isAdmin={isAdmin}
               showJumbo={isAdmin || !!userProfile?.werk_tab}
               hasLevelUp={hasLevelUp}
+              hasActiveGymWorkout={hasActiveGymWorkout}
             />
           </div>
         </div>

@@ -18,7 +18,7 @@ export default function Sidebar({
   activePage, setActivePage,
   isAdmin, showJumbo, user,
   onShowSettings, onShowAdmin, onLogout,
-  syncing, syncFlash, updateAvailable, hasLevelUp,
+  syncing, syncFlash, updateAvailable, hasLevelUp, hasActiveGymWorkout,
 }) {
   const displayName = user?.email?.split('@')[0] || 'Student'
   const initial = displayName.charAt(0).toUpperCase()
@@ -73,8 +73,12 @@ export default function Sidebar({
       <nav style={{ flex: 1, padding: '10px 8px', overflowY: 'auto' }}>
         {navItems.map(({ id, Icon, label }) => {
           const active = activePage === id
-          const isStats = id === 'statistieken'
-          const glowing = isStats && hasLevelUp && !active
+          const glowingStats = id === 'statistieken' && hasLevelUp && !active
+          const glowingGym   = id === 'gym' && hasActiveGymWorkout && !active
+          const glowing = glowingStats || glowingGym
+          const glowColor  = glowingGym ? '#F97316' : '#FACC15'
+          const glowBg     = glowingGym ? 'rgba(249,115,22,0.06)' : 'rgba(250,204,21,0.06)'
+          const glowBorder = glowingGym ? 'rgba(249,115,22,0.6)' : 'rgba(250,204,21,0.6)'
           return (
             <button
               key={id}
@@ -85,11 +89,11 @@ export default function Sidebar({
                 padding: '8px 10px',
                 borderRadius: 8,
                 marginBottom: 2,
-                background: active ? 'var(--accent-dim)' : glowing ? 'rgba(250,204,21,0.06)' : 'transparent',
+                background: active ? 'var(--accent-dim)' : glowing ? glowBg : 'transparent',
                 border: 'none',
-                borderLeft: active ? '2px solid var(--accent)' : glowing ? '2px solid rgba(250,204,21,0.6)' : '2px solid transparent',
+                borderLeft: active ? '2px solid var(--accent)' : glowing ? `2px solid ${glowBorder}` : '2px solid transparent',
                 cursor: 'pointer',
-                color: active ? 'var(--accent)' : glowing ? '#FACC15' : 'var(--text-2)',
+                color: active ? 'var(--accent)' : glowing ? glowColor : 'var(--text-2)',
                 fontSize: 13,
                 fontWeight: active || glowing ? 600 : 400,
                 textAlign: 'left',
@@ -112,7 +116,7 @@ export default function Sidebar({
             >
               <Icon size={15} />
               {label}
-              {glowing && (
+              {glowingStats && (
                 <span style={{
                   marginLeft: 'auto', fontSize: 10, fontWeight: 700,
                   background: 'linear-gradient(90deg, #FACC15, #F97316, #FACC15)',
@@ -120,6 +124,15 @@ export default function Sidebar({
                   WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                   animation: 'gradientShift 1.5s linear infinite',
                 }}>LEVEL UP</span>
+              )}
+              {glowingGym && (
+                <span style={{
+                  marginLeft: 'auto', fontSize: 10, fontWeight: 700,
+                  background: 'linear-gradient(90deg, #F97316, #EF4444, #F97316)',
+                  backgroundSize: '200% 100%',
+                  WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+                  animation: 'gradientShift 1.5s linear infinite',
+                }}>ACTIEF</span>
               )}
             </button>
           )
