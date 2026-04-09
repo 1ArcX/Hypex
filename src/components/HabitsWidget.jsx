@@ -227,9 +227,29 @@ function HabitModal({ habit, onSave, onClose, onDelete, counterConfig }) {
   const [counterUnit, setCounterUnit] = useState(existingConfig.unit || 'glazen')
   const [counterTarget, setCounterTarget] = useState(existingConfig.target || 8)
   const [showLibrary, setShowLibrary] = useState(false)
+  const [remindTimes, setRemindTimes] = useState(
+    habit?.remind_times && !Array.isArray(habit.remind_times) ? habit.remind_times : {}
+  )
 
   const toggleDay = (i) =>
     setFrequency(f => f.includes(i) ? f.filter(d => d !== i) : [...f, i].sort((a, b) => a - b))
+
+  const REMIND_DEFAULTS = { ochtend: '08:00', middag: '13:00', avond: '20:00' }
+  const REMIND_OPTIONS  = {
+    ochtend: ['06:00','07:00','08:00','09:00','10:00','11:00'],
+    middag:  ['11:00','12:00','13:00','14:00','15:00','16:00'],
+    avond:   ['17:00','18:00','19:00','20:00','21:00','22:00'],
+  }
+
+  const toggleRemind = (slot) =>
+    setRemindTimes(r =>
+      slot in r
+        ? (({ [slot]: _, ...rest }) => rest)(r)
+        : { ...r, [slot]: REMIND_DEFAULTS[slot] }
+    )
+
+  const setRemindTime = (slot, time) =>
+    setRemindTimes(r => ({ ...r, [slot]: time }))
 
   const pickPreset = (preset) => {
     setName(preset.name)
@@ -250,7 +270,7 @@ function HabitModal({ habit, onSave, onClose, onDelete, counterConfig }) {
     const counterData = habitType === 'counter'
       ? { type: 'counter', unit: counterUnit, target: counterTarget }
       : { type: 'check' }
-    onSave({ name: name.trim(), icon, color, frequency }, counterData)
+    onSave({ name: name.trim(), icon, color, frequency, remind_times: remindTimes }, counterData)
   }
 
   return ReactDOM.createPortal(
@@ -392,7 +412,7 @@ function HabitModal({ habit, onSave, onClose, onDelete, counterConfig }) {
           </div>
         </div>
 
-        <div style={{ marginBottom: 22 }}>
+        <div style={{ marginBottom: 14 }}>
           <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, display: 'block', marginBottom: 6 }}>Herhaling</label>
           <div style={{ display: 'flex', gap: 5 }}>
             {DAY_LABELS.map((label, i) => (
@@ -405,6 +425,56 @@ function HabitModal({ habit, onSave, onClose, onDelete, counterConfig }) {
                 boxShadow: frequency.includes(i) ? `0 0 8px ${color}40` : 'none',
               }}>{label}</button>
             ))}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 22 }}>
+          <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, display: 'block', marginBottom: 6 }}>
+            Herinnering <span style={{ opacity: 0.45 }}>(optioneel)</span>
+          </label>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[
+              ['ochtend', '☀️', 'Ochtend'],
+              ['middag',  '🌤', 'Middag'],
+              ['avond',   '🌙', 'Avond'],
+            ].map(([slot, emoji, label]) => {
+              const active = slot in remindTimes
+              return (
+                <div key={slot} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <button onClick={() => toggleRemind(slot)} style={{
+                    width: '100%', padding: '8px 4px', borderRadius: 10, cursor: 'pointer',
+                    transition: 'all 0.15s',
+                    background: active ? `${color}18` : 'rgba(255,255,255,0.04)',
+                    color: active ? color : 'rgba(255,255,255,0.3)',
+                    border: active ? `1px solid ${color}60` : '1px solid rgba(255,255,255,0.07)',
+                    boxShadow: active ? `0 0 10px ${color}30` : 'none',
+                    fontWeight: active ? 600 : 400,
+                  }}>
+                    <div style={{ fontSize: 16 }}>{emoji}</div>
+                    <div style={{ fontSize: 11, marginTop: 2 }}>{label}</div>
+                    <div style={{ fontSize: 9, opacity: 0.55, marginTop: 1 }}>
+                      {active ? remindTimes[slot] : REMIND_DEFAULTS[slot]}
+                    </div>
+                  </button>
+                  {active && (
+                    <select
+                      value={remindTimes[slot]}
+                      onChange={e => setRemindTime(slot, e.target.value)}
+                      style={{
+                        width: '100%', padding: '5px 4px', borderRadius: 8, fontSize: 11,
+                        background: 'rgba(255,255,255,0.06)', color: color,
+                        border: `1px solid ${color}40`, colorScheme: 'dark',
+                        textAlign: 'center', cursor: 'pointer',
+                      }}
+                    >
+                      {REMIND_OPTIONS[slot].map(t => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </div>
 

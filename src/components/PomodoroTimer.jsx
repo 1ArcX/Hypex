@@ -19,6 +19,9 @@ async function registerPushSubscription(userId) {
   if (!userId || !('serviceWorker' in navigator) || !('PushManager' in window)) return
   try {
     const reg = await navigator.serviceWorker.ready
+
+    // subscribe() is idempotent: geeft bestaande subscription terug als die nog geldig is,
+    // of maakt een nieuwe als die verlopen/verwijderd is (iOS ruimt deze op na inactiviteit).
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC),
@@ -327,11 +330,24 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
 
   useEffect(() => { stateRef.current = state }, [state])
 
-  // ── Re-register push subscription on mount if notifs already enabled ─────
+  // ── Re-register push subscription on mount + periodically ────────────────
   useEffect(() => {
     if (!userId || !state.notifEnabled) return
-    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      registerPushSubscription(userId)
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+
+    // Registreer bij elke app-open (mount) en elke keer dat de app naar de voorgrond komt.
+    // Op iOS/Android PWA wordt de push subscription door het OS gewist na inactiviteit —
+    // dit zorgt dat die automatisch opnieuw aangemaakt wordt zonder dat de gebruiker
+    // meldingen hoeft uit en aan te zetten.
+    registerPushSubscription(userId)
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') registerPushSubscription(userId)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [userId, state.notifEnabled])
 

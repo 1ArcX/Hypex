@@ -20,6 +20,9 @@
 [functions."pomodoro-cron/pomodoro-cron"]
   schedule = "* * * * *"
 
+[functions."habit-reminder/habit-reminder"]
+  schedule = "0 * * * *"
+
 [functions."simacan-check/simacan-check"]
   schedule = "* * * * *"
 
