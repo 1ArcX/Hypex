@@ -27,6 +27,7 @@ import AgendaPage from './pages/AgendaPage'
 import SchoolPage from './pages/SchoolPage'
 import TakenPage from './pages/TakenPage'
 import GewoontesPage from './pages/GewoontesPage'
+import GymPage from './pages/GymPage'
 import NotitiesPage from './pages/NotitiesPage'
 import JumboPage from './pages/JumboPage'
 import StatsPage from './pages/StatsPage'
@@ -44,7 +45,7 @@ function urlBase64ToUint8Array(b) {
 const PAGE_NAMES = {
   dashboard: 'Dashboard', agenda: 'Agenda', taken: 'Taken',
   pomodoro: 'Pomodoro', school: 'School',
-  gewoontes: 'Gewoontes', notities: 'Notities', statistieken: 'Statistieken', jumbo: 'Jumbo',
+  gewoontes: 'Gewoontes', gym: 'Gym', notities: 'Notities', statistieken: 'Statistieken', jumbo: 'Jumbo',
 }
 
 const PAGE_ORDER = ['dashboard', 'agenda', 'taken', 'pomodoro', 'school', 'gewoontes', 'notities', 'statistieken']
@@ -768,6 +769,10 @@ export default function App() {
 
             {activePage === 'gewoontes' && (
               <GewoontesPage userId={user.id} syncTrigger={syncTrigger} />
+            )}
+
+            {activePage === 'gym' && (
+              <GymPage userId={user.id} />
             )}
 
             {activePage === 'notities' && (

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Home, Calendar, CheckSquare, Timer, MoreHorizontal, GraduationCap, Flame, FileText, Briefcase, BarChart2 } from 'lucide-react'
+import { Home, Calendar, CheckSquare, Timer, MoreHorizontal, GraduationCap, Flame, FileText, Briefcase, BarChart2, Dumbbell } from 'lucide-react'
 
 const PRIMARY_TABS = [
   { id: 'dashboard', Icon: Home,          label: 'Home'      },
@@ -13,6 +13,7 @@ const SHEET_BASE = [
   { id: 'pomodoro',     Icon: Timer,         label: 'Pomodoro' },
   { id: 'statistieken', Icon: BarChart2,     label: 'Stats'    },
   { id: 'notities',     Icon: FileText,      label: 'Notities' },
+  { id: 'gym',          Icon: Dumbbell,      label: 'Gym'      },
 ]
 
 export default function BottomNav({ activePage, setActivePage, isAdmin, showJumbo, hasLevelUp }) {
