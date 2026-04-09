@@ -548,6 +548,13 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
   const level = getLevel(xp)
   const xpProgress = xpInLevel(xp)
 
+  const [activeTab, setActiveTab] = useState(() => {
+    const h = new Date().getHours()
+    if (h < 12) return 'ochtend'
+    if (h < 17) return 'middag'
+    return 'avond'
+  })
+
   // ── Perfect day check ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!todayHabits.length || loading) return
@@ -852,247 +859,301 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
   }
 
   // ── Full render ────────────────────────────────────────────────────────────
+  // Classify today's habits by time slot
+  function habitSlot(habit) {
+    const rt = habit.remind_times
+    if (!rt || typeof rt !== 'object' || Array.isArray(rt)) return null
+    for (const slot of ['ochtend', 'middag', 'avond']) {
+      if (slot in rt) return slot
+    }
+    return null
+  }
+
+  const altijdHabits = todayHabits.filter(h => !habitSlot(h))
+  const slotHabits   = {
+    ochtend: todayHabits.filter(h => habitSlot(h) === 'ochtend'),
+    middag:  todayHabits.filter(h => habitSlot(h) === 'middag'),
+    avond:   todayHabits.filter(h => habitSlot(h) === 'avond'),
+  }
+
+  const TABS = [
+    { key: 'ochtend', label: 'Ochtend' },
+    { key: 'middag',  label: 'Middag'  },
+    { key: 'avond',   label: 'Avond'   },
+  ]
+
+  function subTitle(habit, done, streak) {
+    if (done) return '✓ Gedaan vandaag'
+    if (streak > 0) return `🔥 ${streak} ${streak === 1 ? 'dag' : 'dagen'} op rij`
+    return '⭐ Ga ervoor!'
+  }
+
+  function HabitCard({ habit }) {
+    const set       = completions[habit.id] || new Set()
+    const streak    = calcStreak(set, habit)
+    const bounce    = animating[habit.id]
+    const cfg       = counterConfig[habit.id]
+    const isCounter = cfg?.type === 'counter'
+    const count     = isCounter ? (counterValues[habit.id]?.[today] || 0) : 0
+    const target    = isCounter ? (cfg.target || 1) : 1
+    const done      = isHabitDone(habit)
+
+    return (
+      <div
+        onClick={() => !isCounter && toggleCompletion(habit)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 14,
+          padding: '14px 16px', borderRadius: 18,
+          background: done ? `${habit.color}12` : 'rgba(255,255,255,0.055)',
+          cursor: isCounter ? 'default' : 'pointer',
+          transition: 'background 0.25s',
+          transform: bounce ? 'scale(0.98)' : 'scale(1)',
+        }}
+      >
+        {/* Icon */}
+        <div style={{
+          width: 52, height: 52, borderRadius: 16, flexShrink: 0,
+          background: `${habit.color}22`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 26,
+          transition: 'transform 0.2s',
+          transform: bounce ? 'scale(1.15)' : 'scale(1)',
+        }}>
+          {habit.icon}
+        </div>
+
+        {/* Text */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontSize: 16, fontWeight: 600, lineHeight: 1.2,
+            color: done ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.95)',
+            textDecoration: done && !isCounter ? 'line-through' : 'none',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            marginBottom: 4,
+          }}>
+            {habit.name}
+          </div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', display: 'flex', alignItems: 'center', gap: 4 }}>
+            {subTitle(habit, done, streak)}
+          </div>
+        </div>
+
+        {/* Right side */}
+        {isCounter ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            <div style={{
+              minWidth: 62, padding: '8px 12px', borderRadius: 14,
+              background: done ? `${habit.color}25` : 'rgba(255,255,255,0.08)',
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+              transition: 'background 0.2s',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 2, lineHeight: 1 }}>
+                <span style={{ fontSize: 20, fontWeight: 700, color: done ? habit.color : 'white' }}>{count}</span>
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>/{target}</span>
+              </div>
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>{cfg.unit}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={e => { e.stopPropagation(); adjustCounter(habit, -1) }}
+                style={{
+                  width: 28, height: 28, borderRadius: '50%',
+                  border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: 'rgba(255,255,255,0.45)',
+                }}>
+                <Minus size={12} />
+              </button>
+              <button
+                onClick={e => { e.stopPropagation(); adjustCounter(habit, 1) }}
+                style={{
+                  width: 28, height: 28, borderRadius: '50%',
+                  border: `1px solid ${habit.color}60`, background: `${habit.color}20`,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: habit.color,
+                }}>
+                <Plus size={12} />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <div
+              onClick={e => { e.stopPropagation(); toggleCompletion(habit) }}
+              style={{
+                width: 34, height: 34, borderRadius: '50%', cursor: 'pointer',
+                border: `2px solid ${done ? habit.color : 'rgba(255,255,255,0.2)'}`,
+                background: done ? habit.color : 'transparent',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all 0.22s',
+                boxShadow: done ? `0 0 14px ${habit.color}55` : 'none',
+                transform: bounce ? 'scale(1.25)' : 'scale(1)',
+              }}>
+              {done && (
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path d="M2.5 7l3 3 6-6" stroke="#000" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+            </div>
+            <button
+              onClick={e => { e.stopPropagation(); setModalHabit(habit) }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.18)', padding: 0, lineHeight: 0 }}
+              onTouchStart={e => e.currentTarget.style.color = 'rgba(255,255,255,0.6)'}
+              onTouchEnd={e => e.currentTarget.style.color = 'rgba(255,255,255,0.18)'}>
+              <Pencil size={11} />
+            </button>
+          </div>
+        )}
+        {isCounter && (
+          <button
+            onClick={e => { e.stopPropagation(); setModalHabit(habit) }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.18)', padding: '0 0 0 2px', alignSelf: 'flex-start', lineHeight: 0 }}>
+            <Pencil size={11} />
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  function SectionHeader({ label }) {
+    return (
+      <div style={{ fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.3)', padding: '8px 4px 4px', letterSpacing: '0.03em' }}>
+        {label}
+      </div>
+    )
+  }
+
+  const activeSlotHabits = slotHabits[activeTab] || []
+
   return (
     <>
-      <div className={seamless ? '' : 'glass-card p-4'} style={{
-        ...(seamless ? { padding: '0 4px' } : { borderLeft: '3px solid rgba(34,197,94,0.45)', background: 'linear-gradient(135deg, rgba(34,197,94,0.05) 0%, transparent 60%)' }),
-      }}>
+      <div style={{ paddingBottom: 16 }}>
+
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-          {!seamless && <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <div style={{ width: 24, height: 24, borderRadius: 8, background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Leaf size={12} style={{ color: '#22C55E' }} />
-            </div>
-            <span style={{ fontSize: 10, color: '#22C55E', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Gewoontes</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, padding: seamless ? '0 4px' : 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 18, fontWeight: 700, color: 'rgba(255,255,255,0.92)' }}>Gewoontes</span>
             {todayHabits.length > 0 && (
               <span style={{
-                fontSize: 11, fontWeight: 700,
-                color: doneToday === todayHabits.length ? '#22C55E' : 'rgba(255,255,255,0.3)',
+                fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
+                background: 'rgba(255,255,255,0.07)',
+                color: doneToday === todayHabits.length ? '#22C55E' : 'rgba(255,255,255,0.4)',
               }}>
                 {doneToday}/{todayHabits.length}
               </span>
             )}
-          </div>}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {/* Level badge */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 4,
-              padding: '2px 8px', borderRadius: 20,
-              background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.2)',
-            }}>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '2px 8px', borderRadius: 20, background: 'rgba(250,204,21,0.07)' }}>
               <Trophy size={10} color="#FACC15" />
               <span style={{ fontSize: 11, color: '#FACC15', fontWeight: 600 }}>Lvl {level}</span>
             </div>
             <button onClick={() => setModalHabit('new')} style={{
-              background: 'color-mix(in srgb, var(--accent) 10%, transparent)',
-              border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
-              borderRadius: 8, padding: '4px 8px', cursor: 'pointer',
-              color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12,
+              width: 30, height: 30, borderRadius: '50%', cursor: 'pointer',
+              background: 'rgba(255,255,255,0.1)', border: 'none',
+              color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <Plus size={12} /> Nieuw
+              <Plus size={16} />
             </button>
           </div>
         </div>
 
-        {/* Habit progress bar */}
+        {/* Progress bar */}
         {todayHabits.length > 0 && (
-          <div style={{ height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 4, marginBottom: 6, overflow: 'hidden' }}>
+          <div style={{ height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 4, marginBottom: 4, overflow: 'hidden' }}>
             <div style={{
-              height: '100%',
-              width: `${(doneToday / todayHabits.length) * 100}%`,
-              background: doneToday === todayHabits.length
-                ? 'linear-gradient(90deg, var(--accent), #818CF8)' : 'var(--accent)',
+              height: '100%', width: `${(doneToday / todayHabits.length) * 100}%`,
+              background: doneToday === todayHabits.length ? 'linear-gradient(90deg, #22C55E, #818CF8)' : '#22C55E',
               borderRadius: 4, transition: 'width 0.4s',
-              boxShadow: '0 0 8px color-mix(in srgb, var(--accent) 50%, transparent)',
             }} />
           </div>
         )}
 
         {/* XP bar */}
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ height: 2, background: 'rgba(255,255,255,0.04)', borderRadius: 4, overflow: 'hidden' }}>
-            <div style={{
-              height: '100%', width: `${(xpProgress / LEVEL_XP) * 100}%`,
-              background: 'linear-gradient(90deg, #FACC15, #F59E0B)',
-              borderRadius: 4, transition: 'width 0.6s ease',
-            }} />
-          </div>
-          <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.18)', margin: '2px 0 0', textAlign: 'right' }}>
-            {xpProgress}/{LEVEL_XP} XP → Lvl {level + 1}
-          </p>
+        <div style={{ height: 2, background: 'rgba(255,255,255,0.04)', borderRadius: 4, overflow: 'hidden', marginBottom: 16 }}>
+          <div style={{ height: '100%', width: `${(xpProgress / LEVEL_XP) * 100}%`, background: 'linear-gradient(90deg, #FACC15, #F59E0B)', borderRadius: 4, transition: 'width 0.6s' }} />
+        </div>
+
+        {/* Time tabs */}
+        <div style={{
+          display: 'flex', gap: 6, marginBottom: 18,
+          overflowX: 'auto', paddingBottom: 2,
+          scrollbarWidth: 'none',
+        }}>
+          {TABS.map(tab => (
+            <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{
+              padding: '7px 18px', borderRadius: 22, border: 'none', cursor: 'pointer',
+              fontWeight: 500, fontSize: 14, flexShrink: 0, transition: 'all 0.18s',
+              background: activeTab === tab.key ? 'rgba(255,255,255,0.14)' : 'transparent',
+              color: activeTab === tab.key ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.35)',
+            }}>
+              {tab.label}
+            </button>
+          ))}
         </div>
 
         {/* Perfect day banner */}
-        {showPerfectDay && (
-          <PerfectDayBanner onDone={() => setShowPerfectDay(false)} />
-        )}
+        {showPerfectDay && <PerfectDayBanner onDone={() => setShowPerfectDay(false)} />}
 
         {loading && (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
-            <div className="animate-spin" style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid var(--accent)', borderTopColor: 'transparent' }} />
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '32px 0' }}>
+            <div className="animate-spin" style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.2)', borderTopColor: 'white' }} />
           </div>
         )}
 
         {!loading && habits.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '18px 0' }}>
-            <div style={{ fontSize: 30, marginBottom: 8 }}>🌱</div>
-            <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, margin: '0 0 2px' }}>Nog geen gewoontes</p>
-            <p style={{ color: 'rgba(255,255,255,0.18)', fontSize: 11, margin: 0 }}>Klik op Nieuw om te beginnen</p>
+          <div style={{ textAlign: 'center', padding: '32px 0' }}>
+            <div style={{ fontSize: 36, marginBottom: 10 }}>🌱</div>
+            <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 15, fontWeight: 500, margin: '0 0 4px' }}>Nog geen gewoontes</p>
+            <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13, margin: 0 }}>Tik op + om te beginnen</p>
           </div>
         )}
 
         {!loading && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            {todayHabits.map(habit => {
-              const set = completions[habit.id] || new Set()
-              const streak = calcStreak(set, habit)
-              const bounce = animating[habit.id]
-              const cfg = counterConfig[habit.id]
-              const isCounter = cfg?.type === 'counter'
-              const count = isCounter ? (counterValues[habit.id]?.[today] || 0) : null
-              const target = isCounter ? (cfg.target || 1) : null
-              const done = isHabitDone(habit)
-              const sc = streakColor(streak)
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
 
-              return (
-                <div key={habit.id}
-                  onClick={() => !isCounter && toggleCompletion(habit)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    padding: '10px 12px', borderRadius: 12,
-                    cursor: isCounter ? 'default' : 'pointer',
-                    border: done ? `1px solid ${habit.color}35` : '1px solid rgba(255,255,255,0.06)',
-                    background: done ? `${habit.color}0C` : 'rgba(255,255,255,0.015)',
-                    transition: 'border-color 0.2s, background 0.2s',
-                  }}>
+            {/* Altijd (geen tijdslot) */}
+            {altijdHabits.length > 0 && (
+              <>
+                <SectionHeader label="Altijd" />
+                {altijdHabits.map(habit => <HabitCard key={habit.id} habit={habit} />)}
+              </>
+            )}
 
-                  {isCounter ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
-                      <button
-                        onClick={e => { e.stopPropagation(); adjustCounter(habit, -1) }}
-                        style={{
-                          width: 22, height: 22, borderRadius: '50%', border: `1px solid rgba(255,255,255,0.15)`,
-                          background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          color: 'rgba(255,255,255,0.4)',
-                        }}>
-                        <Minus size={10} />
-                      </button>
-                      <div style={{
-                        width: 34, height: 34, borderRadius: 10, flexShrink: 0,
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                        border: `2px solid ${done ? habit.color : 'rgba(255,255,255,0.18)'}`,
-                        background: done ? `${habit.color}20` : 'transparent',
-                        transition: 'all 0.2s',
-                        transform: bounce ? 'scale(1.2)' : 'scale(1)',
-                      }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: done ? habit.color : 'rgba(255,255,255,0.7)', lineHeight: 1 }}>{count}</span>
-                        <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', lineHeight: 1 }}>/{target}</span>
-                      </div>
-                      <button
-                        onClick={e => { e.stopPropagation(); adjustCounter(habit, 1) }}
-                        style={{
-                          width: 22, height: 22, borderRadius: '50%', border: `1px solid ${habit.color}60`,
-                          background: `${habit.color}15`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          color: habit.color,
-                        }}>
-                        <Plus size={10} />
-                      </button>
-                    </div>
-                  ) : (
-                    <div style={{
-                      width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      border: `2px solid ${done ? habit.color : 'rgba(255,255,255,0.18)'}`,
-                      background: done ? habit.color : 'transparent',
-                      transition: 'all 0.2s',
-                      transform: bounce ? 'scale(1.35)' : 'scale(1)',
-                      boxShadow: done ? `0 0 12px ${habit.color}60` : 'none',
-                    }}>
-                      {done && (
-                        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                          <path d="M2 6.5l3 3 6-6" stroke="#000" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      )}
-                    </div>
-                  )}
+            {/* Actief tijdslot */}
+            {activeSlotHabits.length > 0 && (
+              <>
+                <SectionHeader label={{ ochtend: 'Ochtend', middag: 'Middag', avond: 'Avond' }[activeTab]} />
+                {activeSlotHabits.map(habit => <HabitCard key={habit.id} habit={habit} />)}
+              </>
+            )}
 
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
-                      <span style={{ fontSize: 15 }}>{habit.icon}</span>
-                      <span style={{
-                        fontSize: 13, fontWeight: 500,
-                        color: done ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.88)',
-                        textDecoration: done && !isCounter ? 'line-through' : 'none',
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        transition: 'color 0.2s',
-                      }}>{habit.name}</span>
-                      {isCounter && (
-                        <span style={{ fontSize: 10, color: habit.color, opacity: 0.7 }}>{cfg.unit}</span>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', gap: 3 }}>
-                      {last7.map(date => {
-                        const dayFreq = jsDayToFreq(new Date(date + 'T12:00:00').getDay())
-                        const scheduled = (habit.frequency ?? [0,1,2,3,4,5,6]).includes(dayFreq)
-                        const completed = (completions[habit.id] || new Set()).has(date)
-                        return (
-                          <div key={date} style={{
-                            width: 5, height: 5, borderRadius: '50%',
-                            background: completed ? habit.color : (scheduled ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.03)'),
-                            boxShadow: completed ? `0 0 4px ${habit.color}80` : 'none',
-                            transition: 'background 0.2s',
-                          }} />
-                        )
-                      })}
-                    </div>
-                  </div>
+            {altijdHabits.length === 0 && activeSlotHabits.length === 0 && todayHabits.length > 0 && (
+              <div style={{ textAlign: 'center', padding: '24px 0', color: 'rgba(255,255,255,0.25)', fontSize: 13 }}>
+                Geen gewoontes voor {TABS.find(t => t.key === activeTab)?.label.toLowerCase()}
+              </div>
+            )}
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
-                    {streak > 0 && (
-                      <div style={{
-                        display: 'flex', alignItems: 'center', gap: 2,
-                        padding: streak >= 7 ? '2px 6px' : '0',
-                        borderRadius: 20,
-                        background: streak >= 7 ? `${sc}18` : 'transparent',
-                        border: streak >= 7 ? `1px solid ${sc}40` : 'none',
-                      }}>
-                        <Flame size={12} color={sc} style={{ filter: streak >= 7 ? `drop-shadow(0 0 4px ${sc})` : 'none' }} />
-                        <span style={{
-                          fontSize: 12, fontWeight: 700, color: sc,
-                          textShadow: streak >= 14 ? `0 0 8px ${sc}` : 'none',
-                        }}>
-                          {streak}
-                        </span>
-                      </div>
-                    )}
-                    <button
-                      onClick={e => { e.stopPropagation(); setModalHabit(habit) }}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.18)', padding: '2px', borderRadius: 4, lineHeight: 0 }}
-                      onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.6)'}
-                      onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.18)'}>
-                      <Pencil size={11} />
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
-
+            {/* Niet vandaag */}
             {otherHabits.length > 0 && (
-              <div style={{ marginTop: 6 }}>
-                <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.18)', margin: '0 0 5px 2px' }}>Niet vandaag</p>
+              <div style={{ marginTop: 8 }}>
+                <SectionHeader label="Niet vandaag" />
                 {otherHabits.map(habit => (
                   <div key={habit.id}
                     onClick={() => setModalHabit(habit)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderRadius: 10, cursor: 'pointer', opacity: 0.38 }}
-                    onMouseEnter={e => e.currentTarget.style.opacity = '0.55'}
-                    onMouseLeave={e => e.currentTarget.style.opacity = '0.38'}>
-                    <span style={{ fontSize: 14 }}>{habit.icon}</span>
-                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>{habit.name}</span>
-                    <div style={{ marginLeft: 'auto', display: 'flex', gap: 3 }}>
-                      {(habit.frequency ?? []).map(d => (
-                        <span key={d} style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>{DAY_LABELS[d]}</span>
-                      ))}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      padding: '12px 16px', borderRadius: 18, cursor: 'pointer',
+                      background: 'rgba(255,255,255,0.03)', opacity: 0.4,
+                      marginBottom: 6,
+                    }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+                      {habit.icon}
                     </div>
+                    <span style={{ fontSize: 15, color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>{habit.name}</span>
+                    <span style={{ marginLeft: 'auto', fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>
+                      {(habit.frequency ?? []).map(d => DAY_LABELS[d]).join(' ')}
+                    </span>
                   </div>
                 ))}
               </div>
