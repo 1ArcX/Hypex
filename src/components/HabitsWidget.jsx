@@ -959,18 +959,17 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
   }
 
   // ── Full render ────────────────────────────────────────────────────────────
-  function habitSlot(habit) {
+  function habitHasSlot(habit, slot) {
     const rt = habit.remind_times
-    if (!rt || typeof rt !== 'object' || Array.isArray(rt)) return null
-    for (const slot of ['ochtend', 'middag', 'avond']) { if (slot in rt) return slot }
-    return null
+    if (!rt || typeof rt !== 'object' || Array.isArray(rt)) return false
+    return slot in rt
   }
 
-  const altijdHabits = todayHabits.filter(h => !habitSlot(h))
+  const altijdHabits = todayHabits.filter(h => !habitHasSlot(h, 'ochtend') && !habitHasSlot(h, 'middag') && !habitHasSlot(h, 'avond'))
   const slotHabits   = {
-    ochtend: todayHabits.filter(h => habitSlot(h) === 'ochtend'),
-    middag:  todayHabits.filter(h => habitSlot(h) === 'middag'),
-    avond:   todayHabits.filter(h => habitSlot(h) === 'avond'),
+    ochtend: todayHabits.filter(h => habitHasSlot(h, 'ochtend')),
+    middag:  todayHabits.filter(h => habitHasSlot(h, 'middag')),
+    avond:   todayHabits.filter(h => habitHasSlot(h, 'avond')),
   }
   const TABS = [{ key: 'ochtend', label: 'Ochtend' }, { key: 'middag', label: 'Middag' }, { key: 'avond', label: 'Avond' }]
 
