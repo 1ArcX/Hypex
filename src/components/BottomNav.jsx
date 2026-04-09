@@ -164,6 +164,7 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
                 background: 'none', border: 'none', cursor: 'pointer',
                 color: sheetActive || showSheet ? 'var(--accent)' : gymGlowing ? '#F97316' : pomoGlowing ? '#EF4444' : 'var(--text-3)',
                 transition: 'color 0.15s', position: 'relative',
+                animation: gymGlowing ? 'meerGymGlow 2s ease-in-out infinite' : pomoGlowing ? 'meerPomoGlow 2s ease-in-out infinite' : 'none',
               }}
             >
               {(sheetActive || showSheet) && (
@@ -177,7 +178,7 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
                 ? <activeMeerItem.Icon size={20} strokeWidth={2.2} style={{ position: 'relative' }} />
                 : <MoreHorizontal size={20} strokeWidth={showSheet ? 2.2 : 1.7} style={{ position: 'relative' }} />
               }
-              <span style={{ fontSize: 10, fontWeight: sheetActive || showSheet || gymGlowing ? 600 : 400, position: 'relative' }}>
+              <span style={{ fontSize: 10, fontWeight: sheetActive || showSheet || gymGlowing || pomoGlowing ? 600 : 400, position: 'relative' }}>
                 {activeMeerItem && !showSheet ? activeMeerItem.label : 'Meer'}
               </span>
               {(gymGlowing || pomoGlowing) && (
@@ -220,6 +221,14 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
         @keyframes dotPulse {
           0%, 100% { opacity: 1; transform: scale(1); }
           50%       { opacity: 0.5; transform: scale(0.7); }
+        }
+        @keyframes meerGymGlow {
+          0%, 100% { filter: drop-shadow(0 0 0px rgba(249,115,22,0)); }
+          50%       { filter: drop-shadow(0 0 6px rgba(249,115,22,0.7)); }
+        }
+        @keyframes meerPomoGlow {
+          0%, 100% { filter: drop-shadow(0 0 0px rgba(239,68,68,0)); }
+          50%       { filter: drop-shadow(0 0 6px rgba(239,68,68,0.7)); }
         }
       `}</style>
     </>
