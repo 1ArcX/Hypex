@@ -419,18 +419,18 @@ function WorkoutModal({ schedule, dayIdx, userId, onClose, onSaved }) {
       { onConflict: 'user_id,day_of_week' }
     )
 
-    // Sync to calendar
-    const start = new Date(`${dateStr}T08:00:00`)
-    const end   = new Date(`${dateStr}T${String(start.getHours() + Math.max(1, Math.round(timerSec / 3600))).padStart(2,'0')}:00:00`)
+    // Sync to calendar (hele dag event)
     await supabase.from('calendar_events')
-      .delete().eq('user_id', userId).eq('start_time', start.toISOString())
+      .delete().eq('user_id', userId)
+      .gte('start_time', `${dateStr}T00:00:00`)
+      .lte('start_time', `${dateStr}T23:59:59`)
       .like('description', 'gym:%')
     await supabase.from('calendar_events').insert({
       user_id: userId,
       title: `${mg.emoji} ${daySchedule.muscle_group} workout`,
       description: `gym:${dateStr}`,
-      start_time: start.toISOString(),
-      end_time: end.toISOString(),
+      start_time: new Date(`${dateStr}T00:00:00`).toISOString(),
+      end_time:   new Date(`${dateStr}T23:59:00`).toISOString(),
       color: mg.color,
     })
 
@@ -684,14 +684,12 @@ export default function GymWidget({ userId }) {
       const d = new Date(today)
       d.setDate(d.getDate() + (i - todayNL))
       const dateStr = d.toISOString().slice(0, 10)
-      const start = new Date(`${dateStr}T07:00:00`)
-      const end   = new Date(`${dateStr}T08:30:00`)
       events.push({
         user_id: userId,
         title: `${mg.emoji} ${day.muscle_group}`,
         description: `gym:${dateStr}`,
-        start_time: start.toISOString(),
-        end_time: end.toISOString(),
+        start_time: new Date(`${dateStr}T00:00:00`).toISOString(),
+        end_time:   new Date(`${dateStr}T23:59:00`).toISOString(),
         color: mg.color,
       })
     })
