@@ -29,6 +29,19 @@ function getWeekDays(date) {
   start.setDate(date.getDate() - (day === 0 ? 6 : day - 1))
   return Array.from({length:7}, (_, i) => { const d = new Date(start); d.setDate(start.getDate()+i); return d })
 }
+function getMonthRange(date) {
+  const firstDay = new Date(date.getFullYear(), date.getMonth(), 1)
+  const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0)
+  const startDow = (firstDay.getDay() + 6) % 7
+  const endDow = (lastDay.getDay() + 6) % 7
+  const start = new Date(firstDay); start.setDate(start.getDate() - startDow)
+  const end = new Date(lastDay); end.setDate(end.getDate() + (6 - endDow))
+  return { start, end }
+}
+function mergeLessons(prev, next) {
+  const keys = new Set(next.map(l => `${l.start}|${l.vak || ''}|${l.lokaal || ''}`))
+  return [...prev.filter(l => !keys.has(`${l.start}|${l.vak || ''}|${l.lokaal || ''}`)), ...next]
+}
 function timeStrToMins(str) {
   if (!str) return 0
   const [h, m] = str.split(':').map(Number)
@@ -127,7 +140,11 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
     return () => clearTimeout(timer)
   }, [highlightKey])
 
-  useEffect(() => { fetchEvents() }, [])
+  useEffect(() => {
+    fetchEvents()
+    window.addEventListener('refreshCalendarEvents', fetchEvents)
+    return () => window.removeEventListener('refreshCalendarEvents', fetchEvents)
+  }, [])
   useEffect(() => { onLessonsChange?.([...magisterLessons, ...somtodayLessons]) }, [magisterLessons, somtodayLessons])
   useEffect(() => { onEventsChange?.(events) }, [events])
 
@@ -226,36 +243,61 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
     return () => window.removeEventListener('somtodayLogin', handler)
   }, [])
 
+  // Prefetch multiple weeks on mount / after login so month view is populated
+  useEffect(() => {
+    const creds = (() => { try { return JSON.parse(localStorage.getItem(magisterKey(userId))) } catch { return null } })()
+    if (!creds) return
+    const weekStart = getWeekDays(new Date())[0]
+    for (let i = 0; i < 5; i++) {
+      const ws = new Date(weekStart); ws.setDate(ws.getDate() + i * 7)
+      const we = new Date(ws); we.setDate(we.getDate() + 6)
+      const key = `magister_sched_${toDateStr(ws)}_${toDateStr(we)}`
+      if (sessionStorage.getItem(key) && scheduleVersion === 0) {
+        try {
+          const cached = JSON.parse(sessionStorage.getItem(key))
+          if (Array.isArray(cached)) setMagisterLessons(prev => mergeLessons(prev, cached))
+        } catch {}
+        continue
+      }
+      callMagister(creds, 'schedule', { start: toDateStr(ws), end: toDateStr(we) })
+        .then(d => {
+          if (Array.isArray(d)) {
+            sessionStorage.setItem(key, JSON.stringify(d))
+            setMagisterLessons(prev => mergeLessons(prev, d))
+          }
+        })
+        .catch(() => {})
+    }
+  }, [scheduleVersion])
+
   // Fetch Magister schedule for visible range, cached per range in sessionStorage
   useEffect(() => {
-    const days = view === 'week' ? getWeekDays(current) : [current]
-    const start = toDateStr(days[0])
-    const end = toDateStr(days[days.length - 1])
+    let start, end
+    if (view === 'week') {
+      const days = getWeekDays(current)
+      start = toDateStr(days[0]); end = toDateStr(days[6])
+    } else if (view === 'month') {
+      const { start: ms, end: me } = getMonthRange(current)
+      start = toDateStr(ms); end = toDateStr(me)
+    } else {
+      start = toDateStr(current); end = toDateStr(current)
+    }
     const cacheKey = `magister_sched_${start}_${end}`
     const cached = sessionStorage.getItem(cacheKey)
     if (cached && scheduleVersion === 0) {
-      try { setMagisterLessons(JSON.parse(cached)) } catch {}
+      try { setMagisterLessons(prev => mergeLessons(prev, JSON.parse(cached))) } catch {}
       return
     }
     const creds = (() => { try { return JSON.parse(localStorage.getItem(magisterKey(userId))) } catch { return null } })()
     if (!creds) return
-    setMagisterSyncing(true)
+    if (view !== 'month') setMagisterSyncing(true)
     setMagisterError(null)
     callMagister(creds, 'schedule', { start, end }).then(data => {
       if (Array.isArray(data)) {
         sessionStorage.setItem(cacheKey, JSON.stringify(data))
-        setMagisterLessons(data)
+        setMagisterLessons(prev => mergeLessons(prev, data))
         setMagisterError(null)
         onMagisterError?.(null)
-        // Background-fetch volgende week zodat nextEvent op home werkt
-        const nextStart = new Date(days[0]); nextStart.setDate(nextStart.getDate() + 7)
-        const nextEnd   = new Date(days[days.length - 1]); nextEnd.setDate(nextEnd.getDate() + 7)
-        const nextKey   = `magister_sched_${toDateStr(nextStart)}_${toDateStr(nextEnd)}`
-        if (!sessionStorage.getItem(nextKey)) {
-          callMagister(creds, 'schedule', { start: toDateStr(nextStart), end: toDateStr(nextEnd) })
-            .then(d => { if (Array.isArray(d)) sessionStorage.setItem(nextKey, JSON.stringify(d)) })
-            .catch(() => {})
-        }
       } else {
         const msg = data?.error || 'Geen lessen ontvangen'
         setMagisterError(msg)
@@ -766,9 +808,13 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
           {cells.map((date, i) => {
             if (!date) return <div key={i} style={{ borderRight: '1px solid rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(0,0,0,0.1)', minHeight: '64px' }} />
             const evs = getEventsForDay(date)
+            const workEvs = events.filter(ev => ev.description?.startsWith('pmt:')).filter(ev => {
+              const s = new Date(ev.start_time)
+              return s.getFullYear() === date.getFullYear() && s.getMonth() === date.getMonth() && s.getDate() === date.getDate()
+            })
             const tsks = getTasksForDay(date)
             const les = getMagisterLessonsForDay(date)
-            const all = [...evs, ...tsks, ...les]
+            const all = [...evs, ...workEvs, ...tsks, ...les]
             const isToday = isSameDay(date, now)
             const isWeekend = date.getDay() === 0 || date.getDay() === 6
             return (
