@@ -898,7 +898,7 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
 
   const saveHabit = async (data, counterData) => {
     let habitId
-    if (modalHabit && modalHabit !== 'new') {
+    if (modalHabit && modalHabit !== 'new' && modalHabit.id) {
       await supabase.from('habits').update(data).eq('id', modalHabit.id)
       habitId = modalHabit.id
     } else {
