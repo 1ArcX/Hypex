@@ -427,7 +427,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
           duration_minutes: getMins(s),
           mode: 'work',
         }).then(() => {})
-        const xpEarned = getMins(s)
+        const xpEarned = Math.round(Math.sqrt(getMins(s)) * 4.5)
         awardXP(userIdRef.current, xpEarned)
         onXPEarned?.(xpEarned)
       }
