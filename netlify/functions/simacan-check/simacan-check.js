@@ -131,38 +131,45 @@ async function simacanCheckHandler() {
         continue
       }
 
-      const eta    = stop.actualStartTime || stop.eta || stop.plannedStartTime
-      const etaFmt = eta ? new Date(eta).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Amsterdam' }) : '?'
-      const act    = stop.tripStatus?.activity
-      const delay  = stop.delay
-      const dc     = stop.tripStatus?.startLocation?.name || stop.trip?.tripId || 'Rit'
-      const prev   = prevStates[stopId]
+      // actualStartTime = werkelijke aankomsttijd bij déze stop (de winkel)
+      // eta             = verwachte aankomsttijd als de truck nog onderweg is
+      const actualArrival  = stop.actualStartTime || null
+      const eta            = actualArrival || stop.eta || stop.plannedStartTime
+      const etaFmt         = eta ? new Date(eta).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Amsterdam' }) : '?'
+      const act            = stop.tripStatus?.activity
+      const delay          = stop.delay
+      const dc             = stop.tripStatus?.startLocation?.name || stop.trip?.tripId || 'Rit'
+      const prev           = prevStates[stopId]
 
-      console.log(`[simacan-check] Stop ${stopId} (${dc}) — delay: ${delay}, act: ${act}, prev:`, prev)
+      console.log(`[simacan-check] Stop ${stopId} (${dc}) — delay: ${delay}, act: ${act}, actualArrival: ${actualArrival}, prev:`, prev)
 
       const lastNotifiedDelay = prev?.lastNotifiedDelay ?? prev?.delay ?? null
 
       if (prev) {
-        if (delay != null && lastNotifiedDelay != null && Math.abs(delay - lastNotifiedDelay) >= 5) {
+        // ── Aankomst bij de winkel: actualStartTime verschijnt voor het eerst ──
+        if (!prev.actualArrival && actualArrival) {
+          const arrFmt = new Date(actualArrival).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Amsterdam' })
+          console.log(`[simacan-check] Push: aankomst bij stop ${stopId} om ${arrFmt}`)
+          await sendPush(subs, '✅ Vracht aangekomen',
+            `${dc} is aangekomen om ${arrFmt}`,
+            `arrived-${stopId}`)
+          newStates[stopId] = { delay, activity: act, eta, actualArrival, lastNotifiedDelay }
+        }
+        // ── Vertraging gewijzigd (alleen als nog niet aangekomen) ─────────────
+        else if (!actualArrival && delay != null && lastNotifiedDelay != null && Math.abs(delay - lastNotifiedDelay) >= 5) {
           const more = delay > lastNotifiedDelay
           console.log(`[simacan-check] Push: vertraging gewijzigd stop ${stopId} (was ${lastNotifiedDelay}, nu ${delay})`)
           await sendPush(subs, '🚛 Vrachttijden',
             more ? `${dc} loopt meer uit (+${delay} min) — komt nu om ${etaFmt}`
                  : `${dc} loopt in (${delay > 0 ? '+' : ''}${delay} min) — komt om ${etaFmt}`,
             `delay-${stopId}`)
-          newStates[stopId] = { delay, activity: act, eta, lastNotifiedDelay: delay }
+          newStates[stopId] = { delay, activity: act, eta, actualArrival, lastNotifiedDelay: delay }
         } else {
-          newStates[stopId] = { delay, activity: act, eta, lastNotifiedDelay }
-        }
-        if (prev.activity !== 'AFGEROND' && act === 'AFGEROND') {
-          console.log(`[simacan-check] Push: afgerond stop ${stopId}`)
-          await sendPush(subs, '✅ Vracht aangekomen',
-            `${dc} is aangekomen${stop.actualStartTime ? ' om ' + new Date(stop.actualStartTime).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Amsterdam' }) : ''}`,
-            `arrived-${stopId}`)
+          newStates[stopId] = { delay, activity: act, eta, actualArrival, lastNotifiedDelay }
         }
       } else {
         console.log(`[simacan-check] Stop ${stopId} — geen vorige staat, eerste run`)
-        newStates[stopId] = { delay, activity: act, eta, lastNotifiedDelay: delay }
+        newStates[stopId] = { delay, activity: act, eta, actualArrival, lastNotifiedDelay: delay }
       }
     }
 
