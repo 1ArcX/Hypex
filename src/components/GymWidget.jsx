@@ -733,18 +733,25 @@ export default function GymWidget({ userId, onXPEarned }) {
     const currentEx = schedule[selectedDay]?.exercises || []
     await saveDay(mg, currentEx)
 
-    // Remove calendar event for this day if changed to Rust or no group
+    // Als er al een workout is gelogd voor deze dag → agenda blijft onaangepast (gelockt)
     const dateStr = getDayDateStr(selectedDay)
-    await supabase.from('calendar_events').delete().eq('user_id', userId).eq('description', `gym:${dateStr}`)
+    if (logs[dateStr]) return
+
+    // Geen workout gelogd → herhalende agenda-event voor dit weekdag bijwerken
+    const descKey = `gym:weekly:${selectedDay}`
+    await supabase.from('calendar_events').delete().eq('user_id', userId).eq('description', descKey)
     if (mg && mg !== 'Rust') {
       const info = getMuscleGroupInfo(mg)
+      const jsDay = (selectedDay + 1) % 7  // NL→JS dag (0=ma→1, 6=zo→0)
       await supabase.from('calendar_events').insert({
         user_id: userId,
         title: `${info.emoji} ${mg}`,
-        description: `gym:${dateStr}`,
+        description: descKey,
         start_time: new Date(`${dateStr}T00:00:00`).toISOString(),
         end_time:   new Date(`${dateStr}T23:59:00`).toISOString(),
         color: info.color,
+        recurrence: 'weekly',
+        recurrence_days: [jsDay],
       })
     }
   }
@@ -785,32 +792,39 @@ export default function GymWidget({ userId, onXPEarned }) {
     setSchedule(prev => prev.map((d, i) => ({ ...d, muscle_group: split.days[i] || null, exercises: [] })))
   }
 
-  // ── Sync week to calendar ─────────────────────────────────────────────────
+  // ── Sync schema → agenda (wekelijks herhalend) ───────────────────────────
   const syncToCalendar = async () => {
-    const today = new Date()
     const todayNL = getNLDay()
+    const today = new Date()
     const events = []
-    schedule.forEach((day, i) => {
+
+    schedule.forEach((day, nlDay) => {
       if (!day.muscle_group || day.muscle_group === 'Rust') return
       const mg = getMuscleGroupInfo(day.muscle_group)
-      const d = new Date(today)
-      d.setDate(d.getDate() + (i - todayNL))
-      const dateStr = d.toISOString().slice(0, 10)
+      const jsDay = (nlDay + 1) % 7  // NL→JS dag
+
+      // Ankerdatum = deze week (de dag van deze nlDay)
+      const anchor = new Date(today)
+      anchor.setDate(today.getDate() - todayNL + nlDay)
+      const dateStr = anchor.toISOString().slice(0, 10)
+
       events.push({
         user_id: userId,
         title: `${mg.emoji} ${day.muscle_group}`,
-        description: `gym:${dateStr}`,
+        description: `gym:weekly:${nlDay}`,
         start_time: new Date(`${dateStr}T00:00:00`).toISOString(),
         end_time:   new Date(`${dateStr}T23:59:00`).toISOString(),
         color: mg.color,
+        recurrence: 'weekly',
+        recurrence_days: [jsDay],
       })
     })
+
+    // Verwijder alle bestaande herhalende gym-events, vervang door nieuwe
+    await supabase.from('calendar_events').delete().eq('user_id', userId).like('description', 'gym:weekly:%')
     if (!events.length) { setSyncMsg('Geen trainingsdagen ingepland.'); setTimeout(() => setSyncMsg(''), 3000); return }
-    // Delete by exact description to avoid timezone issues
-    const gymDescs = events.map(e => e.description)
-    await supabase.from('calendar_events').delete().eq('user_id', userId).in('description', gymDescs)
     await supabase.from('calendar_events').insert(events)
-    setSyncMsg(`${events.length} workouts gesynchroniseerd ✓`)
+    setSyncMsg(`${events.length} dagen herhalend gesynchroniseerd ✓`)
     setTimeout(() => setSyncMsg(''), 3000)
   }
 
