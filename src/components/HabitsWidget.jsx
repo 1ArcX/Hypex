@@ -249,11 +249,27 @@ function PerfectDayBanner({ onDone }) {
 
 // ─── Notitie modal ─────────────────────────────────────────────────────────────
 function NoteModal({ habit, date, onClose }) {
-  const [text, setText] = useState(() => loadNote(habit.id, date))
+  const [text, setText]       = useState(() => loadNote(habit.id, date))
+  const [bottomOffset, setBottomOffset] = useState(0)
   const save = () => { saveNote(habit.id, date, text); onClose() }
+
+  // Schuif modal omhoog wanneer het mobiele toetsenbord verschijnt
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const onResize = () => {
+      const keyboardHeight = window.innerHeight - vv.height - vv.offsetTop
+      setBottomOffset(Math.max(0, keyboardHeight))
+    }
+    vv.addEventListener('resize', onResize)
+    vv.addEventListener('scroll', onResize)
+    onResize()
+    return () => { vv.removeEventListener('resize', onResize); vv.removeEventListener('scroll', onResize) }
+  }, [])
+
   return ReactDOM.createPortal(
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', zIndex: 10001, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 0 32px' }}>
-      <div style={{ width: '100%', maxWidth: 480, background: 'rgba(20,20,36,0.98)', borderRadius: '20px 20px 0 0', padding: 24 }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', zIndex: 10001, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div style={{ width: '100%', maxWidth: 480, background: 'rgba(20,20,36,0.98)', borderRadius: '20px 20px 0 0', padding: 24, paddingBottom: 24, marginBottom: bottomOffset, transition: 'margin-bottom 0.15s ease' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 22 }}>{habit.icon}</span>
@@ -266,8 +282,8 @@ function NoteModal({ habit, date, onClose }) {
           value={text}
           onChange={e => setText(e.target.value)}
           placeholder="Hoe ging het? Wat viel je op?"
-          rows={4}
-          style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '10px 12px', color: 'white', fontSize: 14, resize: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
+          rows={3}
+          style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '10px 12px', color: 'white', fontSize: 16, resize: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
         />
         <button onClick={save} style={{ marginTop: 10, width: '100%', padding: '12px', borderRadius: 14, background: `${habit.color}22`, border: `1px solid ${habit.color}50`, color: habit.color, fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
           Opslaan
