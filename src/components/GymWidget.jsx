@@ -657,6 +657,7 @@ export default function GymWidget({ userId }) {
   const [loading, setLoading] = useState(true)
   const [syncMsg, setSyncMsg] = useState('')
   const [tab, setTab] = useState('schema') // 'schema' | 'logs'
+  const [logExercise, setLogExercise] = useState(null) // exercise name for progression chart
 
   // ── Workout persistence ────────────────────────────────────────────────────
   const getSavedWorkout = () => { try { return JSON.parse(localStorage.getItem(GYM_LS_KEY)) } catch { return null } }
@@ -699,7 +700,7 @@ export default function GymWidget({ userId }) {
     const [{ data: sched }, { data: favs }, { data: logsData }] = await Promise.all([
       supabase.from('gym_schedule').select('*').eq('user_id', userId),
       supabase.from('gym_favorites').select('exercise_name').eq('user_id', userId),
-      supabase.from('gym_logs').select('date,muscle_group,exercises,duration_minutes,notes').eq('user_id', userId).order('date', { ascending: false }).limit(30),
+      supabase.from('gym_logs').select('date,muscle_group,exercises,duration_minutes,notes').eq('user_id', userId).order('date', { ascending: true }).limit(200),
     ])
     const base = Array.from({ length: 7 }, (_, i) => ({ day_of_week: i, muscle_group: null, exercises: [] }))
     if (sched) sched.forEach(row => { base[row.day_of_week] = row })
@@ -1061,55 +1062,302 @@ export default function GymWidget({ userId }) {
         </>
       )}
 
-      {tab === 'logs' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {Object.keys(logs).length === 0 ? (
-            <div style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--text-3)' }}>
-              <Dumbbell size={32} style={{ marginBottom: 12, opacity: 0.4 }} />
-              <p style={{ margin: 0 }}>Nog geen workouts gelogd</p>
+      {tab === 'logs' && (() => {
+        const sortedLogs = Object.entries(logs).sort(([a], [b]) => a.localeCompare(b)) // asc
+
+        // ── Streak ────────────────────────────────────────────────────────────
+        let streak = 0
+        let check = getTodayDateStr()
+        while (logs[check]) {
+          streak++
+          const d = new Date(check); d.setDate(d.getDate() - 1)
+          check = d.toISOString().slice(0, 10)
+        }
+
+        // ── Totaal volume ─────────────────────────────────────────────────────
+        const totalVol = sortedLogs.reduce((acc, [, log]) =>
+          acc + (log.exercises || []).reduce((a, ex) =>
+            a + (ex.sets || []).filter(s => s.done).reduce((b, s) =>
+              b + (parseFloat(s.weight) || 0) * (parseInt(s.reps) || 0), 0), 0), 0)
+
+        // ── PRs: { name -> { weight, date } } ─────────────────────────────────
+        const prMap = {}
+        sortedLogs.forEach(([date, log]) => {
+          ;(log.exercises || []).forEach(ex => {
+            const maxW = Math.max(0, ...(ex.sets || []).filter(s => s.done).map(s => parseFloat(s.weight) || 0))
+            if (maxW > 0 && (!prMap[ex.name] || maxW >= prMap[ex.name].weight)) {
+              prMap[ex.name] = { weight: maxW, date }
+            }
+          })
+        })
+        const prEntries = Object.entries(prMap).sort((a, b) => b[1].weight - a[1].weight)
+        const recentPRCount = prEntries.filter(([, pr]) => (Date.now() - new Date(pr.date)) / 86400000 <= 7).length
+
+        // ── Exercise history: { name -> [{date, maxWeight}] } ─────────────────
+        const exHistory = {}
+        sortedLogs.forEach(([date, log]) => {
+          ;(log.exercises || []).forEach(ex => {
+            const maxW = Math.max(0, ...(ex.sets || []).filter(s => s.done).map(s => parseFloat(s.weight) || 0))
+            if (maxW > 0) {
+              if (!exHistory[ex.name]) exHistory[ex.name] = []
+              exHistory[ex.name].push({ date, value: maxW })
+            }
+          })
+        })
+        const exNames = Object.keys(exHistory).sort()
+        const chartData = logExercise ? (exHistory[logExercise] || []) : []
+
+        // ── Weekly frequency (last 6 weeks) ───────────────────────────────────
+        const today = new Date()
+        const todayNL = getNLDay()
+        const weekDots = []
+        for (let w = 5; w >= 0; w--) {
+          const days = []
+          for (let d = 0; d < 7; d++) {
+            const day = new Date(today)
+            day.setDate(today.getDate() - todayNL - w * 7 + d)
+            const ds = day.toISOString().slice(0, 10)
+            const isFuture = day > today
+            days.push({ ds, trained: !!logs[ds], isFuture })
+          }
+          weekDots.push(days)
+        }
+        const thisWeekCount = weekDots[5].filter(d => d.trained).length
+
+        if (sortedLogs.length === 0) return (
+          <div style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--text-3)' }}>
+            <Dumbbell size={32} style={{ marginBottom: 12, opacity: 0.4 }} />
+            <p style={{ margin: 0 }}>Nog geen workouts gelogd</p>
+          </div>
+        )
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+            {/* ── Stat chips ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              {[
+                { label: 'Streak', value: `${streak}d`, icon: '🔥', color: '#F97316' },
+                { label: 'Sessies', value: sortedLogs.length, icon: '💪', color: 'var(--accent)' },
+                { label: 'PRs week', value: recentPRCount, icon: '🏆', color: '#FACC15' },
+              ].map(s => (
+                <div key={s.label} style={{
+                  padding: '12px 10px', borderRadius: 14,
+                  background: 'var(--bg-card)', border: '1px solid var(--border)',
+                  textAlign: 'center',
+                }}>
+                  <p style={{ margin: '0 0 2px', fontSize: 18 }}>{s.icon}</p>
+                  <p style={{ margin: '0 0 2px', fontSize: 20, fontWeight: 800, color: s.color }}>{s.value}</p>
+                  <p style={{ margin: 0, fontSize: 11, color: 'var(--text-3)' }}>{s.label}</p>
+                </div>
+              ))}
             </div>
-          ) : (
-            Object.entries(logs).map(([date, log]) => {
+
+            {/* ── Volume + week count ── */}
+            <div style={{
+              padding: '12px 14px', borderRadius: 14,
+              background: 'var(--bg-card)', border: '1px solid var(--border)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              <div>
+                <p style={{ margin: 0, fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Totaal volume</p>
+                <p style={{ margin: '2px 0 0', fontSize: 22, fontWeight: 800, color: 'var(--text-1)' }}>
+                  {totalVol > 1000 ? `${(totalVol / 1000).toFixed(1)}t` : `${Math.round(totalVol).toLocaleString('nl-NL')} kg`}
+                </p>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <p style={{ margin: 0, fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Deze week</p>
+                <p style={{ margin: '2px 0 0', fontSize: 22, fontWeight: 800, color: 'var(--accent)' }}>{thisWeekCount}×</p>
+              </div>
+            </div>
+
+            {/* ── Week heatmap ── */}
+            <div style={{ padding: '12px 14px', borderRadius: 14, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+              <p style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Trainingsfrequentie</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {weekDots.map((week, wi) => (
+                  <div key={wi} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                    <span style={{ fontSize: 10, color: 'var(--text-3)', width: 32, flexShrink: 0 }}>
+                      {wi === 5 ? 'Nu' : `${5 - wi}w`}
+                    </span>
+                    {week.map((day, di) => {
+                      const mg = day.trained ? getMuscleGroupInfo(logs[day.ds]?.muscle_group) : null
+                      return (
+                        <div key={di} title={day.ds} style={{
+                          flex: 1, height: 20, borderRadius: 4,
+                          background: day.isFuture
+                            ? 'transparent'
+                            : day.trained
+                              ? mg?.color || 'var(--accent)'
+                              : 'var(--border)',
+                          opacity: day.isFuture ? 0.2 : 1,
+                          border: day.isFuture ? '1px dashed var(--border)' : 'none',
+                          transition: 'background 0.2s',
+                        }} />
+                      )
+                    })}
+                  </div>
+                ))}
+                <div style={{ display: 'flex', gap: 4, paddingLeft: 36 }}>
+                  {['Ma','Di','Wo','Do','Vr','Za','Zo'].map(d => (
+                    <span key={d} style={{ flex: 1, fontSize: 9, color: 'var(--text-3)', textAlign: 'center' }}>{d}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* ── PR's ── */}
+            {prEntries.length > 0 && (
+              <div style={{ padding: '12px 14px', borderRadius: 14, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                <p style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Personal Records</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {prEntries.map(([name, pr]) => {
+                    const isRecent = (Date.now() - new Date(pr.date)) / 86400000 <= 7
+                    const d = new Date(pr.date)
+                    const label = d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+                    return (
+                      <div key={name} style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: '8px 10px', borderRadius: 10,
+                        background: isRecent ? 'color-mix(in srgb, #FACC15 8%, transparent)' : 'var(--bg-base)',
+                        border: `1px solid ${isRecent ? 'rgba(250,204,21,0.3)' : 'var(--border)'}`,
+                        cursor: 'pointer',
+                      }} onClick={() => setLogExercise(logExercise === name ? null : name)}>
+                        <span style={{ fontSize: 14 }}>{isRecent ? '🏆' : '💪'}</span>
+                        <div style={{ flex: 1 }}>
+                          <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{name}</p>
+                          <p style={{ margin: 0, fontSize: 11, color: 'var(--text-3)' }}>{label}</p>
+                        </div>
+                        <span style={{ fontSize: 15, fontWeight: 800, color: isRecent ? '#FACC15' : 'var(--text-1)' }}>{pr.weight} kg</span>
+                        <ChevronRight size={13} color="var(--text-3)" style={{ transform: logExercise === name ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }} />
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ── Progressie chart ── */}
+            {logExercise && chartData.length >= 2 && (() => {
+              const values = chartData.map(d => d.value)
+              const minV = Math.min(...values), maxV = Math.max(...values)
+              const range = maxV - minV || 1
+              const W = 300, H = 80, pad = 6
+              const pts = chartData.map((d, i) => ({
+                x: pad + (i / (chartData.length - 1)) * (W - pad * 2),
+                y: H - pad - ((d.value - minV) / range) * (H - pad * 2),
+              }))
+              const path = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+              const areaPath = `${path} L${pts.at(-1).x.toFixed(1)},${H} L${pts[0].x.toFixed(1)},${H} Z`
+              const pr = prMap[logExercise]
+              const diff = chartData.length >= 2 ? chartData.at(-1).value - chartData[0].value : 0
+
+              return (
+                <div style={{ padding: '14px', borderRadius: 14, background: 'var(--bg-card)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{logExercise}</p>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: diff >= 0 ? '#10B981' : '#EF4444' }}>
+                      {diff >= 0 ? '+' : ''}{diff} kg
+                    </span>
+                  </div>
+                  <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block', marginBottom: 8 }}>
+                    <defs>
+                      <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.25" />
+                        <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
+                      </linearGradient>
+                    </defs>
+                    <path d={areaPath} fill="url(#chartGrad)" />
+                    <path d={path} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    {pts.map((p, i) => (
+                      <circle key={i} cx={p.x} cy={p.y} r="3.5" fill="var(--accent)" />
+                    ))}
+                    {/* Labels min/max */}
+                    <text x={W - pad} y={pts.reduce((a, b) => a.y < b.y ? a : b).y - 4} fontSize="9" fill="var(--accent)" textAnchor="end">{maxV} kg</text>
+                    <text x={W - pad} y={pts.reduce((a, b) => a.y > b.y ? a : b).y + 10} fontSize="9" fill="var(--text-3)" textAnchor="end">{minV} kg</text>
+                  </svg>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{new Date(chartData[0].date).toLocaleDateString('nl-NL', { day:'numeric', month:'short' })}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{new Date(chartData.at(-1).date).toLocaleDateString('nl-NL', { day:'numeric', month:'short' })}</span>
+                  </div>
+                </div>
+              )
+            })()}
+
+            {/* Exercise picker for chart */}
+            {exNames.length > 0 && (
+              <div>
+                <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Progressie bekijken</p>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {exNames.filter(n => (exHistory[n] || []).length >= 2).map(name => (
+                    <button key={name} onClick={() => setLogExercise(logExercise === name ? null : name)} style={{
+                      padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+                      cursor: 'pointer',
+                      background: logExercise === name ? 'color-mix(in srgb, var(--accent) 15%, transparent)' : 'var(--bg-card)',
+                      border: `1px solid ${logExercise === name ? 'color-mix(in srgb, var(--accent) 40%, transparent)' : 'var(--border)'}`,
+                      color: logExercise === name ? 'var(--accent)' : 'var(--text-2)',
+                    }}>{name}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── Workout history ── */}
+            <p style={{ margin: '4px 0 0', fontSize: 12, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Werkouts</p>
+            {[...sortedLogs].reverse().map(([date, log]) => {
               const info = getMuscleGroupInfo(log.muscle_group)
               const d = new Date(date)
-              const label = d.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })
+              const label = d.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'short' })
+              const vol = (log.exercises || []).reduce((acc, ex) =>
+                acc + (ex.sets || []).filter(s => s.done).reduce((a, s) =>
+                  a + (parseFloat(s.weight) || 0) * (parseInt(s.reps) || 0), 0), 0)
+              // Check if any PR in this session
+              const hasPR = (log.exercises || []).some(ex => prMap[ex.name]?.date === date)
               return (
                 <div key={date} style={{
                   padding: '14px', borderRadius: 16,
                   background: 'var(--bg-card)', border: '1px solid var(--border)',
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 10, background: `color-mix(in srgb, ${info.color} 20%, transparent)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                    <div style={{ width: 38, height: 38, borderRadius: 10, background: `color-mix(in srgb, ${info.color} 20%, transparent)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>
                       {info.emoji}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <p style={{ margin: 0, fontWeight: 700, color: 'var(--text-1)', fontSize: 14 }}>{log.muscle_group}</p>
-                      <p style={{ margin: 0, fontSize: 12, color: 'var(--text-3)' }}>{label}</p>
-                    </div>
-                    {log.duration_minutes && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-3)', fontSize: 12 }}>
-                        <Clock size={12} /> {log.duration_minutes} min
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <p style={{ margin: 0, fontWeight: 700, color: 'var(--text-1)', fontSize: 14 }}>{log.muscle_group}</p>
+                        {hasPR && <span style={{ fontSize: 11, fontWeight: 700, color: '#FACC15' }}>🏆 PR</span>}
                       </div>
-                    )}
+                      <p style={{ margin: 0, fontSize: 12, color: 'var(--text-3)', textTransform: 'capitalize' }}>{label}</p>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      {log.duration_minutes && <p style={{ margin: 0, fontSize: 12, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}><Clock size={11} /> {log.duration_minutes} min</p>}
+                      {vol > 0 && <p style={{ margin: '2px 0 0', fontSize: 12, fontWeight: 700, color: info.color }}>{Math.round(vol).toLocaleString('nl-NL')} kg</p>}
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {(log.exercises || []).map(ex => (
-                      <span key={ex.name} style={{
-                        padding: '4px 10px', borderRadius: 8,
-                        background: `color-mix(in srgb, ${info.color} 12%, transparent)`,
-                        color: info.color, fontSize: 12, fontWeight: 600,
-                      }}>{ex.name}</span>
-                    ))}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                    {(log.exercises || []).map(ex => {
+                      const isPR = prMap[ex.name]?.date === date
+                      const maxW = Math.max(0, ...(ex.sets || []).filter(s => s.done).map(s => parseFloat(s.weight) || 0))
+                      return (
+                        <span key={ex.name} style={{
+                          padding: '4px 10px', borderRadius: 8,
+                          background: isPR ? 'color-mix(in srgb, #FACC15 12%, transparent)' : `color-mix(in srgb, ${info.color} 10%, transparent)`,
+                          color: isPR ? '#FACC15' : info.color,
+                          border: `1px solid ${isPR ? 'rgba(250,204,21,0.3)' : 'transparent'}`,
+                          fontSize: 12, fontWeight: 600,
+                        }}>
+                          {isPR ? '🏆 ' : ''}{ex.name}{maxW > 0 ? ` · ${maxW}kg` : ''}
+                        </span>
+                      )
+                    })}
                   </div>
-                  {log.notes && (
-                    <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text-3)', fontStyle: 'italic' }}>{log.notes}</p>
-                  )}
+                  {log.notes && <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text-3)', fontStyle: 'italic' }}>{log.notes}</p>}
                 </div>
               )
-            })
-          )}
-        </div>
-      )}
+            })}
+          </div>
+        )
+      })()}
 
       {/* ── Modals ── */}
       {showMGModal && <MuscleGroupModal onSelect={handleSelectMG} onClose={() => setShowMGModal(false)} />}
