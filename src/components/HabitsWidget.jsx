@@ -215,6 +215,151 @@ function streakColor(streak) {
   return 'rgba(255,140,66,0.5)'
 }
 
+function getISOWeek() {
+  const d = new Date()
+  const thu = new Date(d); thu.setDate(d.getDate() + (4 - (d.getDay() || 7)))
+  const yearStart = new Date(thu.getFullYear(), 0, 1)
+  const week = Math.ceil((((thu - yearStart) / 86400000) + 1) / 7)
+  return `${thu.getFullYear()}-W${String(week).padStart(2, '0')}`
+}
+
+function isScheduledToday(habit, date = todayStr()) {
+  const type = habit.frequency_type || 'specific_days'
+  if (type === 'times_per_week') return true
+  if (type === 'every_n_days') {
+    const start = habit.created_at ? new Date(habit.created_at).toISOString().slice(0, 10) : date
+    const diff = Math.round((new Date(date + 'T12:00:00') - new Date(start + 'T12:00:00')) / 86400000)
+    return diff >= 0 && diff % (habit.frequency_value || 1) === 0
+  }
+  if (type === 'monthly')
+    return new Date(date + 'T12:00:00').getDate() === (habit.frequency_value || 1)
+  return (habit.frequency ?? [0,1,2,3,4,5,6]).includes(jsDayToFreq(new Date(date + 'T12:00:00').getDay()))
+}
+
+function freqLabel(habit) {
+  const type = habit.frequency_type || 'specific_days'
+  if (type === 'times_per_week') return `${habit.frequency_value || 1}×/week`
+  if (type === 'every_n_days') return `elke ${habit.frequency_value || 1}d`
+  if (type === 'monthly') return `elke ${habit.frequency_value || 1}e`
+  return (habit.frequency ?? []).map(d => DAY_LABELS[d]).join(' ')
+}
+
+function calcStreakNew(completionSet, habit) {
+  const type = habit.frequency_type || 'specific_days'
+  if (type === 'times_per_week') {
+    const target = habit.frequency_value || 1
+    let streak = 0
+    const now = new Date()
+    const dow = (now.getDay() + 6) % 7
+    const curMon = new Date(now); curMon.setDate(now.getDate() - dow)
+    for (let w = 0; w < 52; w++) {
+      const wStart = new Date(curMon); wStart.setDate(curMon.getDate() - w * 7)
+      const wEnd = new Date(wStart); wEnd.setDate(wStart.getDate() + 6)
+      let count = 0
+      const c = new Date(wStart)
+      while (c <= wEnd && c <= now) { if (completionSet.has(c.toISOString().slice(0,10))) count++; c.setDate(c.getDate()+1) }
+      if (w === 0 && count === 0 && streak === 0) break
+      if (count >= target) streak++
+      else if (w > 0) break
+    }
+    return streak
+  }
+  if (type === 'every_n_days') {
+    const n = habit.frequency_value || 1
+    const start = habit.created_at ? new Date(habit.created_at).toISOString().slice(0, 10) : todayStr()
+    let streak = 0
+    const d = new Date()
+    for (let i = 0; i < 365; i++) {
+      const ds = d.toISOString().slice(0, 10)
+      const diff = Math.round((new Date(ds + 'T12:00:00') - new Date(start + 'T12:00:00')) / 86400000)
+      if (diff >= 0 && diff % n === 0) {
+        if (completionSet.has(ds)) streak++; else break
+      }
+      d.setDate(d.getDate() - 1)
+    }
+    return streak
+  }
+  if (type === 'monthly') {
+    const targetDay = habit.frequency_value || 1
+    let streak = 0
+    const now = new Date()
+    for (let m = 0; m < 24; m++) {
+      const cd = new Date(now.getFullYear(), now.getMonth() - m, targetDay)
+      if (cd > now) continue
+      if (completionSet.has(cd.toISOString().slice(0,10))) streak++; else break
+    }
+    return streak
+  }
+  const freq = habit.frequency ?? [0,1,2,3,4,5,6]
+  let streak = 0
+  const d = new Date()
+  for (let i = 0; i < 365; i++) {
+    const ds = d.toISOString().slice(0, 10)
+    if (freq.includes(jsDayToFreq(d.getDay()))) {
+      if (completionSet.has(ds)) streak++; else break
+    }
+    d.setDate(d.getDate() - 1)
+  }
+  return streak
+}
+
+function calcBestStreakNew(completionSet, habit) {
+  const type = habit.frequency_type || 'specific_days'
+  if (type === 'times_per_week') {
+    const target = habit.frequency_value || 1
+    let best = 0, cur = 0
+    const now = new Date()
+    const dow = (now.getDay() + 6) % 7
+    const curMon = new Date(now); curMon.setDate(now.getDate() - dow - 51 * 7)
+    for (let w = 0; w < 52; w++) {
+      const wStart = new Date(curMon); wStart.setDate(curMon.getDate() + w * 7)
+      const wEnd = new Date(wStart); wEnd.setDate(wStart.getDate() + 6)
+      let count = 0
+      const c = new Date(wStart)
+      while (c <= wEnd && c <= now) { if (completionSet.has(c.toISOString().slice(0,10))) count++; c.setDate(c.getDate()+1) }
+      if (count >= target) { cur++; best = Math.max(best, cur) } else cur = 0
+    }
+    return best
+  }
+  if (type === 'every_n_days') {
+    const n = habit.frequency_value || 1
+    const start = habit.created_at ? new Date(habit.created_at).toISOString().slice(0, 10) : todayStr()
+    let best = 0, cur = 0
+    const d = new Date(); d.setDate(d.getDate() - 364)
+    for (let i = 0; i < 365; i++) {
+      const ds = d.toISOString().slice(0, 10)
+      const diff = Math.round((new Date(ds + 'T12:00:00') - new Date(start + 'T12:00:00')) / 86400000)
+      if (diff >= 0 && diff % n === 0) {
+        if (completionSet.has(ds)) { cur++; best = Math.max(best, cur) } else cur = 0
+      }
+      d.setDate(d.getDate() + 1)
+    }
+    return best
+  }
+  if (type === 'monthly') {
+    const targetDay = habit.frequency_value || 1
+    let best = 0, cur = 0
+    const now = new Date()
+    for (let m = 23; m >= 0; m--) {
+      const cd = new Date(now.getFullYear(), now.getMonth() - m, targetDay)
+      if (cd > now) continue
+      if (completionSet.has(cd.toISOString().slice(0,10))) { cur++; best = Math.max(best, cur) } else cur = 0
+    }
+    return best
+  }
+  const freq = habit.frequency ?? [0,1,2,3,4,5,6]
+  let best = 0, cur = 0
+  const d = new Date(); d.setDate(d.getDate() - 364)
+  for (let i = 0; i < 365; i++) {
+    const ds = d.toISOString().slice(0, 10)
+    if (freq.includes(jsDayToFreq(d.getDay()))) {
+      if (completionSet.has(ds)) { cur++; best = Math.max(best, cur) } else cur = 0
+    }
+    d.setDate(d.getDate() + 1)
+  }
+  return best
+}
+
 // ─── Toasts & Banners ─────────────────────────────────────────────────────────
 function AchievementToast({ achievement, onDone }) {
   useEffect(() => { const t = setTimeout(onDone, 3800); return () => clearTimeout(t) }, [onDone])
@@ -297,8 +442,8 @@ function NoteModal({ habit, date, onClose }) {
 // ─── Statistieken modal ────────────────────────────────────────────────────────
 function HabitDetailModal({ habit, completions, counterConfig, counterValues, onClose }) {
   const set       = completions[habit.id] || new Set()
-  const streak    = calcStreak(set, habit)
-  const bestStrk  = calcBestStreak(set, habit)
+  const streak    = calcStreakNew(set, habit)
+  const bestStrk  = calcBestStreakNew(set, habit)
   const last30    = getLast30Days()
   const freq      = habit.frequency ?? [0, 1, 2, 3, 4, 5, 6]
 
@@ -498,6 +643,103 @@ function HabitLibraryModal({ onPick, onCreateOwn, onClose }) {
   )
 }
 
+// ─── Weekly Review Modal ──────────────────────────────────────────────────────
+function WeeklyReviewModal({ habits, completions, counterConfig, counterValues, onClose }) {
+  const last7 = getLast7Days()
+  const prevWeek = Array.from({length:7}, (_,i) => { const d = new Date(); d.setDate(d.getDate() - 7 + i); return d.toISOString().slice(0,10) })
+  // Ma = prevWeek[0], Zo = prevWeek[6] — but last7 is already the right prev 7 days
+  const weekLabel = (() => {
+    const fmt = (ds) => { const d = new Date(ds+'T12:00:00'); return `${d.getDate()} ${['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'][d.getMonth()]}` }
+    return `${fmt(last7[0])} – ${fmt(last7[6])}`
+  })()
+
+  const habitRows = habits.filter(h => !h.paused).map(h => {
+    const scheduled = last7.filter(d => isScheduledToday(h, d))
+    const set = completions[h.id] || new Set()
+    const done = scheduled.filter(d => {
+      const cfg = counterConfig[h.id]
+      if (cfg?.type === 'counter') return (counterValues[h.id]?.[d] || 0) >= (cfg.target || 1)
+      return set.has(d)
+    })
+    const pct = scheduled.length ? Math.round((done.length / scheduled.length) * 100) : null
+    const streak = calcStreakNew(set, h)
+    return { habit: h, pct, done: done.length, scheduled: scheduled.length, streak }
+  }).filter(r => r.scheduled > 0).sort((a,b) => (b.pct||0) - (a.pct||0))
+
+  const totalScheduled = habitRows.reduce((s,r) => s + r.scheduled, 0)
+  const totalDone      = habitRows.reduce((s,r) => s + r.done, 0)
+  const overallPct     = totalScheduled ? Math.round((totalDone / totalScheduled) * 100) : 0
+  const xpThisWeek     = totalDone * XP_PER_HABIT
+  const struggling     = habitRows.filter(r => r.pct !== null && r.pct < 50)
+
+  return ReactDOM.createPortal(
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.8)', backdropFilter:'blur(12px)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+      <div className="glass-card" style={{ width:'100%', maxWidth:420, padding:24, position:'relative', maxHeight:'88vh', overflowY:'auto' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:20 }}>
+          <div>
+            <h2 style={{ fontSize:17, fontWeight:700, color:'white', margin:'0 0 3px' }}>Week samenvatting 📊</h2>
+            <p style={{ fontSize:12, color:'rgba(255,255,255,0.35)', margin:0 }}>{weekLabel}</p>
+          </div>
+          <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.4)', padding:4 }}><X size={18}/></button>
+        </div>
+
+        {/* Overall score */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:20 }}>
+          <div style={{ padding:'14px', borderRadius:14, background: overallPct >= 80 ? 'rgba(34,197,94,0.1)' : overallPct >= 50 ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)', border:`1px solid ${overallPct >= 80 ? 'rgba(34,197,94,0.3)' : overallPct >= 50 ? 'rgba(245,158,11,0.3)' : 'rgba(239,68,68,0.3)'}` }}>
+            <div style={{ fontSize:28, fontWeight:800, color: overallPct >= 80 ? '#22C55E' : overallPct >= 50 ? '#F59E0B' : '#EF4444' }}>{overallPct}%</div>
+            <div style={{ fontSize:11, color:'rgba(255,255,255,0.4)', marginTop:2 }}>Totaal score</div>
+          </div>
+          <div style={{ padding:'14px', borderRadius:14, background:'rgba(250,204,21,0.08)', border:'1px solid rgba(250,204,21,0.25)' }}>
+            <div style={{ fontSize:28, fontWeight:800, color:'#FACC15' }}>+{xpThisWeek}</div>
+            <div style={{ fontSize:11, color:'rgba(255,255,255,0.4)', marginTop:2 }}>XP verdiend</div>
+          </div>
+        </div>
+
+        {/* Per habit */}
+        <p style={{ fontSize:10, color:'rgba(255,255,255,0.3)', textTransform:'uppercase', letterSpacing:'0.07em', fontWeight:600, margin:'0 0 10px' }}>Per gewoonte</p>
+        <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:20 }}>
+          {habitRows.map(({ habit, pct, done, scheduled, streak }) => {
+            const emoji = pct === null ? '–' : pct >= 80 ? '✅' : pct >= 50 ? '⚠️' : '❌'
+            return (
+              <div key={habit.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:12, background:'rgba(255,255,255,0.04)' }}>
+                <span style={{ fontSize:20 }}>{habit.icon}</span>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:13, fontWeight:600, color:'rgba(255,255,255,0.85)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{habit.name}</div>
+                  <div style={{ height:4, background:'rgba(255,255,255,0.08)', borderRadius:2, marginTop:5, overflow:'hidden' }}>
+                    <div style={{ height:'100%', width:`${pct ?? 0}%`, background: pct >= 80 ? '#22C55E' : pct >= 50 ? '#F59E0B' : '#EF4444', borderRadius:2, transition:'width 0.5s' }}/>
+                  </div>
+                </div>
+                <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:2 }}>
+                  <span style={{ fontSize:12 }}>{emoji}</span>
+                  <span style={{ fontSize:10, color:'rgba(255,255,255,0.3)' }}>{done}/{scheduled}</span>
+                </div>
+                {streak >= 7 && <span style={{ fontSize:11 }}>🔥</span>}
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Aandachtspunten */}
+        {struggling.length > 0 && (
+          <div style={{ padding:'12px 14px', borderRadius:12, background:'rgba(239,68,68,0.07)', border:'1px solid rgba(239,68,68,0.2)', marginBottom:20 }}>
+            <p style={{ fontSize:11, fontWeight:600, color:'#EF4444', margin:'0 0 8px', textTransform:'uppercase', letterSpacing:'0.06em' }}>Aandachtspunten</p>
+            {struggling.slice(0,3).map(r => (
+              <div key={r.habit.id} style={{ fontSize:13, color:'rgba(255,255,255,0.6)', padding:'2px 0' }}>
+                {r.habit.icon} {r.habit.name} — {r.pct}% gehaald
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button onClick={onClose} style={{ width:'100%', padding:'12px', borderRadius:12, border:'1px solid rgba(0,255,209,0.3)', background:'rgba(0,255,209,0.08)', color:'var(--accent, #00FFD1)', cursor:'pointer', fontSize:14, fontWeight:600 }}>
+          Aan de slag deze week 💪
+        </button>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
 // ─── Add / Edit modal ─────────────────────────────────────────────────────────
 function HabitModal({ habit, presetData, onSave, onClose, onDelete, onPause, counterConfig }) {
   const existingConfig = habit ? (counterConfig[habit.id] || {}) : {}
@@ -506,6 +748,8 @@ function HabitModal({ habit, presetData, onSave, onClose, onDelete, onPause, cou
   const [icon, setIcon]               = useState(habit?.icon || p.icon || '🌟')
   const [color, setColor]             = useState(habit?.color || p.color || '#00FFD1')
   const [frequency, setFrequency]     = useState(habit?.frequency ?? [0, 1, 2, 3, 4, 5, 6])
+  const [freqType, setFreqType]       = useState(habit?.frequency_type || 'specific_days')
+  const [freqValue, setFreqValue]     = useState(habit?.frequency_value || 3)
   const [habitType, setHabitType]     = useState(existingConfig.type || p.type || 'check')
   const [counterUnit, setCounterUnit] = useState(existingConfig.unit || p.unit || 'glazen')
   const [counterTarget, setCounterTarget] = useState(existingConfig.target || p.target || 8)
@@ -534,7 +778,7 @@ function HabitModal({ habit, presetData, onSave, onClose, onDelete, onPause, cou
     const counterData = habitType === 'counter'
       ? { type: 'counter', unit: counterUnit, target: counterTarget }
       : { type: 'check' }
-    onSave({ name: name.trim(), icon, color, frequency, remind_times: remindTimes }, counterData)
+    onSave({ name: name.trim(), icon, color, frequency, frequency_type: freqType, frequency_value: freqValue, remind_times: remindTimes }, counterData)
   }
 
   return ReactDOM.createPortal(
@@ -604,11 +848,30 @@ function HabitModal({ habit, presetData, onSave, onClose, onDelete, onPause, cou
         {/* Herhaling */}
         <div style={{ marginBottom: 14 }}>
           <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, display: 'block', marginBottom: 6 }}>Herhaling</label>
-          <div style={{ display: 'flex', gap: 5 }}>
-            {DAY_LABELS.map((label, i) => (
-              <button key={i} onClick={() => toggleDay(i)} style={{ flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', background: frequency.includes(i) ? color : 'rgba(255,255,255,0.05)', color: frequency.includes(i) ? '#000' : 'rgba(255,255,255,0.35)', border: frequency.includes(i) ? `1px solid ${color}` : '1px solid rgba(255,255,255,0.07)', boxShadow: frequency.includes(i) ? `0 0 8px ${color}40` : 'none' }}>{label}</button>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, marginBottom: 10 }}>
+            {[['specific_days','Specifieke dagen'],['times_per_week','X/week'],['every_n_days','Om de N dagen'],['monthly','Maandelijks']].map(([val, lbl]) => (
+              <button key={val} onClick={() => setFreqType(val)} style={{ padding: '6px 4px', borderRadius: 8, fontSize: 10, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', background: freqType === val ? `${color}20` : 'rgba(255,255,255,0.05)', color: freqType === val ? color : 'rgba(255,255,255,0.35)', border: freqType === val ? `1px solid ${color}` : '1px solid rgba(255,255,255,0.07)' }}>{lbl}</button>
             ))}
           </div>
+          {freqType === 'specific_days' && (
+            <div style={{ display: 'flex', gap: 5 }}>
+              {DAY_LABELS.map((label, i) => (
+                <button key={i} onClick={() => toggleDay(i)} style={{ flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', background: frequency.includes(i) ? color : 'rgba(255,255,255,0.05)', color: frequency.includes(i) ? '#000' : 'rgba(255,255,255,0.35)', border: frequency.includes(i) ? `1px solid ${color}` : '1px solid rgba(255,255,255,0.07)', boxShadow: frequency.includes(i) ? `0 0 8px ${color}40` : 'none' }}>{label}</button>
+              ))}
+            </div>
+          )}
+          {(freqType === 'times_per_week' || freqType === 'every_n_days' || freqType === 'monthly') && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', flex: 1 }}>
+                {freqType === 'times_per_week' ? 'Keer per week' : freqType === 'every_n_days' ? 'Elke hoeveel dagen' : 'Dag van de maand'}
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <button onClick={() => setFreqValue(v => Math.max(freqType === 'every_n_days' ? 2 : 1, v - 1))} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', cursor: 'pointer', color: 'white', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                <span style={{ fontSize: 20, fontWeight: 700, color, minWidth: 28, textAlign: 'center' }}>{freqValue}</span>
+                <button onClick={() => setFreqValue(v => Math.min(freqType === 'times_per_week' ? 7 : freqType === 'monthly' ? 28 : 30, v + 1))} style={{ width: 30, height: 30, borderRadius: '50%', border: `1px solid ${color}60`, background: `${color}20`, cursor: 'pointer', color, fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Herinnering */}
@@ -676,6 +939,7 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
   const [xp, setXpState]                     = useState(loadXP)
   const [pendingAchievement, setPendingAchievement] = useState(null)
   const [showPerfectDay, setShowPerfectDay]   = useState(false)
+  const [showWeeklyReview, setShowWeeklyReview] = useState(false)
   const seenAchievementsRef = useRef(loadSeenAchievements())
   const perfectDaysRef      = useRef(loadPerfectDays())
   const channelRef          = useRef(null)
@@ -685,12 +949,8 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
   const todayFreq = jsDayToFreq(new Date().getDay())
   const quote     = getDailyQuote()
 
-  const todayHabits = habits.filter(h =>
-    !h.paused && (h.frequency ?? [0,1,2,3,4,5,6]).includes(todayFreq)
-  )
-  const otherHabits = habits.filter(h =>
-    !h.paused && !(h.frequency ?? [0,1,2,3,4,5,6]).includes(todayFreq)
-  )
+  const todayHabits = habits.filter(h => !h.paused && isScheduledToday(h))
+  const otherHabits = habits.filter(h => !h.paused && !isScheduledToday(h))
   const pausedHabits = habits.filter(h => h.paused)
 
   function isHabitDone(habit) {
@@ -706,10 +966,9 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
 
   // Week completion %
   const last7 = getLast7Days()
-  const weekScheduled = last7.reduce((acc, d) => {
-    const df = jsDayToFreq(new Date(d + 'T12:00:00').getDay())
-    return acc + habits.filter(h => !h.paused && (h.frequency ?? [0,1,2,3,4,5,6]).includes(df)).length
-  }, 0)
+  const weekScheduled = last7.reduce((acc, d) =>
+    acc + habits.filter(h => !h.paused && isScheduledToday(h, d)).length
+  , 0)
   const weekDone = last7.reduce((acc, d) => {
     return acc + habits.filter(h => !h.paused && (completions[h.id] || new Set()).has(d)).length
   }, 0)
@@ -786,6 +1045,15 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
     fetchHabits(); fetchCompletions()
   }, [syncTrigger]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Weekly review op maandag
+  useEffect(() => {
+    if (loading || habits.length === 0) return
+    if (new Date().getDay() !== 1) return
+    const weekKey = `habit_weekly_review_shown_${getISOWeek()}`
+    if (localStorage.getItem(weekKey)) return
+    setShowWeeklyReview(true)
+  }, [loading, habits.length])
+
   // Realtime sync
   useEffect(() => {
     if (!userId) return
@@ -858,7 +1126,7 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
       await supabase.from('habit_completions').insert({ habit_id: habit.id, user_id: userId, date: today })
       // Prompt for note
       if (!skipNote) setNoteHabit(habit)
-      const streak = calcStreak(next, habit)
+      const streak = calcStreakNew(next, habit)
       for (const n of [7, 14, 30]) {
         if (streak === n) {
           const ach = ACHIEVEMENTS.find(a => a.key === `streak_${n}`)
@@ -991,7 +1259,7 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
 
   function HabitCard({ habit, idx }) {
     const set       = completions[habit.id] || new Set()
-    const streak    = calcStreak(set, habit)
+    const streak    = calcStreakNew(set, habit)
     const bounce    = animating[habit.id]
     const cfg       = counterConfig[habit.id]
     const isCounter = cfg?.type === 'counter'
@@ -1000,9 +1268,14 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
     const done      = isHabitDone(habit)
     const note      = loadNote(habit.id, today)
 
+    const freqType = habit.frequency_type || 'specific_days'
+    const weekCount = freqType === 'times_per_week' ? last7.filter(d => set.has(d)).length : null
+    const streakUnit = freqType === 'times_per_week' ? 'week' : freqType === 'monthly' ? 'maand' : streak === 1 ? 'dag' : 'dagen'
     const subLine = done
       ? (note ? `📝 ${note.slice(0, 32)}${note.length > 32 ? '…' : ''}` : '✓ Gedaan vandaag')
-      : streak > 0 ? `🔥 ${streak} ${streak === 1 ? 'dag' : 'dagen'} op rij`
+      : weekCount !== null
+        ? `${weekCount}/${habit.frequency_value || 1}× deze week${streak > 0 ? ` · 🔥 ${streak}w` : ''}`
+      : streak > 0 ? `🔥 ${streak} ${streakUnit} op rij`
       : '⭐ Ga ervoor!'
 
     return (
@@ -1202,7 +1475,7 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
                   <div key={habit.id} onClick={() => setModalHabit(habit)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 18, cursor: 'pointer', background: 'rgba(255,255,255,0.03)', opacity: 0.4, marginBottom: 6 }}>
                     <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>{habit.icon}</div>
                     <span style={{ fontSize: 15, color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>{habit.name}</span>
-                    <span style={{ marginLeft: 'auto', fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>{(habit.frequency ?? []).map(d => DAY_LABELS[d]).join(' ')}</span>
+                    <span style={{ marginLeft: 'auto', fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>{freqLabel(habit)}</span>
                   </div>
                 ))}
               </div>
@@ -1277,6 +1550,19 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
 
       {pendingAchievement && (
         <AchievementToast achievement={pendingAchievement} onDone={() => setPendingAchievement(null)} />
+      )}
+
+      {showWeeklyReview && (
+        <WeeklyReviewModal
+          habits={habits}
+          completions={completions}
+          counterConfig={counterConfig}
+          counterValues={counterValues}
+          onClose={() => {
+            localStorage.setItem(`habit_weekly_review_shown_${getISOWeek()}`, '1')
+            setShowWeeklyReview(false)
+          }}
+        />
       )}
     </>
   )
