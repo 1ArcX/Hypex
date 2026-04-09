@@ -12,7 +12,7 @@ function useIsDesktop() {
   return v
 }
 
-export default function GymPage({ userId }) {
+export default function GymPage({ userId, onXPEarned }) {
   const isDesktop = useIsDesktop()
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: isDesktop ? '24px 28px' : '16px 16px 100px' }}>
@@ -21,7 +21,7 @@ export default function GymPage({ userId }) {
           Gym
         </h2>
       )}
-      <GymWidget userId={userId} />
+      <GymWidget userId={userId} onXPEarned={onXPEarned} />
     </div>
   )
 }

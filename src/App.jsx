@@ -781,7 +781,7 @@ export default function App() {
             )}
 
             {activePage === 'gym' && (
-              <GymPage userId={user.id} />
+              <GymPage userId={user.id} onXPEarned={(xp) => setXpToast({ xp, icon: '🏋️' })} />
             )}
 
             {activePage === 'notities' && (

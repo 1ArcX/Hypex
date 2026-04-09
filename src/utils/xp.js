@@ -1,6 +1,7 @@
 import { supabase } from '../supabaseClient'
 
 export const XP_TASK = 5
+export const XP_GYM  = 30 // per afgeronde workout sessie
 
 function loadXP() {
   try { return parseInt(localStorage.getItem('habit_xp') || '0') } catch { return 0 }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../supabaseClient'
+import { awardXP, XP_GYM } from '../utils/xp'
 import {
   Dumbbell, Star, Plus, X, ChevronRight, Check, Trash2,
   CalendarPlus, Play, Square, Clock, Search, ChevronDown, ChevronUp,
@@ -349,7 +350,7 @@ function ExerciseLibraryModal({ muscleGroup, favorites, onToggleFavorite, onAdd,
 
 const GYM_LS_KEY = 'gym_active_workout'
 
-function WorkoutModal({ schedule, dayIdx, userId, savedState, onMinimize, onCancel, onSaved }) {
+function WorkoutModal({ schedule, dayIdx, userId, savedState, onMinimize, onCancel, onSaved, onXPEarned }) {
   const daySchedule = schedule[dayIdx] || {}
   const mg = getMuscleGroupInfo(daySchedule.muscle_group)
 
@@ -445,6 +446,11 @@ function WorkoutModal({ schedule, dayIdx, userId, savedState, onMinimize, onCanc
 
     localStorage.removeItem(GYM_LS_KEY)
     window.dispatchEvent(new CustomEvent('gymWorkoutChange', { detail: { active: false } }))
+
+    // Award XP for completing a workout
+    await awardXP(userId, XP_GYM)
+    onXPEarned?.(XP_GYM)
+
     setSaving(false)
     onSaved()
     onMinimize() // close modal
@@ -646,7 +652,7 @@ function WorkoutModal({ schedule, dayIdx, userId, savedState, onMinimize, onCanc
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
-export default function GymWidget({ userId }) {
+export default function GymWidget({ userId, onXPEarned }) {
   const [schedule, setSchedule] = useState(Array.from({ length: 7 }, (_, i) => ({ day_of_week: i, muscle_group: null, exercises: [] })))
   const [selectedDay, setSelectedDay] = useState(getNLDay)
   const [favorites, setFavorites] = useState(new Set())
@@ -1378,6 +1384,7 @@ export default function GymWidget({ userId }) {
           onMinimize={handleWorkoutMinimize}
           onCancel={handleWorkoutCancel}
           onSaved={handleWorkoutSaved}
+          onXPEarned={onXPEarned}
         />
       )}
 
