@@ -635,6 +635,32 @@ export default function GymWidget({ userId }) {
     setShowMGModal(false)
     const currentEx = schedule[selectedDay]?.exercises || []
     await saveDay(mg, currentEx)
+
+    // Remove calendar event for this day if changed to Rust or no group
+    const dateStr = getDayDateStr(selectedDay)
+    if (!mg || mg === 'Rust') {
+      await supabase.from('calendar_events')
+        .delete().eq('user_id', userId)
+        .gte('start_time', `${dateStr}T00:00:00`)
+        .lte('start_time', `${dateStr}T23:59:59`)
+        .like('description', 'gym:%')
+    } else {
+      // Upsert calendar event with new muscle group
+      const info = getMuscleGroupInfo(mg)
+      await supabase.from('calendar_events')
+        .delete().eq('user_id', userId)
+        .gte('start_time', `${dateStr}T00:00:00`)
+        .lte('start_time', `${dateStr}T23:59:59`)
+        .like('description', 'gym:%')
+      await supabase.from('calendar_events').insert({
+        user_id: userId,
+        title: `${info.emoji} ${mg}`,
+        description: `gym:${dateStr}`,
+        start_time: new Date(`${dateStr}T00:00:00`).toISOString(),
+        end_time:   new Date(`${dateStr}T23:59:00`).toISOString(),
+        color: info.color,
+      })
+    }
   }
 
   // ── Toggle favorite ────────────────────────────────────────────────────────
