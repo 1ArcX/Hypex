@@ -18,7 +18,7 @@ export default function Sidebar({
   activePage, setActivePage,
   isAdmin, showJumbo, user,
   onShowSettings, onShowAdmin, onLogout,
-  syncing, syncFlash, updateAvailable, hasLevelUp, hasActiveGymWorkout,
+  syncing, syncFlash, updateAvailable, hasLevelUp, hasActiveGymWorkout, hasActivePomo,
 }) {
   const displayName = user?.email?.split('@')[0] || 'Student'
   const initial = displayName.charAt(0).toUpperCase()
@@ -75,10 +75,11 @@ export default function Sidebar({
           const active = activePage === id
           const glowingStats = id === 'statistieken' && hasLevelUp && !active
           const glowingGym   = id === 'gym' && hasActiveGymWorkout && !active
-          const glowing = glowingStats || glowingGym
-          const glowColor  = glowingGym ? '#F97316' : '#FACC15'
-          const glowBg     = glowingGym ? 'rgba(249,115,22,0.06)' : 'rgba(250,204,21,0.06)'
-          const glowBorder = glowingGym ? 'rgba(249,115,22,0.6)' : 'rgba(250,204,21,0.6)'
+          const glowingPomo  = id === 'pomodoro' && hasActivePomo && !active
+          const glowing = glowingStats || glowingGym || glowingPomo
+          const glowColor  = glowingGym ? '#F97316' : glowingPomo ? '#EF4444' : '#FACC15'
+          const glowBg     = glowingGym ? 'rgba(249,115,22,0.06)' : glowingPomo ? 'rgba(239,68,68,0.06)' : 'rgba(250,204,21,0.06)'
+          const glowBorder = glowingGym ? 'rgba(249,115,22,0.6)' : glowingPomo ? 'rgba(239,68,68,0.6)' : 'rgba(250,204,21,0.6)'
           return (
             <button
               key={id}
@@ -98,7 +99,7 @@ export default function Sidebar({
                 fontWeight: active || glowing ? 600 : 400,
                 textAlign: 'left',
                 transition: 'all 0.12s',
-                animation: glowing ? 'statsGlow 2s ease-in-out infinite' : 'none',
+                animation: glowingGym ? 'gymGlow 2s ease-in-out infinite' : glowingPomo ? 'pomoGlow 2s ease-in-out infinite' : glowing ? 'statsGlow 2s ease-in-out infinite' : 'none',
                 position: 'relative',
               }}
               onMouseEnter={e => {
@@ -129,6 +130,15 @@ export default function Sidebar({
                 <span style={{
                   marginLeft: 'auto', fontSize: 10, fontWeight: 700,
                   background: 'linear-gradient(90deg, #F97316, #EF4444, #F97316)',
+                  backgroundSize: '200% 100%',
+                  WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+                  animation: 'gradientShift 1.5s linear infinite',
+                }}>ACTIEF</span>
+              )}
+              {glowingPomo && (
+                <span style={{
+                  marginLeft: 'auto', fontSize: 10, fontWeight: 700,
+                  background: 'linear-gradient(90deg, #EF4444, #EC4899, #EF4444)',
                   backgroundSize: '200% 100%',
                   WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                   animation: 'gradientShift 1.5s linear infinite',
@@ -221,6 +231,14 @@ export default function Sidebar({
       @keyframes statsGlow {
         0%, 100% { box-shadow: none; }
         50%       { box-shadow: 0 0 12px rgba(250,204,21,0.25); }
+      }
+      @keyframes gymGlow {
+        0%, 100% { box-shadow: none; }
+        50%       { box-shadow: 0 0 12px rgba(249,115,22,0.3); }
+      }
+      @keyframes pomoGlow {
+        0%, 100% { box-shadow: none; }
+        50%       { box-shadow: 0 0 12px rgba(239,68,68,0.3); }
       }
       @keyframes gradientShift {
         0%   { background-position: 0%   50%; }

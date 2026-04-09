@@ -91,6 +91,7 @@ export default function App() {
   const [xpToast, setXpToast] = useState(null) // { xp, icon }
   const [hasLevelUp, setHasLevelUp] = useState(() => !!localStorage.getItem('levelup_pending'))
   const [hasActiveGymWorkout, setHasActiveGymWorkout] = useState(() => !!localStorage.getItem('gym_active_workout'))
+  const [hasActivePomo, setHasActivePomo] = useState(false)
 
   // Listen for level-up events dispatched by awardXP utility
   useEffect(() => {
@@ -655,6 +656,7 @@ export default function App() {
             updateAvailable={updateAvailable}
             hasLevelUp={hasLevelUp}
             hasActiveGymWorkout={hasActiveGymWorkout}
+            hasActivePomo={hasActivePomo}
           />
         </div>
 
@@ -722,6 +724,7 @@ export default function App() {
               <PomodoroPage
                 onModeChange={setIsBreak}
                 onFocusModeChange={setFocusMode}
+                onPomodoroActive={setHasActivePomo}
                 userId={user?.id}
                 profiles={profiles}
                 onlineUsers={studieBuddiesOnline}
@@ -808,6 +811,7 @@ export default function App() {
               showJumbo={isAdmin || !!userProfile?.werk_tab}
               hasLevelUp={hasLevelUp}
               hasActiveGymWorkout={hasActiveGymWorkout}
+              hasActivePomo={hasActivePomo}
             />
           </div>
         </div>

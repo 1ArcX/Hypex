@@ -16,7 +16,7 @@ const SHEET_BASE = [
   { id: 'gym',          Icon: Dumbbell,      label: 'Gym'      },
 ]
 
-export default function BottomNav({ activePage, setActivePage, isAdmin, showJumbo, hasLevelUp, hasActiveGymWorkout }) {
+export default function BottomNav({ activePage, setActivePage, isAdmin, showJumbo, hasLevelUp, hasActiveGymWorkout, hasActivePomo }) {
   const [showSheet, setShowSheet] = useState(false)
   const sheetRef = useRef(null)
 
@@ -67,11 +67,12 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
                 const active = activePage === id
                 const glowingStats = id === 'statistieken' && hasLevelUp && !active
                 const glowingGym   = id === 'gym' && hasActiveGymWorkout && !active
-                const glowing = glowingStats || glowingGym
-                const glowColor = glowingGym ? '#F97316' : '#FACC15'
-                const glowBg    = glowingGym ? 'rgba(249,115,22,0.08)' : 'rgba(250,204,21,0.08)'
-                const glowBorder= glowingGym ? '1px solid rgba(249,115,22,0.5)' : '1px solid rgba(250,204,21,0.5)'
-                const glowAnim  = glowingGym ? 'sheetGymGlow 2s ease-in-out infinite' : 'sheetStatsGlow 2s ease-in-out infinite'
+                const glowingPomo  = id === 'pomodoro' && hasActivePomo && !active
+                const glowing = glowingStats || glowingGym || glowingPomo
+                const glowColor = glowingGym ? '#F97316' : glowingPomo ? '#EF4444' : '#FACC15'
+                const glowBg    = glowingGym ? 'rgba(249,115,22,0.08)' : glowingPomo ? 'rgba(239,68,68,0.08)' : 'rgba(250,204,21,0.08)'
+                const glowBorder= glowingGym ? '1px solid rgba(249,115,22,0.5)' : glowingPomo ? '1px solid rgba(239,68,68,0.5)' : '1px solid rgba(250,204,21,0.5)'
+                const glowAnim  = glowingGym ? 'sheetGymGlow 2s ease-in-out infinite' : glowingPomo ? 'sheetPomoGlow 2s ease-in-out infinite' : 'sheetStatsGlow 2s ease-in-out infinite'
                 return (
                   <button
                     key={id}
@@ -99,8 +100,10 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
                         width: 7, height: 7, borderRadius: '50%',
                         background: glowingGym
                           ? 'linear-gradient(135deg, #F97316, #EF4444)'
-                          : 'linear-gradient(135deg, #FACC15, #F97316)',
-                        boxShadow: `0 0 6px ${glowingGym ? 'rgba(249,115,22,0.8)' : 'rgba(250,204,21,0.8)'}`,
+                          : glowingPomo
+                            ? 'linear-gradient(135deg, #EF4444, #EC4899)'
+                            : 'linear-gradient(135deg, #FACC15, #F97316)',
+                        boxShadow: `0 0 6px ${glowingGym ? 'rgba(249,115,22,0.8)' : glowingPomo ? 'rgba(239,68,68,0.8)' : 'rgba(250,204,21,0.8)'}`,
                         animation: 'dotPulse 1.2s ease-in-out infinite',
                       }} />
                     )}
@@ -150,7 +153,8 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
 
         {/* Meer */}
         {(() => {
-          const gymGlowing = hasActiveGymWorkout && !sheetActive && !showSheet
+          const gymGlowing  = hasActiveGymWorkout && !sheetActive && !showSheet
+          const pomoGlowing = hasActivePomo && !sheetActive && !showSheet
           return (
             <button
               onClick={() => setShowSheet(v => !v)}
@@ -158,7 +162,7 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
                 flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
                 justifyContent: 'center', gap: 4, padding: '10px 0',
                 background: 'none', border: 'none', cursor: 'pointer',
-                color: sheetActive || showSheet ? 'var(--accent)' : gymGlowing ? '#F97316' : 'var(--text-3)',
+                color: sheetActive || showSheet ? 'var(--accent)' : gymGlowing ? '#F97316' : pomoGlowing ? '#EF4444' : 'var(--text-3)',
                 transition: 'color 0.15s', position: 'relative',
               }}
             >
@@ -176,12 +180,14 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
               <span style={{ fontSize: 10, fontWeight: sheetActive || showSheet || gymGlowing ? 600 : 400, position: 'relative' }}>
                 {activeMeerItem && !showSheet ? activeMeerItem.label : 'Meer'}
               </span>
-              {gymGlowing && (
+              {(gymGlowing || pomoGlowing) && (
                 <span style={{
                   position: 'absolute', top: 6, right: 'calc(50% - 17px + 6px)',
                   width: 7, height: 7, borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #F97316, #EF4444)',
-                  boxShadow: '0 0 6px rgba(249,115,22,0.8)',
+                  background: gymGlowing
+                    ? 'linear-gradient(135deg, #F97316, #EF4444)'
+                    : 'linear-gradient(135deg, #EF4444, #EC4899)',
+                  boxShadow: gymGlowing ? '0 0 6px rgba(249,115,22,0.8)' : '0 0 6px rgba(239,68,68,0.8)',
                   animation: 'dotPulse 1.2s ease-in-out infinite',
                 }} />
               )}
@@ -206,6 +212,10 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
         @keyframes sheetGymGlow {
           0%, 100% { box-shadow: 0 0 0px rgba(249,115,22,0); }
           50%       { box-shadow: 0 0 16px rgba(249,115,22,0.4); }
+        }
+        @keyframes sheetPomoGlow {
+          0%, 100% { box-shadow: 0 0 0px rgba(239,68,68,0); }
+          50%       { box-shadow: 0 0 16px rgba(239,68,68,0.45); }
         }
         @keyframes dotPulse {
           0%, 100% { opacity: 1; transform: scale(1); }
