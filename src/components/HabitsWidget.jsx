@@ -998,6 +998,7 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
   const today     = todayStr()
   const todayFreq = jsDayToFreq(new Date().getDay())
   const quote     = getDailyQuote()
+  const last7     = getLast7Days()
 
   const todayHabits = habits.filter(h => !h.paused && isScheduledToday(h))
   const otherHabits = habits.filter(h => !h.paused && !isScheduledToday(h))
