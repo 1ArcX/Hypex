@@ -80,21 +80,26 @@ async function authenticate(school, username, password) {
     acr_values: `tenant:${school}.magister.net`,
     client_id: 'M6LOAPP',
     state, nonce,
-    prompt: 'select_account'
+    prompt: 'login'
   })
 
   // Step 1: Get the login session + cookies
   const r1 = await fetch(authUrl, noRedirects)
-  const r2 = await fetch(r1.headers.get('location'), noRedirects)
+  const r1loc = r1.headers.get('location')
+  if (!r1loc) throw new Error(`Magister auth stap 1 mislukt (status ${r1.status})`)
+  const r2 = await fetch(r1loc, noRedirects)
   const location = r2.headers.get('location')
+  if (!location) throw new Error(`Magister auth stap 2 mislukt (status ${r2.status})`)
 
   const locationUrl = new URL(location.startsWith('http') ? location : issuerUrl + location)
   const sessionId = locationUrl.searchParams.get('sessionId')
   const returnUrl = locationUrl.searchParams.get('returnUrl')
+  if (!sessionId || !returnUrl) throw new Error(`Geen sessie ontvangen van Magister`)
 
-  const rawCookies = r2.headers.raw()['set-cookie']
+  const rawCookies = r2.headers.raw()['set-cookie'] || []
   const cookieStr = joinCookies(rawCookies)
   const xsrfEntry = rawCookies.find(c => c.split('=')[0] === 'XSRF-TOKEN')
+  if (!xsrfEntry) throw new Error(`Geen XSRF token van Magister (mogelijk gewijzigd inlogformaat)`)
   const xsrfToken = xsrfEntry.split('=')[1].split(';')[0]
 
   const challengeHeaders = {
@@ -123,7 +128,7 @@ async function authenticate(school, username, password) {
   })
   const uText = await uResp.text()
   console.log('challenges/username:', uResp.status, uText.slice(0, 300))
-  if (uResp.status !== 200) throw new Error(`Inloggen mislukt (username ${uResp.status}: ${uText.slice(0, 100)})`)
+  if (uResp.status !== 200) throw new Error(`Gebruikersnaam niet herkend (${uResp.status})`)
   const uBody = JSON.parse(uText)
   if (uBody.error && uBody.error !== 'Unable to load session') throw new Error('Inloggen mislukt')
   if (uBody.action !== 'password') throw new Error('Onbekende gebruikersnaam')
@@ -136,7 +141,7 @@ async function authenticate(school, username, password) {
   })
   const pText = await pResp.text()
   console.log('challenges/password:', pResp.status, pText.slice(0, 300))
-  if (pResp.status !== 200) throw new Error('Inloggen mislukt')
+  if (pResp.status !== 200) throw new Error(`Wachtwoord geweigerd door Magister (${pResp.status})`)
   const pBody = JSON.parse(pText)
   if (pBody.error) throw new Error('Wachtwoord onjuist')
 
@@ -148,7 +153,7 @@ async function authenticate(school, username, password) {
     headers: { cookie: authCookies }
   })
   const finalLoc = finalResp.headers.get('location')
-  if (!finalLoc || !finalLoc.includes('code=')) throw new Error('Inloggen mislukt')
+  if (!finalLoc || !finalLoc.includes('code=')) throw new Error(`Auth code ontbreekt${finalLoc ? ` (redirect: ${finalLoc.slice(0, 80)})` : ' (geen redirect)'}`)
 
   const fragment = finalLoc.includes('#') ? finalLoc.split('#')[1] : finalLoc.split('?')[1]
   const params = Object.fromEntries(new URLSearchParams(fragment))
