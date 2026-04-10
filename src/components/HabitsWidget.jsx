@@ -441,17 +441,54 @@ function NoteModal({ habit, date, onClose }) {
 
 // ─── Statistieken modal ────────────────────────────────────────────────────────
 function HabitDetailModal({ habit, completions, counterConfig, counterValues, onClose }) {
-  const set       = completions[habit.id] || new Set()
-  const streak    = calcStreakNew(set, habit)
-  const bestStrk  = calcBestStreakNew(set, habit)
-  const last30    = getLast30Days()
-  const freq      = habit.frequency ?? [0, 1, 2, 3, 4, 5, 6]
+  const set      = completions[habit.id] || new Set()
+  const streak   = calcStreakNew(set, habit)
+  const bestStrk = calcBestStreakNew(set, habit)
+  const last30   = getLast30Days()
+  const freqType = habit.frequency_type || 'specific_days'
 
-  const scheduledDays = last30.filter(d => freq.includes(jsDayToFreq(new Date(d + 'T12:00:00').getDay())))
-  const doneDays      = scheduledDays.filter(d => set.has(d))
-  const pct           = scheduledDays.length ? Math.round((doneDays.length / scheduledDays.length) * 100) : 0
+  // Per-type scheduled/done calculation
+  let scheduledUnits, doneUnits, unitLabel, streakUnit
 
-  // Group by week for calendar
+  if (freqType === 'times_per_week') {
+    // Group last 30 days into ISO weeks
+    const weekMap = {}
+    for (const d of last30) {
+      const dt = new Date(d + 'T12:00:00')
+      const dow = (dt.getDay() + 6) % 7
+      const mon = new Date(dt); mon.setDate(dt.getDate() - dow)
+      const wk = mon.toISOString().slice(0, 10)
+      if (!weekMap[wk]) weekMap[wk] = []
+      weekMap[wk].push(d)
+    }
+    const target = habit.frequency_value || 1
+    const weekKeys = Object.keys(weekMap).sort()
+    scheduledUnits = weekKeys.length
+    doneUnits = weekKeys.filter(wk => weekMap[wk].filter(d => set.has(d)).length >= target).length
+    unitLabel = 'weken'; streakUnit = streak === 1 ? 'week' : 'weken'
+  } else if (freqType === 'monthly') {
+    // Count months in last 30 days
+    const months = [...new Set(last30.map(d => d.slice(0, 7)))]
+    const targetDay = habit.frequency_value || 1
+    scheduledUnits = months.filter(m => {
+      const dt = new Date(`${m}-${String(targetDay).padStart(2,'0')}T12:00:00`)
+      return dt <= new Date()
+    }).length
+    doneUnits = months.filter(m => {
+      const day = `${m}-${String(targetDay).padStart(2,'0')}`
+      return set.has(day)
+    }).length
+    unitLabel = 'maanden'; streakUnit = streak === 1 ? 'maand' : 'maanden'
+  } else {
+    const scheduledDays = last30.filter(d => isScheduledToday(habit, d))
+    scheduledUnits = scheduledDays.length
+    doneUnits = scheduledDays.filter(d => set.has(d)).length
+    unitLabel = 'dagen'; streakUnit = streak === 1 ? 'dag' : 'dagen'
+  }
+
+  const pct = scheduledUnits ? Math.round((doneUnits / scheduledUnits) * 100) : 0
+
+  // Group by week for calendar heatmap
   const weeks = []
   let week = []
   const firstDay = new Date(last30[0] + 'T12:00:00')
@@ -482,8 +519,8 @@ function HabitDetailModal({ habit, completions, counterConfig, counterValues, on
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, padding: '0 20px 20px' }}>
           {[
             { label: 'Voltooiing', value: `${pct}%`, sub: 'laatste 30 dagen' },
-            { label: 'Huidige streak', value: streak, sub: streak === 1 ? 'dag' : 'dagen' },
-            { label: 'Beste streak', value: bestStrk, sub: bestStrk === 1 ? 'dag' : 'dagen' },
+            { label: 'Huidige streak', value: streak, sub: streakUnit },
+            { label: 'Beste streak', value: bestStrk, sub: bestStrk === 1 ? streakUnit.replace(/en$/, '') : streakUnit },
           ].map(s => (
             <div key={s.label} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: '14px 12px', textAlign: 'center' }}>
               <div style={{ fontSize: 26, fontWeight: 700, color: habit.color }}>{s.value}</div>
@@ -499,22 +536,35 @@ function HabitDetailModal({ habit, completions, counterConfig, counterValues, on
           <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
             {DAY_LABELS.map(l => <div key={l} style={{ flex: 1, textAlign: 'center', fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>{l}</div>)}
           </div>
-          {weeks.map((w, wi) => (
-            <div key={wi} style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
-              {w.map((day, di) => {
-                if (!day) return <div key={di} style={{ flex: 1, aspectRatio: '1', borderRadius: 6 }} />
-                const scheduled = freq.includes(jsDayToFreq(new Date(day + 'T12:00:00').getDay()))
-                const done = set.has(day)
-                return (
-                  <div key={day} style={{
-                    flex: 1, aspectRatio: '1', borderRadius: 6,
-                    background: done ? habit.color : (scheduled ? 'rgba(255,255,255,0.07)' : 'transparent'),
-                    boxShadow: done ? `0 0 6px ${habit.color}60` : 'none',
-                  }} title={day} />
-                )
-              })}
-            </div>
-          ))}
+          {weeks.map((w, wi) => {
+            // For times_per_week: check if this week's target was met
+            const weekDays = w.filter(Boolean)
+            const weekTarget = habit.frequency_value || 1
+            const weekDone = freqType === 'times_per_week'
+              ? weekDays.filter(d => set.has(d)).length
+              : null
+            const weekComplete = weekDone !== null && weekDone >= weekTarget
+            return (
+              <div key={wi} style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+                {w.map((day, di) => {
+                  if (!day) return <div key={di} style={{ flex: 1, aspectRatio: '1', borderRadius: 6 }} />
+                  const scheduled = isScheduledToday(habit, day)
+                  const done = set.has(day)
+                  const cellColor = freqType === 'times_per_week'
+                    ? (weekComplete ? habit.color : done ? habit.color + '90' : 'rgba(255,255,255,0.07)')
+                    : (done ? habit.color : (scheduled ? 'rgba(255,255,255,0.07)' : 'transparent'))
+                  return (
+                    <div key={day} style={{
+                      flex: 1, aspectRatio: '1', borderRadius: 6,
+                      background: cellColor,
+                      boxShadow: (done || weekComplete) ? `0 0 6px ${habit.color}60` : 'none',
+                      outline: freqType === 'times_per_week' && weekComplete ? `1px solid ${habit.color}` : 'none',
+                    }} title={`${day}${freqType === 'times_per_week' ? ` (${weekDone}/${weekTarget}×)` : ''}`} />
+                  )
+                })}
+              </div>
+            )
+          })}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
             <div style={{ width: 10, height: 10, borderRadius: 3, background: habit.color }} />
             <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Gedaan</span>
@@ -529,7 +579,7 @@ function HabitDetailModal({ habit, completions, counterConfig, counterValues, on
           <div style={{ height: 8, background: 'rgba(255,255,255,0.06)', borderRadius: 8, overflow: 'hidden' }}>
             <div style={{ height: '100%', width: `${pct}%`, background: habit.color, borderRadius: 8, transition: 'width 0.6s ease', boxShadow: `0 0 8px ${habit.color}60` }} />
           </div>
-          <div style={{ fontSize: 11, color: habit.color, marginTop: 4, textAlign: 'right', fontWeight: 600 }}>{doneDays.length}/{scheduledDays.length} dagen</div>
+          <div style={{ fontSize: 11, color: habit.color, marginTop: 4, textAlign: 'right', fontWeight: 600 }}>{doneUnits}/{scheduledUnits} {unitLabel}</div>
         </div>
       </div>
     </div>,
@@ -955,8 +1005,16 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
 
   function isHabitDone(habit) {
     const cfg = counterConfig[habit.id]
+    const set = completions[habit.id] || new Set()
+    const type = habit.frequency_type || 'specific_days'
     if (cfg?.type === 'counter') return (counterValues[habit.id]?.[today] || 0) >= (cfg.target || 1)
-    return completions[habit.id]?.has(today) || false
+    if (type === 'times_per_week') {
+      const target = habit.frequency_value || 1
+      return last7.filter(d => set.has(d)).length >= target
+    }
+    if (type === 'every_n_days') return set.has(today)
+    if (type === 'monthly') return set.has(today)
+    return set.has(today)
   }
 
   const doneToday    = todayHabits.filter(h => isHabitDone(h)).length
@@ -1270,11 +1328,19 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
 
     const freqType = habit.frequency_type || 'specific_days'
     const weekCount = freqType === 'times_per_week' ? last7.filter(d => set.has(d)).length : null
-    const streakUnit = freqType === 'times_per_week' ? 'week' : freqType === 'monthly' ? 'maand' : streak === 1 ? 'dag' : 'dagen'
+    const weekTarget = habit.frequency_value || 1
+    const streakUnit = freqType === 'times_per_week' ? (streak === 1 ? 'week' : 'weken') : freqType === 'monthly' ? (streak === 1 ? 'maand' : 'maanden') : streak === 1 ? 'dag' : 'dagen'
+    const doneLabel = freqType === 'times_per_week'
+      ? (note ? `📝 ${note.slice(0, 28)}${note.length > 28 ? '…' : ''}` : `✓ Gedaan deze week (${weekCount}/${weekTarget}×)`)
+      : freqType === 'every_n_days'
+      ? (note ? `📝 ${note.slice(0, 28)}${note.length > 28 ? '…' : ''}` : '✓ Gedaan vandaag')
+      : freqType === 'monthly'
+      ? (note ? `📝 ${note.slice(0, 28)}${note.length > 28 ? '…' : ''}` : '✓ Gedaan deze maand')
+      : (note ? `📝 ${note.slice(0, 32)}${note.length > 32 ? '…' : ''}` : '✓ Gedaan vandaag')
     const subLine = done
-      ? (note ? `📝 ${note.slice(0, 32)}${note.length > 32 ? '…' : ''}` : '✓ Gedaan vandaag')
+      ? doneLabel
       : weekCount !== null
-        ? `${weekCount}/${habit.frequency_value || 1}× deze week${streak > 0 ? ` · 🔥 ${streak}w` : ''}`
+        ? `${weekCount}/${weekTarget}× deze week${streak > 0 ? ` · 🔥 ${streak}w` : ''}`
       : streak > 0 ? `🔥 ${streak} ${streakUnit} op rij`
       : '⭐ Ga ervoor!'
 
