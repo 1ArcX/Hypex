@@ -575,11 +575,19 @@ function HabitDetailModal({ habit, completions, counterConfig, counterValues, on
 
         {/* Completion bar */}
         <div style={{ padding: '20px 20px 0' }}>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginBottom: 8, fontWeight: 500 }}>Voltooiing afgelopen 30 dagen</div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginBottom: 8, fontWeight: 500 }}>
+            {freqType === 'times_per_week' ? 'Weken voltooid (laatste 30 dagen)' : freqType === 'monthly' ? 'Maanden voltooid (laatste 30 dagen)' : 'Voltooiing afgelopen 30 dagen'}
+          </div>
           <div style={{ height: 8, background: 'rgba(255,255,255,0.06)', borderRadius: 8, overflow: 'hidden' }}>
             <div style={{ height: '100%', width: `${pct}%`, background: habit.color, borderRadius: 8, transition: 'width 0.6s ease', boxShadow: `0 0 8px ${habit.color}60` }} />
           </div>
-          <div style={{ fontSize: 11, color: habit.color, marginTop: 4, textAlign: 'right', fontWeight: 600 }}>{doneUnits}/{scheduledUnits} {unitLabel}</div>
+          <div style={{ fontSize: 11, color: habit.color, marginTop: 4, textAlign: 'right', fontWeight: 600 }}>
+            {freqType === 'times_per_week'
+              ? `${doneUnits}/${scheduledUnits} weken gehaald`
+              : freqType === 'monthly'
+              ? `${doneUnits}/${scheduledUnits} maanden gehaald`
+              : `${doneUnits}/${scheduledUnits} dagen`}
+          </div>
         </div>
       </div>
     </div>,
