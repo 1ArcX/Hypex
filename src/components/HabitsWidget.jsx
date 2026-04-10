@@ -1023,7 +1023,6 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
   const perfectTotal = perfectDaysRef.current.size
 
   // Week completion %
-  const last7 = getLast7Days()
   const weekScheduled = last7.reduce((acc, d) =>
     acc + habits.filter(h => !h.paused && isScheduledToday(h, d)).length
   , 0)
