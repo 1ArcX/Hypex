@@ -8,7 +8,7 @@ const CATEGORIES = [
   { id: 'boodschappen',  label: 'Boodschappen',   emoji: '🛒', color: '#10B981' },
   { id: 'transport',     label: 'Transport',       emoji: '🚌', color: '#3B82F6' },
   { id: 'kleding',       label: 'Kleding',         emoji: '👕', color: '#8B5CF6' },
-  { id: 'abonnementen',  label: 'Abonnementen',    emoji: '📱', color: '#EC4899' },
+  { id: 'abonnementen',  label: 'Vaste lasten',     emoji: '🏠', color: '#EC4899' },
   { id: 'sport',         label: 'Sport',           emoji: '⚽', color: '#FACC15' },
   { id: 'overig',        label: 'Overig',          emoji: '💸', color: '#94A3B8' },
 ]
@@ -382,6 +382,45 @@ export default function GeldPage({ userId }) {
   const allTransactions = [...regularExpenses, ...incomeEntries].sort((a, b) => b.date.localeCompare(a.date) || b.created_at?.localeCompare(a.created_at))
   const displayedExpenses = showAll ? allTransactions : allTransactions.slice(0, 8)
 
+  // Smart stats
+  const today        = new Date()
+  const daysInMonth  = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
+  const dayOfMonth   = today.getDate()
+  const daysLeft     = daysInMonth - dayOfMonth + 1
+  const dagBudget    = remaining > 0 ? remaining / daysLeft : 0
+  const projectedTotal = dayOfMonth > 1 ? (totalSpent / dayOfMonth) * daysInMonth : null
+  const projectedOver  = projectedTotal !== null && projectedTotal > base
+
+  let spaarStreak = 0
+  for (let i = 0; i < 366; i++) {
+    const d = new Date(); d.setDate(d.getDate() - i)
+    const ds = d.toISOString().slice(0, 10)
+    if (savingsWithdrawals.some(e => e.date === ds)) break
+    spaarStreak++
+  }
+
+  // Week bars
+  const weekBudget  = base / 4
+  const weekTotals  = [0, 0, 0, 0, 0]
+  regularExpenses.forEach(e => {
+    const day = new Date(e.date).getDate()
+    const wi  = day <= 7 ? 0 : day <= 14 ? 1 : day <= 21 ? 2 : day <= 28 ? 3 : 4
+    weekTotals[wi] += Number(e.amount)
+  })
+  const maxWeekVal    = Math.max(...weekTotals, weekBudget, 1)
+  const currentWeekIdx = dayOfMonth <= 7 ? 0 : dayOfMonth <= 14 ? 1 : dayOfMonth <= 21 ? 2 : dayOfMonth <= 28 ? 3 : 4
+
+  // Donut
+  const circumference  = 2 * Math.PI * 55
+  const catWithSpend   = CATEGORIES.map(c => ({ ...c, spent: spentByCategory[c.id] || 0 })).filter(c => c.spent > 0)
+
+  // Balance line
+  const balanceByDay = []
+  for (let d = 1; d <= daysInMonth; d++) {
+    const spent = regularExpenses.filter(e => new Date(e.date).getDate() <= d).reduce((s, e) => s + Number(e.amount), 0)
+    balanceByDay.push(base - spent)
+  }
+
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
       <div style={{ width: 22, height: 22, borderRadius: '50%', border: '2px solid var(--border)', borderTopColor: 'var(--accent)', animation: 'spin 0.7s linear infinite' }} />
@@ -452,6 +491,30 @@ export default function GeldPage({ userId }) {
           </div>
         </div>
 
+        {/* Smart stats — Dagbudget / Prognose / Spaarstreak */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 14 }}>
+          <div style={{ padding: '12px 14px', borderRadius: 16, background: 'var(--bg-card-2)', border: '1px solid var(--border)' }}>
+            <p style={{ fontSize: 10, color: 'var(--text-3)', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Dagbudget</p>
+            <p style={{ fontSize: 18, fontWeight: 700, margin: '0 0 2px', lineHeight: 1.1, color: dagBudget > 15 ? '#10B981' : dagBudget > 5 ? '#F59E0B' : '#EF4444' }}>{fmtShort(dagBudget)}</p>
+            <p style={{ fontSize: 10, color: 'var(--text-3)', margin: 0 }}>{daysLeft}d over</p>
+          </div>
+          <div style={{ padding: '12px 14px', borderRadius: 16, background: projectedOver ? 'rgba(239,68,68,0.07)' : 'var(--bg-card-2)', border: projectedOver ? '1px solid rgba(239,68,68,0.25)' : '1px solid var(--border)' }}>
+            <p style={{ fontSize: 10, color: projectedOver ? '#EF4444' : 'var(--text-3)', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Prognose</p>
+            {projectedTotal === null
+              ? <p style={{ fontSize: 12, fontWeight: 600, margin: 0, color: 'var(--text-3)' }}>Geen data</p>
+              : <>
+                  <p style={{ fontSize: 18, fontWeight: 700, margin: '0 0 2px', lineHeight: 1.1, color: projectedOver ? '#EF4444' : '#10B981' }}>{fmtShort(projectedTotal)}</p>
+                  <p style={{ fontSize: 10, margin: 0, color: projectedOver ? 'rgba(239,68,68,0.7)' : 'rgba(16,185,129,0.7)' }}>{projectedOver ? `⚠ +${fmtShort(projectedTotal - base)}` : '✓ Op schema'}</p>
+                </>
+            }
+          </div>
+          <div style={{ padding: '12px 14px', borderRadius: 16, background: spaarStreak < 3 ? 'rgba(239,68,68,0.07)' : 'rgba(16,185,129,0.07)', border: spaarStreak < 3 ? '1px solid rgba(239,68,68,0.25)' : '1px solid rgba(16,185,129,0.25)' }}>
+            <p style={{ fontSize: 10, color: spaarStreak < 3 ? '#EF4444' : '#10B981', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Spaarstreak</p>
+            <p style={{ fontSize: 18, fontWeight: 700, margin: '0 0 2px', lineHeight: 1.1, color: spaarStreak < 3 ? '#EF4444' : '#10B981' }}>{spaarStreak}d</p>
+            <p style={{ fontSize: 10, margin: 0, color: spaarStreak < 3 ? 'rgba(239,68,68,0.7)' : 'rgba(16,185,129,0.7)' }}>{spaarStreak < 3 ? '🔓 Recent' : '🔒 Geen opname'}</p>
+          </div>
+        </div>
+
         {/* Savings warning */}
         {savingsWithdrawals.length > 0 && (
           <div style={{ padding: '14px 16px', borderRadius: 16, background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)', marginBottom: 14 }}>
@@ -465,6 +528,129 @@ export default function GeldPage({ userId }) {
                   Totaal: {fmt(savingsTotal)} — {savingsWithdrawals[0]?.savings_reason || 'geen reden opgegeven'}
                 </p>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Analyse */}
+        {regularExpenses.length > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>Analyse</p>
+
+            {/* Week bars */}
+            <div style={{ padding: '16px', borderRadius: 16, background: 'var(--bg-card-2)', border: '1px solid var(--border)', marginBottom: 10 }}>
+              <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', margin: '0 0 12px' }}>Uitgaven per week</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {[0,1,2,3,4].map(i => {
+                  const weekStart = [1,8,15,22,29][i]
+                  if (weekStart > dayOfMonth && weekTotals[i] === 0) return null
+                  const pct  = (weekTotals[i] / maxWeekVal) * 100
+                  const barC = weekTotals[i] > weekBudget * 1.2 ? '#EF4444' : weekTotals[i] > weekBudget * 0.8 ? '#F59E0B' : 'var(--accent)'
+                  const cur  = i === currentWeekIdx
+                  return (
+                    <div key={i}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontSize: 11, color: cur ? 'var(--accent)' : 'var(--text-3)', fontWeight: cur ? 700 : 400 }}>Week {i+1}{cur ? ' ●' : ''}</span>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)' }}>{fmtShort(weekTotals[i])}</span>
+                      </div>
+                      <div style={{ height: 7, background: 'rgba(255,255,255,0.06)', borderRadius: 4, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${pct}%`, background: barC, borderRadius: 4, transition: 'width 0.6s' }} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Donut + Lijn side by side */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+
+              {/* Donut */}
+              <div style={{ padding: '14px', borderRadius: 16, background: 'var(--bg-card-2)', border: '1px solid var(--border)' }}>
+                <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', margin: '0 0 10px' }}>Categorieën</p>
+                {catWithSpend.length === 0
+                  ? <p style={{ fontSize: 12, color: 'var(--text-3)', textAlign: 'center', margin: '20px 0' }}>Geen data</p>
+                  : (() => {
+                      let cum = 0
+                      return (
+                        <>
+                          <svg viewBox="0 0 160 160" style={{ width: '100%', maxWidth: 130, display: 'block', margin: '0 auto 10px' }}>
+                            <circle cx="80" cy="80" r="55" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="20" />
+                            {catWithSpend.map(cat => {
+                              const dash   = (cat.spent / totalSpent) * circumference
+                              const offset = circumference - cum
+                              cum += dash
+                              return (
+                                <circle key={cat.id} cx="80" cy="80" r="55" fill="none"
+                                  stroke={cat.color} strokeWidth="20"
+                                  strokeDasharray={`${dash} ${circumference - dash}`}
+                                  strokeDashoffset={offset}
+                                  style={{ transform: 'rotate(-90deg)', transformOrigin: '80px 80px' }}
+                                />
+                              )
+                            })}
+                            <text x="80" y="76" textAnchor="middle" style={{ fontSize: 13, fontWeight: 700, fill: 'white' }}>{fmtShort(totalSpent)}</text>
+                            <text x="80" y="92" textAnchor="middle" style={{ fontSize: 9, fill: 'rgba(255,255,255,0.4)' }}>totaal</text>
+                          </svg>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            {catWithSpend.map(cat => (
+                              <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                <div style={{ width: 7, height: 7, borderRadius: 2, background: cat.color, flexShrink: 0 }} />
+                                <span style={{ fontSize: 9, color: 'var(--text-3)', flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{cat.emoji} {cat.label.split(' ')[0]}</span>
+                                <span style={{ fontSize: 9, color: 'var(--text-2)', fontWeight: 600 }}>{Math.round((cat.spent / totalSpent) * 100)}%</span>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )
+                    })()
+                }
+              </div>
+
+              {/* Saldo lijn */}
+              <div style={{ padding: '14px', borderRadius: 16, background: 'var(--bg-card-2)', border: '1px solid var(--border)' }}>
+                <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', margin: '0 0 10px' }}>Saldo verloop</p>
+                {(() => {
+                  const svgW = 300, svgH = 120
+                  const padL = 2, padR = 2, padT = 8, padB = 4
+                  const chartW = svgW - padL - padR
+                  const chartH = svgH - padT - padB
+                  const maxY   = Math.max(base, balanceByDay[0] || base)
+                  const minY   = Math.min(0, ...balanceByDay)
+                  const range  = maxY - minY || 1
+                  const toX = d => padL + ((d - 1) / Math.max(daysInMonth - 1, 1)) * chartW
+                  const toY = v => padT + ((maxY - v) / range) * chartH
+
+                  const actualPts = balanceByDay.slice(0, dayOfMonth).map((v, i) => `${toX(i+1)},${toY(v)}`).join(' ')
+
+                  let projPts = ''
+                  if (dayOfMonth < daysInMonth && totalSpent > 0) {
+                    const rate = totalSpent / dayOfMonth
+                    const pp = []
+                    for (let d = dayOfMonth; d <= daysInMonth; d++) {
+                      pp.push(`${toX(d)},${toY(base - totalSpent - rate * (d - dayOfMonth))}`)
+                    }
+                    projPts = pp.join(' ')
+                  }
+
+                  const todayX  = toX(dayOfMonth)
+                  const todayY  = toY(balanceByDay[dayOfMonth - 1] ?? 0)
+                  const zeroY   = toY(0)
+                  const baseY   = toY(base)
+
+                  return (
+                    <svg viewBox={`0 0 ${svgW} ${svgH}`} style={{ width: '100%' }}>
+                      <line x1={padL} y1={zeroY} x2={svgW-padR} y2={zeroY} stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+                      <line x1={padL} y1={baseY} x2={svgW-padR} y2={baseY} stroke="rgba(255,255,255,0.06)" strokeWidth="1" strokeDasharray="3,3" />
+                      <line x1={todayX} y1={padT} x2={todayX} y2={svgH-padB} stroke="rgba(255,255,255,0.15)" strokeWidth="1" strokeDasharray="2,2" />
+                      {projPts && <polyline points={projPts} fill="none" stroke="var(--accent)" strokeWidth="1.5" strokeOpacity="0.35" strokeDasharray="4,3" />}
+                      {actualPts && <polyline points={actualPts} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
+                      <circle cx={todayX} cy={todayY} r="3" fill="var(--accent)" />
+                    </svg>
+                  )
+                })()}
+              </div>
+
             </div>
           </div>
         )}
