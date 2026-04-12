@@ -335,15 +335,15 @@ export default function App() {
 
     navigator.serviceWorker.ready.then(async (reg) => {
       try {
-        // Unsubscribe first then re-subscribe to force a fresh endpoint on iOS,
-        // which silently invalidates subscriptions after periods of inactivity.
-        const existing = await reg.pushManager.getSubscription()
-        if (existing) await existing.unsubscribe().catch(() => {})
-
-        const sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC),
-        })
+        // Get existing subscription — subscribe() is idempotent and returns the
+        // current one if still valid. Only creates a new one if iOS revoked it.
+        let sub = await reg.pushManager.getSubscription()
+        if (!sub) {
+          sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC),
+          })
+        }
         const subJson = sub.toJSON()
 
         const { data: rows } = await supabase
@@ -353,14 +353,12 @@ export default function App() {
 
         if (rows && rows.length > 0) {
           const row = rows[0]
-          const storedEndpoint = row.subscription?.endpoint
           const update = { subscription: subJson }
           if (row.vracht_notify_stops?.length) update.vracht_enabled = true
-          // Only update if endpoint changed or data needs sync
-          if (storedEndpoint !== subJson.endpoint || row.vracht_notify_stops?.length) {
+          // Only write to DB if endpoint changed
+          if (row.subscription?.endpoint !== subJson.endpoint) {
             await supabase.from('push_subscriptions').update(update).eq('id', row.id)
           }
-          // Remove duplicate rows
           if (rows.length > 1) {
             await supabase.from('push_subscriptions').delete().in('id', rows.slice(1).map(r => r.id))
           }

@@ -32,14 +32,14 @@ export async function requestAndSubscribe(userId) {
   try {
     const reg = await navigator.serviceWorker.ready
 
-    // Always get a fresh subscription (iOS invalidates after inactivity)
-    const existing = await reg.pushManager.getSubscription()
-    if (existing) await existing.unsubscribe().catch(() => {})
-
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC),
-    })
+    // Use existing subscription if still valid; create new one if iOS revoked it
+    let sub = await reg.pushManager.getSubscription()
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC),
+      })
+    }
     const subJson = sub.toJSON()
 
     const { data: rows } = await supabase
