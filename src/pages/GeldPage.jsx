@@ -21,28 +21,14 @@ const DEFAULT_CAT_BUDGETS = {
 // iOS: scroll focused input above keyboard
 const scrollFix = (e) => { const t = e.target; setTimeout(() => t.scrollIntoView({ behavior: 'smooth', block: 'center' }), 350) }
 
-// iOS: prevent body from swallowing touch-scroll while modal is open.
-// Walks up from the touch target; allows scroll if a scrollable ancestor exists.
+// Lift body overflow-hidden while modal is open
 function useModalScroll() {
   useEffect(() => {
     document.documentElement.style.overflow = 'auto'
     document.body.style.overflow = 'auto'
-
-    const prevent = (e) => {
-      let el = e.target
-      while (el && el !== document.documentElement) {
-        const s = window.getComputedStyle(el)
-        if ((s.overflowY === 'auto' || s.overflowY === 'scroll') && el.scrollHeight > el.clientHeight) return
-        el = el.parentElement
-      }
-      e.preventDefault()
-    }
-    document.addEventListener('touchmove', prevent, { passive: false })
-
     return () => {
       document.documentElement.style.overflow = 'hidden'
       document.body.style.overflow = 'hidden'
-      document.removeEventListener('touchmove', prevent)
     }
   }, [])
 }
@@ -179,12 +165,11 @@ function BudgetModal({ config, onClose, onSave }) {
   const total = Object.values(cats).reduce((a, b) => a + Number(b), 0)
 
   return ReactDOM.createPortal(
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9999 }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       {/* Backdrop */}
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)' }} onClick={onClose} />
-      {/* Scrollable layer — separate from backdrop so iOS treats it as its own scroll container */}
-      <div style={{ position: 'absolute', inset: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '16px 16px calc(32px + env(safe-area-inset-bottom))' }}>
-      <div style={{ width: '100%', maxWidth: 420, background: 'var(--bg-sidebar)', borderRadius: 22, border: '1px solid var(--border)', padding: 24, position: 'relative', marginTop: 'auto', marginBottom: 'auto' }}>
+      {/* Card is the scroll container — overscroll-behavior:contain stops iOS bounce bleed */}
+      <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420, background: 'var(--bg-sidebar)', borderRadius: 22, border: '1px solid var(--border)', padding: 24, maxHeight: 'calc(100vh - 120px)', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Budget instellen</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)' }}><X size={18} /></button>
@@ -226,7 +211,6 @@ function BudgetModal({ config, onClose, onSave }) {
           style={{ width: '100%', padding: '14px', borderRadius: 14, background: 'var(--accent)', border: 'none', color: '#000', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
           Opslaan
         </button>
-      </div>
       </div>
     </div>,
     document.body
