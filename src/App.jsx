@@ -109,20 +109,18 @@ export default function App() {
   }, [])
 
   // Track keyboard height via visualViewport → CSS variable --keyboard-height
-  // Used by modals to stay visible above the iOS keyboard
+  // Uses initial viewport height as baseline (window.innerHeight unreliable on iOS)
   useEffect(() => {
     const vv = window.visualViewport
     if (!vv) return
+    const baseHeight = vv.height
     const update = () => {
-      const kh = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
+      const kh = Math.max(0, baseHeight - vv.height)
       document.documentElement.style.setProperty('--keyboard-height', `${kh}px`)
     }
     vv.addEventListener('resize', update)
-    vv.addEventListener('scroll', update)
-    update()
     return () => {
       vv.removeEventListener('resize', update)
-      vv.removeEventListener('scroll', update)
       document.documentElement.style.setProperty('--keyboard-height', '0px')
     }
   }, [])
