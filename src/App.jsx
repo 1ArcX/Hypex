@@ -19,6 +19,7 @@ import VersionChecker from './components/VersionChecker'
 import { callMagister } from './utils/magisterApi'
 import { ensureSomtodayCreds } from './utils/somtodayApi'
 import { awardXP, XP_TASK } from './utils/xp'
+import { VAPID_PUBLIC, urlBase64ToUint8Array } from './utils/push'
 import XPToast from './components/XPToast'
 import BottomNav from './components/BottomNav'
 import DashboardPage from './pages/DashboardPage'
@@ -35,13 +36,6 @@ import GeldPage from './pages/GeldPage'
 
 const ADMIN_EMAIL = 'zhafirfachri@gmail.com'
 
-const VAPID_PUBLIC = 'BCsu1QaHUead0cgQ23qUKIu3_MnSi0s21LaD_c9wBcqdP43A9ojEx-nWZ4_xUDYLVMQn0CqzqdhSuLQr6eOQqh4'
-function urlBase64ToUint8Array(b) {
-  const pad = '='.repeat((4 - b.length % 4) % 4)
-  const base64 = (b + pad).replace(/-/g, '+').replace(/_/g, '/')
-  const raw = atob(base64)
-  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)))
-}
 
 const PAGE_NAMES = {
   dashboard: 'Dashboard', agenda: 'Agenda', taken: 'Taken',
@@ -876,6 +870,7 @@ export default function App() {
           setTheme={setTheme}
           onLogout={() => supabase.auth.signOut({ scope: 'local' })}
           userEmail={user?.email}
+          userId={user?.id}
         />
       )}
 

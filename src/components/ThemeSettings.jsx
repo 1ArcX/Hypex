@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { X, Palette, RotateCcw, LogOut } from 'lucide-react'
+import { X, Palette, RotateCcw, LogOut, Bell, BellOff } from 'lucide-react'
+import { pushSupported, requestAndSubscribe } from '../utils/push'
 
 const PRESETS = [
   { name: 'Neon Cyan', accent: '#00FFD1', bg1: '#0a0a1a', bg2: '#0d1117' },
@@ -12,8 +13,12 @@ const PRESETS = [
 
 const SOMTODAY_EMAIL = 'jbrugman.prive@gmail.com'
 
-export default function ThemeSettings({ onClose, theme, setTheme, onLogout, userEmail }) {
+export default function ThemeSettings({ onClose, theme, setTheme, onLogout, userEmail, userId }) {
   const [customAccent, setCustomAccent] = useState(theme.accent)
+  const [notifState, setNotifState] = useState(() => {
+    if (!pushSupported()) return 'unsupported'
+    return Notification.permission // 'default' | 'granted' | 'denied'
+  })
   const [somtodayColor, setSomtodayColorState] = useState(() => {
     try { return localStorage.getItem('somtoday_lesson_color') || '#FACC15' } catch { return '#FACC15' }
   })
@@ -105,6 +110,39 @@ export default function ThemeSettings({ onClose, theme, setTheme, onLogout, user
             </div>
           </div>
         )}
+
+        {/* Meldingen */}
+        <div className="mb-5">
+          <p className="text-xs font-medium mb-2" style={{ color: 'rgba(255,255,255,0.5)' }}>Meldingen</p>
+          {notifState === 'unsupported' && (
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', padding: '8px 0' }}>
+              Niet ondersteund op dit apparaat / browser.
+            </div>
+          )}
+          {notifState === 'denied' && (
+            <div style={{ fontSize: 12, color: 'rgba(239,68,68,0.7)', lineHeight: 1.5 }}>
+              Geblokkeerd — ga naar je telefoon-instellingen → browser → Hypex om meldingen toe te staan.
+            </div>
+          )}
+          {(notifState === 'default' || notifState === 'loading') && (
+            <button
+              disabled={notifState === 'loading'}
+              onClick={async () => {
+                setNotifState('loading')
+                const result = await requestAndSubscribe(userId)
+                setNotifState(result === 'granted' ? 'granted' : result === 'denied' ? 'denied' : 'default')
+              }}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '9px', borderRadius: 12, background: 'rgba(0,255,209,0.08)', border: '1px solid rgba(0,255,209,0.25)', color: 'var(--accent)', cursor: notifState === 'loading' ? 'default' : 'pointer', fontSize: 13, fontWeight: 600 }}
+            >
+              <Bell size={14} /> {notifState === 'loading' ? 'Even wachten...' : 'Meldingen aanzetten'}
+            </button>
+          )}
+          {notifState === 'granted' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: 12, background: 'rgba(29,185,84,0.08)', border: '1px solid rgba(29,185,84,0.2)', fontSize: 13, color: '#1DB954' }}>
+              <Bell size={14} /> Meldingen staan aan
+            </div>
+          )}
+        </div>
 
         <button onClick={resetTheme}
           className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-sm"

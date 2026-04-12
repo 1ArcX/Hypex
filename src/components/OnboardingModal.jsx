@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { MapPin, GraduationCap, ChevronRight, Check } from 'lucide-react'
+import { MapPin, GraduationCap, ChevronRight, Check, Bell } from 'lucide-react'
+import { pushSupported, requestAndSubscribe } from '../utils/push'
 
 export default function OnboardingModal({ user, onClose }) {
   const [closing, setClosing] = useState(false)
@@ -13,9 +14,15 @@ export default function OnboardingModal({ user, onClose }) {
   const [steps] = useState(() => {
     const s = ['welcome', 'location']
     if (!localStorage.getItem(`magister_credentials_${user?.id}`)) s.push('magister')
+    // Only show notifications step if supported and not yet granted
+    if (pushSupported() && Notification.permission !== 'granted') s.push('notifications')
     s.push('done')
     return s
   })
+
+  const [notifState, setNotifState] = useState(
+    Notification.permission === 'granted' ? 'granted' : 'idle'
+  ) // idle | loading | granted | denied
 
   const [stepIndex, setStepIndex] = useState(0)
 
@@ -253,6 +260,48 @@ export default function OnboardingModal({ user, onClose }) {
               >
                 Koppelen
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* ─── Meldingen ─── */}
+        {step === 'notifications' && (
+          <div>
+            <Bell size={26} style={{ color: 'var(--accent)', marginBottom: 10 }} />
+            <h2 style={{ color: 'white', fontSize: 18, fontWeight: 700, margin: '0 0 6px' }}>Meldingen</h2>
+            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, margin: '0 0 18px', lineHeight: 1.6 }}>
+              Ontvang meldingen voor je Pomodoro timer, gewoontes en meer — ook als de app op de achtergrond staat.
+            </p>
+
+            {notifState === 'denied' ? (
+              <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', marginBottom: 16, fontSize: 13, color: 'rgba(239,68,68,0.8)' }}>
+                Meldingen zijn geblokkeerd. Zet ze aan via je telefoon-instellingen → Safari/Chrome → Hypex.
+              </div>
+            ) : notifState === 'granted' ? (
+              <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(29,185,84,0.08)', border: '1px solid rgba(29,185,84,0.25)', marginBottom: 16, fontSize: 13, color: '#1DB954', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Check size={14} /> Meldingen staan aan!
+              </div>
+            ) : null}
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={next} style={secondaryBtn}>Overslaan</button>
+              {notifState !== 'granted' && (
+                <button
+                  disabled={notifState === 'loading' || notifState === 'denied'}
+                  onClick={async () => {
+                    setNotifState('loading')
+                    const result = await requestAndSubscribe(user?.id)
+                    setNotifState(result)
+                    if (result === 'granted') setTimeout(next, 800)
+                  }}
+                  style={primaryBtn(notifState === 'loading' || notifState === 'denied')}
+                >
+                  {notifState === 'loading' ? 'Even wachten...' : '🔔 Aanzetten'}
+                </button>
+              )}
+              {notifState === 'granted' && (
+                <button onClick={next} style={primaryBtn(false)}>Doorgaan</button>
+              )}
             </div>
           </div>
         )}
