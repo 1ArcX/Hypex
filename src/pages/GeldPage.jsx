@@ -81,7 +81,7 @@ function ExpenseModal({ onClose, onSave, editing }) {
 
   return ReactDOM.createPortal(
     <div ref={backdropRef} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)', zIndex: 9999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-      <div style={{ width: '100%', maxWidth: 480, background: 'var(--bg-sidebar)', borderRadius: '22px 22px 0 0', border: '1px solid var(--border)', borderBottom: 'none', padding: '20px 20px calc(24px + env(safe-area-inset-bottom))', animation: 'sheetUp 0.3s cubic-bezier(0.34,1.1,0.64,1)' }}>
+      <div style={{ width: '100%', maxWidth: 480, background: 'var(--bg-sidebar)', borderRadius: '22px 22px 0 0', border: '1px solid var(--border)', borderBottom: 'none', padding: '20px 20px calc(24px + env(safe-area-inset-bottom))', paddingBottom: 'calc(24px + env(safe-area-inset-bottom) + var(--keyboard-height, 0px))', animation: 'sheetUp 0.3s cubic-bezier(0.34,1.1,0.64,1)', transition: 'padding-bottom 0.2s ease' }}>
         <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border)', margin: '0 auto 18px' }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
           <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>{editing ? 'Bewerken' : 'Uitgave toevoegen'}</h3>
@@ -149,7 +149,7 @@ function SavingsModal({ onClose, onSave }) {
   }
 
   return ReactDOM.createPortal(
-    <div ref={backdropRef} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+    <div ref={backdropRef} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, paddingBottom: 'calc(20px + var(--keyboard-height, 0px))', transition: 'padding-bottom 0.2s ease' }}>
       <div style={{ width: '100%', maxWidth: 380, background: 'var(--bg-sidebar)', borderRadius: 22, border: '1px solid rgba(239,68,68,0.4)', padding: 24 }}>
         <div style={{ textAlign: 'center', marginBottom: 20 }}>
           <div style={{ fontSize: 40, marginBottom: 8 }}>⚠️</div>
@@ -193,8 +193,8 @@ function BudgetModal({ config, onClose, onSave }) {
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       {/* Backdrop */}
       <div ref={backdropRef} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)' }} onClick={onClose} />
-      {/* Card — scrollable, bounce blocked at boundaries */}
-      <div ref={cardRef} style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420, background: 'var(--bg-sidebar)', borderRadius: 22, border: '1px solid var(--border)', padding: 24, maxHeight: 'calc(100vh - 120px)', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      {/* Card — scrollable, shrinks above keyboard via --keyboard-height */}
+      <div ref={cardRef} style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420, background: 'var(--bg-sidebar)', borderRadius: 22, border: '1px solid var(--border)', padding: 24, maxHeight: 'calc(100vh - 80px - var(--keyboard-height, 0px))', overflowY: 'auto', WebkitOverflowScrolling: 'touch', transition: 'max-height 0.2s ease' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Budget instellen</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)' }}><X size={18} /></button>

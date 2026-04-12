@@ -108,6 +108,25 @@ export default function App() {
     return () => window.removeEventListener('gymWorkoutChange', handler)
   }, [])
 
+  // Track keyboard height via visualViewport → CSS variable --keyboard-height
+  // Used by modals to stay visible above the iOS keyboard
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const update = () => {
+      const kh = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
+      document.documentElement.style.setProperty('--keyboard-height', `${kh}px`)
+    }
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    update()
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+      document.documentElement.style.setProperty('--keyboard-height', '0px')
+    }
+  }, [])
+
   // Pull-to-refresh
   const pullStartY = useRef(null)
   const pullStartX = useRef(null)
