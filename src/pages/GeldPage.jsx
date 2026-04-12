@@ -190,11 +190,11 @@ function BudgetModal({ config, onClose, onSave }) {
   const total = Object.values(cats).reduce((a, b) => a + Number(b), 0)
 
   return ReactDOM.createPortal(
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      {/* Backdrop */}
-      <div ref={backdropRef} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)' }} onClick={onClose} />
-      {/* Card — scrollable, shrinks above keyboard via --keyboard-height */}
-      <div ref={cardRef} style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420, background: 'var(--bg-sidebar)', borderRadius: 22, border: '1px solid var(--border)', padding: 24, maxHeight: 'calc(100vh - 80px - var(--keyboard-height, 0px))', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 'var(--keyboard-height, 0px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      {/* Backdrop covers full screen regardless of keyboard */}
+      <div ref={backdropRef} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)', zIndex: -1 }} onClick={onClose} />
+      {/* Card centered in visible area above keyboard */}
+      <div ref={cardRef} style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420, background: 'var(--bg-sidebar)', borderRadius: 22, border: '1px solid var(--border)', padding: 24, maxHeight: 'calc(100% - 32px)', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Budget instellen</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)' }}><X size={18} /></button>
