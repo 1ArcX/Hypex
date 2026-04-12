@@ -332,27 +332,46 @@ export default function App() {
     }
   }, [])
 
-  // Globale push-subscription refresh — draait bij elke app-start als permissie al granted is,
-  // ongeacht welke widget meldingen heeft aanstaan (Vracht, Regen, Pomodoro, enz.)
+  // Global push-subscription refresh on every app start when permission is already granted.
+  // Only writes to Supabase when the endpoint actually changed (avoids unnecessary updates).
   useEffect(() => {
     if (!user?.id) return
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+
     navigator.serviceWorker.ready.then(async (reg) => {
       try {
-        const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC) })
-        const { data: rows } = await supabase.from('push_subscriptions').select('id, vracht_enabled, vracht_notify_stops').eq('user_id', user.id)
+        // Unsubscribe first then re-subscribe to force a fresh endpoint on iOS,
+        // which silently invalidates subscriptions after periods of inactivity.
+        const existing = await reg.pushManager.getSubscription()
+        if (existing) await existing.unsubscribe().catch(() => {})
+
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC),
+        })
+        const subJson = sub.toJSON()
+
+        const { data: rows } = await supabase
+          .from('push_subscriptions')
+          .select('id, subscription, vracht_enabled, vracht_notify_stops')
+          .eq('user_id', user.id)
+
         if (rows && rows.length > 0) {
-          // Always re-enable vracht if it was set — subscription may have been cleared on 410
-          const existing = rows[0]
-          const update = { subscription: sub.toJSON() }
-          if (existing.vracht_notify_stops?.length) update.vracht_enabled = true
-          await supabase.from('push_subscriptions').update(update).eq('id', existing.id)
+          const row = rows[0]
+          const storedEndpoint = row.subscription?.endpoint
+          const update = { subscription: subJson }
+          if (row.vracht_notify_stops?.length) update.vracht_enabled = true
+          // Only update if endpoint changed or data needs sync
+          if (storedEndpoint !== subJson.endpoint || row.vracht_notify_stops?.length) {
+            await supabase.from('push_subscriptions').update(update).eq('id', row.id)
+          }
+          // Remove duplicate rows
           if (rows.length > 1) {
             await supabase.from('push_subscriptions').delete().in('id', rows.slice(1).map(r => r.id))
           }
         } else {
-          await supabase.from('push_subscriptions').insert({ user_id: user.id, subscription: sub.toJSON() })
+          await supabase.from('push_subscriptions').insert({ user_id: user.id, subscription: subJson })
         }
       } catch (e) {
         console.error('Global push refresh failed:', e)

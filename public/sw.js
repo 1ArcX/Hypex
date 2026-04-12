@@ -1,7 +1,12 @@
-const CACHE = 'hypex-v1'
+const CACHE = 'hypex-v3'
+const ICON  = '/icon.png'
 
 self.addEventListener('install', e => {
   self.skipWaiting()
+  // Pre-cache the shell so notifications can open the app offline
+  e.waitUntil(
+    caches.open(CACHE).then(c => c.addAll(['/', '/icon.png']).catch(() => {}))
+  )
 })
 
 self.addEventListener('activate', e => {
@@ -12,32 +17,43 @@ self.addEventListener('activate', e => {
   )
 })
 
-// Pass-through fetch — keeps SW alive on iOS without breaking anything
+// Only intercept GET — leave POST/PUT/etc. to pass through unmodified
 self.addEventListener('fetch', e => {
-  e.respondWith(fetch(e.request).catch(() => caches.match(e.request)))
+  if (e.request.method !== 'GET') return
+  e.respondWith(
+    fetch(e.request).catch(() => caches.match(e.request))
+  )
 })
 
 self.addEventListener('push', e => {
-  const data = e.data?.json() || {}
+  let data = {}
+  try { data = e.data?.json() ?? {} } catch {}
+
   e.waitUntil(
-    self.registration.showNotification(data.title || 'Dashboard', {
-      body: data.body || '',
-      icon: '/icon-192.png',
-      badge: '/icon-192.png',
-      tag: data.tag || 'general',
-      renotify: false,
-      data: { url: data.url || '/' },
+    self.registration.showNotification(data.title || 'Hypex', {
+      body:              data.body  || '',
+      icon:              ICON,
+      badge:             ICON,
+      tag:               data.tag   || 'hypex',
+      renotify:          !!data.renotify,
+      requireInteraction: false,
+      data:              { url: data.url || '/' },
     })
   )
 })
 
 self.addEventListener('notificationclick', e => {
   e.notification.close()
-  const url = e.notification.data?.url || '/'
+  const target = e.notification.data?.url || '/'
   e.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-      for (const c of list) if ('focus' in c) return c.focus()
-      return clients.openWindow(url)
+      // Prefer the window already at the target URL
+      const match = list.find(c => c.url.endsWith(target))
+      if (match && 'focus' in match) return match.focus()
+      // Otherwise focus any open window (SPA — it will navigate itself)
+      const any = list.find(c => 'focus' in c)
+      if (any) return any.focus()
+      return clients.openWindow(target)
     })
   )
 })
