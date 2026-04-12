@@ -61,6 +61,9 @@ const DEFAULT_CAT_BUDGETS = {
   kleding: 50, abonnementen: 30, sport: 20, overig: 60,
 }
 
+const CAT_COLORS = ['#F97316','#EF4444','#10B981','#3B82F6','#8B5CF6','#EC4899','#FACC15','#06B6D4','#84CC16','#94A3B8','#FB923C','#A3E635']
+const CAT_EMOJIS = ['🎮','🎸','✈️','🍕','🧴','📚','🐾','🎁','🏋️','💊','🎨','🛒','🚗','🎬','☕','🧹','🏠','💡','🔧','🎓']
+
 // iOS: scroll focused input above keyboard
 const scrollFix = (e) => { const t = e.target; setTimeout(() => t.scrollIntoView({ behavior: 'smooth', block: 'center' }), 350) }
 
@@ -108,7 +111,7 @@ function monthLabel() {
 }
 
 // ── Expense Log Modal ─────────────────────────────────────────────────────────
-function ExpenseModal({ onClose, onSave, editing }) {
+function ExpenseModal({ onClose, onSave, editing, categories = CATEGORIES }) {
   const backdropRef = useRef(null)
   usePreventTouch(backdropRef)
   const [amount, setAmount]             = useState(editing?.amount || '')
@@ -148,7 +151,7 @@ function ExpenseModal({ onClose, onSave, editing }) {
 
         {/* Category */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 16 }}>
-          {CATEGORIES.map(c => (
+          {categories.map(c => (
             <button key={c.id} onClick={() => setCat(c.id)} style={{ padding: '10px 4px', borderRadius: 12, border: cat === c.id ? `1px solid ${c.color}` : '1px solid var(--border)', background: cat === c.id ? `${c.color}18` : 'var(--bg-card-2)', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
               <span style={{ fontSize: 20 }}>{c.emoji}</span>
               <span style={{ fontSize: 9, color: cat === c.id ? c.color : 'var(--text-3)', fontWeight: cat === c.id ? 600 : 400 }}>{c.label.split(' ')[0]}</span>
@@ -295,11 +298,33 @@ function IncomeModal({ onClose, onSave }) {
 function BudgetModal({ config, onClose, onSave }) {
   const backdropRef = useRef(null)
   const cardRef     = useRef(null)
-  usePreventTouch(backdropRef)   // backdrop: block all touch-scroll
-  useScrollContain(cardRef)      // card: allow scroll but clamp overscroll at edges
+  usePreventTouch(backdropRef)
+  useScrollContain(cardRef)
 
-  const [monthly, setMonthly] = useState(config?.monthly_budget || 400)
-  const [cats, setCats] = useState(config?.category_budgets || DEFAULT_CAT_BUDGETS)
+  const [monthly,    setMonthly]    = useState(config?.monthly_budget || 400)
+  const [cats,       setCats]       = useState(config?.category_budgets || DEFAULT_CAT_BUDGETS)
+  const [customCats, setCustomCats] = useState(config?.custom_categories || [])
+  const [addingCat,  setAddingCat]  = useState(false)
+  const [newName,    setNewName]    = useState('')
+  const [newEmoji,   setNewEmoji]   = useState('🎮')
+  const [newColor,   setNewColor]   = useState(CAT_COLORS[0])
+  const [newBudget,  setNewBudget]  = useState('')
+
+  const resetCatForm = () => { setNewName(''); setNewEmoji('🎮'); setNewColor(CAT_COLORS[0]); setNewBudget('') }
+
+  const addCustomCat = () => {
+    if (!newName.trim()) return
+    const id = `cat_${Date.now()}`
+    const budget = parseFloat(String(newBudget).replace(',', '.')) || 0
+    setCustomCats(cs => [...cs, { id, label: newName.trim(), emoji: newEmoji, color: newColor }])
+    setCats(c => ({ ...c, [id]: budget }))
+    resetCatForm(); setAddingCat(false)
+  }
+
+  const deleteCustomCat = (id) => {
+    setCustomCats(cs => cs.filter(c => c.id !== id))
+    setCats(c => { const n = { ...c }; delete n[id]; return n })
+  }
 
   const total = Object.values(cats).reduce((a, b) => a + Number(b), 0)
 
@@ -340,13 +365,71 @@ function BudgetModal({ config, onClose, onSave }) {
           ))}
         </div>
 
+        {/* Custom categories */}
+        <label style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', marginBottom: 10 }}>Eigen enveloppen</label>
+
+        {customCats.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+            {customCats.map(c => (
+              <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 20, width: 28 }}>{c.emoji}</span>
+                <span style={{ flex: 1, fontSize: 13, color: 'var(--text-2)' }}>{c.label}</span>
+                <div style={{ position: 'relative', width: 90 }}>
+                  <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: 'var(--text-3)' }}>€</span>
+                  <input type="number" value={cats[c.id] || 0} onChange={e => setCats(p => ({ ...p, [c.id]: +e.target.value }))}
+                    onFocus={scrollFix}
+                    style={{ width: '100%', padding: '8px 8px 8px 22px', borderRadius: 10, background: 'var(--bg-card-2)', border: `1px solid ${c.color}40`, color: c.color, fontSize: 14, fontWeight: 600, colorScheme: 'dark' }} />
+                </div>
+                <button onClick={() => deleteCustomCat(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(239,68,68,0.5)', padding: 4 }}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {addingCat ? (
+          <div style={{ padding: 14, borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', marginBottom: 12 }}>
+            <input placeholder="Naam (bijv. Hobby, Huisdier)" value={newName} onChange={e => setNewName(e.target.value)} onFocus={scrollFix} autoFocus
+              style={{ width: '100%', padding: '9px 12px', borderRadius: 10, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: 14, marginBottom: 10, colorScheme: 'dark', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+            <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '0 0 6px', fontWeight: 600 }}>Emoji</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
+              {CAT_EMOJIS.map(e => (
+                <button key={e} onClick={() => setNewEmoji(e)} style={{ fontSize: 18, width: 32, height: 32, borderRadius: 8, border: newEmoji === e ? '2px solid var(--accent)' : '1px solid var(--border)', background: newEmoji === e ? 'rgba(0,255,209,0.08)' : 'var(--bg-card-2)', cursor: 'pointer' }}>{e}</button>
+              ))}
+            </div>
+            <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '0 0 6px', fontWeight: 600 }}>Kleur</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+              {CAT_COLORS.map(col => (
+                <button key={col} onClick={() => setNewColor(col)} style={{ width: 24, height: 24, borderRadius: 6, background: col, border: newColor === col ? '2px solid white' : '2px solid transparent', cursor: 'pointer' }} />
+              ))}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <span style={{ fontSize: 13, color: 'var(--text-3)' }}>Budget:</span>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: 'var(--text-3)' }}>€</span>
+                <input type="text" inputMode="decimal" placeholder="0" value={newBudget} onChange={e => setNewBudget(e.target.value)} onFocus={scrollFix}
+                  style={{ width: '100%', padding: '8px 8px 8px 22px', borderRadius: 10, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: 14, fontWeight: 600, colorScheme: 'dark', boxSizing: 'border-box' }} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => { setAddingCat(false); resetCatForm() }} style={{ flex: 1, padding: '9px', borderRadius: 10, background: 'none', border: '1px solid var(--border)', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13 }}>Annuleer</button>
+              <button onClick={addCustomCat} disabled={!newName.trim()} style={{ flex: 2, padding: '9px', borderRadius: 10, background: newName.trim() ? 'var(--accent)' : 'rgba(255,255,255,0.07)', border: 'none', color: newName.trim() ? '#000' : 'rgba(255,255,255,0.25)', fontWeight: 700, fontSize: 13, cursor: newName.trim() ? 'pointer' : 'default' }}>Aanmaken</button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => setAddingCat(true)} style={{ width: '100%', padding: '10px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.15)', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13, marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <Plus size={14} /> Envelop toevoegen
+          </button>
+        )}
+
         <div style={{ padding: '10px 14px', borderRadius: 12, background: total > monthly ? 'rgba(239,68,68,0.08)' : 'rgba(0,255,209,0.06)', border: `1px solid ${total > monthly ? 'rgba(239,68,68,0.3)' : 'rgba(0,255,209,0.2)'}`, marginBottom: 18 }}>
           <span style={{ fontSize: 13, color: total > monthly ? '#EF4444' : 'var(--accent)' }}>
             {total > monthly ? `⚠️ Categorieën (${fmtShort(total)}) overschrijden maandbudget` : `✓ Categorieën: ${fmtShort(total)} van ${fmtShort(monthly)}`}
           </span>
         </div>
 
-        <button onClick={() => onSave({ monthly_budget: monthly, category_budgets: cats })}
+        <button onClick={() => onSave({ monthly_budget: monthly, category_budgets: cats, custom_categories: customCats })}
           style={{ width: '100%', padding: '14px', borderRadius: 14, background: 'var(--accent)', border: 'none', color: '#000', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
           Opslaan
         </button>
@@ -559,6 +642,8 @@ export default function GeldPage({ userId }) {
   // Derived stats
   const monthlyBudget      = config?.monthly_budget || 400
   const catBudgets         = config?.category_budgets || DEFAULT_CAT_BUDGETS
+  const customCategories   = config?.custom_categories || []
+  const allCategories      = [...CATEGORIES, ...customCategories]
   const manualIncome       = expenses.filter(e => e.is_income)
   const totalManualIncome  = manualIncome.reduce((s, e) => s + Number(e.amount), 0)
   const regularExpenses    = expenses.filter(e => !e.is_savings_withdrawal && !e.is_income)
@@ -580,7 +665,7 @@ export default function GeldPage({ userId }) {
     .reduce((s, e) => s + Number(e.amount), 0)
 
   const spentByCategory = {}
-  for (const cat of CATEGORIES) {
+  for (const cat of allCategories) {
     spentByCategory[cat.id] = regularExpenses.filter(e => e.category === cat.id)
       .reduce((s, e) => s + Number(e.amount), 0)
   }
@@ -619,7 +704,7 @@ export default function GeldPage({ userId }) {
 
   // Donut
   const circumference  = 2 * Math.PI * 55
-  const catWithSpend   = CATEGORIES.map(c => ({ ...c, spent: spentByCategory[c.id] || 0 })).filter(c => c.spent > 0)
+  const catWithSpend   = allCategories.map(c => ({ ...c, spent: spentByCategory[c.id] || 0 })).filter(c => c.spent > 0)
 
   // Balance line
   const balanceByDay = []
@@ -787,7 +872,7 @@ export default function GeldPage({ userId }) {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 10 }}>
               {savingsExpenses.map(e => {
-                const cat = CATEGORIES.find(c => c.id === e.category) || CATEGORIES[6]
+                const cat = allCategories.find(c => c.id === e.category) || CATEGORIES[6]
                 return (
                   <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 10, background: 'rgba(245,158,11,0.05)' }}>
                     <span style={{ fontSize: 14 }}>{cat.emoji}</span>
@@ -932,7 +1017,7 @@ export default function GeldPage({ userId }) {
         <div style={{ marginBottom: 20 }}>
           <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>Enveloppen</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {CATEGORIES.map(cat => {
+            {allCategories.map(cat => {
               const budget = catBudgets[cat.id] || 0
               const spent  = spentByCategory[cat.id] || 0
               const pct    = budget > 0 ? Math.min(100, (spent / budget) * 100) : 0
@@ -968,7 +1053,7 @@ export default function GeldPage({ userId }) {
                 const isInc = exp.is_income
                 const cat   = isInc
                   ? (INCOME_CATEGORIES.find(c => c.id === exp.category) || INCOME_CATEGORIES[4])
-                  : (CATEGORIES.find(c => c.id === exp.category) || CATEGORIES[6])
+                  : (allCategories.find(c => c.id === exp.category) || CATEGORIES[6])
                 const color = isInc ? '#10B981' : (cat.color || '#94A3B8')
                 return (
                   <div key={exp.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 14, background: isInc ? 'rgba(16,185,129,0.05)' : 'var(--bg-card-2)', border: `1px solid ${isInc ? 'rgba(16,185,129,0.2)' : 'var(--border)'}` }}>
@@ -1031,7 +1116,7 @@ export default function GeldPage({ userId }) {
       </div>
 
       {showAdd && (
-        <ExpenseModal editing={editing} onClose={() => { setShowAdd(false); setEditing(null) }} onSave={saveExpense} />
+        <ExpenseModal editing={editing} onClose={() => { setShowAdd(false); setEditing(null) }} onSave={saveExpense} categories={allCategories} />
       )}
       {showIncome && <IncomeModal onClose={() => setShowIncome(false)} onSave={saveExpense} />}
       {showSavings && <SavingsModal onClose={() => setShowSavings(false)} onSave={saveExpense} />}
