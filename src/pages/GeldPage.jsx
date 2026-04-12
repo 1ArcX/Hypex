@@ -203,18 +203,18 @@ function ExpenseModal({ onClose, onSave, editing, categories = CATEGORIES }) {
 }
 
 // ── Savings Withdrawal Modal ──────────────────────────────────────────────────
-function SavingsModal({ onClose, onSave }) {
+function SavingsModal({ onClose, onSave, editing }) {
   const backdropRef = useRef(null)
   usePreventTouch(backdropRef)
-  const [amount, setAmount] = useState('')
-  const [reason, setReason] = useState('')
+  const [amount, setAmount] = useState(editing?.amount || '')
+  const [reason, setReason] = useState(editing?.description || '')
 
   const canSave = parseFloat(String(amount).replace(',', '.')) > 0 && reason.trim().length > 0
 
   const handleSave = () => {
     const n = parseFloat(String(amount).replace(',', '.'))
     if (!n || n <= 0 || !reason.trim()) return
-    onSave({ amount: n, category: 'overig', description: reason.trim(), date: todayStr(), is_savings_withdrawal: true })
+    onSave({ amount: n, category: 'overig', description: reason.trim(), date: editing?.date || todayStr(), is_savings_withdrawal: true })
   }
 
   return ReactDOM.createPortal(
@@ -222,8 +222,8 @@ function SavingsModal({ onClose, onSave }) {
       <div style={{ width: '100%', maxWidth: 380, background: 'var(--bg-sidebar)', borderRadius: 22, border: '1px solid rgba(239,68,68,0.4)', padding: 24 }}>
         <div style={{ textAlign: 'center', marginBottom: 20 }}>
           <div style={{ fontSize: 40, marginBottom: 8 }}>⚠️</div>
-          <h3 style={{ fontSize: 17, fontWeight: 700, color: '#EF4444', margin: '0 0 6px' }}>Spaargeld afhalen</h3>
-          <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0 }}>Dit wordt bijgehouden. Zeker weten?</p>
+          <h3 style={{ fontSize: 17, fontWeight: 700, color: '#EF4444', margin: '0 0 6px' }}>{editing ? 'Opname bewerken' : 'Spaargeld afhalen'}</h3>
+          <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0 }}>{editing ? 'Pas het bedrag of de reden aan.' : 'Dit wordt bijgehouden. Zeker weten?'}</p>
         </div>
 
         <div style={{ position: 'relative', marginBottom: 12 }}>
@@ -698,8 +698,9 @@ export default function GeldPage({ userId, onClose }) {
   const [showBudget, setShowBudget]   = useState(false)
   const [editing, setEditing]         = useState(null)
   const [showAll, setShowAll]         = useState(false)
-  const [showRecurring, setShowRecurring] = useState(false)
-  const [prevExpenses, setPrevExpenses]   = useState([])
+  const [showRecurring, setShowRecurring]   = useState(false)
+  const [editingSavings, setEditingSavings] = useState(null)
+  const [prevExpenses, setPrevExpenses]     = useState([])
   const [yearSavings, setYearSavings]     = useState([])
   const [subView, setSubView]         = useState('weergave')
   const [isMobile, setIsMobile]       = useState(window.innerWidth < 768)
@@ -1274,13 +1275,32 @@ export default function GeldPage({ userId, onClose }) {
               </>}
             </div>
           )}
+          {savingsWithdrawals.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <p style={{ fontSize: 11, color: 'rgba(239,68,68,0.7)', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>🏦 Spaaropnames deze maand</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {savingsWithdrawals.map(exp => (
+                  <div key={exp.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 14, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)' }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(239,68,68,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🏦</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exp.description || 'Spaaropname'}</p>
+                      <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>{exp.date}</p>
+                    </div>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: '#EF4444', flexShrink: 0 }}>+{fmt(exp.amount)}</span>
+                    <button onClick={() => { setEditingSavings(exp); setShowSavings(true) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4, flexShrink: 0 }}><Pencil size={14} /></button>
+                    <button onClick={() => deleteExpense(exp.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(239,68,68,0.5)', padding: 4, flexShrink: 0 }}><Trash2 size={14} /></button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {manualIncome.length > 0 && (
             <div style={{ marginBottom: 16 }}>
               <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>Eenmalig / extra</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>{manualIncome.map(exp => renderTxRow(exp))}</div>
             </div>
           )}
-          {manualIncome.length === 0 && !hasRecurring && (
+          {manualIncome.length === 0 && !hasRecurring && savingsWithdrawals.length === 0 && (
             <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-3)' }}>
               <div style={{ fontSize: 40, marginBottom: 10 }}>💚</div>
               <p style={{ fontSize: 15, fontWeight: 600, margin: '0 0 4px', color: 'var(--text-2)' }}>Geen inkomsten</p>
@@ -1366,7 +1386,7 @@ export default function GeldPage({ userId, onClose }) {
 
       {showAdd && <ExpenseModal editing={editing} onClose={() => { setShowAdd(false); setEditing(null) }} onSave={saveExpense} categories={allCategories} />}
       {showIncome && <IncomeModal onClose={() => setShowIncome(false)} onSave={saveExpense} />}
-      {showSavings && <SavingsModal onClose={() => setShowSavings(false)} onSave={saveExpense} />}
+      {showSavings && <SavingsModal editing={editingSavings} onClose={() => { setShowSavings(false); setEditingSavings(null) }} onSave={async (data) => { if (editingSavings) { await supabase.from('expenses').update(data).eq('id', editingSavings.id); setEditingSavings(null); setShowSavings(false); fetchAll() } else { saveExpense(data) } }} />}
       {showBudget && <BudgetModal config={config} onClose={() => setShowBudget(false)} onSave={saveBudget} />}
       {showRecurring && <RecurringIncomeModal config={config} onClose={() => setShowRecurring(false)} onSave={saveRecurring} />}
       <style>{`@keyframes sheetUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }`}</style>
