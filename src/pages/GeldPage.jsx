@@ -461,10 +461,11 @@ function RecurringIncomeModal({ config, onClose, onSave }) {
   usePreventTouch(backdropRef)
   useScrollContain(cardRef)
 
-  const [sources, setSources] = useState(config?.recurring_income || [])
-  const [adding,  setAdding]  = useState((config?.recurring_income || []).length === 0)
-  const [name,    setName]    = useState('')
-  const [emoji,   setEmoji]   = useState('💼')
+  const [sources,   setSources]  = useState(config?.recurring_income || [])
+  const [adding,    setAdding]   = useState((config?.recurring_income || []).length === 0)
+  const [editingId, setEditingId] = useState(null)
+  const [name,      setName]     = useState('')
+  const [emoji,     setEmoji]    = useState('💼')
   const [amount,  setAmount]  = useState('')
   const [type,    setType]    = useState('monthly')
   const [day,     setDay]     = useState(1)
@@ -472,6 +473,13 @@ function RecurringIncomeModal({ config, onClose, onSave }) {
   const [refDate, setRefDate] = useState(todayStr())
 
   const resetForm = () => { setName(''); setEmoji('💼'); setAmount(''); setType('monthly'); setDay(1); setIntDays(28); setRefDate(todayStr()) }
+
+  const startEdit = (src) => {
+    setEditingId(src.id)
+    setName(src.name); setEmoji(src.emoji); setAmount(String(src.amount))
+    setType(src.type); setDay(src.day || 1); setIntDays(src.interval_days || 28); setRefDate(src.ref_date || todayStr())
+    setAdding(false)
+  }
 
   const handleAdd = () => {
     const n = parseFloat(String(amount).replace(',', '.'))
@@ -482,6 +490,16 @@ function RecurringIncomeModal({ config, onClose, onSave }) {
       ...(type === 'monthly' ? { day: Number(day) } : { interval_days: Number(intDays), ref_date: refDate }),
     }])
     resetForm(); setAdding(false)
+  }
+
+  const handleSaveEdit = () => {
+    const n = parseFloat(String(amount).replace(',', '.'))
+    if (!name.trim() || !n || n <= 0) return
+    setSources(s => s.map(src => src.id === editingId ? {
+      ...src, name: name.trim(), emoji, amount: n, type,
+      ...(type === 'monthly' ? { day: Number(day) } : { interval_days: Number(intDays), ref_date: refDate }),
+    } : src))
+    resetForm(); setEditingId(null)
   }
 
   const handleClose = () => { onSave(sources); onClose() }
@@ -503,6 +521,55 @@ function RecurringIncomeModal({ config, onClose, onSave }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
             {sources.map(src => {
               const next = getNextPayDate(src)
+              if (editingId === src.id) return (
+                <div key={src.id} style={{ padding: 14, borderRadius: 14, background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.3)' }}>
+                  <p style={{ fontSize: 11, color: '#10B981', fontWeight: 700, margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>✏ {src.name} bewerken</p>
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+                    {REC_EMOJIS.map(e => (
+                      <button key={e} onClick={() => setEmoji(e)} style={{ fontSize: 18, width: 32, height: 32, borderRadius: 8, border: emoji === e ? '2px solid #10B981' : '1px solid var(--border)', background: emoji === e ? 'rgba(16,185,129,0.1)' : 'var(--bg-sidebar)', cursor: 'pointer' }}>{e}</button>
+                    ))}
+                  </div>
+                  <input placeholder="Naam" value={name} onChange={e => setName(e.target.value)} onFocus={scrollFix}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: 10, background: 'var(--bg-sidebar)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: 14, marginBottom: 8, colorScheme: 'dark', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+                  <div style={{ position: 'relative', marginBottom: 10 }}>
+                    <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 15, color: '#10B981' }}>€</span>
+                    <input type="text" inputMode="decimal" placeholder="Bedrag" value={amount} onChange={e => setAmount(e.target.value)} onFocus={scrollFix} autoFocus
+                      style={{ width: '100%', padding: '10px 12px 10px 26px', borderRadius: 10, background: 'var(--bg-sidebar)', border: '1px solid rgba(16,185,129,0.35)', color: '#10B981', fontSize: 20, fontWeight: 700, colorScheme: 'dark', boxSizing: 'border-box' }} />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                    {[['monthly','Maandelijks'],['interval','Elke X weken']].map(([v,l]) => (
+                      <button key={v} onClick={() => setType(v)} style={{ padding: '8px', borderRadius: 10, border: type === v ? '1px solid #10B981' : '1px solid var(--border)', background: type === v ? 'rgba(16,185,129,0.08)' : 'var(--bg-sidebar)', color: type === v ? '#10B981' : 'var(--text-3)', cursor: 'pointer', fontSize: 12, fontWeight: type === v ? 600 : 400 }}>{l}</button>
+                    ))}
+                  </div>
+                  {type === 'monthly' && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                      <span style={{ fontSize: 13, color: 'var(--text-3)' }}>Dag van de maand:</span>
+                      <input type="number" min="1" max="31" value={day} onChange={e => setDay(e.target.value)}
+                        style={{ width: 60, padding: '7px 10px', borderRadius: 10, background: 'var(--bg-sidebar)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: 15, fontWeight: 700, colorScheme: 'dark', textAlign: 'center' }} />
+                    </div>
+                  )}
+                  {type === 'interval' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 13, color: 'var(--text-3)' }}>Elke</span>
+                        <select value={intDays} onChange={e => setIntDays(+e.target.value)}
+                          style={{ padding: '7px 10px', borderRadius: 10, background: 'var(--bg-sidebar)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: 13, colorScheme: 'dark' }}>
+                          <option value={7}>1 week</option><option value={14}>2 weken</option><option value={21}>3 weken</option><option value={28}>4 weken</option>
+                        </select>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 13, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>Laatste betaling:</span>
+                        <input type="date" value={refDate} onChange={e => setRefDate(e.target.value)}
+                          style={{ flex: 1, padding: '7px 10px', borderRadius: 10, background: 'var(--bg-sidebar)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: 13, colorScheme: 'dark' }} />
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => { setEditingId(null); resetForm() }} style={{ flex: 1, padding: '10px', borderRadius: 10, background: 'none', border: '1px solid var(--border)', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13 }}>Annuleer</button>
+                    <button onClick={handleSaveEdit} style={{ flex: 2, padding: '10px', borderRadius: 10, background: '#10B981', border: 'none', color: '#000', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>Opslaan</button>
+                  </div>
+                </div>
+              )
               return (
                 <div key={src.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 14, background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)' }}>
                   <span style={{ fontSize: 22 }}>{src.emoji}</span>
@@ -513,7 +580,10 @@ function RecurringIncomeModal({ config, onClose, onSave }) {
                       {next ? ` · volgende: ${next}` : ''}
                     </p>
                   </div>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: '#10B981', marginRight: 4 }}>€{Number(src.amount).toFixed(0)}</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: '#10B981', marginRight: 2 }}>€{Number(src.amount).toFixed(0)}</span>
+                  <button onClick={() => startEdit(src)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(16,185,129,0.6)', padding: 4 }}>
+                    <Pencil size={13} />
+                  </button>
                   <button onClick={() => setSources(s => s.filter(x => x.id !== src.id))}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(239,68,68,0.5)', padding: 4 }}>
                     <Trash2 size={13} />
