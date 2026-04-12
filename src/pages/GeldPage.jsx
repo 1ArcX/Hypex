@@ -106,6 +106,14 @@ function monthEnd() {
   const d = new Date(); const last = new Date(d.getFullYear(), d.getMonth()+1, 0)
   return `${last.getFullYear()}-${String(last.getMonth()+1).padStart(2,'0')}-${String(last.getDate()).padStart(2,'0')}`
 }
+function prevMonthStart() {
+  const d = new Date(); const p = new Date(d.getFullYear(), d.getMonth() - 1, 1)
+  return `${p.getFullYear()}-${String(p.getMonth()+1).padStart(2,'0')}-01`
+}
+function prevMonthEnd() {
+  const d = new Date(); const last = new Date(d.getFullYear(), d.getMonth(), 0)
+  return `${last.getFullYear()}-${String(last.getMonth()+1).padStart(2,'0')}-${String(last.getDate()).padStart(2,'0')}`
+}
 function monthLabel() {
   return new Date().toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
 }
@@ -689,6 +697,7 @@ export default function GeldPage({ userId, onClose }) {
   const [editing, setEditing]         = useState(null)
   const [showAll, setShowAll]         = useState(false)
   const [showRecurring, setShowRecurring] = useState(false)
+  const [prevExpenses, setPrevExpenses]   = useState([])
   const [subView, setSubView]         = useState('weergave')
   const [isMobile, setIsMobile]       = useState(window.innerWidth < 768)
 
@@ -699,13 +708,16 @@ export default function GeldPage({ userId, onClose }) {
   }, [])
 
   const fetchAll = useCallback(async () => {
-    const [expRes, cfgRes] = await Promise.all([
+    const [expRes, cfgRes, prevExpRes] = await Promise.all([
       supabase.from('expenses').select('*').eq('user_id', userId)
         .gte('date', monthStart()).lte('date', monthEnd()).order('date', { ascending: false }).order('created_at', { ascending: false }),
       supabase.from('budget_config').select('*').eq('user_id', userId).single(),
+      supabase.from('expenses').select('amount, is_income, is_savings_withdrawal').eq('user_id', userId)
+        .gte('date', prevMonthStart()).lte('date', prevMonthEnd()),
     ])
     setExpenses(expRes.data || [])
     setConfig(cfgRes.data || { monthly_budget: 400, category_budgets: DEFAULT_CAT_BUDGETS })
+    setPrevExpenses(prevExpRes.data || [])
     setLoading(false)
   }, [userId])
 
@@ -770,7 +782,15 @@ export default function GeldPage({ userId, onClose }) {
       .reduce((s, e) => s + Number(e.amount), 0)
   }
 
-  const barColor = remainPct > 40 ? 'var(--accent)' : remainPct > 15 ? '#F59E0B' : '#EF4444'
+  // Carryover from previous month
+  const prevRegular  = prevExpenses.filter(e => !e.is_savings_withdrawal && !e.is_income)
+  const prevSpent    = prevRegular.reduce((s, e) => s + Number(e.amount), 0)
+  const carryover    = Math.max(0, prevSpent - base)
+  const adjustedBase = Math.max(0, base - carryover)
+  const adjustedRemaining = adjustedBase - totalSpent
+  const adjustedRemainPct = adjustedBase > 0 ? Math.max(0, Math.min(100, (adjustedRemaining / adjustedBase) * 100)) : 0
+
+  const barColor = adjustedRemainPct > 40 ? 'var(--accent)' : adjustedRemainPct > 15 ? '#F59E0B' : '#EF4444'
   const allTransactions = [...regularExpenses, ...manualIncome].sort((a, b) => b.date.localeCompare(a.date) || b.created_at?.localeCompare(a.created_at))
   const displayedExpenses = showAll ? allTransactions : allTransactions.slice(0, 8)
 
@@ -779,9 +799,9 @@ export default function GeldPage({ userId, onClose }) {
   const daysInMonth  = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
   const dayOfMonth   = today.getDate()
   const daysLeft     = daysInMonth - dayOfMonth + 1
-  const dagBudget    = remaining > 0 ? remaining / daysLeft : 0
+  const dagBudget    = adjustedRemaining > 0 ? adjustedRemaining / daysLeft : 0
   const projectedTotal = dayOfMonth > 1 ? (totalSpent / dayOfMonth) * daysInMonth : null
-  const projectedOver  = projectedTotal !== null && projectedTotal > base
+  const projectedOver  = projectedTotal !== null && projectedTotal > adjustedBase
 
   let spaarStreak = 0
   for (let i = 0; i < 366; i++) {
@@ -806,11 +826,11 @@ export default function GeldPage({ userId, onClose }) {
   const circumference  = 2 * Math.PI * 55
   const catWithSpend   = allCategories.map(c => ({ ...c, spent: spentByCategory[c.id] || 0 })).filter(c => c.spent > 0)
 
-  // Balance line
+  // Balance line (uses adjustedBase so carryover is reflected)
   const balanceByDay = []
   for (let d = 1; d <= daysInMonth; d++) {
     const spent = regularExpenses.filter(e => new Date(e.date).getDate() <= d).reduce((s, e) => s + Number(e.amount), 0)
-    balanceByDay.push(base - spent)
+    balanceByDay.push(adjustedBase - spent)
   }
 
   if (loading) return (
@@ -858,35 +878,44 @@ export default function GeldPage({ userId, onClose }) {
           </button>
         </div>
 
+        {/* Carryover banner */}
+        {carryover > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', borderRadius: 14, marginBottom: 10, background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)', fontSize: 12, color: 'rgba(239,68,68,0.85)' }}>
+            <span style={{ fontSize: 15 }}>↩</span>
+            <span style={{ flex: 1 }}>Vorige maand {fmt(carryover)} over limiet — wordt afgetrokken van dit maandbudget</span>
+            <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>−{fmt(carryover)}</span>
+          </div>
+        )}
+
         {/* Big remaining card */}
         <div style={{
           padding: '22px 22px 18px', borderRadius: 22, marginBottom: 14,
-          background: remaining < 0
+          background: adjustedRemaining < 0
             ? 'linear-gradient(135deg, rgba(239,68,68,0.12), rgba(239,68,68,0.04))'
-            : remainPct < 15
+            : adjustedRemainPct < 15
             ? 'linear-gradient(135deg, rgba(239,68,68,0.10), rgba(239,68,68,0.03))'
-            : remainPct < 40
+            : adjustedRemainPct < 40
             ? 'linear-gradient(135deg, rgba(245,158,11,0.10), rgba(245,158,11,0.03))'
             : 'linear-gradient(135deg, rgba(0,255,209,0.08), rgba(0,255,209,0.02))',
-          border: `1px solid ${remaining < 0 ? 'rgba(239,68,68,0.35)' : remainPct < 15 ? 'rgba(239,68,68,0.25)' : remainPct < 40 ? 'rgba(245,158,11,0.25)' : 'rgba(0,255,209,0.2)'}`,
+          border: `1px solid ${adjustedRemaining < 0 ? 'rgba(239,68,68,0.35)' : adjustedRemainPct < 15 ? 'rgba(239,68,68,0.25)' : adjustedRemainPct < 40 ? 'rgba(245,158,11,0.25)' : 'rgba(0,255,209,0.2)'}`,
         }}>
           <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>
-            {remaining < 0 ? '🚨 Budget overschreden' : 'Nog over deze maand'}
+            {adjustedRemaining < 0 ? '🚨 Budget overschreden' : 'Nog over deze maand'}
           </p>
-          <p style={{ fontSize: 48, fontWeight: 800, margin: '0 0 14px', color: remaining < 0 ? '#EF4444' : remainPct < 15 ? '#EF4444' : remainPct < 40 ? '#F59E0B' : 'var(--text-1)', lineHeight: 1 }}>
-            {fmt(Math.abs(remaining))}
+          <p style={{ fontSize: 48, fontWeight: 800, margin: '0 0 14px', color: adjustedRemaining < 0 ? '#EF4444' : adjustedRemainPct < 15 ? '#EF4444' : adjustedRemainPct < 40 ? '#F59E0B' : 'var(--text-1)', lineHeight: 1 }}>
+            {fmt(Math.abs(adjustedRemaining))}
           </p>
           <div style={{ height: 8, background: 'rgba(255,255,255,0.08)', borderRadius: 8, overflow: 'hidden', marginBottom: 10 }}>
-            <div style={{ height: '100%', width: `${100 - remainPct}%`, background: barColor, borderRadius: 8, transition: 'width 0.6s ease', boxShadow: `0 0 8px ${barColor}60` }} />
+            <div style={{ height: '100%', width: `${100 - adjustedRemainPct}%`, background: barColor, borderRadius: 8, transition: 'width 0.6s ease', boxShadow: `0 0 8px ${barColor}60` }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-3)' }}>
-            <span>{fmt(totalSpent)} uitgegeven</span>
+            <span>{fmt(totalSpent)} uitgegeven{carryover > 0 ? ` + ${fmt(carryover)} carry` : ''}</span>
             <span>
               {savingsGoal > 0
-                ? `${fmt(grossIncome)} − 🏦 ${fmt(savingsGoal)} = ${fmt(base)}`
+                ? `${fmt(grossIncome)} − 🏦 ${fmt(savingsGoal)} = ${fmt(adjustedBase)}`
                 : hasRecurring
                   ? `Verwacht: ${fmt(recurringExpected)}${totalManualIncome > 0 ? ` + ${fmt(totalManualIncome)}` : ''}`
-                  : totalManualIncome > 0 ? `Inkomsten: ${fmt(totalManualIncome)}` : `Budget: ${fmt(monthlyBudget)}`
+                  : totalManualIncome > 0 ? `Inkomsten: ${fmt(totalManualIncome)}` : `Budget: ${fmt(adjustedBase)}`
               }
             </span>
           </div>
@@ -1101,7 +1130,7 @@ export default function GeldPage({ userId, onClose }) {
                   const padL = 2, padR = 2, padT = 8, padB = 4
                   const chartW = svgW - padL - padR
                   const chartH = svgH - padT - padB
-                  const maxY   = Math.max(base, balanceByDay[0] || base)
+                  const maxY   = Math.max(adjustedBase, balanceByDay[0] || adjustedBase)
                   const minY   = Math.min(0, ...balanceByDay)
                   const range  = maxY - minY || 1
                   const toX = d => padL + ((d - 1) / Math.max(daysInMonth - 1, 1)) * chartW
@@ -1114,7 +1143,7 @@ export default function GeldPage({ userId, onClose }) {
                     const rate = totalSpent / dayOfMonth
                     const pp = []
                     for (let d = dayOfMonth; d <= daysInMonth; d++) {
-                      pp.push(`${toX(d)},${toY(base - totalSpent - rate * (d - dayOfMonth))}`)
+                      pp.push(`${toX(d)},${toY(adjustedBase - totalSpent - rate * (d - dayOfMonth))}`)
                     }
                     projPts = pp.join(' ')
                   }
@@ -1122,7 +1151,7 @@ export default function GeldPage({ userId, onClose }) {
                   const todayX  = toX(dayOfMonth)
                   const todayY  = toY(balanceByDay[dayOfMonth - 1] ?? 0)
                   const zeroY   = toY(0)
-                  const baseY   = toY(base)
+                  const baseY   = toY(adjustedBase)
 
                   return (
                     <svg viewBox={`0 0 ${svgW} ${svgH}`} style={{ width: '100%' }}>
@@ -1260,16 +1289,20 @@ export default function GeldPage({ userId, onClose }) {
               <p style={{ fontSize: 13, margin: 0 }}>Voeg je eerste uitgave toe</p>
             </div>
           )}
-          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            <button onClick={() => setShowSavings(true)} style={{ flex: 1, padding: '13px 8px', borderRadius: 16, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#EF4444', cursor: 'pointer', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              <TrendingDown size={15} /> Spaar af
-            </button>
-            <button onClick={() => { setEditing(null); setShowAdd(true) }} style={{ flex: 2, padding: '13px 8px', borderRadius: 16, background: 'var(--accent)', border: 'none', color: '#000', cursor: 'pointer', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              <Plus size={16} /> Uitgave toevoegen
-            </button>
-          </div>
         </>}
 
+        </div>
+      </div>
+
+      {/* Persistent action bar */}
+      <div style={{ padding: '10px 16px 0', flexShrink: 0 }}>
+        <div style={{ maxWidth: 480, margin: '0 auto', display: 'flex', gap: 8, paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>
+          <button onClick={() => setShowSavings(true)} style={{ flex: 1, padding: '11px 8px', borderRadius: 14, background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.3)', color: '#EF4444', cursor: 'pointer', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <TrendingDown size={14} /> Spaar af
+          </button>
+          <button onClick={() => { setEditing(null); setShowAdd(true) }} style={{ flex: 2, padding: '11px 8px', borderRadius: 14, background: 'var(--accent)', border: 'none', color: '#000', cursor: 'pointer', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <Plus size={15} /> Uitgave toevoegen
+          </button>
         </div>
       </div>
 
