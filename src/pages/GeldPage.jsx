@@ -111,15 +111,16 @@ function monthLabel() {
 function ExpenseModal({ onClose, onSave, editing }) {
   const backdropRef = useRef(null)
   usePreventTouch(backdropRef)
-  const [amount, setAmount]   = useState(editing?.amount || '')
-  const [cat, setCat]         = useState(editing?.category || 'eten')
-  const [desc, setDesc]       = useState(editing?.description || '')
-  const [date, setDate]       = useState(editing?.date || todayStr())
+  const [amount, setAmount]             = useState(editing?.amount || '')
+  const [cat, setCat]                   = useState(editing?.category || 'eten')
+  const [desc, setDesc]                 = useState(editing?.description || '')
+  const [date, setDate]                 = useState(editing?.date || todayStr())
+  const [paidFromSavings, setPFS]       = useState(editing?.paid_from_savings || false)
 
   const handleSave = () => {
     const n = parseFloat(String(amount).replace(',', '.'))
     if (!n || n <= 0) return
-    onSave({ amount: n, category: cat, description: desc.trim(), date, is_savings_withdrawal: false })
+    onSave({ amount: n, category: cat, description: desc.trim(), date, is_savings_withdrawal: false, paid_from_savings: paidFromSavings })
   }
 
   return ReactDOM.createPortal(
@@ -168,6 +169,18 @@ function ExpenseModal({ onClose, onSave, editing }) {
           type="date" value={date} onChange={e => setDate(e.target.value)}
           style={{ width: '100%', padding: '10px 14px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-3)', fontSize: 13, marginBottom: 18, colorScheme: 'dark' }}
         />
+
+        {/* Betaald van spaarrekening toggle */}
+        <div onClick={() => setPFS(p => !p)}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 14px', borderRadius: 12, background: paidFromSavings ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.03)', border: paidFromSavings ? '1px solid rgba(245,158,11,0.35)' : '1px solid var(--border)', marginBottom: 14, cursor: 'pointer' }}>
+          <div>
+            <p style={{ fontSize: 13, fontWeight: 600, color: paidFromSavings ? '#F59E0B' : 'var(--text-3)', margin: '0 0 1px' }}>🏦 Betaald van spaarrekening</p>
+            <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>Voor noodzakelijke uitgaven buiten budget</p>
+          </div>
+          <div style={{ width: 40, height: 22, borderRadius: 11, background: paidFromSavings ? 'rgba(245,158,11,0.5)' : 'rgba(255,255,255,0.1)', position: 'relative', flexShrink: 0, transition: 'background 0.2s' }}>
+            <div style={{ position: 'absolute', width: 18, height: 18, borderRadius: '50%', background: paidFromSavings ? '#F59E0B' : 'rgba(255,255,255,0.35)', top: 2, left: paidFromSavings ? 20 : 2, transition: 'left 0.2s' }} />
+          </div>
+        </div>
 
         <button onClick={handleSave} style={{ width: '100%', padding: '14px', borderRadius: 14, background: 'var(--accent)', border: 'none', color: '#000', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
           {editing ? 'Opslaan' : '+ Toevoegen'}
@@ -552,6 +565,8 @@ export default function GeldPage({ userId }) {
   const totalSpent         = regularExpenses.reduce((s, e) => s + Number(e.amount), 0)
   const savingsWithdrawals = expenses.filter(e => e.is_savings_withdrawal)
   const savingsTotal       = savingsWithdrawals.reduce((s, e) => s + Number(e.amount), 0)
+  const savingsExpenses    = regularExpenses.filter(e => e.paid_from_savings)
+  const savingsExpTotal    = savingsExpenses.reduce((s, e) => s + Number(e.amount), 0)
 
   const recurringIncome    = config?.recurring_income || []
   const recurringExpected  = calcRecurringThisMonth(recurringIncome)
@@ -756,6 +771,40 @@ export default function GeldPage({ userId }) {
           </div>
         )}
 
+        {/* Savings-funded expenses motivational card */}
+        {savingsExpenses.length > 0 && (
+          <div style={{ padding: '14px 16px', borderRadius: 16, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.25)', marginBottom: 14 }}>
+            <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+              <span style={{ fontSize: 20, flexShrink: 0 }}>🏦</span>
+              <div>
+                <p style={{ fontSize: 13, fontWeight: 700, color: '#F59E0B', margin: '0 0 2px' }}>
+                  {savingsExpenses.length === 1 ? '1 noodaankoop' : `${savingsExpenses.length} noodaankopen`} van spaarrekening — {fmt(savingsExpTotal)}
+                </p>
+                <p style={{ fontSize: 12, color: 'rgba(245,158,11,0.7)', margin: 0 }}>
+                  Noodzakelijk, maar probeer dit te vermijden
+                </p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 10 }}>
+              {savingsExpenses.map(e => {
+                const cat = CATEGORIES.find(c => c.id === e.category) || CATEGORIES[6]
+                return (
+                  <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 10, background: 'rgba(245,158,11,0.05)' }}>
+                    <span style={{ fontSize: 14 }}>{cat.emoji}</span>
+                    <span style={{ flex: 1, fontSize: 12, color: 'var(--text-2)' }}>{e.description || cat.label}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#F59E0B' }}>{fmt(e.amount)}</span>
+                  </div>
+                )
+              })}
+            </div>
+            <div style={{ padding: '9px 12px', borderRadius: 10, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
+              <p style={{ fontSize: 11, color: 'rgba(245,158,11,0.85)', margin: 0, lineHeight: 1.55 }}>
+                💡 Dit overkomt iedereen. Overweeg om volgend maand je <strong>{savingsExpenses.map(e => (CATEGORIES.find(c => c.id === e.category) || CATEGORIES[6]).label.split(' ')[0]).filter((v,i,a)=>a.indexOf(v)===i).join(' & ')}</strong>-budget wat hoger te zetten, of maak een kleine "onverwacht" envelop aan.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Analyse */}
         {regularExpenses.length > 0 && (
           <div style={{ marginBottom: 20 }}>
@@ -932,7 +981,10 @@ export default function GeldPage({ userId }) {
                       </p>
                       <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>{exp.date}{isInc ? ' · inkomsten' : ''}</p>
                     </div>
-                    <span style={{ fontSize: 15, fontWeight: 700, color, flexShrink: 0 }}>{isInc ? '+' : ''}{fmt(exp.amount)}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
+                      <span style={{ fontSize: 15, fontWeight: 700, color }}>{isInc ? '+' : ''}{fmt(exp.amount)}</span>
+                      {exp.paid_from_savings && <span style={{ fontSize: 9, fontWeight: 700, color: '#F59E0B', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 5, padding: '1px 5px' }}>GESPAARD</span>}
+                    </div>
                     {!isInc && <button onClick={() => { setEditing(exp); setShowAdd(true) }}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4 }}>
                       <Pencil size={12} />
