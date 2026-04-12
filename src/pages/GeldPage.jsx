@@ -18,6 +18,9 @@ const DEFAULT_CAT_BUDGETS = {
   kleding: 50, abonnementen: 30, sport: 20, overig: 60,
 }
 
+// iOS: scroll focused input above keyboard
+const scrollFix = (e) => { const t = e.target; setTimeout(() => t.scrollIntoView({ behavior: 'smooth', block: 'center' }), 350) }
+
 function fmt(n) { return `€${Number(n).toFixed(2).replace('.', ',')}` }
 function fmtShort(n) { return `€${Math.round(n)}` }
 function todayStr() { return new Date().toISOString().slice(0, 10) }
@@ -59,6 +62,7 @@ function ExpenseModal({ onClose, onSave, editing }) {
             <input
               autoFocus type="number" inputMode="decimal" placeholder="0,00"
               value={amount} onChange={e => setAmount(e.target.value)}
+              onFocus={scrollFix}
               onKeyDown={e => e.key === 'Enter' && handleSave()}
               style={{ width: '100%', padding: '14px 16px 14px 36px', borderRadius: 14, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: 28, fontWeight: 700, colorScheme: 'dark' }}
             />
@@ -79,6 +83,7 @@ function ExpenseModal({ onClose, onSave, editing }) {
         <input
           placeholder="Omschrijving (optioneel)"
           value={desc} onChange={e => setDesc(e.target.value)}
+          onFocus={scrollFix}
           style={{ width: '100%', padding: '10px 14px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: 14, marginBottom: 12, colorScheme: 'dark' }}
         />
 
@@ -120,9 +125,11 @@ function SavingsModal({ onClose, onSave }) {
         <div style={{ position: 'relative', marginBottom: 12 }}>
           <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 20, fontWeight: 700, color: 'var(--text-3)' }}>€</span>
           <input autoFocus type="number" inputMode="decimal" placeholder="0,00" value={amount} onChange={e => setAmount(e.target.value)}
+            onFocus={scrollFix}
             style={{ width: '100%', padding: '12px 14px 12px 32px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--text-1)', fontSize: 24, fontWeight: 700, colorScheme: 'dark' }} />
         </div>
         <input placeholder="Waarom haal je dit af?" value={reason} onChange={e => setReason(e.target.value)}
+          onFocus={scrollFix}
           style={{ width: '100%', padding: '10px 14px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: 14, marginBottom: 18, colorScheme: 'dark' }} />
 
         <div style={{ display: 'flex', gap: 10 }}>
@@ -143,8 +150,8 @@ function BudgetModal({ config, onClose, onSave }) {
   const total = Object.values(cats).reduce((a, b) => a + Number(b), 0)
 
   return ReactDOM.createPortal(
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ width: '100%', maxWidth: 420, background: 'var(--bg-sidebar)', borderRadius: 22, border: '1px solid var(--border)', padding: 24, maxHeight: '88vh', overflowY: 'auto' }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)', zIndex: 9999, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '16px 16px calc(16px + env(safe-area-inset-bottom))' }}>
+      <div style={{ width: '100%', maxWidth: 420, background: 'var(--bg-sidebar)', borderRadius: 22, border: '1px solid var(--border)', padding: 24, marginTop: 'auto', marginBottom: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Budget instellen</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)' }}><X size={18} /></button>
@@ -155,6 +162,7 @@ function BudgetModal({ config, onClose, onSave }) {
           <div style={{ position: 'relative' }}>
             <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 18, color: 'var(--text-3)' }}>€</span>
             <input type="number" value={monthly} onChange={e => setMonthly(+e.target.value)}
+              onFocus={scrollFix}
               style={{ width: '100%', padding: '12px 14px 12px 30px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: 20, fontWeight: 700, colorScheme: 'dark' }} />
           </div>
         </div>
@@ -168,6 +176,7 @@ function BudgetModal({ config, onClose, onSave }) {
               <div style={{ position: 'relative', width: 90 }}>
                 <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: 'var(--text-3)' }}>€</span>
                 <input type="number" value={cats[c.id] || 0} onChange={e => setCats(p => ({ ...p, [c.id]: +e.target.value }))}
+                  onFocus={scrollFix}
                   style={{ width: '100%', padding: '8px 8px 8px 22px', borderRadius: 10, background: 'var(--bg-card-2)', border: `1px solid ${c.color}40`, color: c.color, fontSize: 14, fontWeight: 600, colorScheme: 'dark' }} />
               </div>
             </div>
