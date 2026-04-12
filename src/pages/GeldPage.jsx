@@ -101,7 +101,7 @@ function ExpenseModal({ onClose, onSave, editing }) {
           <div style={{ position: 'relative' }}>
             <span style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', fontSize: 24, fontWeight: 700, color: 'var(--text-3)' }}>€</span>
             <input
-              autoFocus type="number" inputMode="decimal" placeholder="0,00"
+              autoFocus type="text" inputMode="decimal" placeholder="0,00"
               value={amount} onChange={e => setAmount(e.target.value)}
               onFocus={scrollFix}
               onKeyDown={e => e.key === 'Enter' && handleSave()}
@@ -167,7 +167,7 @@ function SavingsModal({ onClose, onSave }) {
 
         <div style={{ position: 'relative', marginBottom: 12 }}>
           <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 20, fontWeight: 700, color: 'var(--text-3)' }}>€</span>
-          <input autoFocus type="number" inputMode="decimal" placeholder="0,00" value={amount} onChange={e => setAmount(e.target.value)}
+          <input autoFocus type="text" inputMode="decimal" placeholder="0,00" value={amount} onChange={e => setAmount(e.target.value)}
             onFocus={scrollFix}
             style={{ width: '100%', padding: '12px 14px 12px 32px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--text-1)', fontSize: 24, fontWeight: 700, colorScheme: 'dark' }} />
         </div>
@@ -211,7 +211,7 @@ function IncomeModal({ onClose, onSave }) {
 
         <div style={{ position: 'relative', marginBottom: 16 }}>
           <span style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', fontSize: 24, fontWeight: 700, color: '#10B981' }}>€</span>
-          <input autoFocus type="number" inputMode="decimal" placeholder="0,00"
+          <input autoFocus type="text" inputMode="decimal" placeholder="0,00"
             value={amount} onChange={e => setAmount(e.target.value)}
             onFocus={scrollFix} onKeyDown={e => e.key === 'Enter' && handleSave()}
             style={{ width: '100%', padding: '14px 16px 14px 36px', borderRadius: 14, background: 'var(--bg-card-2)', border: '1px solid rgba(16,185,129,0.35)', color: 'var(--text-1)', fontSize: 28, fontWeight: 700, colorScheme: 'dark' }}
