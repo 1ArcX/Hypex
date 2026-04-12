@@ -206,39 +206,71 @@ function ExpenseModal({ onClose, onSave, editing, categories = CATEGORIES }) {
 function SavingsModal({ onClose, onSave, editing }) {
   const backdropRef = useRef(null)
   usePreventTouch(backdropRef)
-  const [amount, setAmount] = useState(editing?.amount || '')
-  const [reason, setReason] = useState(editing?.description || '')
+  const [amount, setAmount]   = useState(editing?.amount || '')
+  const [reason, setReason]   = useState(editing?.description || '')
+  const [savType, setSavType] = useState(editing?.savings_type || 'saved')
 
-  const canSave = parseFloat(String(amount).replace(',', '.')) > 0 && reason.trim().length > 0
+  const n       = parseFloat(String(amount).replace(',', '.'))
+  const canSave = n > 0 && reason.trim().length > 0
+  const interest = savType === 'loan' && n > 0 ? +(n * 0.1).toFixed(2) : 0
 
   const handleSave = () => {
-    const n = parseFloat(String(amount).replace(',', '.'))
-    if (!n || n <= 0 || !reason.trim()) return
-    onSave({ amount: n, category: 'overig', description: reason.trim(), date: editing?.date || todayStr(), is_savings_withdrawal: true })
+    if (!canSave) return
+    onSave({ amount: n, category: 'overig', description: reason.trim(), date: editing?.date || todayStr(), is_savings_withdrawal: true, savings_type: savType })
   }
 
   return ReactDOM.createPortal(
     <div ref={backdropRef} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 20px calc(20px + var(--keyboard-height, 0px))' }}>
-      <div style={{ width: '100%', maxWidth: 380, background: 'var(--bg-sidebar)', borderRadius: 22, border: '1px solid rgba(239,68,68,0.4)', padding: 24 }}>
-        <div style={{ textAlign: 'center', marginBottom: 20 }}>
-          <div style={{ fontSize: 40, marginBottom: 8 }}>⚠️</div>
-          <h3 style={{ fontSize: 17, fontWeight: 700, color: '#EF4444', margin: '0 0 6px' }}>{editing ? 'Opname bewerken' : 'Spaargeld afhalen'}</h3>
-          <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0 }}>{editing ? 'Pas het bedrag of de reden aan.' : 'Dit wordt bijgehouden. Zeker weten?'}</p>
+      <div style={{ width: '100%', maxWidth: 380, background: 'var(--bg-sidebar)', borderRadius: 22, border: '1px solid rgba(239,68,68,0.35)', padding: 24 }}>
+        <div style={{ textAlign: 'center', marginBottom: 18 }}>
+          <div style={{ fontSize: 36, marginBottom: 6 }}>⚠️</div>
+          <h3 style={{ fontSize: 17, fontWeight: 700, color: '#EF4444', margin: '0 0 4px' }}>{editing ? 'Opname bewerken' : 'Spaargeld afhalen'}</h3>
+          <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>Wat voor soort opname is dit?</p>
+        </div>
+
+        {/* Type keuze */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
+          <button onClick={() => setSavType('saved')} style={{ padding: '12px 8px', borderRadius: 14, border: savType === 'saved' ? '2px solid #10B981' : '1px solid var(--border)', background: savType === 'saved' ? 'rgba(16,185,129,0.1)' : 'var(--bg-card-2)', cursor: 'pointer', textAlign: 'center' }}>
+            <div style={{ fontSize: 22, marginBottom: 4 }}>💰</div>
+            <p style={{ fontSize: 12, fontWeight: 700, color: savType === 'saved' ? '#10B981' : 'var(--text-2)', margin: '0 0 2px' }}>Echt gespaard</p>
+            <p style={{ fontSize: 10, color: 'var(--text-3)', margin: 0 }}>Geld dat ik had gespaard</p>
+          </button>
+          <button onClick={() => setSavType('loan')} style={{ padding: '12px 8px', borderRadius: 14, border: savType === 'loan' ? '2px solid #F59E0B' : '1px solid var(--border)', background: savType === 'loan' ? 'rgba(245,158,11,0.1)' : 'var(--bg-card-2)', cursor: 'pointer', textAlign: 'center' }}>
+            <div style={{ fontSize: 22, marginBottom: 4 }}>🤝</div>
+            <p style={{ fontSize: 12, fontWeight: 700, color: savType === 'loan' ? '#F59E0B' : 'var(--text-2)', margin: '0 0 2px' }}>Lening</p>
+            <p style={{ fontSize: 10, color: 'var(--text-3)', margin: 0 }}>Leen van mezelf (+10%)</p>
+          </button>
         </div>
 
         <div style={{ position: 'relative', marginBottom: 12 }}>
           <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 20, fontWeight: 700, color: 'var(--text-3)' }}>€</span>
           <input autoFocus type="text" inputMode="decimal" placeholder="0,00" value={amount} onChange={e => setAmount(e.target.value)}
             onFocus={scrollFix}
-            style={{ width: '100%', padding: '12px 14px 12px 32px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--text-1)', fontSize: 24, fontWeight: 700, colorScheme: 'dark' }} />
+            style={{ width: '100%', padding: '12px 14px 12px 32px', borderRadius: 12, background: 'var(--bg-card-2)', border: `1px solid ${savType === 'loan' ? 'rgba(245,158,11,0.4)' : 'rgba(239,68,68,0.3)'}`, color: 'var(--text-1)', fontSize: 24, fontWeight: 700, colorScheme: 'dark' }} />
         </div>
-        <input placeholder="Waarom haal je dit af?" value={reason} onChange={e => setReason(e.target.value)}
+
+        {/* Lening: rente preview */}
+        {savType === 'loan' && n > 0 && (
+          <div style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', marginBottom: 12, display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+            <span style={{ color: 'var(--text-3)' }}>Terug te storten incl. 10% rente</span>
+            <span style={{ fontWeight: 700, color: '#F59E0B' }}>{fmt(n + interest)}</span>
+          </div>
+        )}
+
+        <input placeholder="Waarom haal je dit af? (verplicht)" value={reason} onChange={e => setReason(e.target.value)}
           onFocus={scrollFix}
-          style={{ width: '100%', padding: '10px 14px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: 14, marginBottom: 18, colorScheme: 'dark' }} />
+          style={{ width: '100%', padding: '10px 14px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: 14, marginBottom: 16, colorScheme: 'dark' }} />
 
         <div style={{ display: 'flex', gap: 10 }}>
           <button onClick={onClose} style={{ flex: 1, padding: '12px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-2)', cursor: 'pointer', fontSize: 14 }}>Annuleer</button>
-          <button onClick={handleSave} disabled={!canSave} style={{ flex: 1, padding: '12px', borderRadius: 12, background: canSave ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)', border: canSave ? '1px solid rgba(239,68,68,0.5)' : '1px solid var(--border)', color: canSave ? '#EF4444' : 'var(--text-3)', cursor: canSave ? 'pointer' : 'default', fontSize: 14, fontWeight: 700 }}>Loggen</button>
+          <button onClick={handleSave} disabled={!canSave}
+            style={{ flex: 1, padding: '12px', borderRadius: 12,
+              background: !canSave ? 'rgba(255,255,255,0.05)' : savType === 'loan' ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)',
+              border: !canSave ? '1px solid var(--border)' : savType === 'loan' ? '1px solid rgba(245,158,11,0.5)' : '1px solid rgba(239,68,68,0.5)',
+              color: !canSave ? 'var(--text-3)' : savType === 'loan' ? '#F59E0B' : '#EF4444',
+              cursor: canSave ? 'pointer' : 'default', fontSize: 14, fontWeight: 700 }}>
+            Loggen
+          </button>
         </div>
       </div>
     </div>,
@@ -768,6 +800,10 @@ export default function GeldPage({ userId, onClose }) {
   const totalSpent         = regularExpenses.reduce((s, e) => s + Number(e.amount), 0)
   const savingsWithdrawals = expenses.filter(e => e.is_savings_withdrawal)
   const savingsTotal       = savingsWithdrawals.reduce((s, e) => s + Number(e.amount), 0)
+  const loanWithdrawals    = savingsWithdrawals.filter(e => e.savings_type === 'loan')
+  const savedWithdrawals   = savingsWithdrawals.filter(e => e.savings_type !== 'loan')
+  const loanPrincipal      = loanWithdrawals.reduce((s, e) => s + Number(e.amount), 0)
+  const loanTotal          = +(loanPrincipal * 1.1).toFixed(2)   // principal + 10% interest
   const savingsExpenses    = regularExpenses.filter(e => e.paid_from_savings)
   const savingsExpTotal    = savingsExpenses.reduce((s, e) => s + Number(e.amount), 0)
 
@@ -893,6 +929,28 @@ export default function GeldPage({ userId, onClose }) {
         </div>
 
         {/* Yearly savings withdrawal counter */}
+        {/* Outstanding loan card */}
+        {loanPrincipal > 0 && (
+          <div style={{ padding: '14px 16px', borderRadius: 14, marginBottom: 10, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.35)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 18 }}>🤝</span>
+              <p style={{ fontSize: 12, fontWeight: 700, color: '#F59E0B', margin: 0 }}>Openstaande lening aan jezelf</p>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+              <span style={{ color: 'var(--text-3)' }}>Geleend</span>
+              <span style={{ color: 'var(--text-2)' }}>{fmt(loanPrincipal)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
+              <span style={{ color: 'var(--text-3)' }}>Rente (10%)</span>
+              <span style={{ color: '#F59E0B' }}>+{fmt(loanTotal - loanPrincipal)}</span>
+            </div>
+            <div style={{ borderTop: '1px solid rgba(245,158,11,0.2)', paddingTop: 6, display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+              <span style={{ fontWeight: 700, color: 'var(--text-1)' }}>Totaal terug te storten</span>
+              <span style={{ fontWeight: 800, color: '#F59E0B' }}>{fmt(loanTotal)}</span>
+            </div>
+          </div>
+        )}
+
         {yearSavingsCount > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 14, marginBottom: 10, background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)' }}>
             <span style={{ fontSize: 22 }}>🏦</span>
@@ -1275,13 +1333,38 @@ export default function GeldPage({ userId, onClose }) {
               </>}
             </div>
           )}
-          {savingsWithdrawals.length > 0 && (
+          {/* Leningen */}
+          {loanWithdrawals.length > 0 && (
             <div style={{ marginBottom: 16 }}>
-              <p style={{ fontSize: 11, color: 'rgba(239,68,68,0.7)', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>🏦 Spaaropnames deze maand</p>
+              <p style={{ fontSize: 11, color: 'rgba(245,158,11,0.8)', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>🤝 Leningen van mezelf</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {savingsWithdrawals.map(exp => (
+                {loanWithdrawals.map(exp => {
+                  const interest = +(Number(exp.amount) * 0.1).toFixed(2)
+                  return (
+                    <div key={exp.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 14, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.25)' }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(245,158,11,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🤝</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exp.description || 'Lening'}</p>
+                        <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>{exp.date} · terug: {fmt(Number(exp.amount) + interest)}</p>
+                      </div>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: '#F59E0B', flexShrink: 0 }}>+{fmt(exp.amount)}</span>
+                      <button onClick={() => { setEditingSavings(exp); setShowSavings(true) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4, flexShrink: 0 }}><Pencil size={14} /></button>
+                      <button onClick={() => deleteExpense(exp.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(239,68,68,0.5)', padding: 4, flexShrink: 0 }}><Trash2 size={14} /></button>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Echt gespaard opnames */}
+          {savedWithdrawals.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <p style={{ fontSize: 11, color: 'rgba(239,68,68,0.7)', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>💰 Echt gespaard — opnames</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {savedWithdrawals.map(exp => (
                   <div key={exp.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 14, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)' }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(239,68,68,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🏦</div>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(239,68,68,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>💰</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exp.description || 'Spaaropname'}</p>
                       <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>{exp.date}</p>
@@ -1300,7 +1383,7 @@ export default function GeldPage({ userId, onClose }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>{manualIncome.map(exp => renderTxRow(exp))}</div>
             </div>
           )}
-          {manualIncome.length === 0 && !hasRecurring && savingsWithdrawals.length === 0 && (
+          {manualIncome.length === 0 && !hasRecurring && savingsWithdrawals.length === 0 && loanWithdrawals.length === 0 && (
             <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-3)' }}>
               <div style={{ fontSize: 40, marginBottom: 10 }}>💚</div>
               <p style={{ fontSize: 15, fontWeight: 600, margin: '0 0 4px', color: 'var(--text-2)' }}>Geen inkomsten</p>
