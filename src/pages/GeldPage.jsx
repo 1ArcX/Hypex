@@ -101,31 +101,26 @@ function useScrollContain(ref) {
 function fmt(n) { return `€${Number(n).toFixed(2).replace('.', ',')}` }
 function fmtShort(n) { return `€${Math.round(n)}` }
 function todayStr() { return new Date().toISOString().slice(0, 10) }
-function monthStart() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01` }
-function monthEnd() {
-  const d = new Date(); const last = new Date(d.getFullYear(), d.getMonth()+1, 0)
+function monthStartOf(y, m) { return `${y}-${String(m+1).padStart(2,'0')}-01` }
+function monthEndOf(y, m) {
+  const last = new Date(y, m+1, 0)
   return `${last.getFullYear()}-${String(last.getMonth()+1).padStart(2,'0')}-${String(last.getDate()).padStart(2,'0')}`
 }
-function prevMonthStart() {
-  const d = new Date(); const p = new Date(d.getFullYear(), d.getMonth() - 1, 1)
-  return `${p.getFullYear()}-${String(p.getMonth()+1).padStart(2,'0')}-01`
+function monthLabelOf(y, m) {
+  return new Date(y, m, 1).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
 }
-function prevMonthEnd() {
-  const d = new Date(); const last = new Date(d.getFullYear(), d.getMonth(), 0)
-  return `${last.getFullYear()}-${String(last.getMonth()+1).padStart(2,'0')}-${String(last.getDate()).padStart(2,'0')}`
-}
-function monthLabel() {
-  return new Date().toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
-}
+// Legacy wrappers (still used by calcRecurringThisMonth)
+function monthStart() { const d = new Date(); return monthStartOf(d.getFullYear(), d.getMonth()) }
+function monthEnd()   { const d = new Date(); return monthEndOf(d.getFullYear(), d.getMonth()) }
 
 // ── Expense Log Modal ─────────────────────────────────────────────────────────
-function ExpenseModal({ onClose, onSave, editing, categories = CATEGORIES }) {
+function ExpenseModal({ onClose, onSave, editing, categories = CATEGORIES, defaultDate }) {
   const backdropRef = useRef(null)
   usePreventTouch(backdropRef)
   const [amount, setAmount]             = useState(editing?.amount || '')
   const [cat, setCat]                   = useState(editing?.category || 'eten')
   const [desc, setDesc]                 = useState(editing?.description || '')
-  const [date, setDate]                 = useState(editing?.date || todayStr())
+  const [date, setDate]                 = useState(editing?.date || defaultDate || todayStr())
   const [paidFromSavings, setPFS]       = useState(editing?.paid_from_savings || false)
 
   const handleSave = () => {
@@ -718,6 +713,7 @@ const GELD_TABS = [
   { id: 'enveloppen', label: 'Enveloppen',emoji: '📁' },
   { id: 'inkomsten',  label: 'Inkomsten', emoji: '💚' },
   { id: 'uitgaven',   label: 'Uitgaven',  emoji: '💸' },
+  { id: 'jaar',       label: 'Jaar',      emoji: '📅' },
 ]
 
 export default function GeldPage({ userId, onClose }) {
@@ -734,7 +730,11 @@ export default function GeldPage({ userId, onClose }) {
   const [editingSavings, setEditingSavings]     = useState(null)
   const [confirmingLoanId, setConfirmingLoanId] = useState(null)
   const [prevExpenses, setPrevExpenses]     = useState([])
-  const [yearSavings, setYearSavings]     = useState([])
+  const [yearSavings, setYearSavings]       = useState([])
+  const [yearExpenses, setYearExpenses]     = useState([])
+  const _now = new Date()
+  const [selYear, setSelYear]   = useState(_now.getFullYear())
+  const [selMonth, setSelMonth] = useState(_now.getMonth())
   const [subView, setSubView]         = useState('weergave')
   const [isMobile, setIsMobile]       = useState(window.innerWidth < 768)
 
@@ -745,22 +745,29 @@ export default function GeldPage({ userId, onClose }) {
   }, [])
 
   const fetchAll = useCallback(async () => {
-    const [expRes, cfgRes, prevExpRes, yearSavRes] = await Promise.all([
+    // prev month relative to selected month
+    const prevY = selMonth === 0 ? selYear - 1 : selYear
+    const prevM = selMonth === 0 ? 11 : selMonth - 1
+    const [expRes, cfgRes, prevExpRes, yearSavRes, yearExpRes] = await Promise.all([
       supabase.from('expenses').select('*').eq('user_id', userId)
-        .gte('date', monthStart()).lte('date', monthEnd()).order('date', { ascending: false }).order('created_at', { ascending: false }),
+        .gte('date', monthStartOf(selYear, selMonth)).lte('date', monthEndOf(selYear, selMonth))
+        .order('date', { ascending: false }).order('created_at', { ascending: false }),
       supabase.from('budget_config').select('*').eq('user_id', userId).single(),
       supabase.from('expenses').select('amount, is_income, is_savings_withdrawal').eq('user_id', userId)
-        .gte('date', prevMonthStart()).lte('date', prevMonthEnd()),
+        .gte('date', monthStartOf(prevY, prevM)).lte('date', monthEndOf(prevY, prevM)),
       supabase.from('expenses').select('id, amount, description, date, savings_type, repaid').eq('user_id', userId)
         .eq('is_savings_withdrawal', true)
-        .gte('date', `${new Date().getFullYear()}-01-01`),
+        .gte('date', `${selYear}-01-01`),
+      supabase.from('expenses').select('amount, date, is_income, is_savings_withdrawal, category').eq('user_id', userId)
+        .gte('date', `${selYear}-01-01`).lte('date', `${selYear}-12-31`),
     ])
     setExpenses(expRes.data || [])
     setConfig(cfgRes.data || { monthly_budget: 400, category_budgets: DEFAULT_CAT_BUDGETS })
     setPrevExpenses(prevExpRes.data || [])
     setYearSavings(yearSavRes.data || [])
+    setYearExpenses(yearExpRes.data || [])
     setLoading(false)
-  }, [userId])
+  }, [userId, selYear, selMonth])
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
@@ -839,8 +846,27 @@ export default function GeldPage({ userId, onClose }) {
   const yearSavingsTotal = yearSavings.reduce((s, e) => s + Number(e.amount), 0)
   const yearSavingsCount = yearSavings.length
 
+  const nowY = new Date().getFullYear(), nowM = new Date().getMonth()
+  const isCurrentMonth = selYear === nowY && selMonth === nowM
+  const goToPrevMonth = () => { if (selMonth === 0) { setSelYear(y => y-1); setSelMonth(11) } else { setSelMonth(m => m-1) } }
+  const goToNextMonth = () => {
+    if (selYear < nowY || selMonth < nowM) {
+      if (selMonth === 11) { setSelYear(y => y+1); setSelMonth(0) } else { setSelMonth(m => m+1) }
+    }
+  }
+
   const todayTotal = regularExpenses.filter(e => e.date === todayStr())
     .reduce((s, e) => s + Number(e.amount), 0)
+
+  // Year summary grouped by month
+  const yearMonthly = Array.from({ length: 12 }, (_, m) => {
+    const mStart = monthStartOf(selYear, m), mEnd = monthEndOf(selYear, m)
+    const mExps  = yearExpenses.filter(e => e.date >= mStart && e.date <= mEnd)
+    const spent  = mExps.filter(e => !e.is_income && !e.is_savings_withdrawal).reduce((s,e) => s + Number(e.amount), 0)
+    const income = mExps.filter(e => e.is_income).reduce((s,e) => s + Number(e.amount), 0)
+    const hasDat = mExps.length > 0
+    return { m, spent, income, hasDat }
+  })
 
   const spentByCategory = {}
   for (const cat of allCategories) {
@@ -939,12 +965,24 @@ export default function GeldPage({ userId, onClose }) {
         <div style={{ maxWidth: 480, margin: '0 auto', padding: `20px 16px ${isMobile ? '90px' : '24px'}` }}>
 
         {/* ── WEERGAVE ── */}
+        {/* Month navigator — shown in all views except jaar */}
+        {subView !== 'jaar' && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, padding: '8px 4px' }}>
+            <button onClick={goToPrevMonth} style={{ width: 32, height: 32, borderRadius: 10, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-2)', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
+            <span style={{ fontSize: 14, fontWeight: 700, color: isCurrentMonth ? 'var(--text-1)' : 'var(--accent)', letterSpacing: '0.01em' }}>
+              {monthLabelOf(selYear, selMonth)}{!isCurrentMonth && ' ✎'}
+            </span>
+            <button onClick={goToNextMonth} disabled={isCurrentMonth}
+              style={{ width: 32, height: 32, borderRadius: 10, background: isCurrentMonth ? 'rgba(255,255,255,0.03)' : 'var(--bg-card-2)', border: '1px solid var(--border)', color: isCurrentMonth ? 'var(--text-3)' : 'var(--text-2)', cursor: isCurrentMonth ? 'default' : 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
+          </div>
+        )}
+
         {subView === 'weergave' && <>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <div>
             <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-1)', margin: '0 0 2px' }}>Geld</h2>
-            <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>{monthLabel()}</p>
+            <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>{monthLabelOf(selYear, selMonth)}</p>
           </div>
           <button onClick={() => setShowBudget(true)} style={{ padding: '8px 14px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-2)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
             Budget
@@ -1476,6 +1514,64 @@ export default function GeldPage({ userId, onClose }) {
           )}
         </>}
 
+        {subView === 'jaar' && <>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+            <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>Jaaroverzicht {selYear}</h2>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={() => setSelYear(y => y - 1)} style={{ padding: '6px 10px', borderRadius: 10, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-2)', cursor: 'pointer', fontSize: 13 }}>‹ {selYear - 1}</button>
+              {selYear < nowY && <button onClick={() => setSelYear(y => y + 1)} style={{ padding: '6px 10px', borderRadius: 10, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-2)', cursor: 'pointer', fontSize: 13 }}>{selYear + 1} ›</button>}
+            </div>
+          </div>
+
+          {/* Yearly totals */}
+          {(() => {
+            const totalYearSpent  = yearMonthly.reduce((s, m) => s + m.spent, 0)
+            const totalYearIncome = yearMonthly.reduce((s, m) => s + m.income, 0)
+            const maxSpent        = Math.max(...yearMonthly.map(m => m.spent), 1)
+            const MONTHS_NL       = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec']
+            return <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+                <div style={{ padding: '12px 14px', borderRadius: 14, background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                  <p style={{ fontSize: 10, color: 'rgba(239,68,68,0.7)', margin: '0 0 4px', textTransform: 'uppercase', fontWeight: 700 }}>Totaal uitgegeven</p>
+                  <p style={{ fontSize: 22, fontWeight: 800, color: '#EF4444', margin: 0 }}>{fmt(totalYearSpent)}</p>
+                </div>
+                <div style={{ padding: '12px 14px', borderRadius: 14, background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.2)' }}>
+                  <p style={{ fontSize: 10, color: 'rgba(16,185,129,0.7)', margin: '0 0 4px', textTransform: 'uppercase', fontWeight: 700 }}>Totaal inkomen</p>
+                  <p style={{ fontSize: 22, fontWeight: 800, color: '#10B981', margin: 0 }}>{fmt(totalYearIncome)}</p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {yearMonthly.map(({ m, spent, income, hasDat }) => {
+                  const isSelMonth = m === selMonth
+                  const barW = maxSpent > 0 ? (spent / maxSpent) * 100 : 0
+                  return (
+                    <button key={m} onClick={() => { setSelMonth(m); setSubView('weergave') }}
+                      style={{ padding: '12px 14px', borderRadius: 14, background: isSelMonth ? 'rgba(0,255,209,0.07)' : hasDat ? 'var(--bg-card-2)' : 'rgba(255,255,255,0.02)', border: isSelMonth ? '1px solid var(--accent)' : '1px solid var(--border)', cursor: 'pointer', textAlign: 'left' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: hasDat ? 8 : 0 }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: isSelMonth ? 'var(--accent)' : 'var(--text-2)', width: 28, flexShrink: 0 }}>{MONTHS_NL[m]}</span>
+                        <div style={{ flex: 1 }}>
+                          {hasDat ? (
+                            <div style={{ height: 6, background: 'rgba(255,255,255,0.07)', borderRadius: 4, overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${barW}%`, background: spent > (income || base) ? '#EF4444' : 'var(--accent)', borderRadius: 4 }} />
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Geen data</span>
+                          )}
+                        </div>
+                        {hasDat && <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: '#EF4444' }}>{fmt(spent)}</span>
+                          {income > 0 && <span style={{ fontSize: 11, color: '#10B981', marginLeft: 6 }}>+{fmt(income)}</span>}
+                        </div>}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          })()}
+        </>}
+
         </div>
       </div>
 
@@ -1523,7 +1619,7 @@ export default function GeldPage({ userId, onClose }) {
         document.body
       )}
 
-      {showAdd && <ExpenseModal editing={editing} onClose={() => { setShowAdd(false); setEditing(null) }} onSave={saveExpense} categories={allCategories} />}
+      {showAdd && <ExpenseModal editing={editing} defaultDate={isCurrentMonth ? undefined : monthEndOf(selYear, selMonth)} onClose={() => { setShowAdd(false); setEditing(null) }} onSave={saveExpense} categories={allCategories} />}
       {showIncome && <IncomeModal onClose={() => setShowIncome(false)} onSave={saveExpense} />}
       {showSavings && <SavingsModal editing={editingSavings} onClose={() => { setShowSavings(false); setEditingSavings(null) }} onSave={async (data) => { if (editingSavings) { await supabase.from('expenses').update(data).eq('id', editingSavings.id); setEditingSavings(null); setShowSavings(false); fetchAll() } else { saveExpense(data) } }} />}
       {showBudget && <BudgetModal config={config} onClose={() => setShowBudget(false)} onSave={saveBudget} />}
