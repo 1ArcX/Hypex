@@ -21,16 +21,35 @@ const DEFAULT_CAT_BUDGETS = {
 // iOS: scroll focused input above keyboard
 const scrollFix = (e) => { const t = e.target; setTimeout(() => t.scrollIntoView({ behavior: 'smooth', block: 'center' }), 350) }
 
-// Lift body overflow-hidden while modal is open
-function useModalScroll() {
+// Prevent touchmove on an element entirely (for backdrops / non-scrollable overlays)
+function usePreventTouch(ref) {
   useEffect(() => {
-    document.documentElement.style.overflow = 'auto'
-    document.body.style.overflow = 'auto'
-    return () => {
-      document.documentElement.style.overflow = 'hidden'
-      document.body.style.overflow = 'hidden'
+    const el = ref.current; if (!el) return
+    const fn = (e) => e.preventDefault()
+    el.addEventListener('touchmove', fn, { passive: false })
+    return () => el.removeEventListener('touchmove', fn)
+  }, [ref])
+}
+
+// Allow scroll inside el but block overscroll at top/bottom so iOS can't bounce the body
+function useScrollContain(ref) {
+  useEffect(() => {
+    const el = ref.current; if (!el) return
+    let startY = 0
+    const onStart = (e) => { startY = e.touches[0].clientY }
+    const onMove = (e) => {
+      const dy = e.touches[0].clientY - startY
+      const atTop    = el.scrollTop <= 0
+      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1
+      if ((atTop && dy > 0) || (atBottom && dy < 0)) e.preventDefault()
     }
-  }, [])
+    el.addEventListener('touchstart', onStart, { passive: true })
+    el.addEventListener('touchmove',  onMove,  { passive: false })
+    return () => {
+      el.removeEventListener('touchstart', onStart)
+      el.removeEventListener('touchmove',  onMove)
+    }
+  }, [ref])
 }
 
 function fmt(n) { return `€${Number(n).toFixed(2).replace('.', ',')}` }
@@ -47,7 +66,8 @@ function monthLabel() {
 
 // ── Expense Log Modal ─────────────────────────────────────────────────────────
 function ExpenseModal({ onClose, onSave, editing }) {
-  useModalScroll()
+  const backdropRef = useRef(null)
+  usePreventTouch(backdropRef)
   const [amount, setAmount]   = useState(editing?.amount || '')
   const [cat, setCat]         = useState(editing?.category || 'eten')
   const [desc, setDesc]       = useState(editing?.description || '')
@@ -60,7 +80,7 @@ function ExpenseModal({ onClose, onSave, editing }) {
   }
 
   return ReactDOM.createPortal(
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)', zIndex: 9999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+    <div ref={backdropRef} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)', zIndex: 9999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
       <div style={{ width: '100%', maxWidth: 480, background: 'var(--bg-sidebar)', borderRadius: '22px 22px 0 0', border: '1px solid var(--border)', borderBottom: 'none', padding: '20px 20px calc(24px + env(safe-area-inset-bottom))', animation: 'sheetUp 0.3s cubic-bezier(0.34,1.1,0.64,1)' }}>
         <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border)', margin: '0 auto 18px' }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
@@ -117,7 +137,8 @@ function ExpenseModal({ onClose, onSave, editing }) {
 
 // ── Savings Withdrawal Modal ──────────────────────────────────────────────────
 function SavingsModal({ onClose, onSave }) {
-  useModalScroll()
+  const backdropRef = useRef(null)
+  usePreventTouch(backdropRef)
   const [amount, setAmount] = useState('')
   const [reason, setReason] = useState('')
 
@@ -128,7 +149,7 @@ function SavingsModal({ onClose, onSave }) {
   }
 
   return ReactDOM.createPortal(
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+    <div ref={backdropRef} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div style={{ width: '100%', maxWidth: 380, background: 'var(--bg-sidebar)', borderRadius: 22, border: '1px solid rgba(239,68,68,0.4)', padding: 24 }}>
         <div style={{ textAlign: 'center', marginBottom: 20 }}>
           <div style={{ fontSize: 40, marginBottom: 8 }}>⚠️</div>
@@ -158,7 +179,11 @@ function SavingsModal({ onClose, onSave }) {
 
 // ── Budget Settings Modal ─────────────────────────────────────────────────────
 function BudgetModal({ config, onClose, onSave }) {
-  useModalScroll()
+  const backdropRef = useRef(null)
+  const cardRef     = useRef(null)
+  usePreventTouch(backdropRef)   // backdrop: block all touch-scroll
+  useScrollContain(cardRef)      // card: allow scroll but clamp overscroll at edges
+
   const [monthly, setMonthly] = useState(config?.monthly_budget || 400)
   const [cats, setCats] = useState(config?.category_budgets || DEFAULT_CAT_BUDGETS)
 
@@ -167,9 +192,9 @@ function BudgetModal({ config, onClose, onSave }) {
   return ReactDOM.createPortal(
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       {/* Backdrop */}
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)' }} onClick={onClose} />
-      {/* Card is the scroll container — overscroll-behavior:contain stops iOS bounce bleed */}
-      <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420, background: 'var(--bg-sidebar)', borderRadius: 22, border: '1px solid var(--border)', padding: 24, maxHeight: 'calc(100vh - 120px)', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
+      <div ref={backdropRef} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)' }} onClick={onClose} />
+      {/* Card — scrollable, bounce blocked at boundaries */}
+      <div ref={cardRef} style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420, background: 'var(--bg-sidebar)', borderRadius: 22, border: '1px solid var(--border)', padding: 24, maxHeight: 'calc(100vh - 120px)', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Budget instellen</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)' }}><X size={18} /></button>
