@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import ReactDOM from 'react-dom'
 import { supabase } from '../supabaseClient'
 import { Plus, X, Trash2, Pencil, AlertTriangle, TrendingDown, Wallet, ChevronDown, ChevronUp } from 'lucide-react'
@@ -21,6 +21,19 @@ const DEFAULT_CAT_BUDGETS = {
 // iOS: scroll focused input above keyboard
 const scrollFix = (e) => { const t = e.target; setTimeout(() => t.scrollIntoView({ behavior: 'smooth', block: 'center' }), 350) }
 
+// iOS: lift body overflow-hidden while modal is open so fixed overlays can scroll
+function useModalScroll() {
+  useEffect(() => {
+    const prev = document.documentElement.style.overflow
+    document.documentElement.style.overflow = 'auto'
+    document.body.style.overflow = 'auto'
+    return () => {
+      document.documentElement.style.overflow = prev || 'hidden'
+      document.body.style.overflow = 'hidden'
+    }
+  }, [])
+}
+
 function fmt(n) { return `€${Number(n).toFixed(2).replace('.', ',')}` }
 function fmtShort(n) { return `€${Math.round(n)}` }
 function todayStr() { return new Date().toISOString().slice(0, 10) }
@@ -35,6 +48,7 @@ function monthLabel() {
 
 // ── Expense Log Modal ─────────────────────────────────────────────────────────
 function ExpenseModal({ onClose, onSave, editing }) {
+  useModalScroll()
   const [amount, setAmount]   = useState(editing?.amount || '')
   const [cat, setCat]         = useState(editing?.category || 'eten')
   const [desc, setDesc]       = useState(editing?.description || '')
@@ -104,6 +118,7 @@ function ExpenseModal({ onClose, onSave, editing }) {
 
 // ── Savings Withdrawal Modal ──────────────────────────────────────────────────
 function SavingsModal({ onClose, onSave }) {
+  useModalScroll()
   const [amount, setAmount] = useState('')
   const [reason, setReason] = useState('')
 
@@ -144,6 +159,7 @@ function SavingsModal({ onClose, onSave }) {
 
 // ── Budget Settings Modal ─────────────────────────────────────────────────────
 function BudgetModal({ config, onClose, onSave }) {
+  useModalScroll()
   const [monthly, setMonthly] = useState(config?.monthly_budget || 400)
   const [cats, setCats] = useState(config?.category_budgets || DEFAULT_CAT_BUDGETS)
 
