@@ -837,7 +837,7 @@ export default function App() {
             )}
 
             {activePage === 'geld' && isAdmin && (
-              <GeldPage userId={user.id} />
+              <GeldPage userId={user.id} onClose={() => setActivePage('home')} />
             )}
 
           </div>
