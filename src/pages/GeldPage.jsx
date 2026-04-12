@@ -21,6 +21,41 @@ const INCOME_CATEGORIES = [
   { id: 'overig',    label: 'Overig',    emoji: '💰' },
 ]
 
+// ── Recurring income helpers ──────────────────────────────────────────────────
+function getNextPayDate(src) {
+  const now = new Date()
+  if (src.type === 'monthly') {
+    let d = new Date(now.getFullYear(), now.getMonth(), src.day)
+    if (d <= now) d = new Date(now.getFullYear(), now.getMonth() + 1, src.day)
+    return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+  }
+  if (src.type === 'interval' && src.ref_date) {
+    const ms = src.interval_days * 86400000
+    let d = new Date(src.ref_date + 'T12:00:00')
+    while (d <= now) d = new Date(d.getTime() + ms)
+    return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+  }
+  return null
+}
+
+function calcRecurringThisMonth(recurringIncome) {
+  if (!recurringIncome?.length) return 0
+  const mStart = new Date(monthStart() + 'T00:00:00')
+  const mEnd   = new Date(monthEnd()   + 'T23:59:59')
+  return recurringIncome.reduce((sum, src) => {
+    if (src.type === 'monthly') return sum + src.amount
+    if (src.type === 'interval' && src.ref_date) {
+      const ms = src.interval_days * 86400000
+      let d = new Date(src.ref_date + 'T12:00:00')
+      while (d < mStart) d = new Date(d.getTime() + ms)
+      let count = 0
+      while (d <= mEnd) { count++; d = new Date(d.getTime() + ms) }
+      return sum + src.amount * count
+    }
+    return sum
+  }, 0)
+}
+
 const DEFAULT_CAT_BUDGETS = {
   eten: 120, boodschappen: 80, transport: 40,
   kleding: 50, abonnementen: 30, sport: 20, overig: 60,
@@ -308,6 +343,154 @@ function BudgetModal({ config, onClose, onSave }) {
   )
 }
 
+// ── Recurring Income Modal ────────────────────────────────────────────────────
+const REC_EMOJIS = ['💼','🏪','🏥','🎓','💰','🏦','💻','🎁','🏠','📦']
+
+function RecurringIncomeModal({ config, onClose, onSave }) {
+  const backdropRef = useRef(null)
+  const cardRef     = useRef(null)
+  usePreventTouch(backdropRef)
+  useScrollContain(cardRef)
+
+  const [sources, setSources] = useState(config?.recurring_income || [])
+  const [adding,  setAdding]  = useState((config?.recurring_income || []).length === 0)
+  const [name,    setName]    = useState('')
+  const [emoji,   setEmoji]   = useState('💼')
+  const [amount,  setAmount]  = useState('')
+  const [type,    setType]    = useState('monthly')
+  const [day,     setDay]     = useState(1)
+  const [intDays, setIntDays] = useState(28)
+  const [refDate, setRefDate] = useState(todayStr())
+
+  const resetForm = () => { setName(''); setEmoji('💼'); setAmount(''); setType('monthly'); setDay(1); setIntDays(28); setRefDate(todayStr()) }
+
+  const handleAdd = () => {
+    const n = parseFloat(String(amount).replace(',', '.'))
+    if (!name.trim() || !n || n <= 0) return
+    setSources(s => [...s, {
+      id: `rec_${Date.now()}`,
+      name: name.trim(), emoji, amount: n, type,
+      ...(type === 'monthly' ? { day: Number(day) } : { interval_days: Number(intDays), ref_date: refDate }),
+    }])
+    resetForm(); setAdding(false)
+  }
+
+  const handleClose = () => { onSave(sources); onClose() }
+
+  const inputStyle = { width: '100%', padding: '10px 14px', borderRadius: 12, background: 'var(--bg-base)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: 14, colorScheme: 'dark', boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none' }
+
+  return ReactDOM.createPortal(
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 'var(--keyboard-height, 0px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div ref={backdropRef} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)', zIndex: -1 }} onClick={handleClose} />
+      <div ref={cardRef} style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420, background: 'var(--bg-sidebar)', borderRadius: 22, border: '1px solid var(--border)', padding: 24, maxHeight: 'calc(100% - 32px)', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Terugkerend inkomen</h3>
+          <button onClick={handleClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)' }}><X size={18} /></button>
+        </div>
+
+        {/* Bestaande bronnen */}
+        {sources.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+            {sources.map(src => {
+              const next = getNextPayDate(src)
+              return (
+                <div key={src.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 14, background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)' }}>
+                  <span style={{ fontSize: 22 }}>{src.emoji}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', margin: '0 0 1px' }}>{src.name}</p>
+                    <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>
+                      {src.type === 'monthly' ? `${src.day}e van de maand` : `Elke ${src.interval_days} dagen`}
+                      {next ? ` · volgende: ${next}` : ''}
+                    </p>
+                  </div>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: '#10B981', marginRight: 4 }}>€{Number(src.amount).toFixed(0)}</span>
+                  <button onClick={() => setSources(s => s.filter(x => x.id !== src.id))}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(239,68,68,0.5)', padding: 4 }}>
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Toevoegen form */}
+        {adding ? (
+          <div style={{ padding: 16, borderRadius: 16, background: 'var(--bg-card-2)', border: '1px solid var(--border)', marginBottom: 12 }}>
+            {/* Emoji */}
+            <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+              {REC_EMOJIS.map(e => (
+                <button key={e} onClick={() => setEmoji(e)} style={{ fontSize: 20, width: 36, height: 36, borderRadius: 10, border: emoji === e ? '2px solid var(--accent)' : '1px solid var(--border)', background: emoji === e ? 'rgba(0,255,209,0.08)' : 'var(--bg-sidebar)', cursor: 'pointer' }}>{e}</button>
+              ))}
+            </div>
+            <input placeholder="Naam (bijv. Jumbo, Zorgtoeslag)" value={name} onChange={e => setName(e.target.value)} onFocus={scrollFix}
+              style={{ ...inputStyle, marginBottom: 10 }} autoFocus />
+            <div style={{ position: 'relative', marginBottom: 12 }}>
+              <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: 'var(--text-3)' }}>€</span>
+              <input type="text" inputMode="decimal" placeholder="0,00" value={amount} onChange={e => setAmount(e.target.value)} onFocus={scrollFix}
+                style={{ ...inputStyle, paddingLeft: 30, fontSize: 20, fontWeight: 700 }} />
+            </div>
+
+            {/* Frequentie toggle */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+              {[['monthly','Maandelijks'],['interval','Elke X weken']].map(([v,l]) => (
+                <button key={v} onClick={() => setType(v)} style={{ padding: '9px', borderRadius: 12, border: type === v ? '1px solid var(--accent)' : '1px solid var(--border)', background: type === v ? 'rgba(0,255,209,0.08)' : 'var(--bg-sidebar)', color: type === v ? 'var(--accent)' : 'var(--text-3)', cursor: 'pointer', fontSize: 13, fontWeight: type === v ? 600 : 400 }}>{l}</button>
+              ))}
+            </div>
+
+            {type === 'monthly' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                <span style={{ fontSize: 13, color: 'var(--text-3)' }}>Dag van de maand:</span>
+                <input type="number" min="1" max="31" value={day} onChange={e => setDay(e.target.value)}
+                  style={{ width: 60, padding: '8px 10px', borderRadius: 10, background: 'var(--bg-sidebar)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: 15, fontWeight: 700, colorScheme: 'dark', textAlign: 'center' }} />
+              </div>
+            )}
+
+            {type === 'interval' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 13, color: 'var(--text-3)' }}>Elke</span>
+                  <select value={intDays} onChange={e => setIntDays(+e.target.value)}
+                    style={{ padding: '8px 12px', borderRadius: 10, background: 'var(--bg-sidebar)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: 13, colorScheme: 'dark' }}>
+                    <option value={7}>1 week</option>
+                    <option value={14}>2 weken</option>
+                    <option value={21}>3 weken</option>
+                    <option value={28}>4 weken</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 13, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>Laatste betaling:</span>
+                  <input type="date" value={refDate} onChange={e => setRefDate(e.target.value)}
+                    style={{ flex: 1, padding: '8px 10px', borderRadius: 10, background: 'var(--bg-sidebar)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: 13, colorScheme: 'dark' }} />
+                </div>
+                <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>Vul de datum van de meest recente betaling in — de volgende wordt automatisch berekend.</p>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => { setAdding(false); resetForm() }} style={{ flex: 1, padding: '11px', borderRadius: 12, background: 'none', border: '1px solid var(--border)', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13 }}>Annuleer</button>
+              <button onClick={handleAdd} disabled={!name.trim() || !amount}
+                style={{ flex: 2, padding: '11px', borderRadius: 12, background: (!name.trim() || !amount) ? 'rgba(255,255,255,0.07)' : '#10B981', border: 'none', color: (!name.trim() || !amount) ? 'rgba(255,255,255,0.25)' : '#000', fontWeight: 700, fontSize: 14, cursor: (!name.trim() || !amount) ? 'default' : 'pointer' }}>
+                Toevoegen
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => setAdding(true)} style={{ width: '100%', marginBottom: 12, padding: '12px', borderRadius: 14, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', color: '#10B981', cursor: 'pointer', fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <Plus size={15} /> Bron toevoegen
+          </button>
+        )}
+
+        <button onClick={handleClose} style={{ width: '100%', padding: '13px', borderRadius: 14, background: 'var(--accent)', border: 'none', color: '#000', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+          Opslaan
+        </button>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function GeldPage({ userId }) {
   const [expenses, setExpenses]       = useState([])
@@ -319,6 +502,7 @@ export default function GeldPage({ userId }) {
   const [showBudget, setShowBudget]   = useState(false)
   const [editing, setEditing]         = useState(null)
   const [showAll, setShowAll]         = useState(false)
+  const [showRecurring, setShowRecurring] = useState(false)
 
   const fetchAll = useCallback(async () => {
     const [expRes, cfgRes] = await Promise.all([
@@ -354,18 +538,26 @@ export default function GeldPage({ userId }) {
     setShowBudget(false); fetchAll()
   }
 
+  const saveRecurring = async (sources) => {
+    await supabase.from('budget_config').upsert({ recurring_income: sources, user_id: userId, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+    setShowRecurring(false); fetchAll()
+  }
+
   // Derived stats
   const monthlyBudget      = config?.monthly_budget || 400
   const catBudgets         = config?.category_budgets || DEFAULT_CAT_BUDGETS
-  const incomeEntries      = expenses.filter(e => e.is_income)
-  const totalIncome        = incomeEntries.reduce((s, e) => s + Number(e.amount), 0)
+  const manualIncome       = expenses.filter(e => e.is_income)
+  const totalManualIncome  = manualIncome.reduce((s, e) => s + Number(e.amount), 0)
   const regularExpenses    = expenses.filter(e => !e.is_savings_withdrawal && !e.is_income)
   const totalSpent         = regularExpenses.reduce((s, e) => s + Number(e.amount), 0)
   const savingsWithdrawals = expenses.filter(e => e.is_savings_withdrawal)
   const savingsTotal       = savingsWithdrawals.reduce((s, e) => s + Number(e.amount), 0)
 
-  // Remaining: use income if available, otherwise fall back to budget
-  const base       = totalIncome > 0 ? totalIncome : monthlyBudget
+  const recurringIncome    = config?.recurring_income || []
+  const recurringExpected  = calcRecurringThisMonth(recurringIncome)
+  const hasRecurring       = recurringIncome.length > 0
+  // base: recurring config takes priority; manual income entries are one-off additions on top
+  const base       = hasRecurring ? recurringExpected + totalManualIncome : (totalManualIncome > 0 ? totalManualIncome : monthlyBudget)
   const remaining  = base - totalSpent
   const remainPct  = Math.max(0, Math.min(100, (remaining / base) * 100))
 
@@ -379,7 +571,7 @@ export default function GeldPage({ userId }) {
   }
 
   const barColor = remainPct > 40 ? 'var(--accent)' : remainPct > 15 ? '#F59E0B' : '#EF4444'
-  const allTransactions = [...regularExpenses, ...incomeEntries].sort((a, b) => b.date.localeCompare(a.date) || b.created_at?.localeCompare(a.created_at))
+  const allTransactions = [...regularExpenses, ...manualIncome].sort((a, b) => b.date.localeCompare(a.date) || b.created_at?.localeCompare(a.created_at))
   const displayedExpenses = showAll ? allTransactions : allTransactions.slice(0, 8)
 
   // Smart stats
@@ -437,9 +629,14 @@ export default function GeldPage({ userId }) {
             <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-1)', margin: '0 0 2px' }}>Geld</h2>
             <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>{monthLabel()}</p>
           </div>
-          <button onClick={() => setShowBudget(true)} style={{ padding: '8px 14px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-2)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
-            Budget
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setShowRecurring(true)} style={{ padding: '8px 14px', borderRadius: 12, background: hasRecurring ? 'rgba(16,185,129,0.1)' : 'var(--bg-card-2)', border: hasRecurring ? '1px solid rgba(16,185,129,0.3)' : '1px solid var(--border)', color: hasRecurring ? '#10B981' : 'var(--text-2)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+              💚 Inkomen
+            </button>
+            <button onClick={() => setShowBudget(true)} style={{ padding: '8px 14px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-2)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+              Budget
+            </button>
+          </div>
         </div>
 
         {/* Big remaining card */}
@@ -465,7 +662,7 @@ export default function GeldPage({ userId }) {
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-3)' }}>
             <span>{fmt(totalSpent)} uitgegeven</span>
-            <span>{totalIncome > 0 ? `Inkomsten: ${fmt(totalIncome)}` : `Budget: ${fmt(monthlyBudget)}`}</span>
+            <span>{hasRecurring ? `Verwacht: ${fmt(recurringExpected)}${totalManualIncome > 0 ? ` + ${fmt(totalManualIncome)}` : ''}` : totalManualIncome > 0 ? `Inkomsten: ${fmt(totalManualIncome)}` : `Budget: ${fmt(monthlyBudget)}`}</span>
           </div>
         </div>
 
@@ -475,12 +672,13 @@ export default function GeldPage({ userId }) {
             <p style={{ fontSize: 10, color: 'var(--text-3)', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Vandaag</p>
             <p style={{ fontSize: 20, fontWeight: 700, margin: 0, color: todayTotal > 0 ? 'var(--text-1)' : 'var(--text-3)' }}>{fmt(todayTotal)}</p>
           </div>
-          <div onClick={() => totalIncome > 0 && setShowAll(true)}
-            style={{ padding: '12px 14px', borderRadius: 16, background: totalIncome > 0 ? 'rgba(16,185,129,0.08)' : 'var(--bg-card-2)', border: totalIncome > 0 ? '1px solid rgba(16,185,129,0.3)' : '1px solid var(--border)', cursor: totalIncome > 0 ? 'pointer' : 'default' }}>
-            <p style={{ fontSize: 10, color: totalIncome > 0 ? '#10B981' : 'var(--text-3)', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>💚 Inkomsten</p>
-            <p style={{ fontSize: 20, fontWeight: 700, margin: 0, color: totalIncome > 0 ? '#10B981' : 'var(--text-3)' }}>
-              {totalIncome > 0 ? fmt(totalIncome) : '–'}
+          <div onClick={() => setShowRecurring(true)}
+            style={{ padding: '12px 14px', borderRadius: 16, background: hasRecurring ? 'rgba(16,185,129,0.08)' : totalManualIncome > 0 ? 'rgba(16,185,129,0.08)' : 'var(--bg-card-2)', border: (hasRecurring || totalManualIncome > 0) ? '1px solid rgba(16,185,129,0.3)' : '1px solid var(--border)', cursor: 'pointer' }}>
+            <p style={{ fontSize: 10, color: (hasRecurring || totalManualIncome > 0) ? '#10B981' : 'var(--text-3)', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>💚 Inkomen</p>
+            <p style={{ fontSize: 20, fontWeight: 700, margin: 0, color: (hasRecurring || totalManualIncome > 0) ? '#10B981' : 'var(--text-3)' }}>
+              {hasRecurring ? fmt(recurringExpected) : totalManualIncome > 0 ? fmt(totalManualIncome) : '–'}
             </p>
+            {hasRecurring && <p style={{ fontSize: 9, color: 'rgba(16,185,129,0.6)', margin: '2px 0 0', fontWeight: 600 }}>VERWACHT</p>}
           </div>
           <div onClick={() => savingsWithdrawals.length > 0 && setShowAll(true)}
             style={{ padding: '12px 14px', borderRadius: 16, background: savingsWithdrawals.length > 0 ? 'rgba(239,68,68,0.08)' : 'var(--bg-card-2)', border: savingsWithdrawals.length > 0 ? '1px solid rgba(239,68,68,0.3)' : '1px solid var(--border)', cursor: savingsWithdrawals.length > 0 ? 'pointer' : 'default' }}>
@@ -490,6 +688,32 @@ export default function GeldPage({ userId }) {
             </p>
           </div>
         </div>
+
+        {/* Recurring income sources */}
+        {hasRecurring && (
+          <div style={{ marginBottom: 14, padding: '12px 14px', borderRadius: 16, background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.18)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <p style={{ fontSize: 10, color: '#10B981', margin: 0, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Verwacht inkomen</p>
+              <button onClick={() => setShowRecurring(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(16,185,129,0.6)', fontSize: 11, padding: 0 }}>bewerken</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {recurringIncome.map(src => {
+                const next = getNextPayDate(src)
+                const paysThisMonth = src.type === 'monthly' || calcRecurringThisMonth([src]) > 0
+                return (
+                  <div key={src.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 16 }}>{src.emoji}</span>
+                    <span style={{ flex: 1, fontSize: 12, color: paysThisMonth ? 'var(--text-2)' : 'var(--text-3)' }}>{src.name}</span>
+                    {next && <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{next}</span>}
+                    <span style={{ fontSize: 13, fontWeight: 700, color: paysThisMonth ? '#10B981' : 'var(--text-3)' }}>
+                      {paysThisMonth ? fmt(calcRecurringThisMonth([src])) : '–'}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Smart stats — Dagbudget / Prognose / Spaarstreak */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 14 }}>
@@ -760,6 +984,7 @@ export default function GeldPage({ userId }) {
       {showIncome && <IncomeModal onClose={() => setShowIncome(false)} onSave={saveExpense} />}
       {showSavings && <SavingsModal onClose={() => setShowSavings(false)} onSave={saveExpense} />}
       {showBudget && <BudgetModal config={config} onClose={() => setShowBudget(false)} onSave={saveBudget} />}
+      {showRecurring && <RecurringIncomeModal config={config} onClose={() => setShowRecurring(false)} onSave={saveRecurring} />}
 
       <style>{`@keyframes sheetUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }`}</style>
     </div>
