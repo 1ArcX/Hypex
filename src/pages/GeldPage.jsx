@@ -731,7 +731,8 @@ export default function GeldPage({ userId, onClose }) {
   const [editing, setEditing]         = useState(null)
   const [showAll, setShowAll]         = useState(false)
   const [showRecurring, setShowRecurring]   = useState(false)
-  const [editingSavings, setEditingSavings] = useState(null)
+  const [editingSavings, setEditingSavings]     = useState(null)
+  const [confirmingLoanId, setConfirmingLoanId] = useState(null)
   const [prevExpenses, setPrevExpenses]     = useState([])
   const [yearSavings, setYearSavings]     = useState([])
   const [subView, setSubView]         = useState('weergave')
@@ -1383,10 +1384,28 @@ export default function GeldPage({ userId, onClose }) {
                         <button onClick={() => { setEditingSavings(exp); setShowSavings(true) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4, flexShrink: 0 }}><Pencil size={14} /></button>
                         <button onClick={() => deleteExpense(exp.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(239,68,68,0.5)', padding: 4, flexShrink: 0 }}><Trash2 size={14} /></button>
                       </div>
-                      <button onClick={() => repayLoan(exp)}
-                        style={{ width: '100%', padding: '9px', background: 'rgba(16,185,129,0.08)', border: 'none', borderTop: '1px solid rgba(245,158,11,0.2)', color: '#10B981', cursor: 'pointer', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                        ✓ Teruggestort — {fmt(total)} loggen als uitgave
-                      </button>
+                      {confirmingLoanId === exp.id ? (
+                        <div style={{ borderTop: '1px solid rgba(245,158,11,0.2)', padding: '10px 14px', background: 'rgba(16,185,129,0.06)' }}>
+                          <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 10px', textAlign: 'center' }}>
+                            Weet je zeker dat je <strong style={{ color: '#10B981' }}>{fmt(total)}</strong> hebt teruggestort?
+                          </p>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button onClick={() => setConfirmingLoanId(null)}
+                              style={{ flex: 1, padding: '9px', borderRadius: 10, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-3)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                              Annuleer
+                            </button>
+                            <button onClick={() => { setConfirmingLoanId(null); repayLoan(exp) }}
+                              style={{ flex: 2, padding: '9px', borderRadius: 10, background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', color: '#10B981', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+                              ✓ Ja, teruggestort
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button onClick={() => setConfirmingLoanId(exp.id)}
+                          style={{ width: '100%', padding: '9px', background: 'rgba(16,185,129,0.08)', border: 'none', borderTop: '1px solid rgba(245,158,11,0.2)', color: '#10B981', cursor: 'pointer', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                          ✓ Teruggestort — {fmt(total)} loggen als uitgave
+                        </button>
+                      )}
                     </div>
                   )
                 })}
