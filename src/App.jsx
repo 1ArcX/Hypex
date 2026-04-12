@@ -109,18 +109,26 @@ export default function App() {
   }, [])
 
   // Track keyboard height via visualViewport → CSS variable --keyboard-height
-  // Uses initial viewport height as baseline (window.innerHeight unreliable on iOS)
+  // Also resets visualViewport scroll offset to fix iOS touch target mismatch:
+  // when keyboard opens, iOS shifts the visual viewport (offsetTop > 0) but
+  // touch hit-tests remain at original coords → buttons appear offset.
   useEffect(() => {
     const vv = window.visualViewport
     if (!vv) return
     const baseHeight = vv.height
-    const update = () => {
+    const onResize = () => {
       const kh = Math.max(0, baseHeight - vv.height)
       document.documentElement.style.setProperty('--keyboard-height', `${kh}px`)
     }
-    vv.addEventListener('resize', update)
+    const onScroll = () => {
+      // Counteract iOS visual viewport scroll so touch targets stay aligned
+      if (vv.offsetTop !== 0) window.scrollTo(0, vv.offsetTop)
+    }
+    vv.addEventListener('resize', onResize)
+    vv.addEventListener('scroll', onScroll)
     return () => {
-      vv.removeEventListener('resize', update)
+      vv.removeEventListener('resize', onResize)
+      vv.removeEventListener('scroll', onScroll)
       document.documentElement.style.setProperty('--keyboard-height', '0px')
     }
   }, [])
