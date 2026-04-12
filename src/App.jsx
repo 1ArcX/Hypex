@@ -31,6 +31,7 @@ import GymPage from './pages/GymPage'
 import NotitiesPage from './pages/NotitiesPage'
 import JumboPage from './pages/JumboPage'
 import StatsPage from './pages/StatsPage'
+import GeldPage from './pages/GeldPage'
 
 const ADMIN_EMAIL = 'zhafirfachri@gmail.com'
 
@@ -45,7 +46,7 @@ function urlBase64ToUint8Array(b) {
 const PAGE_NAMES = {
   dashboard: 'Dashboard', agenda: 'Agenda', taken: 'Taken',
   pomodoro: 'Pomodoro', school: 'School',
-  gewoontes: 'Gewoontes', gym: 'Gym', notities: 'Notities', statistieken: 'Statistieken', jumbo: 'Jumbo',
+  gewoontes: 'Gewoontes', gym: 'Gym', notities: 'Notities', statistieken: 'Statistieken', jumbo: 'Jumbo', geld: 'Geld',
 }
 
 const PAGE_ORDER = ['dashboard', 'agenda', 'taken', 'pomodoro', 'school', 'gewoontes', 'notities', 'statistieken']
@@ -797,6 +798,10 @@ export default function App() {
 
             {activePage === 'jumbo' && (isAdmin || userProfile?.werk_tab) && (
               <JumboPage isAdmin={isAdmin || !!userProfile?.werk_tab} userId={user?.id} />
+            )}
+
+            {activePage === 'geld' && isAdmin && (
+              <GeldPage userId={user.id} />
             )}
 
           </div>
