@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:magister-api.readthedocs.io)",
+      "Bash(netlify status:*)",
+      "Bash(npm install:*)",
+      "Bash(node -e \"const m = require\\(''''magister.js''''\\); console.log\\(Object.keys\\(m\\)\\)\")",
+      "Bash(node -e \"const { Magister, MagisterSchool } = require\\(''magister.js''\\); console.log\\(typeof Magister\\); const m = new Magister\\({ school: new MagisterSchool\\(''ichthus'', ''https://ichthus.magister.net''\\), username: ''test'', password: ''test'' }\\); console.log\\(Object.getOwnPropertyNames\\(Object.getPrototypeOf\\(m\\)\\).filter\\(n => n !== ''constructor''\\)\\)\")",
+      "Bash(node -e \"const m = require\\(''magister.js''\\); const M = m.Magister; console.log\\(Object.getOwnPropertyNames\\(M.prototype\\)\\)\")",
+      "Bash(node -e \"const m = require\\(''magister.js''\\); console.log\\(m.default.toString\\(\\).substring\\(0, 500\\)\\)\")",
+      "Bash(node -e \"const m = require\\(''magister.js''\\); const magister = m.default; console.log\\(''magister fn:'', typeof magister\\); const inst = magister\\({ school: { url: ''https://ichthus.magister.net'' }, username: ''x'', password: ''y'' }\\); console.log\\(''returns:'', typeof inst, inst instanceof Promise\\)\")",
+      "Bash(node -e \"const m = require\\(''magister.js''\\); const M = m.Magister; const proto = Object.getOwnPropertyNames\\(M.prototype\\); console.log\\(proto\\); const inst = new M\\(\\); console.log\\(typeof inst.grades\\)\")",
+      "Bash(node -e \"const m = require\\(''magister.js''\\); console.log\\(typeof m.default\\)\")",
+      "Bash(npm run:*)",
+      "Bash(netlify deploy:*)",
+      "Bash(node -e \":*)",
+      "Bash(npm view:*)",
+      "Bash(npx netlify-cli:*)",
+      "Bash(echo \"exit: $?\")"
+    ]
+  }
+}
