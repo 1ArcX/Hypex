@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import ReactDOM from 'react-dom'
 import { supabase } from '../supabaseClient'
-import { Plus, X, Trash2, Pencil, AlertTriangle, TrendingDown, Wallet, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, X, Trash2, Pencil, AlertTriangle, TrendingDown, Wallet, ChevronDown, ChevronUp, ArrowDownLeft } from 'lucide-react'
 
 const CATEGORIES = [
   { id: 'eten',          label: 'Eten & drinken', emoji: '🍔', color: '#F97316' },
@@ -11,6 +11,14 @@ const CATEGORIES = [
   { id: 'abonnementen',  label: 'Abonnementen',    emoji: '📱', color: '#EC4899' },
   { id: 'sport',         label: 'Sport',           emoji: '⚽', color: '#FACC15' },
   { id: 'overig',        label: 'Overig',          emoji: '💸', color: '#94A3B8' },
+]
+
+const INCOME_CATEGORIES = [
+  { id: 'salaris',   label: 'Salaris',   emoji: '💼' },
+  { id: 'bijbaan',   label: 'Bijbaan',   emoji: '🏪' },
+  { id: 'freelance', label: 'Freelance', emoji: '💻' },
+  { id: 'zakgeld',   label: 'Zakgeld',   emoji: '🎁' },
+  { id: 'overig',    label: 'Overig',    emoji: '💰' },
 ]
 
 const DEFAULT_CAT_BUDGETS = {
@@ -177,6 +185,64 @@ function SavingsModal({ onClose, onSave }) {
   )
 }
 
+// ── Income Modal ──────────────────────────────────────────────────────────────
+function IncomeModal({ onClose, onSave }) {
+  const backdropRef = useRef(null)
+  usePreventTouch(backdropRef)
+  const [amount, setAmount] = useState('')
+  const [cat, setCat]       = useState('salaris')
+  const [desc, setDesc]     = useState('')
+  const [date, setDate]     = useState(todayStr())
+
+  const handleSave = () => {
+    const n = parseFloat(String(amount).replace(',', '.'))
+    if (!n || n <= 0) return
+    onSave({ amount: n, category: cat, description: desc.trim(), date, is_income: true, is_savings_withdrawal: false })
+  }
+
+  return ReactDOM.createPortal(
+    <div ref={backdropRef} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)', zIndex: 9999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div style={{ width: '100%', maxWidth: 480, background: 'var(--bg-sidebar)', borderRadius: '22px 22px 0 0', border: '1px solid var(--border)', borderBottom: 'none', padding: '20px 20px calc(24px + env(safe-area-inset-bottom) + var(--keyboard-height, 0px))', animation: 'sheetUp 0.3s cubic-bezier(0.34,1.1,0.64,1)' }}>
+        <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border)', margin: '0 auto 18px' }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: '#10B981', margin: 0 }}>💚 Inkomsten toevoegen</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)' }}><X size={18} /></button>
+        </div>
+
+        <div style={{ position: 'relative', marginBottom: 16 }}>
+          <span style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', fontSize: 24, fontWeight: 700, color: '#10B981' }}>€</span>
+          <input autoFocus type="number" inputMode="decimal" placeholder="0,00"
+            value={amount} onChange={e => setAmount(e.target.value)}
+            onFocus={scrollFix} onKeyDown={e => e.key === 'Enter' && handleSave()}
+            style={{ width: '100%', padding: '14px 16px 14px 36px', borderRadius: 14, background: 'var(--bg-card-2)', border: '1px solid rgba(16,185,129,0.35)', color: 'var(--text-1)', fontSize: 28, fontWeight: 700, colorScheme: 'dark' }}
+          />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8, marginBottom: 14 }}>
+          {INCOME_CATEGORIES.map(c => (
+            <button key={c.id} onClick={() => setCat(c.id)} style={{ padding: '10px 4px', borderRadius: 12, border: cat === c.id ? '1px solid #10B981' : '1px solid var(--border)', background: cat === c.id ? 'rgba(16,185,129,0.12)' : 'var(--bg-card-2)', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+              <span style={{ fontSize: 18 }}>{c.emoji}</span>
+              <span style={{ fontSize: 9, color: cat === c.id ? '#10B981' : 'var(--text-3)', fontWeight: cat === c.id ? 600 : 400 }}>{c.label}</span>
+            </button>
+          ))}
+        </div>
+
+        <input placeholder="Omschrijving (optioneel)" value={desc} onChange={e => setDesc(e.target.value)}
+          onFocus={scrollFix}
+          style={{ width: '100%', padding: '10px 14px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: 14, marginBottom: 12, colorScheme: 'dark' }} />
+
+        <input type="date" value={date} onChange={e => setDate(e.target.value)}
+          style={{ width: '100%', padding: '10px 14px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-3)', fontSize: 13, marginBottom: 18, colorScheme: 'dark' }} />
+
+        <button onClick={handleSave} style={{ width: '100%', padding: '14px', borderRadius: 14, background: '#10B981', border: 'none', color: '#000', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+          + Toevoegen
+        </button>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
 // ── Budget Settings Modal ─────────────────────────────────────────────────────
 function BudgetModal({ config, onClose, onSave }) {
   const backdropRef = useRef(null)
@@ -248,6 +314,7 @@ export default function GeldPage({ userId }) {
   const [config, setConfig]           = useState(null)
   const [loading, setLoading]         = useState(true)
   const [showAdd, setShowAdd]         = useState(false)
+  const [showIncome, setShowIncome]   = useState(false)
   const [showSavings, setShowSavings] = useState(false)
   const [showBudget, setShowBudget]   = useState(false)
   const [editing, setEditing]         = useState(null)
@@ -273,7 +340,7 @@ export default function GeldPage({ userId }) {
     } else {
       await supabase.from('expenses').insert({ ...data, user_id: userId })
     }
-    setShowAdd(false); setShowSavings(false)
+    setShowAdd(false); setShowSavings(false); setShowIncome(false)
     fetchAll()
   }
 
@@ -288,26 +355,32 @@ export default function GeldPage({ userId }) {
   }
 
   // Derived stats
-  const monthlyBudget  = config?.monthly_budget || 400
-  const catBudgets     = config?.category_budgets || DEFAULT_CAT_BUDGETS
-  const totalSpent     = expenses.filter(e => !e.is_savings_withdrawal).reduce((s, e) => s + Number(e.amount), 0)
-  const remaining      = monthlyBudget - totalSpent
-  const remainPct      = Math.max(0, Math.min(100, (remaining / monthlyBudget) * 100))
+  const monthlyBudget      = config?.monthly_budget || 400
+  const catBudgets         = config?.category_budgets || DEFAULT_CAT_BUDGETS
+  const incomeEntries      = expenses.filter(e => e.is_income)
+  const totalIncome        = incomeEntries.reduce((s, e) => s + Number(e.amount), 0)
+  const regularExpenses    = expenses.filter(e => !e.is_savings_withdrawal && !e.is_income)
+  const totalSpent         = regularExpenses.reduce((s, e) => s + Number(e.amount), 0)
   const savingsWithdrawals = expenses.filter(e => e.is_savings_withdrawal)
-  const savingsTotal   = savingsWithdrawals.reduce((s, e) => s + Number(e.amount), 0)
+  const savingsTotal       = savingsWithdrawals.reduce((s, e) => s + Number(e.amount), 0)
 
-  const todayTotal = expenses.filter(e => !e.is_savings_withdrawal && e.date === todayStr())
+  // Remaining: use income if available, otherwise fall back to budget
+  const base       = totalIncome > 0 ? totalIncome : monthlyBudget
+  const remaining  = base - totalSpent
+  const remainPct  = Math.max(0, Math.min(100, (remaining / base) * 100))
+
+  const todayTotal = regularExpenses.filter(e => e.date === todayStr())
     .reduce((s, e) => s + Number(e.amount), 0)
 
   const spentByCategory = {}
   for (const cat of CATEGORIES) {
-    spentByCategory[cat.id] = expenses.filter(e => !e.is_savings_withdrawal && e.category === cat.id)
+    spentByCategory[cat.id] = regularExpenses.filter(e => e.category === cat.id)
       .reduce((s, e) => s + Number(e.amount), 0)
   }
 
   const barColor = remainPct > 40 ? 'var(--accent)' : remainPct > 15 ? '#F59E0B' : '#EF4444'
-  const regularExpenses = expenses.filter(e => !e.is_savings_withdrawal)
-  const displayedExpenses = showAll ? regularExpenses : regularExpenses.slice(0, 8)
+  const allTransactions = [...regularExpenses, ...incomeEntries].sort((a, b) => b.date.localeCompare(a.date) || b.created_at?.localeCompare(a.created_at))
+  const displayedExpenses = showAll ? allTransactions : allTransactions.slice(0, 8)
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
@@ -353,20 +426,27 @@ export default function GeldPage({ userId }) {
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-3)' }}>
             <span>{fmt(totalSpent)} uitgegeven</span>
-            <span>Budget: {fmt(monthlyBudget)}</span>
+            <span>{totalIncome > 0 ? `Inkomsten: ${fmt(totalIncome)}` : `Budget: ${fmt(monthlyBudget)}`}</span>
           </div>
         </div>
 
         {/* Quick stats row */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
-          <div style={{ padding: '14px 16px', borderRadius: 16, background: 'var(--bg-card-2)', border: '1px solid var(--border)' }}>
-            <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Vandaag</p>
-            <p style={{ fontSize: 24, fontWeight: 700, margin: 0, color: todayTotal > 0 ? 'var(--text-1)' : 'var(--text-3)' }}>{fmt(todayTotal)}</p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 14 }}>
+          <div style={{ padding: '12px 14px', borderRadius: 16, background: 'var(--bg-card-2)', border: '1px solid var(--border)' }}>
+            <p style={{ fontSize: 10, color: 'var(--text-3)', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Vandaag</p>
+            <p style={{ fontSize: 20, fontWeight: 700, margin: 0, color: todayTotal > 0 ? 'var(--text-1)' : 'var(--text-3)' }}>{fmt(todayTotal)}</p>
+          </div>
+          <div onClick={() => totalIncome > 0 && setShowAll(true)}
+            style={{ padding: '12px 14px', borderRadius: 16, background: totalIncome > 0 ? 'rgba(16,185,129,0.08)' : 'var(--bg-card-2)', border: totalIncome > 0 ? '1px solid rgba(16,185,129,0.3)' : '1px solid var(--border)', cursor: totalIncome > 0 ? 'pointer' : 'default' }}>
+            <p style={{ fontSize: 10, color: totalIncome > 0 ? '#10B981' : 'var(--text-3)', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>💚 Inkomsten</p>
+            <p style={{ fontSize: 20, fontWeight: 700, margin: 0, color: totalIncome > 0 ? '#10B981' : 'var(--text-3)' }}>
+              {totalIncome > 0 ? fmt(totalIncome) : '–'}
+            </p>
           </div>
           <div onClick={() => savingsWithdrawals.length > 0 && setShowAll(true)}
-            style={{ padding: '14px 16px', borderRadius: 16, background: savingsWithdrawals.length > 0 ? 'rgba(239,68,68,0.08)' : 'var(--bg-card-2)', border: savingsWithdrawals.length > 0 ? '1px solid rgba(239,68,68,0.3)' : '1px solid var(--border)', cursor: savingsWithdrawals.length > 0 ? 'pointer' : 'default' }}>
-            <p style={{ fontSize: 11, color: savingsWithdrawals.length > 0 ? '#EF4444' : 'var(--text-3)', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>💸 Spaargeld</p>
-            <p style={{ fontSize: 24, fontWeight: 700, margin: 0, color: savingsWithdrawals.length > 0 ? '#EF4444' : 'var(--text-3)' }}>
+            style={{ padding: '12px 14px', borderRadius: 16, background: savingsWithdrawals.length > 0 ? 'rgba(239,68,68,0.08)' : 'var(--bg-card-2)', border: savingsWithdrawals.length > 0 ? '1px solid rgba(239,68,68,0.3)' : '1px solid var(--border)', cursor: savingsWithdrawals.length > 0 ? 'pointer' : 'default' }}>
+            <p style={{ fontSize: 10, color: savingsWithdrawals.length > 0 ? '#EF4444' : 'var(--text-3)', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>💸 Spaar</p>
+            <p style={{ fontSize: 20, fontWeight: 700, margin: 0, color: savingsWithdrawals.length > 0 ? '#EF4444' : 'var(--text-3)' }}>
               {savingsWithdrawals.length > 0 ? `${savingsWithdrawals.length}× ${fmtShort(savingsTotal)}` : '–'}
             </p>
           </div>
@@ -426,23 +506,27 @@ export default function GeldPage({ userId }) {
             <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>Transacties</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {displayedExpenses.map(exp => {
-                const cat = CATEGORIES.find(c => c.id === exp.category) || CATEGORIES[6]
+                const isInc = exp.is_income
+                const cat   = isInc
+                  ? (INCOME_CATEGORIES.find(c => c.id === exp.category) || INCOME_CATEGORIES[4])
+                  : (CATEGORIES.find(c => c.id === exp.category) || CATEGORIES[6])
+                const color = isInc ? '#10B981' : (cat.color || '#94A3B8')
                 return (
-                  <div key={exp.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 14, background: 'var(--bg-card-2)', border: '1px solid var(--border)' }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 10, background: `${cat.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
+                  <div key={exp.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 14, background: isInc ? 'rgba(16,185,129,0.05)' : 'var(--bg-card-2)', border: `1px solid ${isInc ? 'rgba(16,185,129,0.2)' : 'var(--border)'}` }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: `${color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
                       {cat.emoji}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {exp.description || cat.label}
                       </p>
-                      <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>{exp.date}</p>
+                      <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>{exp.date}{isInc ? ' · inkomsten' : ''}</p>
                     </div>
-                    <span style={{ fontSize: 15, fontWeight: 700, color: cat.color, flexShrink: 0 }}>{fmt(exp.amount)}</span>
-                    <button onClick={() => { setEditing(exp); setShowAdd(true) }}
+                    <span style={{ fontSize: 15, fontWeight: 700, color, flexShrink: 0 }}>{isInc ? '+' : ''}{fmt(exp.amount)}</span>
+                    {!isInc && <button onClick={() => { setEditing(exp); setShowAdd(true) }}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4 }}>
                       <Pencil size={12} />
-                    </button>
+                    </button>}
                     <button onClick={() => deleteExpense(exp.id)}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(239,68,68,0.5)', padding: 4 }}>
                       <Trash2 size={12} />
@@ -468,14 +552,18 @@ export default function GeldPage({ userId }) {
         )}
 
         {/* Action buttons */}
-        <div style={{ display: 'flex', gap: 10, position: 'fixed', bottom: 'calc(70px + env(safe-area-inset-bottom))', left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, padding: '0 16px', zIndex: 50 }}>
-          <button onClick={() => { setShowSavings(true) }}
-            style={{ flex: 1, padding: '14px', borderRadius: 16, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#EF4444', cursor: 'pointer', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            <TrendingDown size={16} /> Spaargeld af
+        <div style={{ display: 'flex', gap: 8, position: 'fixed', bottom: 'calc(70px + env(safe-area-inset-bottom))', left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, padding: '0 16px', zIndex: 50 }}>
+          <button onClick={() => setShowSavings(true)}
+            style={{ flex: 1, padding: '12px 6px', borderRadius: 16, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#EF4444', cursor: 'pointer', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+            <TrendingDown size={14} /> Spaar af
+          </button>
+          <button onClick={() => setShowIncome(true)}
+            style={{ flex: 1, padding: '12px 6px', borderRadius: 16, background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.35)', color: '#10B981', cursor: 'pointer', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+            <ArrowDownLeft size={14} /> Inkomsten
           </button>
           <button onClick={() => { setEditing(null); setShowAdd(true) }}
-            style={{ flex: 2, padding: '14px', borderRadius: 16, background: 'var(--accent)', border: 'none', color: '#000', cursor: 'pointer', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            <Plus size={16} /> Uitgave toevoegen
+            style={{ flex: 2, padding: '12px 8px', borderRadius: 16, background: 'var(--accent)', border: 'none', color: '#000', cursor: 'pointer', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <Plus size={15} /> Uitgave
           </button>
         </div>
       </div>
@@ -483,6 +571,7 @@ export default function GeldPage({ userId }) {
       {showAdd && (
         <ExpenseModal editing={editing} onClose={() => { setShowAdd(false); setEditing(null) }} onSave={saveExpense} />
       )}
+      {showIncome && <IncomeModal onClose={() => setShowIncome(false)} onSave={saveExpense} />}
       {showSavings && <SavingsModal onClose={() => setShowSavings(false)} onSave={saveExpense} />}
       {showBudget && <BudgetModal config={config} onClose={() => setShowBudget(false)} onSave={saveBudget} />}
 
