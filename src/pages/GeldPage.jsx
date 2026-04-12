@@ -209,10 +209,12 @@ function SavingsModal({ onClose, onSave }) {
   const [amount, setAmount] = useState('')
   const [reason, setReason] = useState('')
 
+  const canSave = parseFloat(String(amount).replace(',', '.')) > 0 && reason.trim().length > 0
+
   const handleSave = () => {
     const n = parseFloat(String(amount).replace(',', '.'))
-    if (!n || n <= 0) return
-    onSave({ amount: n, category: 'overig', description: reason.trim() || 'Spaargeld opname', date: todayStr(), is_savings_withdrawal: true, savings_reason: reason.trim() })
+    if (!n || n <= 0 || !reason.trim()) return
+    onSave({ amount: n, category: 'overig', description: reason.trim(), date: todayStr(), is_savings_withdrawal: true })
   }
 
   return ReactDOM.createPortal(
@@ -236,7 +238,7 @@ function SavingsModal({ onClose, onSave }) {
 
         <div style={{ display: 'flex', gap: 10 }}>
           <button onClick={onClose} style={{ flex: 1, padding: '12px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-2)', cursor: 'pointer', fontSize: 14 }}>Annuleer</button>
-          <button onClick={handleSave} style={{ flex: 1, padding: '12px', borderRadius: 12, background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.5)', color: '#EF4444', cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>Loggen</button>
+          <button onClick={handleSave} disabled={!canSave} style={{ flex: 1, padding: '12px', borderRadius: 12, background: canSave ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)', border: canSave ? '1px solid rgba(239,68,68,0.5)' : '1px solid var(--border)', color: canSave ? '#EF4444' : 'var(--text-3)', cursor: canSave ? 'pointer' : 'default', fontSize: 14, fontWeight: 700 }}>Loggen</button>
         </div>
       </div>
     </div>,
@@ -698,6 +700,7 @@ export default function GeldPage({ userId, onClose }) {
   const [showAll, setShowAll]         = useState(false)
   const [showRecurring, setShowRecurring] = useState(false)
   const [prevExpenses, setPrevExpenses]   = useState([])
+  const [yearSavings, setYearSavings]     = useState([])
   const [subView, setSubView]         = useState('weergave')
   const [isMobile, setIsMobile]       = useState(window.innerWidth < 768)
 
@@ -708,16 +711,20 @@ export default function GeldPage({ userId, onClose }) {
   }, [])
 
   const fetchAll = useCallback(async () => {
-    const [expRes, cfgRes, prevExpRes] = await Promise.all([
+    const [expRes, cfgRes, prevExpRes, yearSavRes] = await Promise.all([
       supabase.from('expenses').select('*').eq('user_id', userId)
         .gte('date', monthStart()).lte('date', monthEnd()).order('date', { ascending: false }).order('created_at', { ascending: false }),
       supabase.from('budget_config').select('*').eq('user_id', userId).single(),
       supabase.from('expenses').select('amount, is_income, is_savings_withdrawal').eq('user_id', userId)
         .gte('date', prevMonthStart()).lte('date', prevMonthEnd()),
+      supabase.from('expenses').select('amount, description, date').eq('user_id', userId)
+        .eq('is_savings_withdrawal', true)
+        .gte('date', `${new Date().getFullYear()}-01-01`),
     ])
     setExpenses(expRes.data || [])
     setConfig(cfgRes.data || { monthly_budget: 400, category_budgets: DEFAULT_CAT_BUDGETS })
     setPrevExpenses(prevExpRes.data || [])
+    setYearSavings(yearSavRes.data || [])
     setLoading(false)
   }, [userId])
 
@@ -768,10 +775,16 @@ export default function GeldPage({ userId, onClose }) {
   const hasRecurring       = recurringIncome.length > 0
   const savingsGoal        = config?.savings_goal || 0
   // base: income minus savings goal = what's available to spend
+  // savingsTotal added: savings withdrawals boost this month's budget
   const grossIncome = hasRecurring ? recurringExpected + totalManualIncome : (totalManualIncome > 0 ? totalManualIncome : monthlyBudget)
-  const base        = savingsGoal > 0 ? Math.max(0, grossIncome - savingsGoal) : grossIncome
+  const baseWithoutSavings = savingsGoal > 0 ? Math.max(0, grossIncome - savingsGoal) : grossIncome
+  const base        = baseWithoutSavings + savingsTotal
   const remaining  = base - totalSpent
   const remainPct  = Math.max(0, Math.min(100, (remaining / base) * 100))
+
+  // Year savings stats
+  const yearSavingsTotal = yearSavings.reduce((s, e) => s + Number(e.amount), 0)
+  const yearSavingsCount = yearSavings.length
 
   const todayTotal = regularExpenses.filter(e => e.date === todayStr())
     .reduce((s, e) => s + Number(e.amount), 0)
@@ -878,6 +891,17 @@ export default function GeldPage({ userId, onClose }) {
           </button>
         </div>
 
+        {/* Yearly savings withdrawal counter */}
+        {yearSavingsCount > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 14, marginBottom: 10, background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)' }}>
+            <span style={{ fontSize: 22 }}>🏦</span>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: '#EF4444', margin: '0 0 1px' }}>{yearSavingsCount}× spaargeld opgenomen dit jaar</p>
+              <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>Totaal {fmt(yearSavingsTotal)} van spaarrekening gehaald</p>
+            </div>
+          </div>
+        )}
+
         {/* Carryover banner */}
         {carryover > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', borderRadius: 14, marginBottom: 10, background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)', fontSize: 12, color: 'rgba(239,68,68,0.85)' }}>
@@ -912,10 +936,12 @@ export default function GeldPage({ userId, onClose }) {
             <span>{fmt(totalSpent)} uitgegeven{carryover > 0 ? ` + ${fmt(carryover)} carry` : ''}</span>
             <span>
               {savingsGoal > 0
-                ? `${fmt(grossIncome)} − 🏦 ${fmt(savingsGoal)} = ${fmt(adjustedBase)}`
+                ? `${fmt(grossIncome)} − 🏦 ${fmt(savingsGoal)}${savingsTotal > 0 ? ` + 🏦 ${fmt(savingsTotal)}` : ''} = ${fmt(adjustedBase)}`
                 : hasRecurring
-                  ? `Verwacht: ${fmt(recurringExpected)}${totalManualIncome > 0 ? ` + ${fmt(totalManualIncome)}` : ''}`
-                  : totalManualIncome > 0 ? `Inkomsten: ${fmt(totalManualIncome)}` : `Budget: ${fmt(adjustedBase)}`
+                  ? `Verwacht: ${fmt(recurringExpected)}${totalManualIncome > 0 ? ` + ${fmt(totalManualIncome)}` : ''}${savingsTotal > 0 ? ` + 🏦 ${fmt(savingsTotal)}` : ''}`
+                  : savingsTotal > 0
+                    ? `Budget + 🏦 ${fmt(savingsTotal)} opname`
+                    : totalManualIncome > 0 ? `Inkomsten: ${fmt(totalManualIncome)}` : `Budget: ${fmt(adjustedBase)}`
               }
             </span>
           </div>
