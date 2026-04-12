@@ -303,8 +303,9 @@ function BudgetModal({ config, onClose, onSave }) {
 
   const [monthly,    setMonthly]    = useState(config?.monthly_budget || 400)
   const [cats,       setCats]       = useState(config?.category_budgets || DEFAULT_CAT_BUDGETS)
-  const [customCats, setCustomCats] = useState(config?.custom_categories || [])
-  const [addingCat,  setAddingCat]  = useState(false)
+  const [customCats,   setCustomCats]   = useState(config?.custom_categories || [])
+  const [savingsGoal,  setSavingsGoal]  = useState(config?.savings_goal || 0)
+  const [addingCat,    setAddingCat]    = useState(false)
   const [newName,    setNewName]    = useState('')
   const [newEmoji,   setNewEmoji]   = useState('🎮')
   const [newColor,   setNewColor]   = useState(CAT_COLORS[0])
@@ -339,14 +340,26 @@ function BudgetModal({ config, onClose, onSave }) {
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)' }}><X size={18} /></button>
         </div>
 
-        <div style={{ marginBottom: 20 }}>
-          <label style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', marginBottom: 8 }}>Maandbudget totaal</label>
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', marginBottom: 8 }}>Maandbudget (fallback)</label>
           <div style={{ position: 'relative' }}>
             <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 18, color: 'var(--text-3)' }}>€</span>
             <input type="number" value={monthly} onChange={e => setMonthly(+e.target.value)}
               onFocus={scrollFix}
               style={{ width: '100%', padding: '12px 14px 12px 30px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: 20, fontWeight: 700, colorScheme: 'dark' }} />
           </div>
+          <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '6px 0 0' }}>Wordt gebruikt als je geen terugkerend inkomen hebt ingesteld.</p>
+        </div>
+
+        <div style={{ marginBottom: 20, padding: '14px 16px', borderRadius: 14, background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)' }}>
+          <label style={{ fontSize: 11, color: '#10B981', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', marginBottom: 8 }}>🏦 Spaardoel per maand</label>
+          <div style={{ position: 'relative' }}>
+            <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 18, color: '#10B981' }}>€</span>
+            <input type="number" value={savingsGoal} onChange={e => setSavingsGoal(+e.target.value)}
+              onFocus={scrollFix}
+              style={{ width: '100%', padding: '12px 14px 12px 30px', borderRadius: 12, background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.25)', color: '#10B981', fontSize: 20, fontWeight: 700, colorScheme: 'dark' }} />
+          </div>
+          <p style={{ fontSize: 11, color: 'rgba(16,185,129,0.6)', margin: '6px 0 0' }}>Dit bedrag wordt automatisch van je inkomen afgetrokken. Beschikbaar = inkomen − spaardoel.</p>
         </div>
 
         <label style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', marginBottom: 10 }}>Per categorie</label>
@@ -429,7 +442,7 @@ function BudgetModal({ config, onClose, onSave }) {
           </span>
         </div>
 
-        <button onClick={() => onSave({ monthly_budget: monthly, category_budgets: cats, custom_categories: customCats })}
+        <button onClick={() => onSave({ monthly_budget: monthly, category_budgets: cats, custom_categories: customCats, savings_goal: savingsGoal })}
           style={{ width: '100%', padding: '14px', borderRadius: 14, background: 'var(--accent)', border: 'none', color: '#000', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
           Opslaan
         </button>
@@ -656,8 +669,10 @@ export default function GeldPage({ userId }) {
   const recurringIncome    = config?.recurring_income || []
   const recurringExpected  = calcRecurringThisMonth(recurringIncome)
   const hasRecurring       = recurringIncome.length > 0
-  // base: recurring config takes priority; manual income entries are one-off additions on top
-  const base       = hasRecurring ? recurringExpected + totalManualIncome : (totalManualIncome > 0 ? totalManualIncome : monthlyBudget)
+  const savingsGoal        = config?.savings_goal || 0
+  // base: income minus savings goal = what's available to spend
+  const grossIncome = hasRecurring ? recurringExpected + totalManualIncome : (totalManualIncome > 0 ? totalManualIncome : monthlyBudget)
+  const base        = savingsGoal > 0 ? Math.max(0, grossIncome - savingsGoal) : grossIncome
   const remaining  = base - totalSpent
   const remainPct  = Math.max(0, Math.min(100, (remaining / base) * 100))
 
@@ -762,7 +777,14 @@ export default function GeldPage({ userId }) {
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-3)' }}>
             <span>{fmt(totalSpent)} uitgegeven</span>
-            <span>{hasRecurring ? `Verwacht: ${fmt(recurringExpected)}${totalManualIncome > 0 ? ` + ${fmt(totalManualIncome)}` : ''}` : totalManualIncome > 0 ? `Inkomsten: ${fmt(totalManualIncome)}` : `Budget: ${fmt(monthlyBudget)}`}</span>
+            <span>
+              {savingsGoal > 0
+                ? `${fmt(grossIncome)} − 🏦 ${fmt(savingsGoal)} = ${fmt(base)}`
+                : hasRecurring
+                  ? `Verwacht: ${fmt(recurringExpected)}${totalManualIncome > 0 ? ` + ${fmt(totalManualIncome)}` : ''}`
+                  : totalManualIncome > 0 ? `Inkomsten: ${fmt(totalManualIncome)}` : `Budget: ${fmt(monthlyBudget)}`
+              }
+            </span>
           </div>
         </div>
 
@@ -793,7 +815,9 @@ export default function GeldPage({ userId }) {
         {hasRecurring && (
           <div style={{ marginBottom: 14, padding: '12px 14px', borderRadius: 16, background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.18)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <p style={{ fontSize: 10, color: '#10B981', margin: 0, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Verwacht inkomen</p>
+              <p style={{ fontSize: 10, color: '#10B981', margin: 0, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>
+                Verwacht inkomen{savingsGoal > 0 ? ` · 🏦 ${fmt(savingsGoal)} sparen` : ''}
+              </p>
               <button onClick={() => setShowRecurring(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(16,185,129,0.6)', fontSize: 11, padding: 0 }}>bewerken</button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
