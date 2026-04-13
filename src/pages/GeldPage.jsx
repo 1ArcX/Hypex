@@ -839,10 +839,10 @@ export default function GeldPage({ userId, onClose }) {
   const recurringExpected  = calcRecurringThisMonth(recurringIncome)
   const hasRecurring       = recurringIncome.length > 0
   const savingsGoal        = config?.savings_goal || 0
-  // base = income minus savings goal (savings withdrawals do NOT inflate base —
-  // they're tracked separately so envelopes and big card stay in sync)
+  // grossIncome alleen voor weergave (inkomen-kaartje, prognose etc.)
   const grossIncome = hasRecurring ? recurringExpected + totalManualIncome : (totalManualIncome > 0 ? totalManualIncome : monthlyBudget)
-  const base        = savingsGoal > 0 ? Math.max(0, grossIncome - savingsGoal) : grossIncome
+  // base is altijd het ingestelde maandbudget — extra inkomen gaat naar spaargeld, niet naar vrije ruimte
+  const base        = monthlyBudget
   const remaining  = base - totalSpent
   const remainPct  = Math.max(0, Math.min(100, (remaining / base) * 100))
 
@@ -1052,13 +1052,9 @@ export default function GeldPage({ userId, onClose }) {
               {fmt(totalSpent)} budget{savingsExpTotal > 0 ? ` · 💳 ${fmt(savingsExpTotal)} spaar` : ''}{carryover > 0 ? ` · ↩ ${fmt(carryover)}` : ''}
             </span>
             <span>
-              {savingsGoal > 0
-                ? `${fmt(grossIncome)} − 🎯 ${fmt(savingsGoal)}${vasteLastenBudget > 0 ? ` − 🏠 ${fmt(vasteLastenBudget)}` : ''} = ${fmt(adjustedBase)}`
-                : vasteLastenBudget > 0
-                  ? `${fmt(grossIncome)} − 🏠 ${fmt(vasteLastenBudget)} = ${fmt(adjustedBase)}`
-                  : hasRecurring
-                    ? `${fmt(recurringExpected)}${totalManualIncome > 0 ? ` + ${fmt(totalManualIncome)}` : ''}`
-                    : totalManualIncome > 0 ? `Inkomen: ${fmt(totalManualIncome)}` : `Budget: ${fmt(adjustedBase)}`
+              {vasteLastenBudget > 0
+                ? `Budget ${fmt(monthlyBudget)} − 🏠 ${fmt(vasteLastenBudget)} = ${fmt(adjustedBase)}`
+                : `Budget: ${fmt(adjustedBase)}`
               }
             </span>
           </div>
