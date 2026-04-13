@@ -113,6 +113,32 @@ function monthLabelOf(y, m) {
 function monthStart() { const d = new Date(); return monthStartOf(d.getFullYear(), d.getMonth()) }
 function monthEnd()   { const d = new Date(); return monthEndOf(d.getFullYear(), d.getMonth()) }
 
+// ── Income day helpers ────────────────────────────────────────────────────────
+function isPayDayToday(src) {
+  const today = new Date()
+  if (src.type === 'monthly') return today.getDate() === src.day
+  if (src.type === 'interval' && src.ref_date) {
+    const todayISO = today.toISOString().slice(0, 10)
+    const ms = src.interval_days * 86400000
+    let d = new Date(src.ref_date + 'T12:00:00')
+    while (d.toISOString().slice(0, 10) < todayISO) d = new Date(d.getTime() + ms)
+    return d.toISOString().slice(0, 10) === todayISO
+  }
+  return false
+}
+function getFilledInToday() {
+  try { const d = JSON.parse(localStorage.getItem('income_filled_in') || '{}'); return d[new Date().toISOString().slice(0,10)] || [] } catch { return [] }
+}
+function markFilledInToday(id) {
+  try {
+    const data = JSON.parse(localStorage.getItem('income_filled_in') || '{}')
+    const today = new Date().toISOString().slice(0, 10)
+    data[today] = [...new Set([...(data[today] || []), id])]
+    Object.keys(data).forEach(d => { if (d < today) delete data[d] })
+    localStorage.setItem('income_filled_in', JSON.stringify(data))
+  } catch {}
+}
+
 // ── Expense Log Modal ─────────────────────────────────────────────────────────
 function ExpenseModal({ onClose, onSave, editing, categories = CATEGORIES, defaultDate }) {
   const backdropRef = useRef(null)
@@ -707,6 +733,116 @@ function RecurringIncomeModal({ config, onClose, onSave }) {
   )
 }
 
+// SQL migration needed: ALTER TABLE expenses ADD COLUMN IF NOT EXISTS is_savings_contribution boolean DEFAULT false; ALTER TABLE expenses ADD COLUMN IF NOT EXISTS is_loan_repayment boolean DEFAULT false;
+
+// ── IncomeDayModal ────────────────────────────────────────────────────────────
+function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMonth, totalLoanRemaining, userId, onLater, onDone }) {
+  const backdropRef = useRef(null)
+  usePreventTouch(backdropRef)
+  const [received, setReceived] = useState('')
+  const [balance, setBalance]   = useState(() => {
+    try { return localStorage.getItem('current_balance') || '' } catch { return '' }
+  })
+  const [saving, setSaving] = useState(false)
+
+  const rec = parseFloat(String(received).replace(',', '.')) || 0
+  const bal = parseFloat(String(balance).replace(',', '.')) || 0
+  const targetBalance    = adjustedBase
+  const toTopUp          = Math.max(0, Math.min(rec, targetBalance - bal))
+  const excessAfterTopUp = Math.max(0, rec - toTopUp)
+  const remainingSavNeeded = Math.max(0, savingsGoal - alreadySavedThisMonth)
+  const toSavings        = Math.min(excessAfterTopUp, remainingSavNeeded)
+  const toLoan           = totalLoanRemaining > 0 ? Math.min(Math.max(0, excessAfterTopUp - toSavings), totalLoanRemaining) : 0
+
+  const canSave = rec > 0
+
+  const handleSave = async () => {
+    if (!canSave || saving) return
+    setSaving(true)
+    try {
+      localStorage.setItem('current_balance', String(Math.max(0, bal + toTopUp)))
+      const inserts = [
+        supabase.from('expenses').insert({ user_id: userId, amount: rec, category: source.category || 'salaris', description: source.name, date: todayStr(), is_income: true, is_savings_withdrawal: false }),
+      ]
+      if (toSavings > 0) inserts.push(supabase.from('expenses').insert({ user_id: userId, amount: toSavings, category: 'overig', description: '🏦 Spaarstorting', date: todayStr(), is_savings_contribution: true, is_income: false, is_savings_withdrawal: false }))
+      if (toLoan > 0) inserts.push(supabase.from('expenses').insert({ user_id: userId, amount: toLoan, category: 'overig', description: '↩ Gedeeltelijke terugbetaling lening', date: todayStr(), is_loan_repayment: true, is_income: false, is_savings_withdrawal: false }))
+      await Promise.all(inserts)
+      markFilledInToday(source.id)
+      onDone()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return ReactDOM.createPortal(
+    <div ref={backdropRef} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+      <div style={{ width: '100%', maxWidth: 380, background: 'var(--bg-sidebar)', borderRadius: 22, border: '1px solid rgba(16,185,129,0.35)', padding: 24 }}>
+        <div style={{ textAlign: 'center', marginBottom: 18 }}>
+          <div style={{ fontSize: 36, marginBottom: 6 }}>{source.emoji}</div>
+          <h3 style={{ fontSize: 17, fontWeight: 700, color: '#10B981', margin: '0 0 4px' }}>Betaaldag: {source.name}</h3>
+          <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>Vul in wat je hebt ontvangen</p>
+        </div>
+
+        <div style={{ position: 'relative', marginBottom: 12 }}>
+          <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 20, fontWeight: 700, color: '#10B981' }}>€</span>
+          <input autoFocus type="text" inputMode="decimal" placeholder="0,00"
+            value={received} onChange={e => setReceived(e.target.value)}
+            onFocus={scrollFix}
+            style={{ width: '100%', padding: '12px 14px 12px 32px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid rgba(16,185,129,0.4)', color: 'var(--text-1)', fontSize: 24, fontWeight: 700, colorScheme: 'dark' }} />
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, display: 'block', marginBottom: 5 }}>Huidig saldo (optioneel)</label>
+          <div style={{ position: 'relative' }}>
+            <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 15, color: 'var(--text-3)' }}>€</span>
+            <input type="text" inputMode="decimal" placeholder="0,00"
+              value={balance} onChange={e => setBalance(e.target.value)}
+              onFocus={scrollFix}
+              style={{ width: '100%', padding: '10px 14px 10px 30px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: 16, colorScheme: 'dark' }} />
+          </div>
+        </div>
+
+        {rec > 0 && (
+          <div style={{ padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '0 0 4px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Verdeling</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+              <span style={{ color: 'var(--text-3)' }}>🏦 Aanvullen saldo (tot {fmt(targetBalance)})</span>
+              <span style={{ fontWeight: 700, color: toTopUp > 0 ? 'var(--accent)' : 'var(--text-3)' }}>{fmt(toTopUp)}</span>
+            </div>
+            {toSavings > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: 'var(--text-3)' }}>💰 Naar spaardoel</span>
+                <span style={{ fontWeight: 700, color: '#10B981' }}>{fmt(toSavings)}</span>
+              </div>
+            )}
+            {toLoan > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: 'var(--text-3)' }}>↩ Lening aflossen</span>
+                <span style={{ fontWeight: 700, color: '#F59E0B' }}>{fmt(toLoan)}</span>
+              </div>
+            )}
+            {excessAfterTopUp - toSavings - toLoan > 0.005 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: 'var(--text-3)' }}>Vrij te besteden</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-1)' }}>{fmt(excessAfterTopUp - toSavings - toLoan)}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={onLater} style={{ flex: 1, padding: '12px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-2)', cursor: 'pointer', fontSize: 14 }}>Later</button>
+          <button onClick={handleSave} disabled={!canSave || saving}
+            style={{ flex: 2, padding: '12px', borderRadius: 12, background: canSave ? '#10B981' : 'rgba(255,255,255,0.05)', border: 'none', color: canSave ? '#000' : 'var(--text-3)', cursor: canSave ? 'pointer' : 'default', fontSize: 14, fontWeight: 700 }}>
+            {saving ? '...' : 'Invullen'}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 const GELD_TABS = [
   { id: 'weergave',   label: 'Weergave',  emoji: '📊' },
@@ -732,6 +868,10 @@ export default function GeldPage({ userId, onClose }) {
   const [prevExpenses, setPrevExpenses]     = useState([])
   const [yearSavings, setYearSavings]       = useState([])
   const [yearExpenses, setYearExpenses]     = useState([])
+  const [savingsContribs, setSavingsContribs] = useState([])
+  const [loanRepayments, setLoanRepayments]   = useState([])
+  const [dismissedIncomeIds, setDismissedIncomeIds] = useState([])
+  const [loanRepayInput, setLoanRepayInput]   = useState('')
   const _now = new Date()
   const [selYear, setSelYear]   = useState(_now.getFullYear())
   const [selMonth, setSelMonth] = useState(_now.getMonth())
@@ -748,7 +888,7 @@ export default function GeldPage({ userId, onClose }) {
     // prev month relative to selected month
     const prevY = selMonth === 0 ? selYear - 1 : selYear
     const prevM = selMonth === 0 ? 11 : selMonth - 1
-    const [expRes, cfgRes, prevExpRes, yearSavRes, yearExpRes] = await Promise.all([
+    const [expRes, cfgRes, prevExpRes, yearSavRes, yearExpRes, savContribRes, loanRepRes] = await Promise.all([
       supabase.from('expenses').select('*').eq('user_id', userId)
         .gte('date', monthStartOf(selYear, selMonth)).lte('date', monthEndOf(selYear, selMonth))
         .order('date', { ascending: false }).order('created_at', { ascending: false }),
@@ -760,12 +900,22 @@ export default function GeldPage({ userId, onClose }) {
         .gte('date', `${selYear}-01-01`),
       supabase.from('expenses').select('amount, date, is_income, is_savings_withdrawal, category').eq('user_id', userId)
         .gte('date', `${selYear}-01-01`).lte('date', `${selYear}-12-31`),
+      // Savings contributions this month
+      supabase.from('expenses').select('amount').eq('user_id', userId)
+        .eq('is_savings_contribution', true)
+        .gte('date', monthStartOf(selYear, selMonth)).lte('date', monthEndOf(selYear, selMonth)),
+      // Loan repayments this year
+      supabase.from('expenses').select('amount').eq('user_id', userId)
+        .eq('is_loan_repayment', true)
+        .gte('date', `${selYear}-01-01`),
     ])
     setExpenses(expRes.data || [])
     setConfig(cfgRes.data || { monthly_budget: 400, category_budgets: DEFAULT_CAT_BUDGETS })
     setPrevExpenses(prevExpRes.data || [])
     setYearSavings(yearSavRes.data || [])
     setYearExpenses(yearExpRes.data || [])
+    setSavingsContribs(savContribRes.data || [])
+    setLoanRepayments(loanRepRes.data || [])
     setLoading(false)
   }, [userId, selYear, selMonth])
 
@@ -835,6 +985,10 @@ export default function GeldPage({ userId, onClose }) {
   const openLoanPrincipal  = openLoans.reduce((s, e) => s + Number(e.amount), 0)
   const openLoanTotal      = +(openLoanPrincipal * 1.1).toFixed(2)
 
+  const alreadySavedThisMonth = savingsContribs.reduce((s, e) => s + Number(e.amount), 0)
+  const totalRepaid           = loanRepayments.reduce((s, e) => s + Number(e.amount), 0)
+  const remainingLoan         = Math.max(0, openLoanTotal - totalRepaid)
+
   const recurringIncome    = config?.recurring_income || []
   const recurringExpected  = calcRecurringThisMonth(recurringIncome)
   const hasRecurring       = recurringIncome.length > 0
@@ -852,6 +1006,11 @@ export default function GeldPage({ userId, onClose }) {
 
   const nowY = new Date().getFullYear(), nowM = new Date().getMonth()
   const isCurrentMonth = selYear === nowY && selMonth === nowM
+
+  const filledInToday = isCurrentMonth ? getFilledInToday() : []
+  const pendingIncomeSource = isCurrentMonth
+    ? (recurringIncome.find(src => isPayDayToday(src) && !filledInToday.includes(src.id) && !dismissedIncomeIds.includes(src.id)) || null)
+    : null
   const goToPrevMonth = () => { if (selMonth === 0) { setSelYear(y => y-1); setSelMonth(11) } else { setSelMonth(m => m-1) } }
   const goToNextMonth = () => {
     if (selYear < nowY || selMonth < nowM) {
@@ -995,13 +1154,13 @@ export default function GeldPage({ userId, onClose }) {
         </div>
 
         {/* Alert strip: loans + savings counter */}
-        {(openLoanPrincipal > 0 || yearSavingsCount > 0) && (
+        {(remainingLoan > 0 || yearSavingsCount > 0) && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
-            {openLoanPrincipal > 0 && (
+            {remainingLoan > 0 && (
               <button onClick={() => setSubView('inkomsten')} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', cursor: 'pointer', textAlign: 'left' }}>
                 <span style={{ fontSize: 16 }}>🤝</span>
                 <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: '#F59E0B' }}>
-                  {openLoans.length}× openstaande lening — {fmt(openLoanTotal)} terug te storten
+                  {openLoans.length}× openstaande lening — {fmt(remainingLoan)} nog terug te storten
                 </span>
                 <span style={{ fontSize: 11, color: 'var(--text-3)' }}>→ Inkomsten</span>
               </button>
@@ -1429,51 +1588,48 @@ export default function GeldPage({ userId, onClose }) {
               </>}
             </div>
           )}
-          {/* Leningen */}
+          {/* Leningen — consolidated card */}
           {openLoans.length > 0 && (
             <div style={{ marginBottom: 16 }}>
-              <p style={{ fontSize: 11, color: 'rgba(245,158,11,0.8)', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>🤝 Openstaande leningen van mezelf</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {openLoans.map(exp => {
-                  const interest = +(Number(exp.amount) * 0.1).toFixed(2)
-                  const total    = Number(exp.amount) + interest
-                  return (
-                    <div key={exp.id} style={{ borderRadius: 14, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.25)', overflow: 'hidden' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px' }}>
-                        <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(245,158,11,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🤝</div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exp.description || 'Lening'}</p>
-                          <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>{exp.date} · terug: {fmt(total)}</p>
-                        </div>
-                        <span style={{ fontSize: 15, fontWeight: 700, color: '#F59E0B', flexShrink: 0 }}>+{fmt(exp.amount)}</span>
-                        <button onClick={() => { setEditingSavings(exp); setShowSavings(true) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4, flexShrink: 0 }}><Pencil size={14} /></button>
-                        <button onClick={() => deleteExpense(exp.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(239,68,68,0.5)', padding: 4, flexShrink: 0 }}><Trash2 size={14} /></button>
-                      </div>
-                      {confirmingLoanId === exp.id ? (
-                        <div style={{ borderTop: '1px solid rgba(245,158,11,0.2)', padding: '10px 14px', background: 'rgba(16,185,129,0.06)' }}>
-                          <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 10px', textAlign: 'center' }}>
-                            Weet je zeker dat je <strong style={{ color: '#10B981' }}>{fmt(total)}</strong> hebt teruggestort?
-                          </p>
-                          <div style={{ display: 'flex', gap: 8 }}>
-                            <button onClick={() => setConfirmingLoanId(null)}
-                              style={{ flex: 1, padding: '9px', borderRadius: 10, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-3)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
-                              Annuleer
-                            </button>
-                            <button onClick={() => { setConfirmingLoanId(null); repayLoan(exp) }}
-                              style={{ flex: 2, padding: '9px', borderRadius: 10, background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', color: '#10B981', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
-                              ✓ Ja, teruggestort
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <button onClick={() => setConfirmingLoanId(exp.id)}
-                          style={{ width: '100%', padding: '9px', background: 'rgba(16,185,129,0.08)', border: 'none', borderTop: '1px solid rgba(245,158,11,0.2)', color: '#10B981', cursor: 'pointer', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                          ✓ Teruggestort — {fmt(total)} loggen als uitgave
-                        </button>
-                      )}
+              <div style={{ borderRadius: 16, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.3)', overflow: 'hidden' }}>
+                <div style={{ padding: '14px 16px' }}>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: '#F59E0B', margin: '0 0 4px' }}>🤝 Openstaande lening van mezelf</p>
+                  <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '0 0 10px' }}>
+                    {openLoans.length}× opnames · Totaal {fmt(openLoanPrincipal)} + 10% rente = {fmt(openLoanTotal)}
+                  </p>
+                  {/* Progress bar */}
+                  <div style={{ height: 6, background: 'rgba(255,255,255,0.07)', borderRadius: 4, overflow: 'hidden', marginBottom: 6 }}>
+                    <div style={{ height: '100%', width: `${openLoanTotal > 0 ? Math.min(100, (totalRepaid / openLoanTotal) * 100) : 0}%`, background: '#10B981', borderRadius: 4, transition: 'width 0.5s' }} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-3)', marginBottom: 12 }}>
+                    <span>Terugbetaald: {fmt(totalRepaid)}</span>
+                    <span>Nog open: {fmt(remainingLoan)}</span>
+                  </div>
+                  {/* Partial repay input */}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ position: 'relative', flex: 1 }}>
+                      <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: 'var(--text-3)' }}>€</span>
+                      <input type="text" inputMode="decimal" placeholder="Bedrag teruggestort"
+                        value={loanRepayInput} onChange={e => setLoanRepayInput(e.target.value)}
+                        onFocus={scrollFix}
+                        style={{ width: '100%', padding: '9px 10px 9px 26px', borderRadius: 10, background: 'var(--bg-card-2)', border: '1px solid rgba(245,158,11,0.3)', color: 'var(--text-1)', fontSize: 14, colorScheme: 'dark' }} />
                     </div>
-                  )
-                })}
+                    <button
+                      onClick={async () => {
+                        const partialAmount = parseFloat(String(loanRepayInput).replace(',', '.'))
+                        if (!partialAmount || partialAmount <= 0) return
+                        await supabase.from('expenses').insert({ user_id: userId, amount: partialAmount, category: 'overig', description: '↩ Gedeeltelijke terugbetaling lening', date: todayStr(), is_loan_repayment: true, is_income: false, is_savings_withdrawal: false })
+                        if (remainingLoan - partialAmount <= 0) {
+                          await Promise.all(openLoans.map(loan => supabase.from('expenses').update({ repaid: true }).eq('id', loan.id)))
+                        }
+                        setLoanRepayInput('')
+                        fetchAll()
+                      }}
+                      style={{ padding: '9px 14px', borderRadius: 10, background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', color: '#10B981', cursor: 'pointer', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                      Storten
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -1651,6 +1807,18 @@ export default function GeldPage({ userId, onClose }) {
       {showSavings && <SavingsModal editing={editingSavings} onClose={() => { setShowSavings(false); setEditingSavings(null) }} onSave={async (data) => { if (editingSavings) { await supabase.from('expenses').update(data).eq('id', editingSavings.id); setEditingSavings(null); setShowSavings(false); fetchAll() } else { saveExpense(data) } }} />}
       {showBudget && <BudgetModal config={config} onClose={() => setShowBudget(false)} onSave={saveBudget} />}
       {showRecurring && <RecurringIncomeModal config={config} onClose={() => setShowRecurring(false)} onSave={saveRecurring} />}
+      {pendingIncomeSource && (
+        <IncomeDayModal
+          source={pendingIncomeSource}
+          adjustedBase={adjustedBase}
+          savingsGoal={savingsGoal}
+          alreadySavedThisMonth={alreadySavedThisMonth}
+          totalLoanRemaining={remainingLoan}
+          userId={userId}
+          onLater={() => setDismissedIncomeIds(ids => [...ids, pendingIncomeSource.id])}
+          onDone={() => { markFilledInToday(pendingIncomeSource.id); fetchAll() }}
+        />
+      )}
       <style>{`@keyframes sheetUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }`}</style>
     </div>
   )
