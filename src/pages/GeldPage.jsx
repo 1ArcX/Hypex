@@ -821,12 +821,8 @@ export default function GeldPage({ userId, onClose }) {
   const regularExpenses    = expenses.filter(e => !e.is_savings_withdrawal && !e.is_income)
   // Budget spending = regular expenses that were NOT paid from savings
   // (savings-funded spending is tracked separately and doesn't count against budget)
-  // Vaste lasten (abonnementen) worden buiten het variabele budget gehouden
-  const FIXED_CAT = 'abonnementen'
-  const budgetExpenses     = regularExpenses.filter(e => !e.paid_from_savings && e.category !== FIXED_CAT)
+  const budgetExpenses     = regularExpenses.filter(e => !e.paid_from_savings)
   const savingsExpenses    = regularExpenses.filter(e => e.paid_from_savings)
-  const vasteLastenExp     = regularExpenses.filter(e => e.category === FIXED_CAT && !e.paid_from_savings)
-  const vasteLastenTotal   = vasteLastenExp.reduce((s, e) => s + Number(e.amount), 0)
   const totalSpent         = budgetExpenses.reduce((s, e) => s + Number(e.amount), 0)
   const savingsExpTotal    = savingsExpenses.reduce((s, e) => s + Number(e.amount), 0)
   const savingsWithdrawals = expenses.filter(e => e.is_savings_withdrawal)
@@ -891,11 +887,17 @@ export default function GeldPage({ userId, onClose }) {
   const prevRegular  = prevExpenses.filter(e => !e.is_savings_withdrawal && !e.is_income && !e.paid_from_savings)
   const prevSpent    = prevRegular.reduce((s, e) => s + Number(e.amount), 0)
   const carryover    = Math.max(0, prevSpent - base)
-  const adjustedBase = Math.max(0, base - carryover - vasteLastenTotal)
+  const adjustedBase = Math.max(0, base - carryover)
   const adjustedRemaining = adjustedBase - totalSpent
   const adjustedRemainPct = adjustedBase > 0 ? Math.max(0, Math.min(100, (adjustedRemaining / adjustedBase) * 100)) : 0
 
-  const barColor = adjustedRemainPct > 40 ? 'var(--accent)' : adjustedRemainPct > 15 ? '#F59E0B' : '#EF4444'
+  // Vaste lasten tellen niet mee in de grote kaart (ze zijn altijd gepland)
+  const vasteLastenTotal = regularExpenses.filter(e => e.category === 'abonnementen' && !e.paid_from_savings)
+    .reduce((s, e) => s + Number(e.amount), 0)
+  const displayRemaining = adjustedRemaining + vasteLastenTotal
+  const displayRemainPct = adjustedBase > 0 ? Math.max(0, Math.min(100, (displayRemaining / adjustedBase) * 100)) : 0
+
+  const barColor = displayRemainPct > 40 ? 'var(--accent)' : displayRemainPct > 15 ? '#F59E0B' : '#EF4444'
   const allTransactions = [...regularExpenses, ...manualIncome].sort((a, b) => b.date.localeCompare(a.date) || b.created_at?.localeCompare(a.created_at))
   const displayedExpenses = showAll ? allTransactions : allTransactions.slice(0, 8)
 
@@ -1028,27 +1030,27 @@ export default function GeldPage({ userId, onClose }) {
         {/* Big remaining card */}
         <div style={{
           padding: '22px 22px 18px', borderRadius: 22, marginBottom: 14,
-          background: adjustedRemaining < 0
+          background: displayRemaining < 0
             ? 'linear-gradient(135deg, rgba(239,68,68,0.12), rgba(239,68,68,0.04))'
-            : adjustedRemainPct < 15
+            : displayRemainPct < 15
             ? 'linear-gradient(135deg, rgba(239,68,68,0.10), rgba(239,68,68,0.03))'
-            : adjustedRemainPct < 40
+            : displayRemainPct < 40
             ? 'linear-gradient(135deg, rgba(245,158,11,0.10), rgba(245,158,11,0.03))'
             : 'linear-gradient(135deg, rgba(0,255,209,0.08), rgba(0,255,209,0.02))',
-          border: `1px solid ${adjustedRemaining < 0 ? 'rgba(239,68,68,0.35)' : adjustedRemainPct < 15 ? 'rgba(239,68,68,0.25)' : adjustedRemainPct < 40 ? 'rgba(245,158,11,0.25)' : 'rgba(0,255,209,0.2)'}`,
+          border: `1px solid ${displayRemaining < 0 ? 'rgba(239,68,68,0.35)' : displayRemainPct < 15 ? 'rgba(239,68,68,0.25)' : displayRemainPct < 40 ? 'rgba(245,158,11,0.25)' : 'rgba(0,255,209,0.2)'}`,
         }}>
           <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>
-            {adjustedRemaining < 0 ? '🚨 Budget overschreden' : 'Nog over deze maand'}
+            {displayRemaining < 0 ? '🚨 Budget overschreden' : 'Nog over deze maand'}
           </p>
-          <p style={{ fontSize: 48, fontWeight: 800, margin: '0 0 14px', color: adjustedRemaining < 0 ? '#EF4444' : adjustedRemainPct < 15 ? '#EF4444' : adjustedRemainPct < 40 ? '#F59E0B' : 'var(--text-1)', lineHeight: 1 }}>
-            {fmt(Math.abs(adjustedRemaining))}
+          <p style={{ fontSize: 48, fontWeight: 800, margin: '0 0 14px', color: displayRemaining < 0 ? '#EF4444' : displayRemainPct < 15 ? '#EF4444' : displayRemainPct < 40 ? '#F59E0B' : 'var(--text-1)', lineHeight: 1 }}>
+            {fmt(Math.abs(displayRemaining))}
           </p>
           <div style={{ height: 8, background: 'rgba(255,255,255,0.08)', borderRadius: 8, overflow: 'hidden', marginBottom: 10 }}>
-            <div style={{ height: '100%', width: `${100 - adjustedRemainPct}%`, background: barColor, borderRadius: 8, transition: 'width 0.6s ease', boxShadow: `0 0 8px ${barColor}60` }} />
+            <div style={{ height: '100%', width: `${100 - displayRemainPct}%`, background: barColor, borderRadius: 8, transition: 'width 0.6s ease', boxShadow: `0 0 8px ${barColor}60` }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-3)' }}>
             <span>
-              {fmt(totalSpent)} variabel{savingsExpTotal > 0 ? ` · 💳 ${fmt(savingsExpTotal)} spaar` : ''}{vasteLastenTotal > 0 ? ` · 🏠 ${fmt(vasteLastenTotal)} vast` : ''}{carryover > 0 ? ` · ↩ ${fmt(carryover)}` : ''}
+              {fmt(totalSpent)} budget{savingsExpTotal > 0 ? ` · 💳 ${fmt(savingsExpTotal)} spaar` : ''}{carryover > 0 ? ` · ↩ ${fmt(carryover)}` : ''}
             </span>
             <span>
               {savingsGoal > 0
@@ -1324,8 +1326,7 @@ export default function GeldPage({ userId, onClose }) {
               const spent    = spentByCategory[cat.id] || 0   // regular (budget) spending
               const fromSav  = savingsByCategory[cat.id] || 0 // savings-funded spending
               const total    = spent + fromSav                 // real total for this category
-              const isFixed  = cat.id === FIXED_CAT
-              const overAmt  = !isFixed && spent > budget && budget > 0 ? spent - budget : 0
+              const overAmt  = spent > budget && budget > 0 ? spent - budget : 0
               const over     = overAmt > 0
               // Bar segments as % of budget (capped at 100% each for visual clarity)
               const regPct   = budget > 0 ? Math.min(100, (spent / budget) * 100) : 0
@@ -1333,16 +1334,13 @@ export default function GeldPage({ userId, onClose }) {
               const barColor = over ? '#EF4444' : regPct > 75 ? '#F59E0B' : (cat.color || 'var(--accent)')
               if (budget === 0 && total === 0) return null
               return (
-                <div key={cat.id} style={{ padding: '12px 14px', borderRadius: 14, background: over ? 'rgba(239,68,68,0.06)' : 'var(--bg-card-2)', border: `1px solid ${over ? 'rgba(239,68,68,0.3)' : isFixed ? 'rgba(255,255,255,0.06)' : fromSav > 0 ? 'rgba(245,158,11,0.2)' : 'var(--border)'}`, opacity: isFixed ? 0.7 : 1 }}>
+                <div key={cat.id} style={{ padding: '12px 14px', borderRadius: 14, background: over ? 'rgba(239,68,68,0.06)' : 'var(--bg-card-2)', border: `1px solid ${over ? 'rgba(239,68,68,0.3)' : fromSav > 0 ? 'rgba(245,158,11,0.2)' : 'var(--border)'}` }}>
                   {/* Top row */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: budget > 0 || fromSav > 0 ? 8 : 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                     <span style={{ fontSize: 18 }}>{cat.emoji}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>{cat.label}</span>
-                      {isFixed && <span style={{ fontSize: 9, color: 'var(--text-3)', fontWeight: 600, marginLeft: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>vaste last</span>}
-                    </div>
+                    <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>{cat.label}</span>
                     <div style={{ textAlign: 'right' }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: over ? '#EF4444' : regPct > 75 && !isFixed ? '#F59E0B' : 'var(--text-1)' }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: over ? '#EF4444' : regPct > 75 ? '#F59E0B' : 'var(--text-1)' }}>
                         {fmt(total)}
                       </span>
                       {budget > 0 && (
@@ -1350,8 +1348,8 @@ export default function GeldPage({ userId, onClose }) {
                       )}
                     </div>
                   </div>
-                  {/* Progress bar: regular (solid) + savings (hatched/dim) — niet voor vaste lasten */}
-                  {budget > 0 && !isFixed && (
+                  {/* Progress bar: regular (solid) + savings (hatched/dim) */}
+                  {budget > 0 && (
                     <div style={{ height: 6, background: 'rgba(255,255,255,0.07)', borderRadius: 4, overflow: 'hidden', marginBottom: 6, display: 'flex' }}>
                       <div style={{ height: '100%', width: `${regPct}%`, background: barColor, borderRadius: '4px 0 0 4px', transition: 'width 0.5s', flexShrink: 0 }} />
                       {fromSav > 0 && savPct > 0 && (
@@ -1360,23 +1358,21 @@ export default function GeldPage({ userId, onClose }) {
                     </div>
                   )}
                   {/* Footer labels */}
-                  {!isFixed && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                        {fromSav > 0 && (
-                          <span style={{ fontSize: 10, color: '#F59E0B', fontWeight: 600 }}>🏦 {fmt(fromSav)} spaarrekening</span>
-                        )}
-                        {spent > 0 && fromSav > 0 && (
-                          <span style={{ fontSize: 10, color: 'var(--text-3)' }}>+ {fmt(spent)} budget</span>
-                        )}
-                      </div>
-                      {over && (
-                        <span style={{ fontSize: 11, fontWeight: 800, color: '#EF4444', background: 'rgba(239,68,68,0.12)', padding: '2px 7px', borderRadius: 6 }}>
-                          +{fmt(overAmt)} over
-                        </span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      {fromSav > 0 && (
+                        <span style={{ fontSize: 10, color: '#F59E0B', fontWeight: 600 }}>🏦 {fmt(fromSav)} spaarrekening</span>
+                      )}
+                      {spent > 0 && fromSav > 0 && (
+                        <span style={{ fontSize: 10, color: 'var(--text-3)' }}>+ {fmt(spent)} budget</span>
                       )}
                     </div>
-                  )}
+                    {over && (
+                      <span style={{ fontSize: 11, fontWeight: 800, color: '#EF4444', background: 'rgba(239,68,68,0.12)', padding: '2px 7px', borderRadius: 6 }}>
+                        +{fmt(overAmt)} over
+                      </span>
+                    )}
+                  </div>
                 </div>
               )
             })}
