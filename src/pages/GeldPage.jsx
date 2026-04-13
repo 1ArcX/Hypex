@@ -1339,9 +1339,19 @@ export default function GeldPage({ userId, onClose }) {
                     <span style={{ fontSize: 18 }}>{cat.emoji}</span>
                     <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>{cat.label}</span>
                     <div style={{ textAlign: 'right' }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: over ? '#EF4444' : regPct > 75 ? '#F59E0B' : 'var(--text-1)' }}>
-                        {fmt(total)}
-                      </span>
+                      {budget > 0 ? (
+                        over ? (
+                          <span style={{ fontSize: 13, fontWeight: 700, color: '#EF4444' }}>
+                            −{fmt(overAmt)} over
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: 13, fontWeight: 700, color: regPct > 75 ? '#F59E0B' : 'var(--text-1)' }}>
+                            {fmt(budget - spent)} nog
+                          </span>
+                        )
+                      ) : (
+                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>{fmt(total)}</span>
+                      )}
                       {budget > 0 && (
                         <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 400 }}> / {fmt(budget)}</span>
                       )}
