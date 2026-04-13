@@ -1124,7 +1124,7 @@ export default function GeldPage({ userId, onClose }) {
               ? <p style={{ fontSize: 12, fontWeight: 600, margin: 0, color: 'var(--text-3)' }}>Geen data</p>
               : <>
                   <p style={{ fontSize: 18, fontWeight: 700, margin: '0 0 2px', lineHeight: 1.1, color: projectedOver ? '#EF4444' : '#10B981' }}>{fmtShort(projectedTotal)}</p>
-                  <p style={{ fontSize: 10, margin: 0, color: projectedOver ? 'rgba(239,68,68,0.7)' : 'rgba(16,185,129,0.7)' }}>{projectedOver ? `⚠ +${fmtShort(projectedTotal - base)}` : '✓ Op schema'}</p>
+                  <p style={{ fontSize: 10, margin: 0, color: projectedOver ? 'rgba(239,68,68,0.7)' : 'rgba(16,185,129,0.7)' }}>{projectedOver ? `⚠ +${fmtShort(projectedTotal - adjustedBase)}` : '✓ Op schema'}</p>
                 </>
             }
           </div>
