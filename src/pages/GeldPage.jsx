@@ -1314,33 +1314,57 @@ export default function GeldPage({ userId, onClose }) {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {allCategories.map(cat => {
-              const budget  = catBudgets[cat.id] || 0
-              const spent   = spentByCategory[cat.id] || 0     // regular spending only
-              const fromSav = savingsByCategory[cat.id] || 0   // savings-funded
-              const pct     = budget > 0 ? Math.min(100, (spent / budget) * 100) : 0
-              const over    = spent > budget && budget > 0
-              if (budget === 0 && spent === 0 && fromSav === 0) return null
+              const budget   = catBudgets[cat.id] || 0
+              const spent    = spentByCategory[cat.id] || 0   // regular (budget) spending
+              const fromSav  = savingsByCategory[cat.id] || 0 // savings-funded spending
+              const total    = spent + fromSav                 // real total for this category
+              const overAmt  = spent > budget && budget > 0 ? spent - budget : 0
+              const over     = overAmt > 0
+              // Bar segments as % of budget (capped at 100% each for visual clarity)
+              const regPct   = budget > 0 ? Math.min(100, (spent / budget) * 100) : 0
+              const savPct   = budget > 0 ? Math.min(100 - Math.min(100, regPct), (fromSav / budget) * 100) : 0
+              const barColor = over ? '#EF4444' : regPct > 75 ? '#F59E0B' : (cat.color || 'var(--accent)')
+              if (budget === 0 && total === 0) return null
               return (
-                <div key={cat.id} style={{ padding: '12px 14px', borderRadius: 14, background: over ? 'rgba(239,68,68,0.06)' : 'var(--bg-card-2)', border: `1px solid ${over ? 'rgba(239,68,68,0.25)' : 'var(--border)'}` }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: budget > 0 ? 8 : fromSav > 0 ? 6 : 0 }}>
+                <div key={cat.id} style={{ padding: '12px 14px', borderRadius: 14, background: over ? 'rgba(239,68,68,0.06)' : 'var(--bg-card-2)', border: `1px solid ${over ? 'rgba(239,68,68,0.3)' : fromSav > 0 ? 'rgba(245,158,11,0.2)' : 'var(--border)'}` }}>
+                  {/* Top row */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                     <span style={{ fontSize: 18 }}>{cat.emoji}</span>
                     <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>{cat.label}</span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: over ? '#EF4444' : pct > 75 ? '#F59E0B' : 'var(--text-1)' }}>
-                      {fmt(spent)}{budget > 0 && <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 400 }}> / {fmt(budget)}</span>}
-                    </span>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: over ? '#EF4444' : regPct > 75 ? '#F59E0B' : 'var(--text-1)' }}>
+                        {fmt(total)}
+                      </span>
+                      {budget > 0 && (
+                        <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 400 }}> / {fmt(budget)}</span>
+                      )}
+                    </div>
                   </div>
+                  {/* Progress bar: regular (solid) + savings (hatched/dim) */}
                   {budget > 0 && (
-                    <div style={{ height: 5, background: 'rgba(255,255,255,0.07)', borderRadius: 4, overflow: 'hidden', marginBottom: fromSav > 0 ? 6 : 0 }}>
-                      <div style={{ height: '100%', width: `${pct}%`, background: over ? '#EF4444' : pct > 75 ? '#F59E0B' : cat.color, borderRadius: 4, transition: 'width 0.5s' }} />
+                    <div style={{ height: 6, background: 'rgba(255,255,255,0.07)', borderRadius: 4, overflow: 'hidden', marginBottom: 6, display: 'flex' }}>
+                      <div style={{ height: '100%', width: `${regPct}%`, background: barColor, borderRadius: '4px 0 0 4px', transition: 'width 0.5s', flexShrink: 0 }} />
+                      {fromSav > 0 && savPct > 0 && (
+                        <div style={{ height: '100%', width: `${savPct}%`, background: 'rgba(245,158,11,0.45)', flexShrink: 0 }} />
+                      )}
                     </div>
                   )}
-                  {fromSav > 0 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, color: '#F59E0B' }}>
-                      <span>🏦</span>
-                      <span style={{ fontWeight: 600 }}>{fmt(fromSav)} van spaarrekening</span>
-                      <span style={{ color: 'var(--text-3)' }}>— telt niet mee voor budget</span>
+                  {/* Footer labels */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      {fromSav > 0 && (
+                        <span style={{ fontSize: 10, color: '#F59E0B', fontWeight: 600 }}>🏦 {fmt(fromSav)} spaarrekening</span>
+                      )}
+                      {spent > 0 && fromSav > 0 && (
+                        <span style={{ fontSize: 10, color: 'var(--text-3)' }}>+ {fmt(spent)} budget</span>
+                      )}
                     </div>
-                  )}
+                    {over && (
+                      <span style={{ fontSize: 11, fontWeight: 800, color: '#EF4444', background: 'rgba(239,68,68,0.12)', padding: '2px 7px', borderRadius: 6 }}>
+                        +{fmt(overAmt)} over
+                      </span>
+                    )}
+                  </div>
                 </div>
               )
             })}
