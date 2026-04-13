@@ -822,8 +822,9 @@ export default function GeldPage({ userId, onClose }) {
   // Budget spending = regular expenses that were NOT paid from savings
   // (savings-funded spending is tracked separately and doesn't count against budget)
   const budgetExpenses     = regularExpenses.filter(e => !e.paid_from_savings)
+  const savingsExpenses    = regularExpenses.filter(e => e.paid_from_savings)
   const totalSpent         = budgetExpenses.reduce((s, e) => s + Number(e.amount), 0)
-  const savingsExpTotal    = regularExpenses.filter(e => e.paid_from_savings).reduce((s, e) => s + Number(e.amount), 0)
+  const savingsExpTotal    = savingsExpenses.reduce((s, e) => s + Number(e.amount), 0)
   const savingsWithdrawals = expenses.filter(e => e.is_savings_withdrawal)
   const savingsTotal       = savingsWithdrawals.reduce((s, e) => s + Number(e.amount), 0)
   const savedWithdrawals   = savingsWithdrawals.filter(e => e.savings_type !== 'loan')
