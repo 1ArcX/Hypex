@@ -965,60 +965,48 @@ export default function GeldPage({ userId, onClose }) {
         <div style={{ maxWidth: 480, margin: '0 auto', padding: `20px 16px ${isMobile ? '90px' : '24px'}` }}>
 
         {/* ── WEERGAVE ── */}
-        {/* Month navigator — shown in all views except jaar */}
-        {subView !== 'jaar' && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, padding: '8px 4px' }}>
-            <button onClick={goToPrevMonth} style={{ width: 32, height: 32, borderRadius: 10, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-2)', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
-            <span style={{ fontSize: 14, fontWeight: 700, color: isCurrentMonth ? 'var(--text-1)' : 'var(--accent)', letterSpacing: '0.01em' }}>
-              {monthLabelOf(selYear, selMonth)}{!isCurrentMonth && ' ✎'}
-            </span>
-            <button onClick={goToNextMonth} disabled={isCurrentMonth}
-              style={{ width: 32, height: 32, borderRadius: 10, background: isCurrentMonth ? 'rgba(255,255,255,0.03)' : 'var(--bg-card-2)', border: '1px solid var(--border)', color: isCurrentMonth ? 'var(--text-3)' : 'var(--text-2)', cursor: isCurrentMonth ? 'default' : 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
+        {/* Shared header: month navigator + context button */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
+          <button onClick={goToPrevMonth} style={{ width: 32, height: 32, borderRadius: 10, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-2)', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>‹</button>
+          <div style={{ flex: 1, textAlign: 'center' }}>
+            <p style={{ fontSize: 15, fontWeight: 700, color: isCurrentMonth ? 'var(--text-1)' : 'var(--accent)', margin: 0, letterSpacing: '0.01em' }}>
+              {monthLabelOf(selYear, selMonth)}
+            </p>
+            {!isCurrentMonth && <p style={{ fontSize: 10, color: 'var(--accent)', margin: 0, fontWeight: 600 }}>VORIGE MAAND — BEWERKBAAR</p>}
           </div>
-        )}
+          <button onClick={goToNextMonth} disabled={isCurrentMonth}
+            style={{ width: 32, height: 32, borderRadius: 10, background: isCurrentMonth ? 'rgba(255,255,255,0.03)' : 'var(--bg-card-2)', border: '1px solid var(--border)', color: isCurrentMonth ? 'rgba(255,255,255,0.12)' : 'var(--text-2)', cursor: isCurrentMonth ? 'default' : 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>›</button>
+        </div>
 
         {subView === 'weergave' && <>
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <div>
-            <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-1)', margin: '0 0 2px' }}>Geld</h2>
-            <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>{monthLabelOf(selYear, selMonth)}</p>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>Overzicht</h2>
           <button onClick={() => setShowBudget(true)} style={{ padding: '8px 14px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-2)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
             Budget
           </button>
         </div>
 
-        {/* Yearly savings withdrawal counter */}
-        {/* Outstanding loan card */}
-        {openLoanPrincipal > 0 && (
-          <div style={{ padding: '14px 16px', borderRadius: 14, marginBottom: 10, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.35)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <span style={{ fontSize: 18 }}>🤝</span>
-              <p style={{ fontSize: 12, fontWeight: 700, color: '#F59E0B', margin: 0 }}>Openstaande lening{openLoans.length > 1 ? ` (${openLoans.length}×)` : ''} aan jezelf</p>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-              <span style={{ color: 'var(--text-3)' }}>Geleend</span>
-              <span style={{ color: 'var(--text-2)' }}>{fmt(openLoanPrincipal)}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
-              <span style={{ color: 'var(--text-3)' }}>Rente (10%)</span>
-              <span style={{ color: '#F59E0B' }}>+{fmt(openLoanTotal - openLoanPrincipal)}</span>
-            </div>
-            <div style={{ borderTop: '1px solid rgba(245,158,11,0.2)', paddingTop: 6, display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-              <span style={{ fontWeight: 700, color: 'var(--text-1)' }}>Totaal terug te storten</span>
-              <span style={{ fontWeight: 800, color: '#F59E0B' }}>{fmt(openLoanTotal)}</span>
-            </div>
-          </div>
-        )}
-
-        {yearSavingsCount > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 14, marginBottom: 10, background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)' }}>
-            <span style={{ fontSize: 22 }}>🏦</span>
-            <div style={{ flex: 1 }}>
-              <p style={{ fontSize: 12, fontWeight: 700, color: '#EF4444', margin: '0 0 1px' }}>{yearSavingsCount}× spaargeld opgenomen dit jaar</p>
-              <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>Totaal {fmt(yearSavingsTotal)} van spaarrekening gehaald</p>
-            </div>
+        {/* Alert strip: loans + savings counter */}
+        {(openLoanPrincipal > 0 || yearSavingsCount > 0) && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+            {openLoanPrincipal > 0 && (
+              <button onClick={() => setSubView('inkomsten')} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', cursor: 'pointer', textAlign: 'left' }}>
+                <span style={{ fontSize: 16 }}>🤝</span>
+                <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: '#F59E0B' }}>
+                  {openLoans.length}× openstaande lening — {fmt(openLoanTotal)} terug te storten
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--text-3)' }}>→ Inkomsten</span>
+              </button>
+            )}
+            {yearSavingsCount > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                <span style={{ fontSize: 16 }}>🏦</span>
+                <span style={{ fontSize: 12, color: 'rgba(239,68,68,0.8)', fontWeight: 600 }}>
+                  {yearSavingsCount}× opname dit jaar · {fmt(yearSavingsTotal)} totaal
+                </span>
+              </div>
+            )}
           </div>
         )}
 
@@ -1056,12 +1044,12 @@ export default function GeldPage({ userId, onClose }) {
             <span>{fmt(totalSpent)} uitgegeven{carryover > 0 ? ` + ${fmt(carryover)} carry` : ''}</span>
             <span>
               {savingsGoal > 0
-                ? `${fmt(grossIncome)} − 🏦 ${fmt(savingsGoal)}${savingsTotal > 0 ? ` + 🏦 ${fmt(savingsTotal)}` : ''} = ${fmt(adjustedBase)}`
+                ? `${fmt(grossIncome)} − 🎯 ${fmt(savingsGoal)}${savingsTotal > 0 ? ` + 💳 ${fmt(savingsTotal)}` : ''} = ${fmt(adjustedBase)}`
                 : hasRecurring
-                  ? `Verwacht: ${fmt(recurringExpected)}${totalManualIncome > 0 ? ` + ${fmt(totalManualIncome)}` : ''}${savingsTotal > 0 ? ` + 🏦 ${fmt(savingsTotal)}` : ''}`
+                  ? `${fmt(recurringExpected)}${totalManualIncome > 0 ? ` + ${fmt(totalManualIncome)}` : ''}${savingsTotal > 0 ? ` + 💳 ${fmt(savingsTotal)}` : ''}`
                   : savingsTotal > 0
-                    ? `Budget + 🏦 ${fmt(savingsTotal)} opname`
-                    : totalManualIncome > 0 ? `Inkomsten: ${fmt(totalManualIncome)}` : `Budget: ${fmt(adjustedBase)}`
+                    ? `Budget + 💳 ${fmt(savingsTotal)} opname`
+                    : totalManualIncome > 0 ? `Inkomen: ${fmt(totalManualIncome)}` : `Budget: ${fmt(adjustedBase)}`
               }
             </span>
           </div>
@@ -1081,9 +1069,9 @@ export default function GeldPage({ userId, onClose }) {
             </p>
             {hasRecurring && <p style={{ fontSize: 9, color: 'rgba(16,185,129,0.6)', margin: '2px 0 0', fontWeight: 600 }}>VERWACHT</p>}
           </div>
-          <div onClick={() => savingsWithdrawals.length > 0 && setShowAll(true)}
+          <div onClick={() => savingsWithdrawals.length > 0 && setSubView('inkomsten')}
             style={{ padding: '12px 14px', borderRadius: 16, background: savingsWithdrawals.length > 0 ? 'rgba(239,68,68,0.08)' : 'var(--bg-card-2)', border: savingsWithdrawals.length > 0 ? '1px solid rgba(239,68,68,0.3)' : '1px solid var(--border)', cursor: savingsWithdrawals.length > 0 ? 'pointer' : 'default' }}>
-            <p style={{ fontSize: 10, color: savingsWithdrawals.length > 0 ? '#EF4444' : 'var(--text-3)', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>💸 Spaar</p>
+            <p style={{ fontSize: 10, color: savingsWithdrawals.length > 0 ? '#EF4444' : 'var(--text-3)', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>🏦 Opnames</p>
             <p style={{ fontSize: 20, fontWeight: 700, margin: 0, color: savingsWithdrawals.length > 0 ? '#EF4444' : 'var(--text-3)' }}>
               {savingsWithdrawals.length > 0 ? `${savingsWithdrawals.length}× ${fmtShort(savingsTotal)}` : '–'}
             </p>
@@ -1095,7 +1083,7 @@ export default function GeldPage({ userId, onClose }) {
           <div style={{ marginBottom: 14, padding: '12px 14px', borderRadius: 16, background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.18)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <p style={{ fontSize: 10, color: '#10B981', margin: 0, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>
-                Verwacht inkomen{savingsGoal > 0 ? ` · 🏦 ${fmt(savingsGoal)} sparen` : ''}
+                Verwacht inkomen{savingsGoal > 0 ? ` · 🎯 ${fmt(savingsGoal)} sparen` : ''}
               </p>
               <button onClick={() => setShowRecurring(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(16,185,129,0.6)', fontSize: 11, padding: 0 }}>bewerken</button>
             </div>
@@ -1575,8 +1563,8 @@ export default function GeldPage({ userId, onClose }) {
         </div>
       </div>
 
-      {/* Persistent action bar */}
-      <div style={{ padding: '10px 16px 0', flexShrink: 0 }}>
+      {/* Persistent action bar — hidden on jaar tab */}
+      <div style={{ padding: '10px 16px 0', flexShrink: 0, display: subView === 'jaar' ? 'none' : 'block' }}>
         <div style={{ maxWidth: 480, margin: '0 auto', display: 'flex', gap: 8, paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>
           <button onClick={() => setShowSavings(true)} style={{ flex: 1, padding: '11px 8px', borderRadius: 14, background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.3)', color: '#EF4444', cursor: 'pointer', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             <TrendingDown size={14} /> Spaar af
