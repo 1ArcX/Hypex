@@ -1053,10 +1053,12 @@ export default function GeldPage({ userId, onClose }) {
             </span>
             <span>
               {savingsGoal > 0
-                ? `${fmt(grossIncome)} − 🎯 ${fmt(savingsGoal)} = ${fmt(adjustedBase)}`
-                : hasRecurring
-                  ? `${fmt(recurringExpected)}${totalManualIncome > 0 ? ` + ${fmt(totalManualIncome)}` : ''}`
-                  : totalManualIncome > 0 ? `Inkomen: ${fmt(totalManualIncome)}` : `Budget: ${fmt(adjustedBase)}`
+                ? `${fmt(grossIncome)} − 🎯 ${fmt(savingsGoal)}${vasteLastenBudget > 0 ? ` − 🏠 ${fmt(vasteLastenBudget)}` : ''} = ${fmt(adjustedBase)}`
+                : vasteLastenBudget > 0
+                  ? `${fmt(grossIncome)} − 🏠 ${fmt(vasteLastenBudget)} = ${fmt(adjustedBase)}`
+                  : hasRecurring
+                    ? `${fmt(recurringExpected)}${totalManualIncome > 0 ? ` + ${fmt(totalManualIncome)}` : ''}`
+                    : totalManualIncome > 0 ? `Inkomen: ${fmt(totalManualIncome)}` : `Budget: ${fmt(adjustedBase)}`
               }
             </span>
           </div>
