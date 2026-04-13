@@ -819,7 +819,11 @@ export default function GeldPage({ userId, onClose }) {
   const manualIncome       = expenses.filter(e => e.is_income)
   const totalManualIncome  = manualIncome.reduce((s, e) => s + Number(e.amount), 0)
   const regularExpenses    = expenses.filter(e => !e.is_savings_withdrawal && !e.is_income)
-  const totalSpent         = regularExpenses.reduce((s, e) => s + Number(e.amount), 0)
+  // Budget spending = regular expenses that were NOT paid from savings
+  // (savings-funded spending is tracked separately and doesn't count against budget)
+  const budgetExpenses     = regularExpenses.filter(e => !e.paid_from_savings)
+  const totalSpent         = budgetExpenses.reduce((s, e) => s + Number(e.amount), 0)
+  const savingsExpTotal    = regularExpenses.filter(e => e.paid_from_savings).reduce((s, e) => s + Number(e.amount), 0)
   const savingsWithdrawals = expenses.filter(e => e.is_savings_withdrawal)
   const savingsTotal       = savingsWithdrawals.reduce((s, e) => s + Number(e.amount), 0)
   const savedWithdrawals   = savingsWithdrawals.filter(e => e.savings_type !== 'loan')
@@ -827,18 +831,15 @@ export default function GeldPage({ userId, onClose }) {
   const openLoans          = yearSavings.filter(e => e.savings_type === 'loan' && !e.repaid)
   const openLoanPrincipal  = openLoans.reduce((s, e) => s + Number(e.amount), 0)
   const openLoanTotal      = +(openLoanPrincipal * 1.1).toFixed(2)
-  const savingsExpenses    = regularExpenses.filter(e => e.paid_from_savings)
-  const savingsExpTotal    = savingsExpenses.reduce((s, e) => s + Number(e.amount), 0)
 
   const recurringIncome    = config?.recurring_income || []
   const recurringExpected  = calcRecurringThisMonth(recurringIncome)
   const hasRecurring       = recurringIncome.length > 0
   const savingsGoal        = config?.savings_goal || 0
-  // base: income minus savings goal = what's available to spend
-  // savingsTotal added: savings withdrawals boost this month's budget
+  // base = income minus savings goal (savings withdrawals do NOT inflate base —
+  // they're tracked separately so envelopes and big card stay in sync)
   const grossIncome = hasRecurring ? recurringExpected + totalManualIncome : (totalManualIncome > 0 ? totalManualIncome : monthlyBudget)
-  const baseWithoutSavings = savingsGoal > 0 ? Math.max(0, grossIncome - savingsGoal) : grossIncome
-  const base        = baseWithoutSavings + savingsTotal
+  const base        = savingsGoal > 0 ? Math.max(0, grossIncome - savingsGoal) : grossIncome
   const remaining  = base - totalSpent
   const remainPct  = Math.max(0, Math.min(100, (remaining / base) * 100))
 
@@ -855,7 +856,7 @@ export default function GeldPage({ userId, onClose }) {
     }
   }
 
-  const todayTotal = regularExpenses.filter(e => e.date === todayStr())
+  const todayTotal = budgetExpenses.filter(e => e.date === todayStr())
     .reduce((s, e) => s + Number(e.amount), 0)
 
   // Year summary grouped by month
@@ -882,7 +883,7 @@ export default function GeldPage({ userId, onClose }) {
   }
 
   // Carryover from previous month
-  const prevRegular  = prevExpenses.filter(e => !e.is_savings_withdrawal && !e.is_income)
+  const prevRegular  = prevExpenses.filter(e => !e.is_savings_withdrawal && !e.is_income && !e.paid_from_savings)
   const prevSpent    = prevRegular.reduce((s, e) => s + Number(e.amount), 0)
   const carryover    = Math.max(0, prevSpent - base)
   const adjustedBase = Math.max(0, base - carryover)
@@ -913,7 +914,7 @@ export default function GeldPage({ userId, onClose }) {
   // Week bars
   const weekBudget  = base / 4
   const weekTotals  = [0, 0, 0, 0, 0]
-  regularExpenses.forEach(e => {
+  budgetExpenses.forEach(e => {
     const day = new Date(e.date).getDate()
     const wi  = day <= 7 ? 0 : day <= 14 ? 1 : day <= 21 ? 2 : day <= 28 ? 3 : 4
     weekTotals[wi] += Number(e.amount)
@@ -928,7 +929,7 @@ export default function GeldPage({ userId, onClose }) {
   // Balance line (uses adjustedBase so carryover is reflected)
   const balanceByDay = []
   for (let d = 1; d <= daysInMonth; d++) {
-    const spent = regularExpenses.filter(e => new Date(e.date).getDate() <= d).reduce((s, e) => s + Number(e.amount), 0)
+    const spent = budgetExpenses.filter(e => new Date(e.date).getDate() <= d).reduce((s, e) => s + Number(e.amount), 0)
     balanceByDay.push(adjustedBase - spent)
   }
 
@@ -1041,15 +1042,15 @@ export default function GeldPage({ userId, onClose }) {
             <div style={{ height: '100%', width: `${100 - adjustedRemainPct}%`, background: barColor, borderRadius: 8, transition: 'width 0.6s ease', boxShadow: `0 0 8px ${barColor}60` }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-3)' }}>
-            <span>{fmt(totalSpent)} uitgegeven{carryover > 0 ? ` + ${fmt(carryover)} carry` : ''}</span>
+            <span>
+              {fmt(totalSpent)} budget{savingsExpTotal > 0 ? ` · 💳 ${fmt(savingsExpTotal)} spaar` : ''}{carryover > 0 ? ` · ↩ ${fmt(carryover)}` : ''}
+            </span>
             <span>
               {savingsGoal > 0
-                ? `${fmt(grossIncome)} − 🎯 ${fmt(savingsGoal)}${savingsTotal > 0 ? ` + 💳 ${fmt(savingsTotal)}` : ''} = ${fmt(adjustedBase)}`
+                ? `${fmt(grossIncome)} − 🎯 ${fmt(savingsGoal)} = ${fmt(adjustedBase)}`
                 : hasRecurring
-                  ? `${fmt(recurringExpected)}${totalManualIncome > 0 ? ` + ${fmt(totalManualIncome)}` : ''}${savingsTotal > 0 ? ` + 💳 ${fmt(savingsTotal)}` : ''}`
-                  : savingsTotal > 0
-                    ? `Budget + 💳 ${fmt(savingsTotal)} opname`
-                    : totalManualIncome > 0 ? `Inkomen: ${fmt(totalManualIncome)}` : `Budget: ${fmt(adjustedBase)}`
+                  ? `${fmt(recurringExpected)}${totalManualIncome > 0 ? ` + ${fmt(totalManualIncome)}` : ''}`
+                  : totalManualIncome > 0 ? `Inkomen: ${fmt(totalManualIncome)}` : `Budget: ${fmt(adjustedBase)}`
               }
             </span>
           </div>
