@@ -1079,6 +1079,17 @@ export default function GeldPage({ userId, onClose }) {
   const adjustedRemainPct = adjustedBase > 0 ? Math.max(0, Math.min(100, (adjustedRemaining / adjustedBase) * 100)) : 0
 
   const barColor = adjustedRemainPct > 40 ? 'var(--accent)' : adjustedRemainPct > 15 ? '#F59E0B' : '#EF4444'
+
+  // Envelop-schaling bij carryover: verdeel tekort proportioneel over variabele enveloppen
+  const variableCats = allCategories.filter(c => c.id !== FIXED_CAT)
+  const variableEnvelopeTotal = variableCats.reduce((s, c) => s + (catBudgets[c.id] || 0), 0)
+  const envelopeScale = carryover > 0 && variableEnvelopeTotal > 0
+    ? Math.max(0, adjustedBase / variableEnvelopeTotal)
+    : 1
+  const effectiveBudget = (catId) => {
+    if (catId === FIXED_CAT) return catBudgets[catId] || 0
+    return Math.round((catBudgets[catId] || 0) * envelopeScale)
+  }
   const allTransactions = [...regularExpenses, ...manualIncome].sort((a, b) => b.date.localeCompare(a.date) || b.created_at?.localeCompare(a.created_at))
   const displayedExpenses = showAll ? allTransactions : allTransactions.slice(0, 8)
 
@@ -1499,9 +1510,19 @@ export default function GeldPage({ userId, onClose }) {
             <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>Enveloppen</h2>
             <button onClick={() => setShowBudget(true)} style={{ padding: '8px 14px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-2)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>Beheren</button>
           </div>
+          {carryover > 0 && (
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', borderRadius: 12, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', marginBottom: 10 }}>
+              <span style={{ fontSize: 16, flexShrink: 0 }}>↩</span>
+              <div>
+                <p style={{ fontSize: 12, fontWeight: 700, color: '#F59E0B', margin: '0 0 1px' }}>Budgetten aangepast door overschrijding vorige maand</p>
+                <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>{fmt(carryover)} tekort verdeeld over alle enveloppen ({Math.round((1 - envelopeScale) * 100)}% minder per categorie)</p>
+              </div>
+            </div>
+          )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {allCategories.map(cat => {
-              const budget   = catBudgets[cat.id] || 0
+              const budget   = effectiveBudget(cat.id)
+              const origBudget = catBudgets[cat.id] || 0
               const spent    = spentByCategory[cat.id] || 0   // regular (budget) spending
               const fromSav  = savingsByCategory[cat.id] || 0 // savings-funded spending
               const total    = spent + fromSav                 // real total for this category
@@ -1532,9 +1553,11 @@ export default function GeldPage({ userId, onClose }) {
                       ) : (
                         <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>{fmt(total)}</span>
                       )}
-                      {budget > 0 && (
+                      {budget > 0 && origBudget !== budget ? (
+                        <span style={{ fontSize: 11, color: '#F59E0B', fontWeight: 400 }}> / {fmt(budget)} <span style={{ textDecoration: 'line-through', opacity: 0.5 }}>{fmt(origBudget)}</span></span>
+                      ) : budget > 0 ? (
                         <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 400 }}> / {fmt(budget)}</span>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                   {/* Progress bar: regular (solid) + savings (hatched/dim) */}
