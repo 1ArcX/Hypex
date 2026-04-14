@@ -736,6 +736,7 @@ function RecurringIncomeModal({ config, onClose, onSave }) {
 // SQL migration needed: ALTER TABLE expenses ADD COLUMN IF NOT EXISTS is_savings_contribution boolean DEFAULT false; ALTER TABLE expenses ADD COLUMN IF NOT EXISTS is_loan_repayment boolean DEFAULT false;
 
 // ── IncomeDayModal ────────────────────────────────────────────────────────────
+// source = recurring income object | null (for manual one-time income)
 function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMonth, totalLoanRemaining, userId, onLater, onDone }) {
   const backdropRef = useRef(null)
   usePreventTouch(backdropRef)
@@ -743,31 +744,36 @@ function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMon
   const [balance, setBalance]   = useState(() => {
     try { return localStorage.getItem('current_balance') || '' } catch { return '' }
   })
-  const [saving, setSaving] = useState(false)
+  const [desc, setDesc]       = useState('')
+  const [catId, setCatId]     = useState('salaris')
+  const [saving, setSaving]   = useState(false)
+  const isManual = !source
 
   const rec = parseFloat(String(received).replace(',', '.')) || 0
   const bal = parseFloat(String(balance).replace(',', '.')) || 0
-  const targetBalance    = adjustedBase
-  const toTopUp          = Math.max(0, Math.min(rec, targetBalance - bal))
-  const excessAfterTopUp = Math.max(0, rec - toTopUp)
+  const targetBalance      = adjustedBase
+  const toTopUp            = Math.max(0, Math.min(rec, targetBalance - bal))
+  const excessAfterTopUp   = Math.max(0, rec - toTopUp)
   const remainingSavNeeded = Math.max(0, savingsGoal - alreadySavedThisMonth)
-  const toSavings        = Math.min(excessAfterTopUp, remainingSavNeeded)
-  const toLoan           = totalLoanRemaining > 0 ? Math.min(Math.max(0, excessAfterTopUp - toSavings), totalLoanRemaining) : 0
+  const toSavings          = Math.min(excessAfterTopUp, remainingSavNeeded)
+  const toLoan             = totalLoanRemaining > 0 ? Math.min(Math.max(0, excessAfterTopUp - toSavings), totalLoanRemaining) : 0
 
-  const canSave = rec > 0
+  const canSave = rec > 0 && (!isManual || desc.trim().length > 0)
 
   const handleSave = async () => {
     if (!canSave || saving) return
     setSaving(true)
     try {
       localStorage.setItem('current_balance', String(Math.max(0, bal + toTopUp)))
+      const incomeDesc = isManual ? desc.trim() : source.name
+      const incomeCat  = isManual ? catId : (source.category || 'salaris')
       const inserts = [
-        supabase.from('expenses').insert({ user_id: userId, amount: rec, category: source.category || 'salaris', description: source.name, date: todayStr(), is_income: true, is_savings_withdrawal: false }),
+        supabase.from('expenses').insert({ user_id: userId, amount: rec, category: incomeCat, description: incomeDesc, date: todayStr(), is_income: true, is_savings_withdrawal: false }),
       ]
       if (toSavings > 0) inserts.push(supabase.from('expenses').insert({ user_id: userId, amount: toSavings, category: 'overig', description: '🏦 Spaarstorting', date: todayStr(), is_savings_contribution: true, is_income: false, is_savings_withdrawal: false }))
       if (toLoan > 0) inserts.push(supabase.from('expenses').insert({ user_id: userId, amount: toLoan, category: 'overig', description: '↩ Gedeeltelijke terugbetaling lening', date: todayStr(), is_loan_repayment: true, is_income: false, is_savings_withdrawal: false }))
       await Promise.all(inserts)
-      markFilledInToday(source.id)
+      if (!isManual) markFilledInToday(source.id)
       onDone()
     } finally {
       setSaving(false)
@@ -777,17 +783,36 @@ function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMon
   return ReactDOM.createPortal(
     <div ref={backdropRef} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
       <div style={{ width: '100%', maxWidth: 380, background: 'var(--bg-sidebar)', borderRadius: 22, border: '1px solid rgba(16,185,129,0.35)', padding: 24 }}>
-        <div style={{ textAlign: 'center', marginBottom: 18 }}>
-          <div style={{ fontSize: 36, marginBottom: 6 }}>{source.emoji}</div>
-          <h3 style={{ fontSize: 17, fontWeight: 700, color: '#10B981', margin: '0 0 4px' }}>Betaaldag: {source.name}</h3>
-          <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>Vul in wat je hebt ontvangen</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
+          <div>
+            <div style={{ fontSize: 28, marginBottom: 4 }}>{isManual ? '💚' : source.emoji}</div>
+            <h3 style={{ fontSize: 17, fontWeight: 700, color: '#10B981', margin: '0 0 2px' }}>
+              {isManual ? 'Eenmalige inkomsten' : `Betaaldag: ${source.name}`}
+            </h3>
+            <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>Vul in wat je hebt ontvangen</p>
+          </div>
+          {isManual && <button onClick={onLater} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: 4 }}><X size={18} /></button>}
         </div>
+
+        {isManual && (
+          <div style={{ marginBottom: 12 }}>
+            <input type="text" placeholder="Beschrijving (bijv. Bijbaan)" value={desc} onChange={e => setDesc(e.target.value)} onFocus={scrollFix}
+              style={{ width: '100%', padding: '10px 14px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: 14, colorScheme: 'dark', marginBottom: 8 }} />
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {[{ id:'salaris',label:'Salaris',emoji:'💼' },{ id:'bijbaan',label:'Bijbaan',emoji:'🏪' },{ id:'freelance',label:'Freelance',emoji:'💻' },{ id:'zakgeld',label:'Zakgeld',emoji:'🎁' },{ id:'overig',label:'Overig',emoji:'💰' }].map(c => (
+                <button key={c.id} onClick={() => setCatId(c.id)}
+                  style={{ padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: catId === c.id ? 'rgba(16,185,129,0.15)' : 'var(--bg-card-2)', border: catId === c.id ? '1px solid rgba(16,185,129,0.4)' : '1px solid var(--border)', color: catId === c.id ? '#10B981' : 'var(--text-3)' }}>
+                  {c.emoji} {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div style={{ position: 'relative', marginBottom: 12 }}>
           <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 20, fontWeight: 700, color: '#10B981' }}>€</span>
-          <input autoFocus type="text" inputMode="decimal" placeholder="0,00"
-            value={received} onChange={e => setReceived(e.target.value)}
-            onFocus={scrollFix}
+          <input autoFocus={!isManual} type="text" inputMode="decimal" placeholder="0,00"
+            value={received} onChange={e => setReceived(e.target.value)} onFocus={scrollFix}
             style={{ width: '100%', padding: '12px 14px 12px 32px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid rgba(16,185,129,0.4)', color: 'var(--text-1)', fontSize: 24, fontWeight: 700, colorScheme: 'dark' }} />
         </div>
 
@@ -795,9 +820,7 @@ function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMon
           <label style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, display: 'block', marginBottom: 5 }}>Huidig saldo (optioneel)</label>
           <div style={{ position: 'relative' }}>
             <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 15, color: 'var(--text-3)' }}>€</span>
-            <input type="text" inputMode="decimal" placeholder="0,00"
-              value={balance} onChange={e => setBalance(e.target.value)}
-              onFocus={scrollFix}
+            <input type="text" inputMode="decimal" placeholder="0,00" value={balance} onChange={e => setBalance(e.target.value)} onFocus={scrollFix}
               style={{ width: '100%', padding: '10px 14px 10px 30px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: 16, colorScheme: 'dark' }} />
           </div>
         </div>
@@ -831,7 +854,7 @@ function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMon
         )}
 
         <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={onLater} style={{ flex: 1, padding: '12px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-2)', cursor: 'pointer', fontSize: 14 }}>Later</button>
+          {!isManual && <button onClick={onLater} style={{ flex: 1, padding: '12px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-2)', cursor: 'pointer', fontSize: 14 }}>Later</button>}
           <button onClick={handleSave} disabled={!canSave || saving}
             style={{ flex: 2, padding: '12px', borderRadius: 12, background: canSave ? '#10B981' : 'rgba(255,255,255,0.05)', border: 'none', color: canSave ? '#000' : 'var(--text-3)', cursor: canSave ? 'pointer' : 'default', fontSize: 14, fontWeight: 700 }}>
             {saving ? '...' : 'Invullen'}
@@ -1803,7 +1826,18 @@ export default function GeldPage({ userId, onClose }) {
       )}
 
       {showAdd && <ExpenseModal editing={editing} defaultDate={isCurrentMonth ? undefined : monthEndOf(selYear, selMonth)} onClose={() => { setShowAdd(false); setEditing(null) }} onSave={saveExpense} categories={allCategories} />}
-      {showIncome && <IncomeModal onClose={() => setShowIncome(false)} onSave={saveExpense} />}
+      {showIncome && (
+        <IncomeDayModal
+          source={null}
+          adjustedBase={adjustedBase}
+          savingsGoal={savingsGoal}
+          alreadySavedThisMonth={alreadySavedThisMonth}
+          totalLoanRemaining={remainingLoan}
+          userId={userId}
+          onLater={() => setShowIncome(false)}
+          onDone={() => { setShowIncome(false); fetchAll() }}
+        />
+      )}
       {showSavings && <SavingsModal editing={editingSavings} onClose={() => { setShowSavings(false); setEditingSavings(null) }} onSave={async (data) => { if (editingSavings) { await supabase.from('expenses').update(data).eq('id', editingSavings.id); setEditingSavings(null); setShowSavings(false); fetchAll() } else { saveExpense(data) } }} />}
       {showBudget && <BudgetModal config={config} onClose={() => setShowBudget(false)} onSave={saveBudget} />}
       {showRecurring && <RecurringIncomeModal config={config} onClose={() => setShowRecurring(false)} onSave={saveRecurring} />}
