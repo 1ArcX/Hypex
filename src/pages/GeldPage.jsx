@@ -1308,13 +1308,27 @@ export default function GeldPage({ userId, onClose }) {
           </div>
         )}
 
-        {/* Smart stats — Dagbudget / Prognose / Spaarstreak */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 14 }}>
-          <div style={{ padding: '12px 14px', borderRadius: 16, background: 'var(--bg-card-2)', border: '1px solid var(--border)' }}>
-            <p style={{ fontSize: 10, color: 'var(--text-3)', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Dagbudget</p>
-            <p style={{ fontSize: 18, fontWeight: 700, margin: '0 0 2px', lineHeight: 1.1, color: dagBudget > 15 ? '#10B981' : dagBudget > 5 ? '#F59E0B' : '#EF4444' }}>{fmtShort(dagBudget)}</p>
-            <p style={{ fontSize: 10, color: 'var(--text-3)', margin: 0 }}>{daysLeft}d over</p>
-          </div>
+        {/* Dagbudget — prominent */}
+        {(() => {
+          const dagColor = dagBudget > 15 ? '#10B981' : dagBudget > 5 ? '#F59E0B' : '#EF4444'
+          const dagBg    = dagBudget > 15 ? 'rgba(16,185,129,0.07)' : dagBudget > 5 ? 'rgba(245,158,11,0.07)' : 'rgba(239,68,68,0.07)'
+          const dagBorder= dagBudget > 15 ? 'rgba(16,185,129,0.25)' : dagBudget > 5 ? 'rgba(245,158,11,0.25)' : 'rgba(239,68,68,0.25)'
+          return (
+            <div style={{ padding: '16px 20px', borderRadius: 18, marginBottom: 10, background: dagBg, border: `1px solid ${dagBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <p style={{ fontSize: 11, color: dagColor, margin: '0 0 3px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700 }}>Vandaag nog te besteden</p>
+                <p style={{ fontSize: 38, fontWeight: 800, margin: 0, color: dagColor, lineHeight: 1 }}>{fmt(dagBudget)}</p>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '0 0 2px' }}>{daysLeft} dagen over</p>
+                <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>vandaag {fmt(todayTotal)} uit</p>
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* Prognose + Spaarstreak */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
           <div style={{ padding: '12px 14px', borderRadius: 16, background: projectedOver ? 'rgba(239,68,68,0.07)' : 'var(--bg-card-2)', border: projectedOver ? '1px solid rgba(239,68,68,0.25)' : '1px solid var(--border)' }}>
             <p style={{ fontSize: 10, color: projectedOver ? '#EF4444' : 'var(--text-3)', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Prognose</p>
             {projectedTotal === null
