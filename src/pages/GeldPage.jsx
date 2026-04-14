@@ -873,6 +873,7 @@ const GELD_TABS = [
   { id: 'inkomsten',  label: 'Inkomsten', emoji: '💚' },
   { id: 'uitgaven',   label: 'Uitgaven',  emoji: '💸' },
   { id: 'jaar',       label: 'Jaar',      emoji: '📅' },
+  { id: 'zoeken',     label: 'Zoeken',    emoji: '🔍' },
 ]
 
 export default function GeldPage({ userId, onClose }) {
@@ -900,12 +901,41 @@ export default function GeldPage({ userId, onClose }) {
   const [selMonth, setSelMonth] = useState(_now.getMonth())
   const [subView, setSubView]         = useState('weergave')
   const [isMobile, setIsMobile]       = useState(window.innerWidth < 768)
+  const [searchQuery, setSearchQuery]   = useState('')
+  const [searchResults, setSearchResults] = useState([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [searchTotal, setSearchTotal]   = useState(0)
 
   useEffect(() => {
     const h = () => setIsMobile(window.innerWidth < 768)
     window.addEventListener('resize', h)
     return () => window.removeEventListener('resize', h)
   }, [])
+
+  // Debounced cross-month search
+  useEffect(() => {
+    if (searchQuery.trim().length < 2) {
+      setSearchResults([])
+      setSearchTotal(0)
+      return
+    }
+    setSearchLoading(true)
+    const query = searchQuery.trim()
+    const timer = setTimeout(async () => {
+      const { data } = await supabase.from('expenses')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_income', false)
+        .eq('is_savings_withdrawal', false)
+        .ilike('description', `%${query}%`)
+        .order('date', { ascending: false })
+        .limit(100)
+      setSearchResults(data || [])
+      setSearchTotal(data?.reduce((s, e) => s + Number(e.amount), 0) || 0)
+      setSearchLoading(false)
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [searchQuery, userId])
 
   const fetchAll = useCallback(async () => {
     // prev month relative to selected month
@@ -1428,6 +1458,73 @@ export default function GeldPage({ userId, onClose }) {
               </div>
             </div>
 
+            {/* Day spending heatmap */}
+            {(() => {
+              const DAY_HEADERS = ['Ma','Di','Wo','Do','Vr','Za','Zo']
+              const daysInSelMonth = new Date(selYear, selMonth + 1, 0).getDate()
+              const todayISO = todayStr()
+              // Build spentPerDay map
+              const spentPerDay = {}
+              budgetExpenses.forEach(e => {
+                if (e.date >= monthStartOf(selYear, selMonth) && e.date <= monthEndOf(selYear, selMonth)) {
+                  spentPerDay[e.date] = (spentPerDay[e.date] || 0) + Number(e.amount)
+                }
+              })
+              const dayValues = Object.values(spentPerDay).filter(v => v > 0)
+              const maxDaySpend = dayValues.length > 0 ? Math.max(...dayValues) : 1
+
+              // First weekday of month (Mon=0 … Sun=6)
+              const rawFirstDay = new Date(selYear, selMonth, 1).getDay() // 0=Sun
+              const firstOffset = (rawFirstDay + 6) % 7 // Mon-first
+
+              const cells = []
+              for (let i = 0; i < firstOffset; i++) cells.push(null)
+              for (let d = 1; d <= daysInSelMonth; d++) cells.push(d)
+
+              const cellColor = (d) => {
+                const iso = `${selYear}-${String(selMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+                if (iso > todayISO) return 'rgba(255,255,255,0.03)'
+                const spent = spentPerDay[iso] || 0
+                if (spent === 0) return 'rgba(255,255,255,0.05)'
+                const ratio = spent / maxDaySpend
+                if (ratio < 0.25) return 'rgba(0,255,209,0.18)'
+                if (ratio < 0.5)  return 'rgba(250,204,21,0.35)'
+                if (ratio < 0.75) return 'rgba(249,115,22,0.5)'
+                return 'rgba(239,68,68,0.7)'
+              }
+
+              return (
+                <div style={{ padding: '14px 14px 10px', borderRadius: 16, background: 'var(--bg-card-2)', border: '1px solid var(--border)', marginBottom: 10 }}>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', margin: '0 0 10px' }}>📅 Uitgaven per dag</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
+                    {DAY_HEADERS.map(h => (
+                      <div key={h} style={{ textAlign: 'center', fontSize: 9, color: 'var(--text-3)', fontWeight: 700, paddingBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</div>
+                    ))}
+                    {cells.map((d, idx) => {
+                      if (d === null) return <div key={`e${idx}`} />
+                      const iso = `${selYear}-${String(selMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+                      const isFuture = iso > todayISO
+                      const isToday  = iso === todayISO
+                      return (
+                        <div key={d} style={{
+                          height: 36, borderRadius: 8,
+                          background: cellColor(d),
+                          border: isToday ? '1px solid var(--accent)' : '1px solid transparent',
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1,
+                          opacity: isFuture ? 0.3 : 1,
+                        }}>
+                          <span style={{ fontSize: 11, fontWeight: isToday ? 700 : 400, color: isFuture ? 'var(--text-3)' : 'var(--text-2)', lineHeight: 1 }}>{d}</span>
+                          {!isFuture && spentPerDay[iso] > 0 && (
+                            <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)', lineHeight: 1 }}>€{Math.round(spentPerDay[iso])}</span>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })()}
+
             {/* Donut + Lijn side by side */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
 
@@ -1820,11 +1917,86 @@ export default function GeldPage({ userId, onClose }) {
           })()}
         </>}
 
+        {/* ── ZOEKEN ── */}
+        {subView === 'zoeken' && (() => {
+          // Group searchResults by month
+          const grouped = []
+          let lastKey = null
+          searchResults.forEach(exp => {
+            const d = new Date(exp.date)
+            const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
+            const label = d.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
+            if (key !== lastKey) { grouped.push({ key, label, items: [] }); lastKey = key }
+            grouped[grouped.length - 1].items.push(exp)
+          })
+          return (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>Zoeken</h2>
+              </div>
+              <div style={{ position: 'relative', marginBottom: 12 }}>
+                <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: 'var(--text-3)' }}>🔍</span>
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Zoek in alle uitgaven..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  onFocus={scrollFix}
+                  style={{ width: '100%', padding: '12px 14px 12px 40px', borderRadius: 14, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: 15, colorScheme: 'dark', boxSizing: 'border-box' }}
+                />
+                {searchQuery.length > 0 && (
+                  <button onClick={() => setSearchQuery('')} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4 }}><X size={14} /></button>
+                )}
+              </div>
+
+              {searchLoading && (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '30px 0' }}>
+                  <div style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid var(--border)', borderTopColor: 'var(--accent)', animation: 'spin 0.7s linear infinite' }} />
+                </div>
+              )}
+
+              {!searchLoading && searchQuery.trim().length < 2 && (
+                <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-3)' }}>
+                  <div style={{ fontSize: 36, marginBottom: 10 }}>🔍</div>
+                  <p style={{ fontSize: 14, margin: 0 }}>Typ minimaal 2 tekens om te zoeken</p>
+                </div>
+              )}
+
+              {!searchLoading && searchQuery.trim().length >= 2 && searchResults.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-3)' }}>
+                  <div style={{ fontSize: 36, marginBottom: 10 }}>😶</div>
+                  <p style={{ fontSize: 14, margin: 0 }}>Geen resultaten voor '{searchQuery.trim()}'</p>
+                </div>
+              )}
+
+              {!searchLoading && searchResults.length > 0 && (
+                <>
+                  <div style={{ position: 'sticky', top: 0, zIndex: 10, padding: '8px 12px', borderRadius: 10, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', border: '1px solid var(--border)', marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{searchResults.length} resultaten</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>totaal {fmt(searchTotal)}</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    {grouped.map(({ key, label, items }) => (
+                      <div key={key}>
+                        <p style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 8px' }}>{label}</p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {items.map(exp => renderTxRow(exp))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          )
+        })()}
+
         </div>
       </div>
 
-      {/* Persistent action bar — hidden on jaar tab */}
-      <div style={{ padding: '10px 16px 0', flexShrink: 0, display: subView === 'jaar' ? 'none' : 'block' }}>
+      {/* Persistent action bar — hidden on jaar and zoeken tabs */}
+      <div style={{ padding: '10px 16px 0', flexShrink: 0, display: subView === 'jaar' || subView === 'zoeken' ? 'none' : 'block' }}>
         <div style={{ maxWidth: 480, margin: '0 auto', display: 'flex', gap: 8, paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>
           <button onClick={() => setShowSavings(true)} style={{ flex: 1, padding: '11px 8px', borderRadius: 14, background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.3)', color: '#EF4444', cursor: 'pointer', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             <TrendingDown size={14} /> Spaar af
