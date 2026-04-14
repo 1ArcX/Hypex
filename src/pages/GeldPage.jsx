@@ -1280,7 +1280,7 @@ export default function GeldPage({ userId, onClose }) {
           </div>
         </div>
 
-        {/* Recurring income sources */}
+        {/* Recurring income sources
         {hasRecurring && (
           <div style={{ marginBottom: 14, padding: '12px 14px', borderRadius: 16, background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.18)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -1306,7 +1306,7 @@ export default function GeldPage({ userId, onClose }) {
               })}
             </div>
           </div>
-        )}
+        )} */}
 
         {/* Dagbudget — prominent */}
         {(() => {
@@ -1317,11 +1317,12 @@ export default function GeldPage({ userId, onClose }) {
             <div style={{ padding: '16px 20px', borderRadius: 18, marginBottom: 10, background: dagBg, border: `1px solid ${dagBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <p style={{ fontSize: 11, color: dagColor, margin: '0 0 3px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700 }}>Vandaag nog te besteden</p>
-                <p style={{ fontSize: 38, fontWeight: 800, margin: 0, color: dagColor, lineHeight: 1 }}>{fmt(dagBudget)}</p>
+                <p style={{ fontSize: 38, fontWeight: 800, margin: 0, color: dagColor, lineHeight: 1 }}>{fmt(dagBudget - todayTotal)}</p>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '0 0 2px' }}>{daysLeft} dagen over</p>
                 <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>vandaag {fmt(todayTotal)} uit</p>
+                <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>dag budget:  {fmt(dagBudget)} uit</p>
               </div>
             </div>
           )
