@@ -741,23 +741,17 @@ function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMon
   const backdropRef = useRef(null)
   usePreventTouch(backdropRef)
   const [received, setReceived] = useState('')
-  const [balance, setBalance]   = useState(() => {
-    try { return localStorage.getItem('current_balance') || '' } catch { return '' }
-  })
   const [desc, setDesc]       = useState('')
   const [catId, setCatId]     = useState('salaris')
   const [saving, setSaving]   = useState(false)
   const isManual = !source
 
-  const rec = parseFloat(String(received).replace(',', '.')) || 0
-  const bal = parseFloat(String(balance).replace(',', '.')) || 0
   const r2  = (n) => Math.round(n * 100) / 100
-  const targetBalance      = savingsGoal
-  const toTopUp            = r2(Math.max(0, Math.min(rec, targetBalance - bal)))
-  const excessAfterTopUp   = r2(Math.max(0, rec - toTopUp))
+  const rec             = parseFloat(String(received).replace(',', '.')) || 0
   const remainingSavNeeded = r2(Math.max(0, savingsGoal - alreadySavedThisMonth))
-  const toSavings          = r2(Math.min(excessAfterTopUp, remainingSavNeeded))
-  const toLoan             = r2(totalLoanRemaining > 0 ? Math.min(Math.max(0, excessAfterTopUp - toSavings), totalLoanRemaining) : 0)
+  const toSavings       = r2(Math.min(rec, remainingSavNeeded))
+  const toLoan          = r2(totalLoanRemaining > 0 ? Math.min(Math.max(0, rec - toSavings), totalLoanRemaining) : 0)
+  const free            = r2(rec - toSavings - toLoan)
 
   const canSave = rec > 0 && (!isManual || desc.trim().length > 0)
 
@@ -765,7 +759,6 @@ function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMon
     if (!canSave || saving) return
     setSaving(true)
     try {
-      localStorage.setItem('current_balance', String(Math.max(0, bal + toTopUp)))
       const incomeDesc = isManual ? desc.trim() : source.name
       const incomeCat  = isManual ? catId : (source.category || 'salaris')
       const inserts = [
@@ -816,25 +809,12 @@ function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMon
             style={{ width: '100%', padding: '12px 14px 12px 32px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid rgba(16,185,129,0.4)', color: 'var(--text-1)', fontSize: 24, fontWeight: 700, colorScheme: 'dark' }} />
         </div>
 
-        <div style={{ marginBottom: 14 }}>
-          <label style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, display: 'block', marginBottom: 5 }}>Huidig saldo (optioneel)</label>
-          <div style={{ position: 'relative' }}>
-            <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 15, color: 'var(--text-3)' }}>€</span>
-            <input type="text" inputMode="decimal" placeholder="0,00" value={balance} onChange={e => setBalance(e.target.value)} onFocus={scrollFix}
-              style={{ width: '100%', padding: '10px 14px 10px 30px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: 16, colorScheme: 'dark' }} />
-          </div>
-        </div>
-
         {rec > 0 && (
           <div style={{ padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '0 0 4px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Verdeling</p>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-              <span style={{ color: 'var(--text-3)' }}>💰 Aanvullen spaardoel (tot {fmt(targetBalance)})</span>
-              <span style={{ fontWeight: 700, color: toTopUp > 0 ? 'var(--accent)' : 'var(--text-3)' }}>{fmt(toTopUp)}</span>
-            </div>
+            <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '0 0 4px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Advies verdeling</p>
             {toSavings > 0 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                <span style={{ color: 'var(--text-3)' }}>💰 Naar spaardoel</span>
+                <span style={{ color: 'var(--text-3)' }}>💰 Naar spaarrekening</span>
                 <span style={{ fontWeight: 700, color: '#10B981' }}>{fmt(toSavings)}</span>
               </div>
             )}
@@ -844,10 +824,10 @@ function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMon
                 <span style={{ fontWeight: 700, color: '#F59E0B' }}>{fmt(toLoan)}</span>
               </div>
             )}
-            {excessAfterTopUp - toSavings - toLoan > 0.005 && (
+            {free > 0.005 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
                 <span style={{ color: 'var(--text-3)' }}>Vrij te besteden</span>
-                <span style={{ fontWeight: 700, color: 'var(--text-1)' }}>{fmt(excessAfterTopUp - toSavings - toLoan)}</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-1)' }}>{fmt(free)}</span>
               </div>
             )}
           </div>
