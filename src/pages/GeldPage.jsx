@@ -751,7 +751,7 @@ function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMon
 
   const rec = parseFloat(String(received).replace(',', '.')) || 0
   const bal = parseFloat(String(balance).replace(',', '.')) || 0
-  const targetBalance      = adjustedBase
+  const targetBalance      = savingsGoal
   const toTopUp            = Math.max(0, Math.min(rec, targetBalance - bal))
   const excessAfterTopUp   = Math.max(0, rec - toTopUp)
   const remainingSavNeeded = Math.max(0, savingsGoal - alreadySavedThisMonth)
@@ -829,7 +829,7 @@ function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMon
           <div style={{ padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
             <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '0 0 4px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Verdeling</p>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-              <span style={{ color: 'var(--text-3)' }}>🏦 Aanvullen saldo (tot {fmt(targetBalance)})</span>
+              <span style={{ color: 'var(--text-3)' }}>💰 Aanvullen spaardoel (tot {fmt(targetBalance)})</span>
               <span style={{ fontWeight: 700, color: toTopUp > 0 ? 'var(--accent)' : 'var(--text-3)' }}>{fmt(toTopUp)}</span>
             </div>
             {toSavings > 0 && (
