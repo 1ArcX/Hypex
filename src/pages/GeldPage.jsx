@@ -1322,7 +1322,7 @@ export default function GeldPage({ userId, onClose }) {
               <div style={{ textAlign: 'right' }}>
                 <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '0 0 2px' }}>{daysLeft} dagen over</p>
                 <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>vandaag {fmt(todayTotal)} uit</p>
-                <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>dag budget:  {fmt(dagBudget)} uit</p>
+                <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>dag budget:  {fmt(dagBudget)}</p>
               </div>
             </div>
           )
