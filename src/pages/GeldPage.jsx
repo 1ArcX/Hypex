@@ -100,7 +100,7 @@ function useScrollContain(ref) {
 
 function fmt(n) { return `€${Number(n).toFixed(2).replace('.', ',')}` }
 function fmtShort(n) { return `€${Math.round(n)}` }
-function todayStr() { return new Date().toISOString().slice(0, 10) }
+function todayStr() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` }
 function monthStartOf(y, m) { return `${y}-${String(m+1).padStart(2,'0')}-01` }
 function monthEndOf(y, m) {
   const last = new Date(y, m+1, 0)
@@ -118,7 +118,7 @@ function isPayDayToday(src) {
   const today = new Date()
   if (src.type === 'monthly') return today.getDate() === src.day
   if (src.type === 'interval' && src.ref_date) {
-    const todayISO = today.toISOString().slice(0, 10)
+    const todayISO = todayStr()
     const ms = src.interval_days * 86400000
     let d = new Date(src.ref_date + 'T12:00:00')
     while (d.toISOString().slice(0, 10) < todayISO) d = new Date(d.getTime() + ms)
@@ -127,12 +127,12 @@ function isPayDayToday(src) {
   return false
 }
 function getFilledInToday() {
-  try { const d = JSON.parse(localStorage.getItem('income_filled_in') || '{}'); return d[new Date().toISOString().slice(0,10)] || [] } catch { return [] }
+  try { const d = JSON.parse(localStorage.getItem('income_filled_in') || '{}'); return d[todayStr()] || [] } catch { return [] }
 }
 function markFilledInToday(id) {
   try {
     const data = JSON.parse(localStorage.getItem('income_filled_in') || '{}')
-    const today = new Date().toISOString().slice(0, 10)
+    const today = todayStr()
     data[today] = [...new Set([...(data[today] || []), id])]
     Object.keys(data).forEach(d => { if (d < today) delete data[d] })
     localStorage.setItem('income_filled_in', JSON.stringify(data))
@@ -751,12 +751,13 @@ function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMon
 
   const rec = parseFloat(String(received).replace(',', '.')) || 0
   const bal = parseFloat(String(balance).replace(',', '.')) || 0
+  const r2  = (n) => Math.round(n * 100) / 100
   const targetBalance      = savingsGoal
-  const toTopUp            = Math.max(0, Math.min(rec, targetBalance - bal))
-  const excessAfterTopUp   = Math.max(0, rec - toTopUp)
-  const remainingSavNeeded = Math.max(0, savingsGoal - alreadySavedThisMonth)
-  const toSavings          = Math.min(excessAfterTopUp, remainingSavNeeded)
-  const toLoan             = totalLoanRemaining > 0 ? Math.min(Math.max(0, excessAfterTopUp - toSavings), totalLoanRemaining) : 0
+  const toTopUp            = r2(Math.max(0, Math.min(rec, targetBalance - bal)))
+  const excessAfterTopUp   = r2(Math.max(0, rec - toTopUp))
+  const remainingSavNeeded = r2(Math.max(0, savingsGoal - alreadySavedThisMonth))
+  const toSavings          = r2(Math.min(excessAfterTopUp, remainingSavNeeded))
+  const toLoan             = r2(totalLoanRemaining > 0 ? Math.min(Math.max(0, excessAfterTopUp - toSavings), totalLoanRemaining) : 0)
 
   const canSave = rec > 0 && (!isManual || desc.trim().length > 0)
 
@@ -770,7 +771,6 @@ function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMon
       const inserts = [
         supabase.from('expenses').insert({ user_id: userId, amount: rec, category: incomeCat, description: incomeDesc, date: todayStr(), is_income: true, is_savings_withdrawal: false }),
       ]
-      if (toSavings > 0) inserts.push(supabase.from('expenses').insert({ user_id: userId, amount: toSavings, category: 'overig', description: '🏦 Spaarstorting', date: todayStr(), is_savings_contribution: true, is_income: false, is_savings_withdrawal: false }))
       if (toLoan > 0) inserts.push(supabase.from('expenses').insert({ user_id: userId, amount: toLoan, category: 'overig', description: '↩ Gedeeltelijke terugbetaling lening', date: todayStr(), is_loan_repayment: true, is_income: false, is_savings_withdrawal: false }))
       await Promise.all(inserts)
       if (!isManual) markFilledInToday(source.id)
