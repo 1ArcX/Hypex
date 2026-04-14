@@ -1070,7 +1070,11 @@ export default function GeldPage({ userId, onClose }) {
   // Carryover from previous month
   const prevRegular  = prevExpenses.filter(e => !e.is_savings_withdrawal && !e.is_income && !e.paid_from_savings)
   const prevSpent    = prevRegular.reduce((s, e) => s + Number(e.amount), 0)
-  const carryover    = Math.max(0, prevSpent - base)
+  // Maart 2026 wordt buiten beschouwing gelaten voor carryover (eenmalig)
+  const _prevY = selMonth === 0 ? selYear - 1 : selYear
+  const _prevM = selMonth === 0 ? 11 : selMonth - 1
+  const prevIsMarch2026 = _prevY === 2026 && _prevM === 2
+  const carryover    = prevIsMarch2026 ? 0 : Math.max(0, prevSpent - base)
   // Vaste lasten budget wordt pre-afgetrokken van de basis zodat de grote
   // kaart alleen het vrij te besteden geld toont
   const vasteLastenBudget = catBudgets[FIXED_CAT] || 0
