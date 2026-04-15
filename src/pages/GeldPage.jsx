@@ -359,6 +359,7 @@ function BudgetModal({ config, onClose, onSave }) {
   const [cats,       setCats]       = useState(config?.category_budgets || DEFAULT_CAT_BUDGETS)
   const [customCats,   setCustomCats]   = useState(config?.custom_categories || [])
   const [savingsGoal,  setSavingsGoal]  = useState(config?.savings_goal || 0)
+  const [minBalance,   setMinBalance]   = useState(config?.min_balance ?? 300)
   const [addingCat,    setAddingCat]    = useState(false)
   const [newName,    setNewName]    = useState('')
   const [newEmoji,   setNewEmoji]   = useState('🎮')
@@ -414,6 +415,17 @@ function BudgetModal({ config, onClose, onSave }) {
               style={{ width: '100%', padding: '12px 14px 12px 30px', borderRadius: 12, background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.25)', color: '#10B981', fontSize: 20, fontWeight: 700, colorScheme: 'dark' }} />
           </div>
           <p style={{ fontSize: 11, color: 'rgba(16,185,129,0.6)', margin: '6px 0 0' }}>Dit bedrag wordt automatisch van je inkomen afgetrokken. Beschikbaar = inkomen − spaardoel.</p>
+        </div>
+
+        <div style={{ marginBottom: 20, padding: '14px 16px', borderRadius: 14, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)' }}>
+          <label style={{ fontSize: 11, color: '#3B82F6', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', marginBottom: 8 }}>💳 Minimum saldo hoofdrekening</label>
+          <div style={{ position: 'relative' }}>
+            <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 18, color: '#3B82F6' }}>€</span>
+            <input type="number" value={minBalance} onChange={e => setMinBalance(+e.target.value)}
+              onFocus={scrollFix}
+              style={{ width: '100%', padding: '12px 14px 12px 30px', borderRadius: 12, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.25)', color: '#3B82F6', fontSize: 20, fontWeight: 700, colorScheme: 'dark' }} />
+          </div>
+          <p style={{ fontSize: 11, color: 'rgba(59,130,246,0.6)', margin: '6px 0 0' }}>Hoeveel je minimaal op je hoofdrekening wil houden na overschrijvingen.</p>
         </div>
 
         <label style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', marginBottom: 10 }}>Per categorie</label>
@@ -496,7 +508,7 @@ function BudgetModal({ config, onClose, onSave }) {
           </span>
         </div>
 
-        <button onClick={() => onSave({ monthly_budget: monthly, category_budgets: cats, custom_categories: customCats, savings_goal: savingsGoal })}
+        <button onClick={() => onSave({ monthly_budget: monthly, category_budgets: cats, custom_categories: customCats, savings_goal: savingsGoal, min_balance: minBalance })}
           style={{ width: '100%', padding: '14px', borderRadius: 14, background: 'var(--accent)', border: 'none', color: '#000', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
           Opslaan
         </button>
@@ -1003,6 +1015,7 @@ export default function GeldPage({ userId, onClose }) {
 
   // Derived stats
   const monthlyBudget      = config?.monthly_budget || 400
+  const minBalance         = config?.min_balance ?? 300
   const catBudgets         = config?.category_budgets || DEFAULT_CAT_BUDGETS
   const customCategories   = config?.custom_categories || []
   const allCategories      = [...CATEGORIES, ...customCategories]
@@ -2086,7 +2099,7 @@ export default function GeldPage({ userId, onClose }) {
       {showIncome && (
         <IncomeDayModal
           source={null}
-          adjustedBase={monthlyBudget}
+          adjustedBase={minBalance}
           savingsGoal={savingsGoal}
           alreadySavedThisMonth={alreadySavedThisMonth}
           totalLoanRemaining={remainingLoan}
@@ -2101,7 +2114,7 @@ export default function GeldPage({ userId, onClose }) {
       {pendingIncomeSource && (
         <IncomeDayModal
           source={pendingIncomeSource}
-          adjustedBase={monthlyBudget}
+          adjustedBase={minBalance}
           savingsGoal={savingsGoal}
           alreadySavedThisMonth={alreadySavedThisMonth}
           totalLoanRemaining={remainingLoan}
