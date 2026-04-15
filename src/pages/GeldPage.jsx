@@ -145,9 +145,10 @@ function markFilledInToday(id) {
 }
 
 // ── Expense Log Modal ─────────────────────────────────────────────────────────
-function ExpenseModal({ onClose, onSave, editing, categories = CATEGORIES, defaultDate }) {
+function ExpenseModal({ onClose, onSave, editing, categories = CATEGORIES, defaultDate, plannedMode }) {
   const backdropRef = useRef(null)
   usePreventTouch(backdropRef)
+  const isPlanned = plannedMode || editing?.is_planned
   const [amount, setAmount]             = useState(editing?.amount || '')
   const [cat, setCat]                   = useState(editing?.category || 'eten')
   const [desc, setDesc]                 = useState(editing?.description || '')
@@ -156,8 +157,14 @@ function ExpenseModal({ onClose, onSave, editing, categories = CATEGORIES, defau
 
   const handleSave = () => {
     const n = parseFloat(String(amount).replace(',', '.'))
+    if (isPlanned) {
+      // Planned: description required, amount optional
+      if (!desc.trim()) return
+      onSave({ amount: n || 0, category: cat, description: desc.trim(), date, is_savings_withdrawal: false, paid_from_savings: false, is_planned: !editing?.is_planned ? true : false })
+      return
+    }
     if (!n || n <= 0) return
-    onSave({ amount: n, category: cat, description: desc.trim(), date, is_savings_withdrawal: false, paid_from_savings: paidFromSavings })
+    onSave({ amount: n, category: cat, description: desc.trim(), date, is_savings_withdrawal: false, paid_from_savings: paidFromSavings, is_planned: false })
   }
 
   return ReactDOM.createPortal(
@@ -165,20 +172,22 @@ function ExpenseModal({ onClose, onSave, editing, categories = CATEGORIES, defau
       <div style={{ width: '100%', maxWidth: 480, background: 'var(--bg-sidebar)', borderRadius: '22px 22px 0 0', border: '1px solid var(--border)', borderBottom: 'none', padding: '20px 20px calc(24px + env(safe-area-inset-bottom) + var(--keyboard-height, 0px))', animation: 'sheetUp 0.3s cubic-bezier(0.34,1.1,0.64,1)' }}>
         <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border)', margin: '0 auto 18px' }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>{editing ? 'Bewerken' : 'Uitgave toevoegen'}</h3>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: isPlanned ? '#F59E0B' : 'var(--text-1)', margin: 0 }}>
+            {isPlanned ? '📌 Geplande uitgave' : editing ? 'Bewerken' : 'Uitgave toevoegen'}
+          </h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)' }}><X size={18} /></button>
         </div>
 
-        {/* Amount */}
+        {/* Amount — optioneel bij planned */}
         <div style={{ marginBottom: 16 }}>
           <div style={{ position: 'relative' }}>
-            <span style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', fontSize: 24, fontWeight: 700, color: 'var(--text-3)' }}>€</span>
+            <span style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', fontSize: 24, fontWeight: 700, color: isPlanned ? 'rgba(245,158,11,0.5)' : 'var(--text-3)' }}>€</span>
             <input
-              autoFocus type="text" inputMode="decimal" placeholder="0,00"
+              autoFocus={!isPlanned} type="text" inputMode="decimal" placeholder={isPlanned ? '0,00 (optioneel)' : '0,00'}
               value={amount} onChange={e => setAmount(e.target.value)}
               onFocus={scrollFix}
               onKeyDown={e => e.key === 'Enter' && handleSave()}
-              style={{ width: '100%', padding: '14px 16px 14px 36px', borderRadius: 14, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: 28, fontWeight: 700, colorScheme: 'dark' }}
+              style={{ width: '100%', padding: '14px 16px 14px 36px', borderRadius: 14, background: 'var(--bg-card-2)', border: `1px solid ${isPlanned ? 'rgba(245,158,11,0.3)' : 'var(--border)'}`, color: 'var(--text-1)', fontSize: 28, fontWeight: 700, colorScheme: 'dark' }}
             />
           </div>
         </div>
@@ -193,12 +202,13 @@ function ExpenseModal({ onClose, onSave, editing, categories = CATEGORIES, defau
           ))}
         </div>
 
-        {/* Description */}
+        {/* Description — verplicht bij planned */}
         <input
-          placeholder="Omschrijving (optioneel)"
+          autoFocus={isPlanned}
+          placeholder={isPlanned ? 'Omschrijving (verplicht)' : 'Omschrijving (optioneel)'}
           value={desc} onChange={e => setDesc(e.target.value)}
           onFocus={scrollFix}
-          style={{ width: '100%', padding: '10px 14px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: 14, marginBottom: 12, colorScheme: 'dark' }}
+          style={{ width: '100%', padding: '10px 14px', borderRadius: 12, background: 'var(--bg-card-2)', border: `1px solid ${isPlanned && !desc.trim() ? 'rgba(245,158,11,0.4)' : 'var(--border)'}`, color: 'var(--text-1)', fontSize: 14, marginBottom: 12, colorScheme: 'dark' }}
         />
 
         {/* Date */}
@@ -207,8 +217,8 @@ function ExpenseModal({ onClose, onSave, editing, categories = CATEGORIES, defau
           style={{ width: '100%', padding: '10px 14px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-3)', fontSize: 13, marginBottom: 18, colorScheme: 'dark' }}
         />
 
-        {/* Betaald van spaarrekening toggle */}
-        <div onClick={() => setPFS(p => !p)}
+        {/* Betaald van spaarrekening toggle — niet bij planned */}
+        {!isPlanned && <div onClick={() => setPFS(p => !p)}
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 14px', borderRadius: 12, background: paidFromSavings ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.03)', border: paidFromSavings ? '1px solid rgba(245,158,11,0.35)' : '1px solid var(--border)', marginBottom: 14, cursor: 'pointer' }}>
           <div>
             <p style={{ fontSize: 13, fontWeight: 600, color: paidFromSavings ? '#F59E0B' : 'var(--text-3)', margin: '0 0 1px' }}>🏦 Betaald van spaarrekening</p>
@@ -217,10 +227,12 @@ function ExpenseModal({ onClose, onSave, editing, categories = CATEGORIES, defau
           <div style={{ width: 40, height: 22, borderRadius: 11, background: paidFromSavings ? 'rgba(245,158,11,0.5)' : 'rgba(255,255,255,0.1)', position: 'relative', flexShrink: 0, transition: 'background 0.2s' }}>
             <div style={{ position: 'absolute', width: 18, height: 18, borderRadius: '50%', background: paidFromSavings ? '#F59E0B' : 'rgba(255,255,255,0.35)', top: 2, left: paidFromSavings ? 20 : 2, transition: 'left 0.2s' }} />
           </div>
-        </div>
+        </div>}
 
-        <button onClick={handleSave} style={{ width: '100%', padding: '14px', borderRadius: 14, background: 'var(--accent)', border: 'none', color: '#000', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
-          {editing ? 'Opslaan' : '+ Toevoegen'}
+        <button onClick={handleSave}
+          disabled={isPlanned && !desc.trim()}
+          style={{ width: '100%', padding: '14px', borderRadius: 14, background: isPlanned ? (desc.trim() ? '#F59E0B' : 'rgba(245,158,11,0.2)') : 'var(--accent)', border: 'none', color: '#000', fontSize: 15, fontWeight: 700, cursor: isPlanned && !desc.trim() ? 'default' : 'pointer' }}>
+          {editing?.is_planned ? '✓ Bevestig als echte uitgave' : isPlanned ? '📌 Vastpinnen' : editing ? 'Opslaan' : '+ Toevoegen'}
         </button>
       </div>
     </div>,
@@ -905,6 +917,7 @@ export default function GeldPage({ userId, onClose }) {
   const [showSavings, setShowSavings] = useState(false)
   const [showBudget, setShowBudget]   = useState(false)
   const [editing, setEditing]         = useState(null)
+  const [showPlanned, setShowPlanned] = useState(false)
   const [showAll, setShowAll]         = useState(false)
   const [showRecurring, setShowRecurring]   = useState(false)
   const [editingSavings, setEditingSavings]     = useState(null)
@@ -1045,7 +1058,8 @@ export default function GeldPage({ userId, onClose }) {
   const allCategories      = [...CATEGORIES, ...customCategories]
   const manualIncome       = expenses.filter(e => e.is_income)
   const totalManualIncome  = manualIncome.reduce((s, e) => s + Number(e.amount), 0)
-  const regularExpenses    = expenses.filter(e => !e.is_savings_withdrawal && !e.is_income && !e.is_savings_contribution && !e.is_loan_repayment)
+  const plannedExpenses    = expenses.filter(e => e.is_planned)
+  const regularExpenses    = expenses.filter(e => !e.is_savings_withdrawal && !e.is_income && !e.is_savings_contribution && !e.is_loan_repayment && !e.is_planned)
   // Budget spending = regular expenses that were NOT paid from savings
   // (savings-funded spending is tracked separately and doesn't count against budget)
   // Vaste lasten (abonnementen) worden buiten het vrije budget gehouden
@@ -1930,10 +1944,37 @@ export default function GeldPage({ userId, onClose }) {
 
         {/* ── UITGAVEN ── */}
         {subView === 'uitgaven' && <>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>Uitgaven</h2>
-            <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{fmt(totalSpent)} totaal</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{fmt(totalSpent)} totaal</span>
+              <button onClick={() => setShowPlanned(true)} style={{ padding: '6px 10px', borderRadius: 10, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', color: '#F59E0B', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>📌 Plannen</button>
+            </div>
           </div>
+
+          {/* Geplande uitgaven */}
+          {plannedExpenses.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <p style={{ fontSize: 11, color: '#F59E0B', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700 }}>📌 Gepland</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {plannedExpenses.map(exp => {
+                  const cat = allCategories.find(c => c.id === exp.category) || CATEGORIES[6]
+                  return (
+                    <div key={exp.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 14, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.3)' }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(245,158,11,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>{cat.emoji}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exp.description}</p>
+                        <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>{exp.date}{exp.amount > 0 ? ` · ${fmt(exp.amount)}` : ' · bedrag onbekend'}</p>
+                      </div>
+                      <button onClick={() => { setEditing(exp); setShowAdd(true) }} style={{ background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.35)', borderRadius: 8, cursor: 'pointer', color: '#F59E0B', padding: '5px 8px', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>✓ Bevestig</button>
+                      <button onClick={() => deleteExpense(exp.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(239,68,68,0.5)', padding: 4 }}><Trash2 size={14} /></button>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {regularExpenses.length > 0 ? <>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
               {(showAll ? regularExpenses : regularExpenses.slice(0, 12)).map(exp => renderTxRow(exp))}
@@ -1943,13 +1984,13 @@ export default function GeldPage({ userId, onClose }) {
                 {showAll ? <><ChevronUp size={14} /> Minder tonen</> : <><ChevronDown size={14} /> Alle {regularExpenses.length} tonen</>}
               </button>
             )}
-          </> : (
+          </> : plannedExpenses.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-3)' }}>
               <div style={{ fontSize: 40, marginBottom: 10 }}>💰</div>
               <p style={{ fontSize: 15, fontWeight: 600, margin: '0 0 4px', color: 'var(--text-2)' }}>Nog geen uitgaves</p>
               <p style={{ fontSize: 13, margin: 0 }}>Voeg je eerste uitgave toe</p>
             </div>
-          )}
+          ) : null}
         </>}
 
         {subView === 'jaar' && <>
@@ -2125,6 +2166,7 @@ export default function GeldPage({ userId, onClose }) {
       </div>
 
       {showAdd && <ExpenseModal editing={editing} defaultDate={isCurrentMonth ? undefined : monthEndOf(selYear, selMonth)} onClose={() => { setShowAdd(false); setEditing(null) }} onSave={saveExpense} categories={allCategories} />}
+      {showPlanned && <ExpenseModal plannedMode onClose={() => setShowPlanned(false)} onSave={(data) => { saveExpense(data); setShowPlanned(false) }} categories={allCategories} defaultDate={isCurrentMonth ? undefined : monthEndOf(selYear, selMonth)} />}
       {showIncome && (
         <IncomeDayModal
           source={null}
