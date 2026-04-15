@@ -2082,21 +2082,17 @@ export default function GeldPage({ userId, onClose }) {
         </div>
       </div>
 
-      {/* Tab bar — zit in de normale flow, geen portal */}
-      <div style={{ borderTop: '1px solid var(--border)', background: 'var(--bg-sidebar)', padding: isMobile ? `8px 6px calc(8px + env(safe-area-inset-bottom))` : '10px 16px', flexShrink: 0, display: 'flex', gap: isMobile ? 2 : 8, justifyContent: 'center' }}>
+      {/* Tab bar */}
+      <div style={{ borderTop: '1px solid var(--border)', background: 'var(--bg-sidebar)', padding: isMobile ? '6px 6px' : '10px 16px', flexShrink: 0, display: 'flex', gap: isMobile ? 2 : 8, justifyContent: 'center' }}>
         {isMobile ? (
           <>
             {GELD_TABS.map(tab => (
               <button key={tab.id} onClick={() => setSubView(tab.id)}
-                style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '5px 2px', borderRadius: 10, background: subView === tab.id ? 'rgba(0,255,209,0.1)' : 'none', border: 'none', cursor: 'pointer' }}>
-                <span style={{ fontSize: 18 }}>{tab.emoji}</span>
+                style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '4px 2px', borderRadius: 10, background: subView === tab.id ? 'rgba(0,255,209,0.1)' : 'none', border: 'none', cursor: 'pointer' }}>
+                <span style={{ fontSize: 16 }}>{tab.emoji}</span>
                 <span style={{ fontSize: 9, color: subView === tab.id ? 'var(--accent)' : 'var(--text-3)', fontWeight: subView === tab.id ? 700 : 400 }}>{tab.label}</span>
               </button>
             ))}
-            <button onClick={onClose} style={{ width: 46, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, padding: '5px 4px', borderRadius: 10, background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
-              <X size={17} color="rgba(255,255,255,0.4)" />
-              <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Sluiten</span>
-            </button>
           </>
         ) : (
           <div style={{ maxWidth: 480, width: '100%', display: 'flex', gap: 8 }}>
