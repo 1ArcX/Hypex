@@ -23,16 +23,17 @@ const INCOME_CATEGORIES = [
 
 // ── Recurring income helpers ──────────────────────────────────────────────────
 function getNextPayDate(src) {
-  const now = new Date()
+  const todayISO = todayStr()
   if (src.type === 'monthly') {
+    const now = new Date()
     let d = new Date(now.getFullYear(), now.getMonth(), src.day)
-    if (d <= now) d = new Date(now.getFullYear(), now.getMonth() + 1, src.day)
+    if (d.toISOString().slice(0, 10) <= todayISO) d = new Date(now.getFullYear(), now.getMonth() + 1, src.day)
     return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
   }
   if (src.type === 'interval' && src.ref_date) {
     const ms = src.interval_days * 86400000
     let d = new Date(src.ref_date + 'T12:00:00')
-    while (d <= now) d = new Date(d.getTime() + ms)
+    while (d.toISOString().slice(0, 10) <= todayISO) d = new Date(d.getTime() + ms)
     return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
   }
   return null
