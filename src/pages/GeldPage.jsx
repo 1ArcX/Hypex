@@ -897,6 +897,7 @@ export default function GeldPage({ userId, onClose }) {
   const [loanRepayments, setLoanRepayments]   = useState([])
   const [dismissedIncomeIds, setDismissedIncomeIds] = useState([])
   const [loanRepayInput, setLoanRepayInput]   = useState('')
+  const [savingsInput, setSavingsInput]       = useState('')
   const _now = new Date()
   const [selYear, setSelYear]   = useState(_now.getFullYear())
   const [selMonth, setSelMonth] = useState(_now.getMonth())
@@ -955,9 +956,10 @@ export default function GeldPage({ userId, onClose }) {
       supabase.from('expenses').select('amount, date, is_income, is_savings_withdrawal, category').eq('user_id', userId)
         .gte('date', `${selYear}-01-01`).lte('date', `${selYear}-12-31`),
       // Savings contributions this month
-      supabase.from('expenses').select('amount').eq('user_id', userId)
+      supabase.from('expenses').select('id, amount, date, description').eq('user_id', userId)
         .eq('is_savings_contribution', true)
-        .gte('date', monthStartOf(selYear, selMonth)).lte('date', monthEndOf(selYear, selMonth)),
+        .gte('date', monthStartOf(selYear, selMonth)).lte('date', monthEndOf(selYear, selMonth))
+        .order('date', { ascending: false }),
       // Loan repayments this year
       supabase.from('expenses').select('amount').eq('user_id', userId)
         .eq('is_loan_repayment', true)
@@ -1790,6 +1792,62 @@ export default function GeldPage({ userId, onClose }) {
                       }}
                       style={{ padding: '9px 14px', borderRadius: 10, background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', color: '#10B981', cursor: 'pointer', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>
                       Storten
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Spaaroverschrijvingen deze maand */}
+          {savingsGoal > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ borderRadius: 16, background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.3)', overflow: 'hidden' }}>
+                <div style={{ padding: '14px 16px' }}>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: '#10B981', margin: '0 0 4px' }}>🏦 Spaaroverboeking deze maand</p>
+                  <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '0 0 10px' }}>
+                    {fmt(alreadySavedThisMonth)} overgeboekt van {fmt(savingsGoal)} doel
+                  </p>
+                  <div style={{ height: 6, background: 'rgba(255,255,255,0.07)', borderRadius: 4, overflow: 'hidden', marginBottom: 6 }}>
+                    <div style={{ height: '100%', width: `${savingsGoal > 0 ? Math.min(100, (alreadySavedThisMonth / savingsGoal) * 100) : 0}%`, background: '#10B981', borderRadius: 4, transition: 'width 0.5s' }} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-3)', marginBottom: savingsContribs.length > 0 ? 10 : 12 }}>
+                    <span>Overgeboekt: {fmt(alreadySavedThisMonth)}</span>
+                    <span>Nog te gaan: {fmt(Math.max(0, savingsGoal - alreadySavedThisMonth))}</span>
+                  </div>
+                  {/* Lijst van bijdragen */}
+                  {savingsContribs.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
+                      {savingsContribs.map(c => (
+                        <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, padding: '6px 0', borderTop: '1px solid rgba(16,185,129,0.1)' }}>
+                          <span style={{ color: 'var(--text-3)' }}>{c.date} · {c.description || 'Spaarstorting'}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontWeight: 700, color: '#10B981' }}>{fmt(c.amount)}</span>
+                            <button onClick={async () => { await supabase.from('expenses').delete().eq('id', c.id); fetchAll() }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(239,68,68,0.5)', padding: 2 }}><Trash2 size={13} /></button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {/* Handmatig toevoegen */}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ position: 'relative', flex: 1 }}>
+                      <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: 'var(--text-3)' }}>€</span>
+                      <input type="text" inputMode="decimal" placeholder="Bedrag overgeboekt"
+                        value={savingsInput} onChange={e => setSavingsInput(e.target.value)}
+                        onFocus={scrollFix}
+                        style={{ width: '100%', padding: '9px 10px 9px 26px', borderRadius: 10, background: 'var(--bg-card-2)', border: '1px solid rgba(16,185,129,0.3)', color: 'var(--text-1)', fontSize: 14, colorScheme: 'dark' }} />
+                    </div>
+                    <button
+                      onClick={async () => {
+                        const amt = parseFloat(String(savingsInput).replace(',', '.'))
+                        if (!amt || amt <= 0) return
+                        await supabase.from('expenses').insert({ user_id: userId, amount: amt, category: 'overig', description: '🏦 Spaarstorting', date: todayStr(), is_savings_contribution: true, is_income: false, is_savings_withdrawal: false })
+                        setSavingsInput('')
+                        fetchAll()
+                      }}
+                      style={{ padding: '9px 14px', borderRadius: 10, background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', color: '#10B981', cursor: 'pointer', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                      Toevoegen
                     </button>
                   </div>
                 </div>
