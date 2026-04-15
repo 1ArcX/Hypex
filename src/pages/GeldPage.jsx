@@ -2096,7 +2096,7 @@ export default function GeldPage({ userId, onClose }) {
       {showIncome && (
         <IncomeDayModal
           source={null}
-          adjustedBase={adjustedBase}
+          adjustedBase={monthlyBudget}
           savingsGoal={savingsGoal}
           alreadySavedThisMonth={alreadySavedThisMonth}
           totalLoanRemaining={remainingLoan}
@@ -2111,7 +2111,7 @@ export default function GeldPage({ userId, onClose }) {
       {pendingIncomeSource && (
         <IncomeDayModal
           source={pendingIncomeSource}
-          adjustedBase={adjustedBase}
+          adjustedBase={monthlyBudget}
           savingsGoal={savingsGoal}
           alreadySavedThisMonth={alreadySavedThisMonth}
           totalLoanRemaining={remainingLoan}
