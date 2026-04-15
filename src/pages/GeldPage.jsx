@@ -750,11 +750,13 @@ function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMon
   const r2  = (n) => Math.round(n * 100) / 100
   const rec             = parseFloat(String(received).replace(',', '.')) || 0
   const bal             = parseFloat(String(balance).replace(',', '.')) || 0
-  const remainingSavNeeded = r2(Math.max(0, savingsGoal - alreadySavedThisMonth))
-  const toSavings       = r2(Math.min(rec, remainingSavNeeded))
+  const hasBal          = balance.trim().length > 0
+  // Als spaarsaldo is ingevuld: aanvullen tot spaardoel. Anders: resterende maanddoel.
+  const toSavings       = r2(hasBal
+    ? Math.max(0, Math.min(rec, savingsGoal - bal))
+    : Math.max(0, Math.min(rec, savingsGoal - alreadySavedThisMonth)))
   const toLoan          = r2(totalLoanRemaining > 0 ? Math.min(Math.max(0, rec - toSavings), totalLoanRemaining) : 0)
   const free            = r2(rec - toSavings - toLoan)
-  const balAfter        = bal > 0 ? r2(bal - toSavings - toLoan) : null
 
   const canSave = rec > 0 && (!isManual || desc.trim().length > 0)
 
@@ -767,6 +769,7 @@ function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMon
       const inserts = [
         supabase.from('expenses').insert({ user_id: userId, amount: rec, category: incomeCat, description: incomeDesc, date: todayStr(), is_income: true, is_savings_withdrawal: false }),
       ]
+      if (toSavings > 0) inserts.push(supabase.from('expenses').insert({ user_id: userId, amount: toSavings, category: 'overig', description: '🏦 Spaarstorting', date: todayStr(), is_savings_contribution: true, is_income: false, is_savings_withdrawal: false }))
       if (toLoan > 0) inserts.push(supabase.from('expenses').insert({ user_id: userId, amount: toLoan, category: 'overig', description: '↩ Gedeeltelijke terugbetaling lening', date: todayStr(), is_loan_repayment: true, is_income: false, is_savings_withdrawal: false }))
       await Promise.all(inserts)
       if (!isManual) markFilledInToday(source.id)
@@ -813,7 +816,7 @@ function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMon
         </div>
 
         <div style={{ marginBottom: 14 }}>
-          <label style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, display: 'block', marginBottom: 5 }}>Huidig saldo (optioneel)</label>
+          <label style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, display: 'block', marginBottom: 5 }}>Huidig spaarsaldo (optioneel)</label>
           <div style={{ position: 'relative' }}>
             <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 15, color: 'var(--text-3)' }}>€</span>
             <input type="text" inputMode="decimal" placeholder="0,00" value={balance} onChange={e => setBalance(e.target.value)} onFocus={scrollFix}
@@ -842,10 +845,10 @@ function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMon
                 <span style={{ fontWeight: 700, color: 'var(--text-1)' }}>{fmt(free)}</span>
               </div>
             )}
-            {balAfter !== null && (
+            {hasBal && toSavings > 0 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, borderTop: '1px solid var(--border)', paddingTop: 6, marginTop: 2 }}>
-                <span style={{ color: 'var(--text-3)' }}>Saldo na overschrijvingen</span>
-                <span style={{ fontWeight: 700, color: 'var(--text-1)' }}>{fmt(balAfter)}</span>
+                <span style={{ color: 'var(--text-3)' }}>Spaarsaldo na overboeking</span>
+                <span style={{ fontWeight: 700, color: '#10B981' }}>{fmt(bal + toSavings)}</span>
               </div>
             )}
           </div>
