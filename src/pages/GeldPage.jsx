@@ -748,13 +748,15 @@ function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMon
   const isManual = !source
 
   const r2  = (n) => Math.round(n * 100) / 100
-  const rec             = parseFloat(String(received).replace(',', '.')) || 0
-  const bal             = parseFloat(String(balance).replace(',', '.')) || 0
-  const hasBal          = balance.trim().length > 0
-  // Altijd gebaseerd op maanddoel minus al bijgehouden bijdragen
-  const toSavings       = r2(Math.max(0, Math.min(rec, savingsGoal - alreadySavedThisMonth)))
-  const toLoan          = r2(totalLoanRemaining > 0 ? Math.min(Math.max(0, rec - toSavings), totalLoanRemaining) : 0)
-  const free            = r2(rec - toSavings - toLoan)
+  const rec          = parseFloat(String(received).replace(',', '.')) || 0
+  const bal          = parseFloat(String(balance).replace(',', '.')) || 0
+  const hasBal       = balance.trim().length > 0
+  // Hoeveel mag je missen zodat je je maandbudget houdt op hoofdrekening
+  const transferable = hasBal ? r2(Math.max(0, bal - adjustedBase)) : rec
+  const savNeeded    = r2(Math.max(0, savingsGoal - alreadySavedThisMonth))
+  const toSavings    = r2(Math.min(transferable, savNeeded))
+  const toLoan       = r2(totalLoanRemaining > 0 ? Math.min(Math.max(0, transferable - toSavings), totalLoanRemaining) : 0)
+  const balAfter     = hasBal ? r2(bal - toSavings - toLoan) : null
 
   const canSave = rec > 0 && (!isManual || desc.trim().length > 0)
 
@@ -822,12 +824,12 @@ function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMon
           </div>
         </div>
 
-        {rec > 0 && (
+        {(rec > 0 || hasBal) && (toSavings > 0 || toLoan > 0 || hasBal) && (
           <div style={{ padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
             <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '0 0 4px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Advies verdeling</p>
             {toSavings > 0 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                <span style={{ color: 'var(--text-3)' }}>💰 Naar spaarrekening</span>
+                <span style={{ color: 'var(--text-3)' }}>💰 Naar spaarrekening {savNeeded > toSavings ? `(${fmt(savNeeded - toSavings)} resterend doel)` : '✓'}</span>
                 <span style={{ fontWeight: 700, color: '#10B981' }}>{fmt(toSavings)}</span>
               </div>
             )}
@@ -837,16 +839,10 @@ function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMon
                 <span style={{ fontWeight: 700, color: '#F59E0B' }}>{fmt(toLoan)}</span>
               </div>
             )}
-            {free > 0.005 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                <span style={{ color: 'var(--text-3)' }}>Vrij te besteden</span>
-                <span style={{ fontWeight: 700, color: 'var(--text-1)' }}>{fmt(free)}</span>
-              </div>
-            )}
             {hasBal && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, borderTop: '1px solid var(--border)', paddingTop: 6, marginTop: 2 }}>
                 <span style={{ color: 'var(--text-3)' }}>Hoofdrekening na overschrijvingen</span>
-                <span style={{ fontWeight: 700, color: 'var(--text-1)' }}>{fmt(r2(bal - toSavings - toLoan))}</span>
+                <span style={{ fontWeight: 700, color: balAfter >= adjustedBase ? '#10B981' : '#F59E0B' }}>{fmt(balAfter)}</span>
               </div>
             )}
           </div>
