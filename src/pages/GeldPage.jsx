@@ -769,8 +769,8 @@ function IncomeDayModal({ source, defaultDate, adjustedBase, savingsGoal, alread
   const rec          = parseFloat(String(received).replace(',', '.')) || 0
   const bal          = parseFloat(String(balance).replace(',', '.')) || 0
   const hasBal       = balance.trim().length > 0
-  // Hoeveel mag je missen zodat je je maandbudget houdt op hoofdrekening
-  const transferable = hasBal ? r2(Math.max(0, bal - adjustedBase)) : rec
+  // Alleen berekenen als huidig saldo is ingevuld
+  const transferable = hasBal ? r2(Math.max(0, bal - adjustedBase)) : 0
   const savNeeded    = r2(Math.max(0, savingsGoal - alreadySavedThisMonth))
   const toSavings    = rd5(Math.min(transferable, savNeeded))
   const toLoan       = rd5(totalLoanRemaining > 0 ? Math.min(Math.max(0, transferable - toSavings), totalLoanRemaining) : 0)
@@ -979,9 +979,10 @@ export default function GeldPage({ userId, onClose }) {
         .gte('date', monthStartOf(selYear, selMonth)).lte('date', monthEndOf(selYear, selMonth))
         .order('date', { ascending: false }),
       // Loan repayments this year
-      supabase.from('expenses').select('amount').eq('user_id', userId)
+      supabase.from('expenses').select('id, amount, date').eq('user_id', userId)
         .eq('is_loan_repayment', true)
-        .gte('date', `${selYear}-01-01`),
+        .gte('date', `${selYear}-01-01`)
+        .order('date', { ascending: false }),
     ])
     setExpenses(expRes.data || [])
     setConfig(cfgRes.data || { monthly_budget: 400, category_budgets: DEFAULT_CAT_BUDGETS })
@@ -1785,10 +1786,23 @@ export default function GeldPage({ userId, onClose }) {
                   <div style={{ height: 6, background: 'rgba(255,255,255,0.07)', borderRadius: 4, overflow: 'hidden', marginBottom: 6 }}>
                     <div style={{ height: '100%', width: `${openLoanTotal > 0 ? Math.min(100, (totalRepaid / openLoanTotal) * 100) : 0}%`, background: '#10B981', borderRadius: 4, transition: 'width 0.5s' }} />
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-3)', marginBottom: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-3)', marginBottom: loanRepayments.length > 0 ? 8 : 12 }}>
                     <span>Terugbetaald: {fmt(totalRepaid)}</span>
                     <span>Nog open: {fmt(remainingLoan)}</span>
                   </div>
+                  {loanRepayments.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
+                      {loanRepayments.map(r => (
+                        <div key={r.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, padding: '5px 0', borderTop: '1px solid rgba(245,158,11,0.1)' }}>
+                          <span style={{ color: 'var(--text-3)' }}>{r.date}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontWeight: 700, color: '#F59E0B' }}>{fmt(r.amount)}</span>
+                            <button onClick={async () => { await supabase.from('expenses').delete().eq('id', r.id); fetchAll() }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(239,68,68,0.5)', padding: 2 }}><Trash2 size={13} /></button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {/* Partial repay input */}
                   <div style={{ display: 'flex', gap: 8 }}>
                     <div style={{ position: 'relative', flex: 1 }}>
