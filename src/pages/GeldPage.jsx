@@ -750,15 +750,16 @@ function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMon
   const [saving, setSaving]   = useState(false)
   const isManual = !source
 
-  const r2  = (n) => Math.round(n * 100) / 100
+  const r2   = (n) => Math.round(n * 100) / 100
+  const rd5  = (n) => Math.floor(n / 5) * 5   // afronden naar beneden op €5
   const rec          = parseFloat(String(received).replace(',', '.')) || 0
   const bal          = parseFloat(String(balance).replace(',', '.')) || 0
   const hasBal       = balance.trim().length > 0
   // Hoeveel mag je missen zodat je je maandbudget houdt op hoofdrekening
   const transferable = hasBal ? r2(Math.max(0, bal - adjustedBase)) : rec
   const savNeeded    = r2(Math.max(0, savingsGoal - alreadySavedThisMonth))
-  const toSavings    = r2(Math.min(transferable, savNeeded))
-  const toLoan       = r2(totalLoanRemaining > 0 ? Math.min(Math.max(0, transferable - toSavings), totalLoanRemaining) : 0)
+  const toSavings    = rd5(Math.min(transferable, savNeeded))
+  const toLoan       = rd5(totalLoanRemaining > 0 ? Math.min(Math.max(0, transferable - toSavings), totalLoanRemaining) : 0)
   const balAfter     = hasBal ? r2(bal - toSavings - toLoan) : null
 
   const canSave = rec > 0 && (!isManual || desc.trim().length > 0)
