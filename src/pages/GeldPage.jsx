@@ -1059,12 +1059,12 @@ export default function GeldPage({ userId, onClose }) {
   const manualIncome       = expenses.filter(e => e.is_income)
   const totalManualIncome  = manualIncome.reduce((s, e) => s + Number(e.amount), 0)
   const plannedExpenses    = expenses.filter(e => e.is_planned)
-  const regularExpenses    = expenses.filter(e => !e.is_savings_withdrawal && !e.is_income && !e.is_savings_contribution && !e.is_loan_repayment && !e.is_planned)
+  const regularExpenses    = expenses.filter(e => !e.is_savings_withdrawal && !e.is_income && !e.is_savings_contribution && !e.is_loan_repayment)
   // Budget spending = regular expenses that were NOT paid from savings
   // (savings-funded spending is tracked separately and doesn't count against budget)
   // Vaste lasten (abonnementen) worden buiten het vrije budget gehouden
   const FIXED_CAT          = 'abonnementen'
-  const budgetExpenses     = regularExpenses.filter(e => !e.paid_from_savings && e.category !== FIXED_CAT)
+  const budgetExpenses     = regularExpenses.filter(e => !e.paid_from_savings && e.category !== FIXED_CAT && (!e.is_planned || e.amount > 0))
   const savingsExpenses    = regularExpenses.filter(e => e.paid_from_savings)
   const totalSpent         = budgetExpenses.reduce((s, e) => s + Number(e.amount), 0)
   const savingsExpTotal    = savingsExpenses.reduce((s, e) => s + Number(e.amount), 0)
