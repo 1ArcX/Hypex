@@ -814,7 +814,7 @@ function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMon
         </div>
 
         <div style={{ marginBottom: 14 }}>
-          <label style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, display: 'block', marginBottom: 5 }}>Saldo spaarrekening (optioneel, voor na-overboeking berekening)</label>
+          <label style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, display: 'block', marginBottom: 5 }}>Huidig saldo hoofdrekening (optioneel)</label>
           <div style={{ position: 'relative' }}>
             <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 15, color: 'var(--text-3)' }}>€</span>
             <input type="text" inputMode="decimal" placeholder="0,00" value={balance} onChange={e => setBalance(e.target.value)} onFocus={scrollFix}
@@ -843,10 +843,10 @@ function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMon
                 <span style={{ fontWeight: 700, color: 'var(--text-1)' }}>{fmt(free)}</span>
               </div>
             )}
-            {hasBal && toSavings > 0 && (
+            {hasBal && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, borderTop: '1px solid var(--border)', paddingTop: 6, marginTop: 2 }}>
-                <span style={{ color: 'var(--text-3)' }}>Spaarsaldo na overboeking</span>
-                <span style={{ fontWeight: 700, color: '#10B981' }}>{fmt(bal + toSavings)}</span>
+                <span style={{ color: 'var(--text-3)' }}>Hoofdrekening na overschrijvingen</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-1)' }}>{fmt(r2(bal - toSavings - toLoan))}</span>
               </div>
             )}
           </div>
