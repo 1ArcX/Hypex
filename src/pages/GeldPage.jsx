@@ -751,10 +751,8 @@ function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMon
   const rec             = parseFloat(String(received).replace(',', '.')) || 0
   const bal             = parseFloat(String(balance).replace(',', '.')) || 0
   const hasBal          = balance.trim().length > 0
-  // Als spaarsaldo is ingevuld: aanvullen tot spaardoel. Anders: resterende maanddoel.
-  const toSavings       = r2(hasBal
-    ? Math.max(0, Math.min(rec, savingsGoal - bal))
-    : Math.max(0, Math.min(rec, savingsGoal - alreadySavedThisMonth)))
+  // Altijd gebaseerd op maanddoel minus al bijgehouden bijdragen
+  const toSavings       = r2(Math.max(0, Math.min(rec, savingsGoal - alreadySavedThisMonth)))
   const toLoan          = r2(totalLoanRemaining > 0 ? Math.min(Math.max(0, rec - toSavings), totalLoanRemaining) : 0)
   const free            = r2(rec - toSavings - toLoan)
 
@@ -816,7 +814,7 @@ function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMon
         </div>
 
         <div style={{ marginBottom: 14 }}>
-          <label style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, display: 'block', marginBottom: 5 }}>Huidig spaarsaldo (optioneel)</label>
+          <label style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, display: 'block', marginBottom: 5 }}>Saldo spaarrekening (optioneel, voor na-overboeking berekening)</label>
           <div style={{ position: 'relative' }}>
             <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 15, color: 'var(--text-3)' }}>€</span>
             <input type="text" inputMode="decimal" placeholder="0,00" value={balance} onChange={e => setBalance(e.target.value)} onFocus={scrollFix}
