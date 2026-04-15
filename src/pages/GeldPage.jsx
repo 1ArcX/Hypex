@@ -126,17 +126,8 @@ function isPayDayToday(src) {
   }
   return false
 }
-function getFilledInToday() {
-  try { const d = JSON.parse(localStorage.getItem('income_filled_in') || '{}'); return d[todayStr()] || [] } catch { return [] }
-}
-function markFilledInToday(id) {
-  try {
-    const data = JSON.parse(localStorage.getItem('income_filled_in') || '{}')
-    const today = todayStr()
-    data[today] = [...new Set([...(data[today] || []), id])]
-    Object.keys(data).forEach(d => { if (d < today) delete data[d] })
-    localStorage.setItem('income_filled_in', JSON.stringify(data))
-  } catch {}
+function getFilledInToday(config) {
+  return (config?.income_confirmed_dates || {})[todayStr()] || []
 }
 
 // ── Expense Log Modal ─────────────────────────────────────────────────────────
@@ -772,7 +763,6 @@ function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMon
       if (toSavings > 0) inserts.push(supabase.from('expenses').insert({ user_id: userId, amount: toSavings, category: 'overig', description: '🏦 Spaarstorting', date: todayStr(), is_savings_contribution: true, is_income: false, is_savings_withdrawal: false }))
       if (toLoan > 0) inserts.push(supabase.from('expenses').insert({ user_id: userId, amount: toLoan, category: 'overig', description: '↩ Gedeeltelijke terugbetaling lening', date: todayStr(), is_loan_repayment: true, is_income: false, is_savings_withdrawal: false }))
       await Promise.all(inserts)
-      if (!isManual) markFilledInToday(source.id)
       onDone()
     } finally {
       setSaving(false)
@@ -1057,7 +1047,7 @@ export default function GeldPage({ userId, onClose }) {
   const nowY = new Date().getFullYear(), nowM = new Date().getMonth()
   const isCurrentMonth = selYear === nowY && selMonth === nowM
 
-  const filledInToday = isCurrentMonth ? getFilledInToday() : []
+  const filledInToday = isCurrentMonth ? getFilledInToday(config) : []
   const pendingIncomeSource = isCurrentMonth
     ? (recurringIncome.find(src => isPayDayToday(src) && !filledInToday.includes(src.id) && !dismissedIncomeIds.includes(src.id)) || null)
     : null
@@ -2117,7 +2107,14 @@ export default function GeldPage({ userId, onClose }) {
           totalLoanRemaining={remainingLoan}
           userId={userId}
           onLater={() => setDismissedIncomeIds(ids => [...ids, pendingIncomeSource.id])}
-          onDone={() => { markFilledInToday(pendingIncomeSource.id); fetchAll() }}
+          onDone={async () => {
+            const today = todayStr()
+            const existing = config?.income_confirmed_dates || {}
+            const updated = { ...existing, [today]: [...new Set([...(existing[today] || []), pendingIncomeSource.id])] }
+            Object.keys(updated).forEach(d => { if (d < today) delete updated[d] })
+            await supabase.from('budget_config').upsert({ income_confirmed_dates: updated, user_id: userId, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+            fetchAll()
+          }}
         />
       )}
       <style>{`@keyframes sheetUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }`}</style>
