@@ -897,7 +897,7 @@ export default function GeldPage({ userId, onClose }) {
   const [yearExpenses, setYearExpenses]     = useState([])
   const [savingsContribs, setSavingsContribs] = useState([])
   const [loanRepayments, setLoanRepayments]   = useState([])
-  const [dismissedIncomeIds, setDismissedIncomeIds] = useState([])
+  const [incomeDone, setIncomeDone] = useState(false)
   const [loanRepayInput, setLoanRepayInput]   = useState('')
   const [savingsInput, setSavingsInput]       = useState('')
   const _now = new Date()
@@ -1068,7 +1068,7 @@ export default function GeldPage({ userId, onClose }) {
 
   const filledInToday = isCurrentMonth ? getFilledInToday(config) : []
   const pendingIncomeSource = isCurrentMonth
-    ? (recurringIncome.find(src => isPayDayToday(src) && !filledInToday.includes(src.id) && !dismissedIncomeIds.includes(src.id)) || null)
+    ? (recurringIncome.find(src => isPayDayToday(src) && !filledInToday.includes(src.id)) || null)
     : null
   const goToPrevMonth = () => { if (selMonth === 0) { setSelYear(y => y-1); setSelMonth(11) } else { setSelMonth(m => m-1) } }
   const goToNextMonth = () => {
@@ -2117,7 +2117,7 @@ export default function GeldPage({ userId, onClose }) {
       {showSavings && <SavingsModal editing={editingSavings} onClose={() => { setShowSavings(false); setEditingSavings(null) }} onSave={async (data) => { if (editingSavings) { await supabase.from('expenses').update(data).eq('id', editingSavings.id); setEditingSavings(null); setShowSavings(false); fetchAll() } else { saveExpense(data) } }} />}
       {showBudget && <BudgetModal config={config} onClose={() => setShowBudget(false)} onSave={saveBudget} />}
       {showRecurring && <RecurringIncomeModal config={config} onClose={() => setShowRecurring(false)} onSave={saveRecurring} />}
-      {pendingIncomeSource && (
+      {pendingIncomeSource && !incomeDone && (
         <IncomeDayModal
           source={pendingIncomeSource}
           adjustedBase={minBalance}
@@ -2125,11 +2125,9 @@ export default function GeldPage({ userId, onClose }) {
           alreadySavedThisMonth={alreadySavedThisMonth}
           totalLoanRemaining={remainingLoan}
           userId={userId}
-          onLater={() => setDismissedIncomeIds(ids => [...ids, pendingIncomeSource.id])}
+          onLater={() => setIncomeDone(true)}
           onDone={async () => {
-            // Sluit popup direct
-            setDismissedIncomeIds(ids => [...ids, pendingIncomeSource.id])
-            // Sla op in Supabase voor cross-device sync
+            setIncomeDone(true)
             const today = todayStr()
             const existing = config?.income_confirmed_dates || {}
             const updated = { ...existing, [today]: [...new Set([...(existing[today] || []), pendingIncomeSource.id])] }
