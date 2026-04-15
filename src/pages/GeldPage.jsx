@@ -127,7 +127,20 @@ function isPayDayToday(src) {
   return false
 }
 function getFilledInToday(config) {
-  return (config?.income_confirmed_dates || {})[todayStr()] || []
+  const fromSupabase = (config?.income_confirmed_dates || {})[todayStr()] || []
+  try {
+    const local = JSON.parse(localStorage.getItem('income_filled_in') || '{}')[todayStr()] || []
+    return [...new Set([...fromSupabase, ...local])]
+  } catch { return fromSupabase }
+}
+function markFilledInToday(id) {
+  try {
+    const data = JSON.parse(localStorage.getItem('income_filled_in') || '{}')
+    const today = todayStr()
+    data[today] = [...new Set([...(data[today] || []), id])]
+    Object.keys(data).forEach(d => { if (d < today) delete data[d] })
+    localStorage.setItem('income_filled_in', JSON.stringify(data))
+  } catch {}
 }
 
 // ── Expense Log Modal ─────────────────────────────────────────────────────────
@@ -2127,6 +2140,7 @@ export default function GeldPage({ userId, onClose }) {
           userId={userId}
           onLater={() => setIncomeDone(true)}
           onDone={async () => {
+            markFilledInToday(pendingIncomeSource.id)
             setIncomeDone(true)
             const today = todayStr()
             const existing = config?.income_confirmed_dates || {}
