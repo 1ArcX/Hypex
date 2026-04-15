@@ -775,6 +775,11 @@ function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMon
       if (toSavings > 0) inserts.push(supabase.from('expenses').insert({ user_id: userId, amount: toSavings, category: 'overig', description: '🏦 Spaarstorting', date: todayStr(), is_savings_contribution: true, is_income: false, is_savings_withdrawal: false }))
       if (toLoan > 0) inserts.push(supabase.from('expenses').insert({ user_id: userId, amount: toLoan, category: 'overig', description: '↩ Gedeeltelijke terugbetaling lening', date: todayStr(), is_loan_repayment: true, is_income: false, is_savings_withdrawal: false }))
       await Promise.all(inserts)
+      // Markeer leningen als afgelost als het totaal nu gedekt is
+      if (toLoan > 0 && toLoan >= totalLoanRemaining) {
+        const { data: openLoanRows } = await supabase.from('expenses').select('id').eq('user_id', userId).eq('savings_type', 'loan').eq('repaid', false)
+        if (openLoanRows?.length) await Promise.all(openLoanRows.map(l => supabase.from('expenses').update({ repaid: true }).eq('id', l.id)))
+      }
       onDone()
     } finally {
       setSaving(false)
