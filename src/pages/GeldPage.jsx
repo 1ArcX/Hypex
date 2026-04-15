@@ -972,7 +972,7 @@ export default function GeldPage({ userId, onClose }) {
       supabase.from('expenses').select('id, amount, description, date, savings_type, repaid').eq('user_id', userId)
         .eq('is_savings_withdrawal', true)
         .gte('date', `${selYear}-01-01`),
-      supabase.from('expenses').select('amount, date, is_income, is_savings_withdrawal, category').eq('user_id', userId)
+      supabase.from('expenses').select('amount, date, is_income, is_savings_withdrawal, is_savings_contribution, is_loan_repayment, category').eq('user_id', userId)
         .gte('date', `${selYear}-01-01`).lte('date', `${selYear}-12-31`),
       // Savings contributions this month
       supabase.from('expenses').select('id, amount, date, description').eq('user_id', userId)
@@ -1102,7 +1102,7 @@ export default function GeldPage({ userId, onClose }) {
   const yearMonthly = Array.from({ length: 12 }, (_, m) => {
     const mStart = monthStartOf(selYear, m), mEnd = monthEndOf(selYear, m)
     const mExps  = yearExpenses.filter(e => e.date >= mStart && e.date <= mEnd)
-    const spent  = mExps.filter(e => !e.is_income && !e.is_savings_withdrawal).reduce((s,e) => s + Number(e.amount), 0)
+    const spent  = mExps.filter(e => !e.is_income && !e.is_savings_withdrawal && !e.is_savings_contribution && !e.is_loan_repayment).reduce((s,e) => s + Number(e.amount), 0)
     const income = mExps.filter(e => e.is_income).reduce((s,e) => s + Number(e.amount), 0)
     const hasDat = mExps.length > 0
     return { m, spent, income, hasDat }
