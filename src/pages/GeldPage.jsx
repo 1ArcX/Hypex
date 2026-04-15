@@ -1027,7 +1027,7 @@ export default function GeldPage({ userId, onClose }) {
   const allCategories      = [...CATEGORIES, ...customCategories]
   const manualIncome       = expenses.filter(e => e.is_income)
   const totalManualIncome  = manualIncome.reduce((s, e) => s + Number(e.amount), 0)
-  const regularExpenses    = expenses.filter(e => !e.is_savings_withdrawal && !e.is_income)
+  const regularExpenses    = expenses.filter(e => !e.is_savings_withdrawal && !e.is_income && !e.is_savings_contribution && !e.is_loan_repayment)
   // Budget spending = regular expenses that were NOT paid from savings
   // (savings-funded spending is tracked separately and doesn't count against budget)
   // Vaste lasten (abonnementen) worden buiten het vrije budget gehouden
@@ -2127,11 +2127,14 @@ export default function GeldPage({ userId, onClose }) {
           userId={userId}
           onLater={() => setDismissedIncomeIds(ids => [...ids, pendingIncomeSource.id])}
           onDone={async () => {
+            // Sluit popup direct
+            setDismissedIncomeIds(ids => [...ids, pendingIncomeSource.id])
+            // Sla op in Supabase voor cross-device sync
             const today = todayStr()
             const existing = config?.income_confirmed_dates || {}
             const updated = { ...existing, [today]: [...new Set([...(existing[today] || []), pendingIncomeSource.id])] }
             Object.keys(updated).forEach(d => { if (d < today) delete updated[d] })
-            await supabase.from('budget_config').upsert({ income_confirmed_dates: updated, user_id: userId, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+            supabase.from('budget_config').upsert({ income_confirmed_dates: updated, user_id: userId, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
             fetchAll()
           }}
         />
