@@ -753,13 +753,14 @@ function RecurringIncomeModal({ config, onClose, onSave }) {
 
 // ── IncomeDayModal ────────────────────────────────────────────────────────────
 // source = recurring income object | null (for manual one-time income)
-function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMonth, totalLoanRemaining, userId, onLater, onDone }) {
+function IncomeDayModal({ source, defaultDate, adjustedBase, savingsGoal, alreadySavedThisMonth, totalLoanRemaining, userId, onLater, onDone }) {
   const backdropRef = useRef(null)
   usePreventTouch(backdropRef)
   const [received, setReceived] = useState('')
   const [balance, setBalance]   = useState('')
   const [desc, setDesc]       = useState('')
   const [catId, setCatId]     = useState('salaris')
+  const [date, setDate]       = useState(defaultDate || todayStr())
   const [saving, setSaving]   = useState(false)
   const isManual = !source
 
@@ -784,10 +785,10 @@ function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMon
       const incomeDesc = isManual ? desc.trim() : source.name
       const incomeCat  = isManual ? catId : (source.category || 'salaris')
       const inserts = [
-        supabase.from('expenses').insert({ user_id: userId, amount: rec, category: incomeCat, description: incomeDesc, date: todayStr(), is_income: true, is_savings_withdrawal: false }),
+        supabase.from('expenses').insert({ user_id: userId, amount: rec, category: incomeCat, description: incomeDesc, date, is_income: true, is_savings_withdrawal: false }),
       ]
-      if (toSavings > 0) inserts.push(supabase.from('expenses').insert({ user_id: userId, amount: toSavings, category: 'overig', description: '🏦 Spaarstorting', date: todayStr(), is_savings_contribution: true, is_income: false, is_savings_withdrawal: false }))
-      if (toLoan > 0) inserts.push(supabase.from('expenses').insert({ user_id: userId, amount: toLoan, category: 'overig', description: '↩ Gedeeltelijke terugbetaling lening', date: todayStr(), is_loan_repayment: true, is_income: false, is_savings_withdrawal: false }))
+      if (toSavings > 0) inserts.push(supabase.from('expenses').insert({ user_id: userId, amount: toSavings, category: 'overig', description: '🏦 Spaarstorting', date, is_savings_contribution: true, is_income: false, is_savings_withdrawal: false }))
+      if (toLoan > 0) inserts.push(supabase.from('expenses').insert({ user_id: userId, amount: toLoan, category: 'overig', description: '↩ Gedeeltelijke terugbetaling lening', date, is_loan_repayment: true, is_income: false, is_savings_withdrawal: false }))
       await Promise.all(inserts)
       // Markeer leningen als afgelost als het totaal nu gedekt is
       if (toLoan > 0 && toLoan >= totalLoanRemaining) {
@@ -818,6 +819,8 @@ function IncomeDayModal({ source, adjustedBase, savingsGoal, alreadySavedThisMon
           <div style={{ marginBottom: 12 }}>
             <input type="text" placeholder="Beschrijving (bijv. Bijbaan)" value={desc} onChange={e => setDesc(e.target.value)} onFocus={scrollFix}
               style={{ width: '100%', padding: '10px 14px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: 14, colorScheme: 'dark', marginBottom: 8 }} />
+            <input type="date" value={date} onChange={e => setDate(e.target.value)}
+              style={{ width: '100%', padding: '10px 14px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-3)', fontSize: 13, colorScheme: 'dark', marginBottom: 8 }} />
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {[{ id:'salaris',label:'Salaris',emoji:'💼' },{ id:'bijbaan',label:'Bijbaan',emoji:'🏪' },{ id:'freelance',label:'Freelance',emoji:'💻' },{ id:'zakgeld',label:'Zakgeld',emoji:'🎁' },{ id:'overig',label:'Overig',emoji:'💰' }].map(c => (
                 <button key={c.id} onClick={() => setCatId(c.id)}
@@ -2110,6 +2113,7 @@ export default function GeldPage({ userId, onClose }) {
       {showIncome && (
         <IncomeDayModal
           source={null}
+          defaultDate={isCurrentMonth ? todayStr() : monthEndOf(selYear, selMonth)}
           adjustedBase={minBalance}
           savingsGoal={savingsGoal}
           alreadySavedThisMonth={alreadySavedThisMonth}
