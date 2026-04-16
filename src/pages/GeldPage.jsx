@@ -1172,6 +1172,24 @@ export default function GeldPage({ userId, onClose }) {
   const projectedTotal = dayOfMonth > 1 ? (totalSpent / dayOfMonth) * daysInMonth : null
   const projectedOver  = projectedTotal !== null && projectedTotal > adjustedBase
 
+  // Week budget (Fri→Thu week)
+  const weekStartDate = (() => {
+    const d = new Date(today)
+    const dow = d.getDay()
+    d.setDate(d.getDate() - (dow === 5 ? 0 : dow === 6 ? 1 : dow + 2))
+    d.setHours(0, 0, 0, 0)
+    return d
+  })()
+  const _p2 = n => String(n).padStart(2, '0')
+  const weekStartStr = `${weekStartDate.getFullYear()}-${_p2(weekStartDate.getMonth()+1)}-${_p2(weekStartDate.getDate())}`
+  const weekSpentSoFar = budgetExpenses.filter(e => e.date >= weekStartStr && e.date <= todayStr()).reduce((s, e) => s + Number(e.amount), 0)
+  const monthEndDate = new Date(today.getFullYear(), today.getMonth(), daysInMonth)
+  let _weeksLeft = 0; let _ws = new Date(weekStartDate)
+  while (_ws <= monthEndDate) { _weeksLeft++; _ws.setDate(_ws.getDate() + 7) }
+  const remainingWeeks = Math.max(1, _weeksLeft)
+  const weekAllowance  = Math.round((Math.max(0, adjustedRemaining) / remainingWeeks) * 100) / 100
+  const weekRemaining  = Math.round((weekAllowance - weekSpentSoFar) * 100) / 100
+
   let spaarStreak = 0
   for (let i = 0; i < 366; i++) {
     const d = new Date(); d.setDate(d.getDate() - i)
@@ -1389,6 +1407,39 @@ export default function GeldPage({ userId, onClose }) {
                 <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '0 0 2px' }}>{daysLeft} dagen over</p>
                 <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>vandaag {fmt(todayTotal)} uit</p>
                 <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>dag budget:  {fmt(dagBudget)}</p>
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* Weekbudget */}
+        {isCurrentMonth && (() => {
+          const wColor  = weekRemaining < 0 ? '#EF4444' : weekAllowance > 0 && weekRemaining / weekAllowance < 0.25 ? '#F59E0B' : '#10B981'
+          const wBg     = weekRemaining < 0 ? 'rgba(239,68,68,0.07)' : weekAllowance > 0 && weekRemaining / weekAllowance < 0.25 ? 'rgba(245,158,11,0.07)' : 'rgba(16,185,129,0.06)'
+          const wBorder = weekRemaining < 0 ? 'rgba(239,68,68,0.25)' : weekAllowance > 0 && weekRemaining / weekAllowance < 0.25 ? 'rgba(245,158,11,0.25)' : 'rgba(16,185,129,0.2)'
+          const wPct    = weekAllowance > 0 ? Math.max(0, Math.min(100, (weekRemaining / weekAllowance) * 100)) : 0
+          return (
+            <div style={{ padding: '14px 16px', borderRadius: 16, marginBottom: 10, background: wBg, border: `1px solid ${wBorder}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                <div>
+                  <p style={{ fontSize: 10, color: wColor, margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700 }}>
+                    💳 Weekbudget · {remainingWeeks} week{remainingWeeks !== 1 ? 'en' : ''} resterend
+                  </p>
+                  <p style={{ fontSize: 30, fontWeight: 800, color: wColor, margin: 0, lineHeight: 1.1 }}>
+                    {fmtShort(weekRemaining)}
+                  </p>
+                  <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '3px 0 0' }}>
+                    {weekRemaining < 0 ? `${fmt(Math.abs(weekRemaining))} over weekbudget` : 'nog over deze week'}
+                  </p>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '0 0 2px' }}>Uitgegeven</p>
+                  <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>{fmt(weekSpentSoFar)}</p>
+                  <p style={{ fontSize: 10, color: 'var(--text-3)', margin: '2px 0 0' }}>van {fmt(weekAllowance)} · {remainingWeeks}× verdeeld</p>
+                </div>
+              </div>
+              <div style={{ height: 4, background: 'rgba(255,255,255,0.07)', borderRadius: 4, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${weekRemaining < 0 ? 100 : wPct}%`, background: wColor, borderRadius: 4, transition: 'width 0.4s' }} />
               </div>
             </div>
           )
