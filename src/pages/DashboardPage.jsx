@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react'
 import Clock from '../components/Clock'
 import WeatherWidget from '../components/WeatherWidget'
 import SpotifyWidget from '../components/SpotifyWidget'
+import WeekBudgetWidget from '../components/WeekBudgetWidget'
 
 // ── Helpers ─────────────────────────���──────────────────���───────────────────────
 function pad2(n) { return String(n).padStart(2, '0') }
@@ -447,6 +448,9 @@ export default function DashboardPage({
           </div>
         )
       })()}
+
+      {/* ── WEEKBUDGET ── */}
+      <WeekBudgetWidget userId={userId} onNavigateToGeld={() => onNavigate?.('geld')} />
 
       {/* ── SPOTIFY + WEATHER ── */}
       <div className="grid gap-4 md:grid-cols-2">
