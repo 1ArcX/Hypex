@@ -39,23 +39,38 @@ export default function WeekBudgetWidget({ userId, onNavigateToGeld }) {
   useEffect(() => {
     if (!userId) return
     const load = async () => {
-      const [expRes, cfgRes] = await Promise.all([
-        supabase.from('expenses').select('amount, is_savings_contribution, is_loan_repayment, is_savings_withdrawal, is_income, paid_from_savings, category, is_planned, date')
+      // Huidige maand voor vaste lasten
+      const now = new Date()
+      const mStart = `${now.getFullYear()}-${pad2(now.getMonth()+1)}-01`
+      const mEnd   = (() => { const d = new Date(now.getFullYear(), now.getMonth()+1, 0); return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}` })()
+
+      const [expRes, cfgRes, vasteRes] = await Promise.all([
+        supabase.from('expenses').select('amount, is_savings_contribution, is_loan_repayment, is_savings_withdrawal, is_income, paid_from_savings, category, is_planned')
           .eq('user_id', userId)
           .gte('date', start)
           .lte('date', end),
-        supabase.from('budget_config').select('monthly_budget, min_balance').eq('user_id', userId).single(),
+        supabase.from('budget_config').select('monthly_budget, category_budgets').eq('user_id', userId).single(),
+        // Vaste lasten deze maand (werkelijk uitgegeven)
+        supabase.from('expenses').select('amount')
+          .eq('user_id', userId)
+          .eq('category', 'abonnementen')
+          .gte('date', mStart)
+          .lte('date', mEnd),
       ])
+
       const exps = expRes.data || []
       const spent = exps
         .filter(e => !e.is_income && !e.is_savings_withdrawal && !e.is_savings_contribution && !e.is_loan_repayment && !e.paid_from_savings && e.category !== 'abonnementen' && (!e.is_planned || e.amount > 0))
         .reduce((s, e) => s + Number(e.amount), 0)
       setWeekSpent(Math.round(spent * 100) / 100)
 
-      // Weekbudget = maandbudget / 4.33 afgerond op €5
-      const monthly = cfgRes.data?.monthly_budget || 400
-      const raw = monthly / 4.33
-      setWeekBudget(Math.floor(raw / 5) * 5)
+      const cfg = cfgRes.data || {}
+      const monthly = cfg.monthly_budget || 400
+      // Trek vaste lasten (budget) af van maandbudget, net als GeldPage doet
+      const vasteLastenBudget = cfg.category_budgets?.abonnementen || 0
+      const freeBudget = Math.max(0, monthly - vasteLastenBudget)
+      // Weekbudget = vrij maandbudget / 4.33, afgerond op €5
+      setWeekBudget(Math.floor((freeBudget / 4.33) / 5) * 5)
       setLoading(false)
     }
     load()
