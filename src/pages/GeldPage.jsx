@@ -1143,8 +1143,6 @@ export default function GeldPage({ userId, onClose }) {
   const _prevM = selMonth === 0 ? 11 : selMonth - 1
   const prevIsMarch2026 = _prevY === 2026 && _prevM === 2
   const carryover    = prevIsMarch2026 ? 0 : Math.max(0, prevSpent - base)
-  // Vaste lasten budget wordt pre-afgetrokken van de basis zodat de grote
-  // kaart alleen het vrij te besteden geld toont
   const vasteLastenBudget = catBudgets[FIXED_CAT] || 0
   const adjustedBase = Math.max(0, base - carryover - vasteLastenBudget)
   const adjustedRemaining = adjustedBase - totalSpent
