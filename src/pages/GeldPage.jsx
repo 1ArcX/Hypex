@@ -1091,9 +1091,6 @@ export default function GeldPage({ userId, onClose }) {
   const remaining  = base - totalSpent
   const remainPct  = Math.max(0, Math.min(100, (remaining / base) * 100))
 
-  // Year savings stats
-  const yearSavingsTotal = yearSavings.reduce((s, e) => s + Number(e.amount), 0)
-  const yearSavingsCount = yearSavings.length
 
   const nowY = new Date().getFullYear(), nowM = new Date().getMonth()
   const isCurrentMonth = selYear === nowY && selMonth === nowM
@@ -1276,7 +1273,7 @@ export default function GeldPage({ userId, onClose }) {
         </div>
 
         {/* Alert strip: loans + savings counter */}
-        {(remainingLoan > 0 || yearSavingsCount > 0) && (
+        {remainingLoan > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
             {remainingLoan > 0 && (
               <button onClick={() => setSubView('inkomsten')} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', cursor: 'pointer', textAlign: 'left' }}>
@@ -1286,14 +1283,6 @@ export default function GeldPage({ userId, onClose }) {
                 </span>
                 <span style={{ fontSize: 11, color: 'var(--text-3)' }}>→ Inkomsten</span>
               </button>
-            )}
-            {yearSavingsCount > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
-                <span style={{ fontSize: 16 }}>🏦</span>
-                <span style={{ fontSize: 12, color: 'rgba(239,68,68,0.8)', fontWeight: 600 }}>
-                  {yearSavingsCount}× opname dit jaar · {fmt(yearSavingsTotal)} totaal
-                </span>
-              </div>
             )}
           </div>
         )}
