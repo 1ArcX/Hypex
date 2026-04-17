@@ -1412,7 +1412,7 @@ export default function GeldPage({ userId, onClose }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                 <div>
                   <p style={{ fontSize: 10, color: wColor, margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700 }}>
-                    💳 Weekbudget · {remainingWeeks} week{remainingWeeks !== 1 ? 'en' : ''} resterend
+                    💳 Weekbudget · {remainingWeeks} {remainingWeeks !== 1 ? 'weken' : 'week'} resterend
                   </p>
                   <p style={{ fontSize: 30, fontWeight: 800, color: wColor, margin: 0, lineHeight: 1.1 }}>
                     {fmtShort(weekRemaining)}
