@@ -1132,8 +1132,8 @@ export default function GeldPage({ userId, onClose }) {
       .reduce((s, e) => s + Number(e.amount), 0)
   }
 
-  // Carryover from previous month
-  const prevRegular  = prevExpenses.filter(e => !e.is_savings_withdrawal && !e.is_income && !e.paid_from_savings)
+  // Carryover from previous month — same exclusions as budgetExpenses
+  const prevRegular  = prevExpenses.filter(e => !e.is_savings_withdrawal && !e.is_income && !e.paid_from_savings && !e.is_savings_contribution && !e.is_loan_repayment && e.category !== FIXED_CAT && (!e.is_planned || e.amount > 0))
   const prevSpent    = prevRegular.reduce((s, e) => s + Number(e.amount), 0)
   // Maart 2026 wordt buiten beschouwing gelaten voor carryover (eenmalig)
   const _prevY = selMonth === 0 ? selYear - 1 : selYear
