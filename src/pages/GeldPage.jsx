@@ -980,7 +980,7 @@ export default function GeldPage({ userId, onClose }) {
         .gte('date', monthStartOf(selYear, selMonth)).lte('date', monthEndOf(selYear, selMonth))
         .order('date', { ascending: false }).order('created_at', { ascending: false }),
       supabase.from('budget_config').select('*').eq('user_id', userId).single(),
-      supabase.from('expenses').select('amount, is_income, is_savings_withdrawal').eq('user_id', userId)
+      supabase.from('expenses').select('amount, is_income, is_savings_withdrawal, paid_from_savings, is_savings_contribution, is_loan_repayment, category, is_planned').eq('user_id', userId)
         .gte('date', monthStartOf(prevY, prevM)).lte('date', monthEndOf(prevY, prevM)),
       supabase.from('expenses').select('id, amount, description, date, savings_type, repaid').eq('user_id', userId)
         .eq('is_savings_withdrawal', true)
