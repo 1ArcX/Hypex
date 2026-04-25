@@ -464,13 +464,16 @@ export default function DashboardPage({
               return (
                 <button
                   key={i}
-                  onClick={() => item.type === 'task' && item.raw && setDetailTask(item.raw)}
+                  onClick={() => {
+                    if (item.type === 'task' && item.raw) setDetailTask(item.raw)
+                    else if (item.type === 'lesson' || item.type === 'event' || item.type === 'work') onNavigateToAgenda?.(new Date(), item.highlightKey)
+                  }}
                   style={{
                     flexShrink: 0, padding: '9px 13px', borderRadius: 14,
                     background: isNow ? `${item.color}22` : `${item.color}11`,
                     border: `1px solid ${item.color}${isNow ? '60' : '30'}`,
                     color: item.color,
-                    cursor: item.type === 'task' ? 'pointer' : 'default',
+                    cursor: 'pointer',
                     display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
                     gap: 3, maxWidth: 140,
                     boxShadow: isNow ? `0 0 12px ${item.color}20` : 'none',

@@ -149,14 +149,13 @@ export default function TakenPage({
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Filter chips */}
+      <div style={{ flexShrink: 0, position: 'relative', borderTop: '2px solid rgba(0,255,209,0.2)' }}>
       <div style={{
-        flexShrink: 0,
         padding: '16px 16px 0',
         overflowX: 'auto',
         display: 'flex',
         gap: 6,
         scrollbarWidth: 'none',
-        borderTop: '2px solid rgba(0,255,209,0.2)',
       }}>
         {FILTERS.map(f => {
           const active = filter === f.id
@@ -254,6 +253,9 @@ export default function TakenPage({
             </button>
           )
         })}
+      </div>
+      {/* Scroll fade — hints that the chip bar is horizontally scrollable */}
+      <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 32, background: 'linear-gradient(to right, transparent, var(--bg-sidebar))', pointerEvents: 'none' }} />
       </div>
 
       {/* Task list */}
