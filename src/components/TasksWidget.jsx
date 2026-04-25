@@ -109,6 +109,7 @@ function getTimeStatus(dateStr, startTime, endTime) {
 export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle, onEdit, onDragStart, onViewDetail, onNew, onMoveToGroup, onReorder, onReorderGroups, groupOrder = [], seamless = false, highlightedIds = new Set() }) {
   const [adding, setAdding] = useState(false)
   const [collapsedGroups, setCollapsedGroups] = useState(new Set())
+  const [showCompleted, setShowCompleted] = useState(false)
   // Task drag
   const [dragId, setDragId] = useState(null)
   const [dropTarget, setDropTarget] = useState(null)   // { id: taskId, pos: 'before'|'after' }
@@ -241,9 +242,10 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
     const ordered = groupOrder.length
       ? [...groupOrder.filter(g => allGroupNames.includes(g)), ...allGroupNames.filter(g => !groupOrder.includes(g))]
       : allGroupNames
+    const hasGroups = ordered.length > 0
     const sections = []
-    for (const name of ordered) sections.push({ name, items: withGroup[name] })
-    if (noGroup.length) sections.push({ name: null, items: noGroup })
+    if (noGroup.length) sections.push({ name: null, items: noGroup, hasGroups })
+    for (const name of ordered) sections.push({ name, items: withGroup[name], hasGroups })
     return sections
   })()
 
@@ -343,6 +345,34 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
               <div style={{ height: 2, borderRadius: 2, background: 'var(--accent)', margin: '4px 4px 0', opacity: 0.85 }} />
             )}
 
+            {/* Label voor ongegroepeeerde taken als er ook groepen zijn */}
+            {section.name === null && section.hasGroups && (
+              <div
+                onDragOver={e => { e.preventDefault(); setDropGroup(null); setDropTarget(null) }}
+                onDragLeave={() => setDropGroup(undefined)}
+                onDrop={e => {
+                  e.preventDefault()
+                  const id = e.dataTransfer.getData('taskId')
+                  if (id && onMoveToGroup) onMoveToGroup(id, null)
+                  clearDrag()
+                }}
+                style={{
+                  fontSize: 10, color: dropGroup === null ? 'var(--accent)' : 'rgba(255,255,255,0.25)',
+                  fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase',
+                  padding: '4px 4px 2px', display: 'flex', alignItems: 'center', gap: 5,
+                  borderRadius: 6, background: dropGroup === null ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'transparent',
+                  transition: 'all 0.15s', marginBottom: 2,
+                }}
+              >
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'inline-block', flexShrink: 0 }} />
+                Overige taken
+                <span style={{ marginLeft: 'auto', fontWeight: 400, color: 'rgba(255,255,255,0.15)', textTransform: 'none', letterSpacing: 0 }}>
+                  {section.items.length} {section.items.length === 1 ? 'taak' : 'taken'}
+                </span>
+                {dropGroup === null && <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700 }}>↓</span>}
+              </div>
+            )}
+
             {section.name && (() => {
               const isCollapsed = collapsedGroups.has(section.name)
               const isDraggingThis = dragGroupName === section.name
@@ -391,22 +421,6 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
             {/* Drop indicator after this group (group drag) */}
             {dropGroupTarget?.name === section.name && dropGroupTarget.pos === 'after' && (
               <div style={{ height: 2, borderRadius: 2, background: 'var(--accent)', margin: '0 4px 4px', opacity: 0.85 }} />
-            )}
-            {/* Drop zone voor "geen groep" sectie (alleen tonen als er ook named groups zijn) */}
-            {section.name === null && dragId && groupedSections.some(s => s.name !== null) && (
-              <div
-                onDragOver={e => { e.preventDefault(); setDropGroup(null); setDropTarget(null) }}
-                onDragLeave={() => setDropGroup(undefined)}
-                onDrop={e => {
-                  e.preventDefault()
-                  const id = e.dataTransfer.getData('taskId')
-                  if (id && onMoveToGroup) onMoveToGroup(id, null)
-                  clearDrag()
-                }}
-                style={{ fontSize: 10, color: dropGroup === null ? 'var(--accent)' : 'rgba(255,255,255,0.2)', padding: '5px 8px', borderRadius: 8, background: dropGroup === null ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'transparent', border: `1px dashed ${dropGroup === null ? 'color-mix(in srgb, var(--accent) 40%, transparent)' : 'rgba(255,255,255,0.1)'}`, marginBottom: 4, textAlign: 'center', transition: 'all 0.15s' }}
-              >
-                {dropGroup === null ? '↓ Verplaats naar geen groep' : 'Geen groep'}
-              </div>
             )}
             {!collapsedGroups.has(section.name) && section.items.map((task, _idx) => {
               const subject = subjects.find(s => s.id === task.subject_id)
@@ -530,14 +544,23 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
         ))}
       </div>
 
-      {/* Afgeronde taken */}
+      {/* Afgeronde taken — inklapbaar */}
       {complete.length > 0 && (
         <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-          <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.2)', marginBottom: '6px' }}>
-            Afgerond ({complete.length})
-          </p>
-          {complete.map(task => (
-            <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', opacity: 0.5 }}>
+          <button
+            onClick={() => setShowCompleted(v => !v)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 6px', display: 'flex', alignItems: 'center', gap: 5, width: '100%' }}
+          >
+            <CheckCircle2 size={11} style={{ color: 'rgba(255,255,255,0.2)', flexShrink: 0 }} />
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', fontWeight: 500 }}>
+              Afgerond ({complete.length})
+            </span>
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.15)', marginLeft: 'auto' }}>
+              {showCompleted ? '▲' : '▼'}
+            </span>
+          </button>
+          {showCompleted && complete.map(task => (
+            <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', opacity: 0.45 }}>
               <button onClick={() => onToggle(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
                 <CheckCircle2 size={15} style={{ color: 'var(--accent)' }} />
               </button>
