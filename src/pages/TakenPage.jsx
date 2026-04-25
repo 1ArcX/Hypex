@@ -1,16 +1,32 @@
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo } from 'react'
 import ReactDOM from 'react-dom'
 import TasksWidget from '../components/TasksWidget'
+import { useIsDesktop } from '../hooks/useIsDesktop'
 
-function useIsDesktop() {
-  const [v, setV] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 768)
-  useEffect(() => {
-    const mq = window.matchMedia('(min-width: 768px)')
-    const h = e => setV(e.matches)
-    mq.addEventListener('change', h)
-    return () => mq.removeEventListener('change', h)
-  }, [])
-  return v
+const EMPTY_STATE = {
+  alles:     { icon: '🎉', title: 'Alles gedaan', sub: 'Geen openstaande taken.' },
+  vandaag:   { icon: '✅', title: 'Vrije dag', sub: 'Niets gepland voor vandaag.' },
+  morgen:    { icon: '😌', title: 'Morgen vrij', sub: 'Nog niets ingepland voor morgen.' },
+  week:      { icon: '📅', title: 'Rustige week', sub: 'Geen taken de komende 7 dagen.' },
+  urgent:    { icon: '🟢', title: 'Niets urgent', sub: 'Alles onder controle.' },
+  telaat:    { icon: '🎊', title: 'Niets achterstallig', sub: 'Geen verlopen taken.' },
+  ongepland: { icon: '📋', title: 'Alles ingepland', sub: 'Elke taak heeft een datum.' },
+}
+
+function EmptyState({ filter, onNew }) {
+  const s = EMPTY_STATE[filter] || EMPTY_STATE.alles
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 60, gap: 10, textAlign: 'center' }}>
+      <span style={{ fontSize: 40 }}>{s.icon}</span>
+      <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>{s.title}</p>
+      <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>{s.sub}</p>
+      {filter === 'alles' && (
+        <button onClick={() => onNew?.()} style={{ marginTop: 8, background: 'color-mix(in srgb, var(--accent) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', color: 'var(--accent)', borderRadius: 10, padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+          + Taak toevoegen
+        </button>
+      )}
+    </div>
+  )
 }
 
 const FILTERS = [
@@ -223,27 +239,31 @@ export default function TakenPage({
 
       {/* Task list */}
       <div style={{ flex: 1, overflow: 'hidden', overflowY: 'auto', padding: '12px 16px 100px' }}>
-        <TasksWidget
-          tasks={filtered}
-          subjects={subjects}
-          onAdd={onAdd}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          onToggle={handleToggleWithUndo}
-          onViewDetail={onViewDetail}
-          onNew={onNew}
-          onMoveToGroup={onMoveToGroup}
-          onReorder={onReorder}
-          onReorderGroups={onReorderGroups}
-          groupOrder={groupOrder}
-          seamless={!isDesktop}
-          highlightedIds={highlightedIds}
-        />
+        {filtered.length === 0 && !filter.startsWith('group:') ? (
+          <EmptyState filter={filter} onNew={onNew} />
+        ) : (
+          <TasksWidget
+            tasks={filtered}
+            subjects={subjects}
+            onAdd={onAdd}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onToggle={handleToggleWithUndo}
+            onViewDetail={onViewDetail}
+            onNew={onNew}
+            onMoveToGroup={onMoveToGroup}
+            onReorder={onReorder}
+            onReorderGroups={onReorderGroups}
+            groupOrder={groupOrder}
+            seamless={!isDesktop}
+            highlightedIds={highlightedIds}
+          />
+        )}
       </div>
 
       {undoTask && ReactDOM.createPortal(
         <div style={{
-          position: 'fixed', bottom: 90, left: '50%', transform: 'translateX(-50%)',
+          position: 'fixed', bottom: isDesktop ? 24 : 90, left: isDesktop ? 'calc(220px + 50%)' : '50%', transform: 'translateX(-50%)',
           zIndex: 9998, display: 'flex', alignItems: 'center', gap: 10,
           background: 'var(--bg-sidebar)', border: '1px solid var(--border)',
           borderRadius: 14, padding: '10px 16px', boxShadow: '0 4px 24px rgba(0,0,0,0.4)',

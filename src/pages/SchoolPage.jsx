@@ -1,16 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React from 'react'
 import MagisterWidget from '../components/MagisterWidget'
-
-function useIsDesktop() {
-  const [v, setV] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 768)
-  useEffect(() => {
-    const mq = window.matchMedia('(min-width: 768px)')
-    const h = e => setV(e.matches)
-    mq.addEventListener('change', h)
-    return () => mq.removeEventListener('change', h)
-  }, [])
-  return v
-}
+import { useIsDesktop } from '../hooks/useIsDesktop'
 
 export default function SchoolPage({ userId, userEmail, onSubjectsSync }) {
   const isDesktop = useIsDesktop()

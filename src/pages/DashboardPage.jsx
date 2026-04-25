@@ -179,7 +179,8 @@ export default function DashboardPage({
   const showMagisterBanner = !hasMagisterCreds || !!magisterError
 
   const urgentCount  = tasks.filter(t => !t.completed && (t.priority ?? 2) === 1).length
-  const overdueCount = tasks.filter(t => !t.completed && t.date && t.date < today).length
+  const overdueTasks = tasks.filter(t => !t.completed && t.date && t.date < today).sort((a, b) => a.date.localeCompare(b.date))
+  const overdueCount = overdueTasks.length
   const openCount    = tasks.filter(t => !t.completed).length
 
   // Naderende deadlines (max 3 pills)
@@ -229,7 +230,7 @@ export default function DashboardPage({
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7 }}>
               <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 500 }}>Voortgang vandaag</span>
               <span style={{ fontSize: 11, color: progressPct === 100 ? 'var(--accent)' : 'var(--text-2)', fontWeight: 700 }}>
-                {completedToday}/{totalToday} {progressPct === 100 ? '✓' : ''}
+                {completedToday}/{totalToday} · {Math.round(progressPct)}%{progressPct === 100 ? ' ✓' : ''}
               </span>
             </div>
             <div style={{ height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 6 }}>
@@ -247,7 +248,7 @@ export default function DashboardPage({
       </div>
 
       {/* ── STATS ROW ── */}
-      {openCount > 0 && (
+      {openCount > 0 ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
           <div onClick={() => onNavigateToTasks?.('urgent')} style={{
             background: urgentCount > 0 ? 'rgba(255,60,60,0.08)' : 'rgba(255,255,255,0.03)',
@@ -269,7 +270,7 @@ export default function DashboardPage({
             <span style={{ fontSize: 18, fontWeight: 800, color: overdueCount > 0 ? '#FF8C42' : 'var(--text-2)', lineHeight: 1 }}>{overdueCount}</span>
             <span style={{ fontSize: 11, color: overdueCount > 0 ? 'rgba(255,140,66,0.65)' : 'var(--text-3)', fontWeight: 600 }}>Te laat</span>
           </div>
-          <div onClick={() => onNavigateToTasks?.('open')} style={{
+          <div onClick={() => onNavigateToTasks?.('alles')} style={{
             background: 'rgba(0,255,209,0.05)',
             border: '1px solid rgba(0,255,209,0.12)',
             borderRadius: 12, padding: '10px 12px',
@@ -280,8 +281,52 @@ export default function DashboardPage({
             <span style={{ fontSize: 11, color: 'rgba(0,255,209,0.55)', fontWeight: 600 }}>Open</span>
           </div>
         </div>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 14, background: 'rgba(0,255,209,0.05)', border: '1px solid rgba(0,255,209,0.15)' }}>
+          <span style={{ fontSize: 20 }}>🎉</span>
+          <div>
+            <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', margin: 0 }}>Alles gedaan!</p>
+            <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>Geen openstaande taken.</p>
+          </div>
+        </div>
       )}
 
+
+      {/* ── ACHTERSTALLIGE TAKEN ── */}
+      {overdueCount > 0 && (
+        <div className="card" style={{
+          padding: '14px 15px',
+          borderLeft: '3px solid rgba(255,120,50,0.6)',
+          background: 'linear-gradient(135deg, rgba(255,100,40,0.07) 0%, transparent 70%)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <p style={{ fontSize: 9, color: 'rgba(255,140,66,0.85)', margin: 0, letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700 }}>
+              ⏰ Te laat · {overdueCount}
+            </p>
+            <button onClick={() => onNavigateToTasks?.('telaat')} style={{ background: 'rgba(255,120,50,0.1)', border: '1px solid rgba(255,120,50,0.25)', borderRadius: 8, cursor: 'pointer', color: 'rgba(255,140,66,0.9)', padding: '2px 9px', fontSize: 11, fontWeight: 600 }}>
+              Alles
+            </button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {overdueTasks.slice(0, 3).map(t => (
+              <div key={t.id} onClick={() => setDetailTask(t)}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.025)', cursor: 'pointer', border: '1px solid transparent', transition: 'background 0.15s' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,100,40,0.06)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.025)'}
+              >
+                <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'rgba(255,140,66,0.7)', flexShrink: 0 }} />
+                <span style={{ fontSize: 13, color: 'var(--text-1)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>{t.title}</span>
+                <span style={{ fontSize: 10, color: 'rgba(255,140,66,0.75)', flexShrink: 0, fontWeight: 600 }}>
+                  {new Date(t.date + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+                </span>
+              </div>
+            ))}
+            {overdueCount > 3 && (
+              <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '2px 0 0 8px' }}>+{overdueCount - 3} meer</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── VANDAAG-STRIP ── */}
       {todayItems.length > 0 && (

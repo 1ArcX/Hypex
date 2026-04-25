@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 // ChevronLeft/Right kept for WeekStrip
 import Timeline from '../components/Timeline'
+import { useIsDesktop } from '../hooks/useIsDesktop'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const DAYS_SHORT = ['MA', 'DI', 'WO', 'DO', 'VR', 'ZA', 'ZO']
@@ -258,17 +259,6 @@ function MonthCalendar({ selectedDay, onSelectDay, tasks, calendarEvents, magist
 }
 
 // ─── Main AgendaPage ──────────────────────────────────────────────────────────
-function useIsDesktop() {
-  const [v, setV] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 768)
-  useEffect(() => {
-    const mq = window.matchMedia('(min-width: 768px)')
-    const h = e => setV(e.matches)
-    mq.addEventListener('change', h)
-    return () => mq.removeEventListener('change', h)
-  }, [])
-  return v
-}
-
 export default function AgendaPage({
   userId, userEmail, tasks, subjects,
   calendarEvents, magisterLessons,
