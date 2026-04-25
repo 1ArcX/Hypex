@@ -709,13 +709,19 @@ export default function App() {
               {PAGE_NAMES[activePage] || 'Hypex'}
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              {/* Sync dot */}
-              <div style={{
-                width: 7, height: 7, borderRadius: '50%',
-                background: syncFlash ? '#1DB954' : syncing ? 'var(--accent)' : 'transparent',
-                boxShadow: syncing ? '0 0 6px var(--accent)' : 'none',
-                transition: 'background 0.4s, box-shadow 0.4s',
-              }} />
+              {/* Sync dot — tap to sync manually */}
+              <button
+                onClick={() => { if (!syncing) doSync() }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8 }}
+                title="Handmatig synchroniseren"
+              >
+                <div style={{
+                  width: 7, height: 7, borderRadius: '50%',
+                  background: syncFlash ? '#1DB954' : syncing ? 'var(--accent)' : 'rgba(255,255,255,0.15)',
+                  boxShadow: syncing ? '0 0 6px var(--accent)' : 'none',
+                  transition: 'background 0.4s, box-shadow 0.4s',
+                }} />
+              </button>
               <button
                 onClick={() => setShowThemeSettings(true)}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: '6px', display: 'flex', alignItems: 'center', borderRadius: 8 }}
