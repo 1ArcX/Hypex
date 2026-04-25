@@ -16,9 +16,24 @@ const SHEET_BASE = [
   { id: 'gym',          Icon: Dumbbell,      label: 'Gym'      },
 ]
 
+const PRIMARY_SWIPE_ORDER = ['dashboard', 'agenda', 'taken', 'gewoontes']
+
 export default function BottomNav({ activePage, setActivePage, isAdmin, showJumbo, hasLevelUp, hasActiveGymWorkout, hasActivePomo }) {
   const [showSheet, setShowSheet] = useState(false)
   const sheetRef = useRef(null)
+  const swipeStartX = useRef(null)
+
+  const onNavSwipeStart = (e) => { swipeStartX.current = e.touches[0].clientX }
+  const onNavSwipeEnd = (e) => {
+    if (swipeStartX.current === null) return
+    const dx = e.changedTouches[0].clientX - swipeStartX.current
+    swipeStartX.current = null
+    if (Math.abs(dx) < 40) return
+    const idx = PRIMARY_SWIPE_ORDER.indexOf(activePage)
+    if (idx < 0) return
+    const next = dx < 0 ? PRIMARY_SWIPE_ORDER[idx + 1] : PRIMARY_SWIPE_ORDER[idx - 1]
+    if (next) { navigator.vibrate?.(15); setActivePage(next) }
+  }
 
   const sheetItems = [
     ...SHEET_BASE,
@@ -117,13 +132,16 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
       )}
 
       {/* Tab bar */}
-      <nav style={{
-        display: 'flex', flexShrink: 0,
-        background: 'var(--bg-sidebar)',
-        borderTop: '1px solid var(--border)',
-        paddingBottom: 'env(safe-area-inset-bottom)',
-        position: 'relative', zIndex: 100,
-      }}>
+      <nav
+        onTouchStart={onNavSwipeStart}
+        onTouchEnd={onNavSwipeEnd}
+        style={{
+          display: 'flex', flexShrink: 0,
+          background: 'var(--bg-sidebar)',
+          borderTop: '1px solid var(--border)',
+          paddingBottom: 'env(safe-area-inset-bottom)',
+          position: 'relative', zIndex: 100,
+        }}>
         {PRIMARY_TABS.map(({ id, Icon, label }) => {
           const active = activePage === id
           return (

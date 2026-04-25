@@ -602,6 +602,7 @@ export default function App() {
   }
 
   const handleDeleteTask = async (id) => {
+    navigator.vibrate?.([30, 40, 30])
     await supabase.from('tasks').delete().eq('id', id)
     setShowTaskModal(false)
     setSelectedTask(null)
@@ -610,6 +611,7 @@ export default function App() {
 
   const handleToggleTask = async (task) => {
     const completing = !task.completed
+    navigator.vibrate?.(completing ? 40 : 20)
     await supabase.from('tasks').update({ completed: completing, updated_at: new Date().toISOString() }).eq('id', task.id)
     if (completing) {
       awardXP(user?.id, XP_TASK)

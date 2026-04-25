@@ -49,6 +49,8 @@ function weekEndStr() {
   return d.toISOString().slice(0, 10)
 }
 
+const SWIPE_HINT_KEY = 'swipe_hint_seen_v1'
+
 export default function TakenPage({
   tasks, subjects,
   onAdd, onEdit, onDelete, onToggle, onViewDetail, onNew, onMoveToGroup, onReorder, onReorderGroups, groupOrder,
@@ -59,6 +61,23 @@ export default function TakenPage({
   const [undoTask, setUndoTask] = useState(null)
   const undoTimerRef = React.useRef(null)
   const [highlightedIds, setHighlightedIds] = useState(new Set())
+  const [showSwipeHint, setShowSwipeHint] = useState(false)
+
+  // Éénmalige swipe-hint tonen als er taken zijn
+  useEffect(() => {
+    if (isDesktop) return
+    if (localStorage.getItem(SWIPE_HINT_KEY)) return
+    const open = tasks.filter(t => !t.completed)
+    if (open.length === 0) return
+    const timer = setTimeout(() => {
+      setShowSwipeHint(true)
+      setTimeout(() => {
+        setShowSwipeHint(false)
+        localStorage.setItem(SWIPE_HINT_KEY, '1')
+      }, 2800)
+    }, 600)
+    return () => clearTimeout(timer)
+  }, [isDesktop, tasks.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleToggleWithUndo = (task) => {
     onToggle(task)
@@ -276,6 +295,43 @@ export default function TakenPage({
           >
             Ongedaan maken
           </button>
+        </div>,
+        document.body
+      )}
+
+      {/* FAB — mobiel only */}
+      {!isDesktop && ReactDOM.createPortal(
+        <button
+          onClick={() => onNew?.()}
+          style={{
+            position: 'fixed', bottom: undoTask ? 148 : 88, right: 18,
+            width: 52, height: 52, borderRadius: '50%',
+            background: 'var(--accent)', color: '#000',
+            border: 'none', cursor: 'pointer', zIndex: 9996,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 26, fontWeight: 700, lineHeight: 1,
+            boxShadow: '0 4px 18px color-mix(in srgb, var(--accent) 45%, transparent)',
+            transition: 'bottom 0.2s ease',
+          }}
+          aria-label="Nieuwe taak"
+        >+</button>,
+        document.body
+      )}
+
+      {/* Swipe-hint overlay — éénmalig */}
+      {showSwipeHint && ReactDOM.createPortal(
+        <div style={{
+          position: 'fixed', bottom: 100, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 9997, display: 'flex', alignItems: 'center', gap: 16,
+          background: 'rgba(15,15,15,0.92)', border: '1px solid var(--border)',
+          borderRadius: 14, padding: '10px 18px',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
+          animation: 'sheetUp 0.3s ease',
+          pointerEvents: 'none',
+        }}>
+          <span style={{ fontSize: 13, color: '#FF6B6B', fontWeight: 600 }}>← verwijder</span>
+          <div style={{ width: 1, height: 16, background: 'var(--border)' }} />
+          <span style={{ fontSize: 13, color: '#4ADE80', fontWeight: 600 }}>voltooi →</span>
         </div>,
         document.body
       )}
