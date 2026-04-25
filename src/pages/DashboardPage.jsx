@@ -459,7 +459,8 @@ export default function DashboardPage({
             {todayItems.map((item, i) => {
               const icon = item.type === 'lesson' ? '📚' : item.type === 'work' ? '💼' : '✅'
               const nowMins = new Date().getHours()*60 + new Date().getMinutes()
-              const isNow = item.sortMins <= nowMins && item.end && (parseInt(item.end)*60 + parseInt(item.end.split(':')[1]||0)) >= nowMins
+              const endMins = item.end ? (() => { const [eh, em] = item.end.split(':').map(Number); return eh*60+em })() : 0
+              const isNow = item.sortMins <= nowMins && item.end && endMins >= nowMins
               return (
                 <button
                   key={i}
@@ -502,10 +503,16 @@ export default function DashboardPage({
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
             <p style={{ fontSize: 9, color: 'rgba(129,140,248,0.7)', margin: 0, letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700 }}>Volgende</p>
-            {ev && hasMore && (
-              <button onClick={() => setSkip(s => s + 1)}
-                style={{ background: 'rgba(129,140,248,0.1)', border: '1px solid rgba(129,140,248,0.2)', borderRadius: 6, cursor: 'pointer', color: 'rgba(129,140,248,0.8)', padding: '2px 7px', fontSize: 13, lineHeight: 1 }}>›</button>
-            )}
+            <div style={{ display: 'flex', gap: 4 }}>
+              {skip > 0 && (
+                <button onClick={() => setSkip(s => s - 1)}
+                  style={{ background: 'rgba(129,140,248,0.1)', border: '1px solid rgba(129,140,248,0.2)', borderRadius: 6, cursor: 'pointer', color: 'rgba(129,140,248,0.8)', padding: '2px 7px', fontSize: 13, lineHeight: 1 }}>‹</button>
+              )}
+              {ev && hasMore && (
+                <button onClick={() => setSkip(s => s + 1)}
+                  style={{ background: 'rgba(129,140,248,0.1)', border: '1px solid rgba(129,140,248,0.2)', borderRadius: 6, cursor: 'pointer', color: 'rgba(129,140,248,0.8)', padding: '2px 7px', fontSize: 13, lineHeight: 1 }}>›</button>
+              )}
+            </div>
           </div>
           {/* Type filter pills */}
           <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
@@ -514,6 +521,7 @@ export default function DashboardPage({
               { key: 'school', label: '📚' },
               { key: 'event',  label: '📅' },
               { key: 'werk',   label: '💼' },
+              { key: 'taak',   label: '✅' },
             ].map(f => {
               const active = nextEventFilter === f.key
               return (

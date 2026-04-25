@@ -110,7 +110,15 @@ function WeekStrip({ selectedDay, onSelectDay, onPrevWeek, onNextWeek, tasks, ca
       {/* Month label + week nav */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 4px' }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>{monthLabel}</span>
-        <div style={{ display: 'flex', gap: 4 }}>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          {!weekDays.some(d => isSameDay(d, now)) && (
+            <button
+              onClick={() => { onSelectDay(now) }}
+              style={{ background: 'color-mix(in srgb, var(--accent) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', borderRadius: 8, cursor: 'pointer', color: 'var(--accent)', padding: '3px 9px', fontSize: 11, fontWeight: 600 }}
+            >
+              Vandaag
+            </button>
+          )}
           <button onClick={onPrevWeek} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', padding: '2px 6px', borderRadius: 6 }}>
             <ChevronLeft size={16} />
           </button>
