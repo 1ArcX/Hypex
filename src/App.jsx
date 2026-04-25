@@ -754,6 +754,7 @@ export default function App() {
                 onRequestPwaInstall={() => setShowPwaPrompt(true)}
                 profiles={profiles}
                 userId={user?.id}
+                onToggleTask={handleToggleTask}
               />
             )}
 

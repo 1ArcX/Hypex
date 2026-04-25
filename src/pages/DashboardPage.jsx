@@ -4,7 +4,7 @@ import WeatherWidget from '../components/WeatherWidget'
 import SpotifyWidget from '../components/SpotifyWidget'
 
 
-// ── Helpers ─────────────────────────���──────────────────���───────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 function pad2(n) { return String(n).padStart(2, '0') }
 function todayDateStr() {
   const d = new Date()
@@ -144,12 +144,129 @@ function useNextEvent({ tasks, calendarEvents, magisterLessons, skip, typeFilter
   }, [tasks, calendarEvents, magisterLessons, skip, typeFilter])
 }
 
-// ── Main ──────────────────────────────��───────────────────────────���────────────
+// ── Focus card: wat is nu het meest relevant? ────────────────────────────────
+function useFocusCard({ todayItems, tasks, subjects, today }) {
+  return useMemo(() => {
+    const now = new Date()
+    const nowMins = now.getHours() * 60 + now.getMinutes()
+    const hour = now.getHours()
+
+    // 1. Iets gaande nu?
+    const current = todayItems.find(item => {
+      if (!item.end) return false
+      const [eh, em] = item.end.split(':').map(Number)
+      return item.sortMins <= nowMins && (eh * 60 + em) >= nowMins
+    })
+    if (current) {
+      const [eh, em] = current.end.split(':').map(Number)
+      return { type: 'now', item: current, minsLeft: Math.max(1, (eh * 60 + em) - nowMins) }
+    }
+
+    // 2. Iets start binnen 45 minuten?
+    const soon = todayItems.find(item => item.sortMins > nowMins && item.sortMins - nowMins <= 45)
+    if (soon) return { type: 'soon', item: soon, minsUntil: soon.sortMins - nowMins }
+
+    // 3. Urgente taak
+    const urgent = tasks.find(t => !t.completed && (t.priority ?? 2) === 1)
+    if (urgent) return { type: 'urgent', task: urgent, subject: subjects?.find(s => s.id === urgent.subject_id) }
+
+    // 4. Achterstallige taak
+    const overdue = tasks.filter(t => !t.completed && t.date && t.date < today)
+      .sort((a, b) => a.date.localeCompare(b.date))[0]
+    if (overdue) return { type: 'overdue', task: overdue }
+
+    // 5. Taak voor vandaag
+    const todayTask = tasks
+      .filter(t => !t.completed && t.date === today)
+      .sort((a, b) => {
+        if ((a.priority ?? 2) !== (b.priority ?? 2)) return (a.priority ?? 2) - (b.priority ?? 2)
+        return (a.start_time || a.time || '23:59').localeCompare(b.start_time || b.time || '23:59')
+      })[0]
+    if (todayTask) return { type: 'today', task: todayTask, subject: subjects?.find(s => s.id === todayTask.subject_id) }
+
+    // 6. Avond-samenvatting
+    if (hour >= 17) {
+      const done = tasks.filter(t => t.completed && t.date === today).length
+      if (done > 0) return { type: 'evening', done, total: tasks.filter(t => t.date === today).length }
+    }
+
+    return null
+  }, [todayItems, tasks, subjects, today])
+}
+
+const FOCUS_CFG = {
+  now:     { color: '#00FFD1', bg: 'rgba(0,255,209,0.08)',   border: 'rgba(0,255,209,0.25)' },
+  soon:    { color: '#818CF8', bg: 'rgba(129,140,248,0.08)', border: 'rgba(129,140,248,0.25)' },
+  urgent:  { color: '#FF6B6B', bg: 'rgba(255,107,107,0.08)', border: 'rgba(255,107,107,0.3)' },
+  overdue: { color: '#FF8C42', bg: 'rgba(255,140,66,0.08)',  border: 'rgba(255,140,66,0.3)' },
+  today:   { color: '#00FFD1', bg: 'rgba(0,255,209,0.06)',   border: 'rgba(0,255,209,0.2)' },
+  evening: { color: '#A78BFA', bg: 'rgba(167,139,250,0.08)', border: 'rgba(167,139,250,0.25)' },
+}
+
+function FocusCard({ card, onToggleTask, setDetailTask }) {
+  if (!card) return null
+  const cfg = FOCUS_CFG[card.type]
+
+  if (card.type === 'now' || card.type === 'soon') {
+    const typeIcon = card.item.type === 'lesson' ? '📚' : card.item.type === 'work' ? '💼' : '✅'
+    const label = card.type === 'now' ? 'Nu bezig' : `Over ${card.minsUntil}m`
+    const badge = card.type === 'now' ? `nog ${card.minsLeft}m` : card.item.time
+    return (
+      <div style={{ padding: '12px 15px', borderRadius: 16, background: cfg.bg, border: `1px solid ${cfg.border}`, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <span style={{ fontSize: 22, lineHeight: 1 }}>{typeIcon}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontSize: 10, color: cfg.color, margin: '0 0 2px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{label}</p>
+          <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.item.label}</p>
+        </div>
+        <span style={{ fontSize: 12, color: cfg.color, fontWeight: 700, background: `${cfg.color}20`, borderRadius: 8, padding: '4px 10px', flexShrink: 0 }}>{badge}</span>
+      </div>
+    )
+  }
+
+  if (card.type === 'urgent' || card.type === 'overdue' || card.type === 'today') {
+    const labelMap = { urgent: '🔥 Urgent', overdue: '⏰ Te laat', today: '📌 Vandaag' }
+    const sub = card.type === 'overdue'
+      ? new Date(card.task.date + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+      : card.subject?.name
+    return (
+      <div onClick={() => setDetailTask?.(card.task)} style={{ padding: '12px 15px', borderRadius: 16, background: cfg.bg, border: `1px solid ${cfg.border}`, display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontSize: 10, color: cfg.color, margin: '0 0 2px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{labelMap[card.type]}</p>
+          <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.task.title}</p>
+          {sub && <p style={{ fontSize: 11, color: cfg.color, margin: '2px 0 0', opacity: 0.8 }}>{sub}</p>}
+        </div>
+        <button
+          onClick={e => { e.stopPropagation(); onToggleTask?.(card.task) }}
+          style={{ flexShrink: 0, width: 34, height: 34, borderRadius: '50%', background: `${cfg.color}18`, border: `2px solid ${cfg.color}50`, color: cfg.color, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 700, transition: 'background 0.15s' }}
+          title="Markeer als gedaan"
+        >✓</button>
+      </div>
+    )
+  }
+
+  if (card.type === 'evening') {
+    return (
+      <div style={{ padding: '12px 15px', borderRadius: 16, background: cfg.bg, border: `1px solid ${cfg.border}`, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <span style={{ fontSize: 22 }}>✨</span>
+        <div>
+          <p style={{ fontSize: 10, color: cfg.color, margin: '0 0 2px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Goed gedaan</p>
+          <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>
+            {card.done}{card.total > 0 ? ` van ${card.total}` : ''} taken afgerond
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  return null
+}
+
+// ── Main ─────────────────────────────────────────────────────────────────────
 export default function DashboardPage({
   isBreak, tasks, subjects, calendarEvents, magisterLessons,
   magisterError, displayName, homeRain, onNavigate, onNavigateToTasks,
   setDetailTask, openNewTask, onRequestPwaInstall, profiles, userId,
-  onNavigateToAgenda,
+  onNavigateToAgenda, onToggleTask,
 }) {
   const [skip, setSkip] = useState(0)
   const [nextEventFilter, setNextEventFilter] = useState(() => localStorage.getItem('nextEventFilter') || 'alle')
@@ -158,6 +275,7 @@ export default function DashboardPage({
   const todayItems = useTodayItems(tasks, magisterLessons, calendarEvents)
 
   const today = todayDateStr()
+  const focusCard = useFocusCard({ todayItems, tasks, subjects, today })
   const todayTasks = tasks.filter(t => t.date === today)
   const completedToday = todayTasks.filter(t => t.completed).length
   const totalToday = todayTasks.length
@@ -246,6 +364,9 @@ export default function DashboardPage({
           </div>
         )}
       </div>
+
+      {/* ── FOCUS KAART ── */}
+      <FocusCard card={focusCard} onToggleTask={onToggleTask} setDetailTask={setDetailTask} />
 
       {/* ── STATS ROW ── */}
       {openCount > 0 ? (
