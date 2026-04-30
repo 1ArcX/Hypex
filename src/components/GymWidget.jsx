@@ -143,6 +143,405 @@ const EXERCISE_LIBRARY = {
   'Rust': [],
 }
 
+// ── Calisthenics Progressions ──────────────────────────────────────────────────
+
+const CALISTHENICS_PROGRESSIONS = {
+  push: {
+    name: 'Push',
+    emoji: '🤜',
+    color: '#3B82F6',
+    subtitle: 'Muur push-ups → 1-arm push-up',
+    levels: [
+      { name: 'Muur Push-ups',               sets: 3, target: '20–50 reps',  tip: 'Sta rechtop, handen op schouderbreedte op de muur. Rechte lichaamshouding.' },
+      { name: 'Schuine Push-ups (hoog)',      sets: 3, target: '15–40 reps',  tip: 'Handen op tafel of bank. Hoe hoger de handen, hoe makkelijker.' },
+      { name: 'Schuine Push-ups (laag)',      sets: 3, target: '10–25 reps',  tip: 'Handen lager dan taillehoogte. Bijna volledig op de vloer.' },
+      { name: 'Knie Push-ups',               sets: 3, target: '10–20 reps',  tip: 'Knieën op de grond. Rechte lijn van knieën naar schouders.' },
+      { name: 'Volledige Push-ups',           sets: 3, target: '8–15 reps',   tip: 'Klassieke push-up. Borst raakt bijna de grond. Houd de plank de hele tijd.' },
+      { name: 'Smalle Push-ups',             sets: 3, target: '8–12 reps',   tip: 'Handen dichter bij elkaar dan schouderbreedte. Meer triceps activatie.' },
+      { name: 'Diamond Push-ups',            sets: 3, target: '6–10 reps',   tip: 'Handen in diamantvorm onder de borst. Maximale triceps belasting.' },
+      { name: 'Archer Push-ups',             sets: 2, target: '4–8/zijde',   tip: 'Eén arm strekt zijwaarts uit terwijl je daalt. Voorbereiding op 1-arm.' },
+      { name: 'Geassisteerde 1-Arm Push-up', sets: 2, target: '3–6/zijde',   tip: 'Gebruik 1 vinger als steun. Minimaliseer de hulp naarmate je sterker wordt.' },
+      { name: 'Volledige 1-Arm Push-up',     sets: 2, target: '2–5/zijde',   tip: 'Voeten iets verder uit elkaar voor stabiliteit. De ultieme push-up.' },
+    ],
+  },
+  pull: {
+    name: 'Pull',
+    emoji: '🏋️',
+    color: '#10B981',
+    subtitle: 'Dead hang → gewogen pull-ups',
+    levels: [
+      { name: 'Dead Hang',                    sets: 3, target: '15–30s',      tip: 'Gewoon hangen. Bouwt grip, schouderstabiliteit en gewrichtsadaptatie.' },
+      { name: 'Scapula Pull-ups',             sets: 3, target: '8–12 reps',   tip: 'Trek schouderbladen omlaag zonder armen te buigen. Aktieve hang leren.' },
+      { name: 'Australische Rijen',           sets: 3, target: '8–15 reps',   tip: 'Onder tafel of lage stang. Trek borst naar de stang. Fantastische basis.' },
+      { name: 'Negatieve Pull-ups (5s)',       sets: 3, target: '5 reps',      tip: 'Spring omhoog tot kin boven stang. Daal LANGZAAM in 5 tellen. Herhaal.' },
+      { name: 'Geassisteerde Pull-ups (band)', sets: 3, target: '5–8 reps',   tip: 'Weerstandsband voor ondersteuning. Maak band lichter naarmate je sterker wordt.' },
+      { name: 'Volledige Pull-ups',           sets: 3, target: '3–8 reps',    tip: 'Overhandgreep, schouderbreedte. Kin boven stang. Controleer de daling.' },
+      { name: 'Chin-ups',                     sets: 3, target: '5–10 reps',   tip: 'Onderhands greep. Iets makkelijker dankzij biceps activatie.' },
+      { name: 'Gewogen Pull-ups',             sets: 3, target: '3–6 reps',    tip: 'Gebruik gewichtsgordel of backpack. Progressieve overbelasting.' },
+      { name: 'L-Sit Pull-ups',              sets: 2, target: '3–5 reps',    tip: 'Houd benen horizontaal tijdens de pull-up. Combinatiekracht.' },
+    ],
+  },
+  legs: {
+    name: 'Benen',
+    emoji: '🦵',
+    color: '#F97316',
+    subtitle: 'Stoel squat → pistol squat',
+    levels: [
+      { name: 'Stoel Squat',                  sets: 3, target: '10–15 reps',  tip: 'Zak naar stoel alsof je gaat zitten. Leer squatdiepte en patroon.' },
+      { name: 'Bodyweight Squat',             sets: 3, target: '15–25 reps',  tip: 'Volle diepte! Heupen onder knieën. Hielen plat. Rug recht.' },
+      { name: 'Pause Squat (2s onderaan)',    sets: 3, target: '8–12 reps',   tip: 'Houd 2 seconden onderaan. Verbetert mobiliteit en bottom-kracht.' },
+      { name: 'Bulgarian Split Squat',        sets: 3, target: '8–12/been',   tip: 'Achterste voet op bankje. Geweldig voor eenbeenskracht en balans.' },
+      { name: 'Step-ups (hoge stap)',         sets: 3, target: '10–12/been',  tip: 'Stap op hoge stoel of trap. Eén been doet al het werk.' },
+      { name: 'Geassisteerde Pistol Squat',   sets: 3, target: '5–8/been',    tip: 'Houd deurkozijn of band vast. Zak op 1 been zo diep mogelijk.' },
+      { name: 'Box Pistol Squat',             sets: 3, target: '5–8/been',    tip: 'Zak op 1 been naar lage box. Vermindert bereik om het patroon te leren.' },
+      { name: 'Pistol Squat',                sets: 3, target: '3–6/been',    tip: 'Vrij staand op 1 been! Andere been gestrekt vooruit. Het einddoel.' },
+    ],
+  },
+  core: {
+    name: 'Core',
+    emoji: '🎯',
+    color: '#EF4444',
+    subtitle: 'Hollow body → volledige L-sit',
+    levels: [
+      { name: 'Dead Bug',                     sets: 3, target: '8–10/zijde',  tip: 'Lig op rug. Strek afwisselend tegenovergestelde arm+been. Rug PLAT houden!' },
+      { name: 'Hollow Body Hold',             sets: 3, target: '20–30s',      tip: 'Rug plat, benen + schouders van de grond. Basis voor alles in calisthenics.' },
+      { name: 'Plank',                        sets: 3, target: '30–60s',      tip: 'Rechte plank van hoofd tot hielen. Billen niet omhoog. Adem normaal.' },
+      { name: 'Zijplank',                    sets: 3, target: '20–45s/zijde', tip: 'Op elleboog of hand. Heupen hoog. Sterke obliques voor rotatiestabiliteit.' },
+      { name: 'Hanging Knee Raises',          sets: 3, target: '8–15 reps',   tip: 'Hang aan stang. Trek knieën naar borst. Gecontroleerde, langzame beweging.' },
+      { name: 'Hanging Leg Raises',           sets: 3, target: '6–10 reps',   tip: 'Houd benen gestrekt. Trek tot hoek van 90° of hoger. Geen schommel.' },
+      { name: 'Tuck L-Sit',                   sets: 3, target: '8–15s',       tip: 'Op parallettes of stoelen. Knieën opgetrokken. Armen volledig gestrekt.' },
+      { name: 'Volledige L-Sit',              sets: 3, target: '10–20s',      tip: 'Benen volledig gestrekt horizontaal. De ultieme corekracht test.' },
+    ],
+  },
+}
+
+const CALISTHENICS_WEEKLY = ['Ma','Di','Wo','Do','Vr','Za','Zo'].map((day, i) => ({
+  day,
+  isTraining: [0, 2, 4].includes(i),
+}))
+
+// ── CalisthenicsTab ────────────────────────────────────────────────────────────
+
+function CalisthenicsTab({ userId }) {
+  const LS_KEY = `calisthenics_v1_${userId}`
+
+  const [progress, setProgress] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(LS_KEY)) || { push: 0, pull: 0, legs: 0, core: 0 } }
+    catch { return { push: 0, pull: 0, legs: 0, core: 0 } }
+  })
+  const [expanded, setExpanded] = useState({ push: false, pull: false, legs: false, core: false })
+  const [showTodayWorkout, setShowTodayWorkout] = useState(false)
+  const [justLeveled, setJustLeveled] = useState(null)
+
+  const saveProgress = (updated) => {
+    setProgress(updated)
+    localStorage.setItem(LS_KEY, JSON.stringify(updated))
+  }
+
+  const advanceLevel = (pillar) => {
+    const maxIdx = CALISTHENICS_PROGRESSIONS[pillar].levels.length - 1
+    if (progress[pillar] < maxIdx) {
+      saveProgress({ ...progress, [pillar]: progress[pillar] + 1 })
+      setJustLeveled(pillar)
+      setTimeout(() => setJustLeveled(null), 2000)
+    }
+  }
+
+  const retreatLevel = (pillar) => {
+    if (progress[pillar] > 0) saveProgress({ ...progress, [pillar]: progress[pillar] - 1 })
+  }
+
+  const pillars = ['push', 'pull', 'legs', 'core']
+  const todayNL = getNLDay()
+  const isTrainingDay = CALISTHENICS_WEEKLY[todayNL]?.isTraining
+
+  const totalLevels = pillars.reduce((acc, p) => acc + CALISTHENICS_PROGRESSIONS[p].levels.length - 1, 0)
+  const earnedLevels = pillars.reduce((acc, p) => acc + progress[p], 0)
+  const overallPct = Math.round((earnedLevels / totalLevels) * 100)
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, animation: 'gymFadeIn 0.3s ease' }}>
+
+      {/* ── Hero card ── */}
+      <div style={{
+        padding: '18px', borderRadius: 18,
+        background: 'linear-gradient(135deg, color-mix(in srgb, #00FFD1 10%, transparent), color-mix(in srgb, #3B82F6 8%, transparent))',
+        border: '1px solid color-mix(in srgb, #00FFD1 20%, transparent)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+          <span style={{ fontSize: 32 }}>🤸</span>
+          <div style={{ flex: 1 }}>
+            <p style={{ margin: 0, fontSize: 17, fontWeight: 800, color: 'var(--text-1)' }}>Calisthenics Pad</p>
+            <p style={{ margin: '1px 0 0', fontSize: 12, color: 'var(--text-3)' }}>Beginner → Gevorderd · 3× per week</p>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <p style={{ margin: 0, fontSize: 22, fontWeight: 800, color: 'var(--accent)' }}>{overallPct}%</p>
+            <p style={{ margin: 0, fontSize: 10, color: 'var(--text-3)' }}>behaald</p>
+          </div>
+        </div>
+
+        {/* Overall progress bar */}
+        <div style={{ height: 6, borderRadius: 3, background: 'var(--border)', marginBottom: 14 }}>
+          <div style={{ height: '100%', borderRadius: 3, width: `${overallPct}%`, background: 'var(--accent)', transition: 'width 0.6s ease' }} />
+        </div>
+
+        {/* Weekly schedule strip */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+          {CALISTHENICS_WEEKLY.map(({ day, isTraining }, i) => {
+            const isToday = i === todayNL
+            return (
+              <div key={day} style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                padding: '7px 2px', borderRadius: 10,
+                background: isToday ? (isTraining ? 'rgba(0,255,209,0.12)' : 'rgba(255,255,255,0.04)') : 'transparent',
+                border: isToday ? `1px solid ${isTraining ? 'rgba(0,255,209,0.35)' : 'var(--border)'}` : '1px solid transparent',
+              }}>
+                <span style={{ fontSize: 9, fontWeight: isToday ? 800 : 500, color: isToday ? 'var(--accent)' : 'var(--text-3)' }}>{day}</span>
+                <span style={{ fontSize: 15 }}>{isTraining ? '💪' : '😴'}</span>
+                <span style={{ fontSize: 8, color: isTraining ? 'var(--accent)' : 'var(--text-3)', fontWeight: 600 }}>{isTraining ? 'Train' : 'Rust'}</span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* ── Today's workout button ── */}
+      <button onClick={() => setShowTodayWorkout(v => !v)} style={{
+        width: '100%', padding: '14px 18px', borderRadius: 16,
+        background: isTrainingDay ? 'var(--accent)' : 'var(--bg-card)',
+        border: isTrainingDay ? 'none' : '1px solid var(--border)',
+        color: isTrainingDay ? '#000' : 'var(--text-2)',
+        fontSize: 15, fontWeight: 800, cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+      }}>
+        {isTrainingDay ? <Play size={16} fill="#000" /> : <Clock size={16} />}
+        {isTrainingDay ? 'Workout van Vandaag' : 'Rustdag · Bekijk schema'}
+        <ChevronDown size={16} style={{ transform: showTodayWorkout ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+      </button>
+
+      {/* ── Today's workout expanded ── */}
+      {showTodayWorkout && (
+        <div style={{
+          padding: '16px', borderRadius: 16,
+          background: 'var(--bg-card)', border: '1px solid var(--border)',
+          animation: 'gymFadeIn 0.2s ease',
+        }}>
+          {isTrainingDay ? (
+            <>
+              <p style={{ margin: '0 0 12px', fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Full Body · Huidige niveaus</p>
+              {pillars.map(pillar => {
+                const prog = CALISTHENICS_PROGRESSIONS[pillar]
+                const lvl = prog.levels[progress[pillar]]
+                return (
+                  <div key={pillar} style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '10px 12px', marginBottom: 8, borderRadius: 12,
+                    background: `color-mix(in srgb, ${prog.color} 8%, transparent)`,
+                    border: `1px solid color-mix(in srgb, ${prog.color} 22%, transparent)`,
+                  }}>
+                    <span style={{ fontSize: 20, flexShrink: 0 }}>{prog.emoji}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lvl.name}</p>
+                      <p style={{ margin: 0, fontSize: 11, color: 'var(--text-3)' }}>{lvl.sets} sets × {lvl.target}</p>
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: prog.color, background: `color-mix(in srgb, ${prog.color} 18%, transparent)`, padding: '3px 8px', borderRadius: 8, flexShrink: 0 }}>
+                      Niv. {progress[pillar] + 1}
+                    </span>
+                  </div>
+                )
+              })}
+              <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--text-3)', textAlign: 'center' }}>
+                💡 2–3 min rust tussen sets · Vorm boven alles
+              </p>
+            </>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '10px 0' }}>
+              <span style={{ fontSize: 36 }}>😴</span>
+              <p style={{ margin: '10px 0 4px', fontWeight: 700, color: 'var(--text-1)' }}>Rustdag</p>
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--text-3)' }}>Herstel is net zo belangrijk als trainen. Spieren groeien buiten de gym.</p>
+              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {[
+                  ['🧘', 'Mobiliteit / Stretching (10–15 min)'],
+                  ['🚶', 'Lichte wandeling'],
+                  ['💧', 'Hydrateer goed (2–3L water)'],
+                  ['😴', '7–9 uur slaap'],
+                ].map(([icon, text]) => (
+                  <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, background: 'var(--bg-base)' }}>
+                    <span style={{ fontSize: 16 }}>{icon}</span>
+                    <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── 4 Movement Pillars ── */}
+      {pillars.map(pillar => {
+        const prog = CALISTHENICS_PROGRESSIONS[pillar]
+        const currentIdx = progress[pillar]
+        const currentLevel = prog.levels[currentIdx]
+        const nextLevel = prog.levels[currentIdx + 1]
+        const isExpanded = expanded[pillar]
+        const isMaxed = currentIdx === prog.levels.length - 1
+        const pct = Math.round((currentIdx / (prog.levels.length - 1)) * 100)
+        const isJust = justLeveled === pillar
+
+        return (
+          <div key={pillar} style={{
+            borderRadius: 18, overflow: 'hidden',
+            border: `1.5px solid ${isJust ? prog.color : 'var(--border)'}`,
+            transition: 'border-color 0.4s',
+          }}>
+            {/* Pillar header */}
+            <div style={{
+              padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12,
+              background: `color-mix(in srgb, ${prog.color} 10%, var(--bg-card))`,
+              cursor: 'pointer', userSelect: 'none',
+            }} onClick={() => setExpanded(prev => ({ ...prev, [pillar]: !prev[pillar] }))}>
+              <span style={{ fontSize: 26 }}>{prog.emoji}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: 'var(--text-1)' }}>{prog.name}</p>
+                  <span style={{
+                    fontSize: 11, fontWeight: 700, color: isMaxed ? '#FACC15' : prog.color,
+                    background: isMaxed ? 'rgba(250,204,21,0.15)' : `color-mix(in srgb, ${prog.color} 18%, transparent)`,
+                    padding: '2px 8px', borderRadius: 8,
+                  }}>
+                    {isMaxed ? '🏆 Max!' : `Niv. ${currentIdx + 1} / ${prog.levels.length}`}
+                  </span>
+                </div>
+                <p style={{ margin: '3px 0 0', fontSize: 11, color: 'var(--text-3)' }}>{prog.subtitle}</p>
+              </div>
+              <ChevronDown size={16} color="var(--text-3)" style={{ transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }} />
+            </div>
+
+            {/* Progress bar */}
+            <div style={{ height: 4, background: 'var(--border)' }}>
+              <div style={{ height: '100%', width: `${pct}%`, background: prog.color, transition: 'width 0.5s ease' }} />
+            </div>
+
+            {/* Current level card */}
+            <div style={{ padding: '14px 16px', background: 'var(--bg-card)' }}>
+              <div style={{
+                padding: '13px 14px', borderRadius: 14,
+                background: `color-mix(in srgb, ${prog.color} 10%, transparent)`,
+                border: `2px solid ${prog.color}`,
+                marginBottom: nextLevel ? 10 : 0,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: prog.color, flexShrink: 0, animation: 'gymPulse 2s ease-in-out infinite' }} />
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: 'var(--text-1)', flex: 1 }}>{currentLevel.name}</p>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: prog.color, whiteSpace: 'nowrap' }}>{currentLevel.sets}× {currentLevel.target}</span>
+                </div>
+                <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--text-2)', lineHeight: 1.6 }}>💡 {currentLevel.tip}</p>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {isMaxed ? (
+                    <div style={{ flex: 1, padding: '10px', borderRadius: 10, textAlign: 'center', background: `color-mix(in srgb, ${prog.color} 15%, transparent)`, color: prog.color, fontSize: 13, fontWeight: 800 }}>
+                      🏆 Maximaal niveau bereikt!
+                    </div>
+                  ) : (
+                    <button onClick={() => advanceLevel(pillar)} style={{
+                      flex: 1, padding: '10px', borderRadius: 10,
+                      background: prog.color, border: 'none',
+                      color: '#000', fontSize: 13, fontWeight: 800, cursor: 'pointer',
+                    }}>✓ Niveau behaald!</button>
+                  )}
+                  {currentIdx > 0 && (
+                    <button onClick={() => retreatLevel(pillar)} style={{
+                      padding: '10px 14px', borderRadius: 10,
+                      background: 'var(--bg-base)', border: '1px solid var(--border)',
+                      color: 'var(--text-3)', fontSize: 14, cursor: 'pointer',
+                    }} title="Niveau terug">↩</button>
+                  )}
+                </div>
+              </div>
+
+              {/* Next level preview */}
+              {nextLevel && (
+                <div style={{
+                  padding: '10px 13px', borderRadius: 12,
+                  background: 'var(--bg-base)', border: '1px solid var(--border)', opacity: 0.65,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>Volgende →</span>
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--text-2)', flex: 1 }}>{nextLevel.name}</p>
+                    <span style={{ fontSize: 11, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>{nextLevel.sets}× {nextLevel.target}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Expandable full level list */}
+            {isExpanded && (
+              <div style={{ padding: '0 16px 16px', background: 'var(--bg-card)' }}>
+                <div style={{ height: 1, background: 'var(--border)', marginBottom: 14 }} />
+                <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Volledige progressie</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {prog.levels.map((level, idx) => {
+                    const isDone = idx < currentIdx
+                    const isCurrent = idx === currentIdx
+                    const isFuture = idx > currentIdx
+                    return (
+                      <div key={idx} style={{
+                        display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 10px', borderRadius: 11,
+                        background: isCurrent ? `color-mix(in srgb, ${prog.color} 8%, transparent)` : 'transparent',
+                        border: isCurrent ? `1px solid color-mix(in srgb, ${prog.color} 28%, transparent)` : '1px solid transparent',
+                        opacity: isFuture ? 0.45 : 1,
+                        transition: 'opacity 0.2s',
+                      }}>
+                        <div style={{
+                          width: 22, height: 22, borderRadius: '50%', flexShrink: 0, marginTop: 1,
+                          background: isDone ? prog.color : isCurrent ? `color-mix(in srgb, ${prog.color} 22%, transparent)` : 'var(--border)',
+                          border: isCurrent ? `2px solid ${prog.color}` : 'none',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}>
+                          {isDone
+                            ? <Check size={11} color="#fff" strokeWidth={3} />
+                            : <span style={{ fontSize: 9, fontWeight: 800, color: isCurrent ? prog.color : 'var(--text-3)' }}>{idx + 1}</span>
+                          }
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <p style={{ margin: 0, fontSize: 13, fontWeight: isCurrent ? 700 : 600, color: isCurrent ? 'var(--text-1)' : isDone ? 'var(--text-2)' : 'var(--text-2)' }}>{level.name}</p>
+                          <p style={{ margin: 0, fontSize: 11, color: 'var(--text-3)' }}>{level.sets} sets × {level.target}</p>
+                          {isCurrent && <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-2)', fontStyle: 'italic' }}>💡 {level.tip}</p>}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })}
+
+      {/* ── Beginner Tips ── */}
+      <div style={{ padding: '16px', borderRadius: 16, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+        <p style={{ margin: '0 0 12px', fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Gouden Regels</p>
+        {[
+          ['🎯', 'Vorm is alles',     'Slechte techniek leidt tot blessures. Liever 5 perfecte reps dan 15 slechte. Film jezelf.'],
+          ['📈', 'Progressie principe','Bereik het doelrep-bereik 2 sessies op rij met goede vorm, dan pas naar het volgende niveau.'],
+          ['😴', 'Rust = groei',       'Spieren groeien tijdens herstel. Neem rustdagen serieus en slaap 7–9 uur per nacht.'],
+          ['🔥', 'Warm altijd op',    '5–10 min lichte cardio + mobiliteitswerk vóór elke sessie. Vermijdt verrekkingen.'],
+          ['⏱️', 'Rust tussen sets',   '2–3 min voor krachtoefeningen. 60–90 sec voor core. Niet minder.'],
+          ['💧', 'Hydrateer',          'Drink 2–3 liter water per dag. Prestaties dalen al bij 2% uitdroging.'],
+        ].map(([icon, title, text]) => (
+          <div key={title} style={{ display: 'flex', gap: 12, marginBottom: 8, padding: '10px', borderRadius: 12, background: 'var(--bg-base)' }}>
+            <span style={{ fontSize: 20, flexShrink: 0, lineHeight: 1 }}>{icon}</span>
+            <div>
+              <p style={{ margin: '0 0 2px', fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>{title}</p>
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5 }}>{text}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+    </div>
+  )
+}
+
 const POPULAR_SPLITS = [
   {
     name: 'Push / Pull / Legs',
@@ -884,7 +1283,7 @@ export default function GymWidget({ userId, onXPEarned }) {
 
       {/* ── Tab bar ── */}
       <div style={{ display: 'flex', gap: 4, padding: '0 0 16px', flexShrink: 0 }}>
-        {[['schema', 'Schema'], ['logs', 'Logboek']].map(([id, label]) => (
+        {[['schema', 'Schema'], ['logs', 'Logboek'], ['calisthenics', '🤸 Cali']].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)} style={{
             flex: 1, padding: '9px', borderRadius: 12,
             background: tab === id ? 'color-mix(in srgb, var(--accent) 15%, transparent)' : 'var(--bg-card)',
@@ -1378,6 +1777,8 @@ export default function GymWidget({ userId, onXPEarned }) {
           </div>
         )
       })()}
+
+      {tab === 'calisthenics' && <CalisthenicsTab userId={userId} />}
 
       {/* ── Modals ── */}
       {showMGModal && <MuscleGroupModal onSelect={handleSelectMG} onClose={() => setShowMGModal(false)} />}
