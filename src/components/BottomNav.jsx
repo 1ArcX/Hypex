@@ -136,11 +136,11 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
         onTouchStart={onNavSwipeStart}
         onTouchEnd={onNavSwipeEnd}
         style={{
-          display: 'flex', flexShrink: 0,
+          display: 'flex',
           background: 'var(--bg-sidebar)',
           borderTop: '1px solid var(--border)',
           paddingBottom: 'env(safe-area-inset-bottom)',
-          position: 'relative', zIndex: 100,
+          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100,
         }}>
         {PRIMARY_TABS.map(({ id, Icon, label }) => {
           const active = activePage === id

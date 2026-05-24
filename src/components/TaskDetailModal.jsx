@@ -52,7 +52,7 @@ export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onE
   return (
     <div
       className={closing ? 'modal-overlay modal-closing' : 'modal-overlay'}
-      style={{ position:'fixed',inset:0,zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.7)',backdropFilter:'blur(10px)',padding:'16px' }}
+      style={{ position:'fixed',inset:0,zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.7)',backdropFilter:'blur(10px)',padding:'16px',paddingBottom:'calc(16px + var(--keyboard-height, 0px))' }}
       onMouseDown={() => { mouseDownedInside.current = false }}
       onClick={() => { if (!mouseDownedInside.current) handleClose() }}
     >
@@ -126,6 +126,7 @@ export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onE
             value={desc}
             onChange={e => { setDesc(e.target.value); setDescDirty(false) }}
             onBlur={() => { if (onSaveDescription) { onSaveDescription(task.id, desc); setDescDirty(true) } }}
+            onFocus={e => { const t = e.target; setTimeout(() => t.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 350) }}
             placeholder="Voeg een beschrijving toe..."
             rows={3}
             style={{

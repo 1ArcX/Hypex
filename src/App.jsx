@@ -852,8 +852,8 @@ export default function App() {
           </div>
           </div>
 
-          {/* Mobile bottom nav */}
-          <div className="md:hidden">
+          {/* Mobile bottom nav — fixed, spacer holds its height in the flex column */}
+          <div className="md:hidden" style={{ height: 'calc(56px + env(safe-area-inset-bottom))', flexShrink: 0 }}>
             <BottomNav
               activePage={activePage}
               setActivePage={handleSetActivePage}
