@@ -168,8 +168,8 @@ function ExpenseModal({ onClose, onSave, editing, categories = CATEGORIES, defau
   }
 
   return ReactDOM.createPortal(
-    <div ref={backdropRef} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)', zIndex: 9999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-      <div style={{ width: '100%', maxWidth: 480, background: 'var(--bg-sidebar)', borderRadius: '22px 22px 0 0', border: '1px solid var(--border)', borderBottom: 'none', padding: '20px 20px calc(24px + env(safe-area-inset-bottom) + var(--keyboard-height, 0px))', animation: 'sheetUp 0.3s cubic-bezier(0.34,1.1,0.64,1)' }}>
+    <div ref={backdropRef} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 'var(--keyboard-height, 0px)', background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)', zIndex: 9999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div style={{ width: '100%', maxWidth: 480, background: 'var(--bg-sidebar)', borderRadius: '22px 22px 0 0', border: '1px solid var(--border)', borderBottom: 'none', padding: '20px 20px calc(24px + env(safe-area-inset-bottom))', maxHeight: '90%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', animation: 'sheetUp 0.3s cubic-bezier(0.34,1.1,0.64,1)' }}>
         <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border)', margin: '0 auto 18px' }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
           <h3 style={{ fontSize: 16, fontWeight: 700, color: isPlanned ? '#F59E0B' : 'var(--text-1)', margin: 0 }}>
@@ -332,8 +332,8 @@ function IncomeModal({ onClose, onSave }) {
   }
 
   return ReactDOM.createPortal(
-    <div ref={backdropRef} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)', zIndex: 9999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-      <div style={{ width: '100%', maxWidth: 480, background: 'var(--bg-sidebar)', borderRadius: '22px 22px 0 0', border: '1px solid var(--border)', borderBottom: 'none', padding: '20px 20px calc(24px + env(safe-area-inset-bottom) + var(--keyboard-height, 0px))', animation: 'sheetUp 0.3s cubic-bezier(0.34,1.1,0.64,1)' }}>
+    <div ref={backdropRef} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 'var(--keyboard-height, 0px)', background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)', zIndex: 9999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div style={{ width: '100%', maxWidth: 480, background: 'var(--bg-sidebar)', borderRadius: '22px 22px 0 0', border: '1px solid var(--border)', borderBottom: 'none', padding: '20px 20px calc(24px + env(safe-area-inset-bottom))', maxHeight: '90%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', animation: 'sheetUp 0.3s cubic-bezier(0.34,1.1,0.64,1)' }}>
         <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border)', margin: '0 auto 18px' }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
           <h3 style={{ fontSize: 16, fontWeight: 700, color: '#10B981', margin: 0 }}>💚 Inkomsten toevoegen</h3>
