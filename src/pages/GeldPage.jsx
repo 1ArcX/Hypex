@@ -388,6 +388,8 @@ function BudgetModal({ config, onClose, onSave }) {
   const [minBalance,   setMinBalance]   = useState(config?.min_balance ?? 300)
   const [vacMode,      setVacMode]      = useState(config?.vacation_mode || false)
   const [vacBudget,    setVacBudget]    = useState(config?.vacation_budget || '')
+  const [vacStart,     setVacStart]     = useState(config?.vacation_start || '')
+  const [vacEnd,       setVacEnd]       = useState(config?.vacation_end || '')
   const [addingCat,    setAddingCat]    = useState(false)
   const [newName,    setNewName]    = useState('')
   const [newEmoji,   setNewEmoji]   = useState('🎮')
@@ -470,15 +472,35 @@ function BudgetModal({ config, onClose, onSave }) {
             </div>
           </div>
           {vacMode && (
-            <div onClick={e => e.stopPropagation()} style={{ position: 'relative' }}>
-              <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 18, color: '#06B6D4' }}>€</span>
-              <input
-                type="number" placeholder="0"
-                value={vacBudget} onChange={e => setVacBudget(+e.target.value)}
-                onFocus={scrollFix}
-                style={{ width: '100%', padding: '12px 14px 12px 30px', borderRadius: 12, background: 'rgba(6,182,212,0.06)', border: '1px solid rgba(6,182,212,0.35)', color: '#06B6D4', fontSize: 20, fontWeight: 700, colorScheme: 'dark' }}
-              />
-              <p style={{ fontSize: 11, color: 'rgba(6,182,212,0.6)', margin: '6px 0 0' }}>Dagbudget en stats worden berekend op basis van dit bedrag.</p>
+            <div onClick={e => e.stopPropagation()}>
+              {/* Budget */}
+              <div style={{ position: 'relative', marginBottom: 10 }}>
+                <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 18, color: '#06B6D4' }}>€</span>
+                <input
+                  type="number" placeholder="Vakantiebudget"
+                  value={vacBudget} onChange={e => setVacBudget(+e.target.value)}
+                  onFocus={scrollFix}
+                  style={{ width: '100%', padding: '12px 14px 12px 30px', borderRadius: 12, background: 'rgba(6,182,212,0.06)', border: '1px solid rgba(6,182,212,0.35)', color: '#06B6D4', fontSize: 20, fontWeight: 700, colorScheme: 'dark' }}
+                />
+              </div>
+              {/* Dates */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 6 }}>
+                <div>
+                  <label style={{ fontSize: 10, color: 'rgba(6,182,212,0.7)', fontWeight: 600, display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Vertrekdatum</label>
+                  <input type="date" value={vacStart} onChange={e => setVacStart(e.target.value)}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: 10, background: 'rgba(6,182,212,0.06)', border: '1px solid rgba(6,182,212,0.3)', color: 'var(--text-2)', fontSize: 13, colorScheme: 'dark', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, color: 'rgba(6,182,212,0.7)', fontWeight: 600, display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Thuiskomst</label>
+                  <input type="date" value={vacEnd} onChange={e => setVacEnd(e.target.value)}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: 10, background: 'rgba(6,182,212,0.06)', border: '1px solid rgba(6,182,212,0.3)', color: 'var(--text-2)', fontSize: 13, colorScheme: 'dark', boxSizing: 'border-box' }} />
+                </div>
+              </div>
+              {vacStart && vacEnd && new Date(vacEnd) > new Date(vacStart) && (
+                <p style={{ fontSize: 11, color: 'rgba(6,182,212,0.6)', margin: '4px 0 0' }}>
+                  {Math.round((new Date(vacEnd) - new Date(vacStart)) / 86400000)} dagen · dagbudget {vacBudget > 0 ? `€${(vacBudget / Math.round((new Date(vacEnd) - new Date(vacStart)) / 86400000)).toFixed(0)}/dag` : '–'}
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -563,7 +585,7 @@ function BudgetModal({ config, onClose, onSave }) {
           </span>
         </div>
 
-        <button onClick={() => onSave({ monthly_budget: monthly, category_budgets: cats, custom_categories: customCats, savings_goal: savingsGoal, min_balance: minBalance, vacation_mode: vacMode, vacation_budget: vacMode ? (Number(vacBudget) || 0) : 0 })}
+        <button onClick={() => onSave({ monthly_budget: monthly, category_budgets: cats, custom_categories: customCats, savings_goal: savingsGoal, min_balance: minBalance, vacation_mode: vacMode, vacation_budget: vacMode ? (Number(vacBudget) || 0) : 0, vacation_start: vacMode ? vacStart : null, vacation_end: vacMode ? vacEnd : null })}
           style={{ width: '100%', padding: '14px', borderRadius: 14, background: 'var(--accent)', border: 'none', color: '#000', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
           Opslaan
         </button>
@@ -1194,9 +1216,17 @@ export default function GeldPage({ userId, onClose }) {
 
   // Smart stats
   const today        = new Date()
-  const daysInMonth  = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
-  const dayOfMonth   = today.getDate()
-  const daysLeft     = daysInMonth - dayOfMonth + 1
+  const vacStartDate = vacationMode && config?.vacation_start ? new Date(config.vacation_start + 'T00:00:00') : null
+  const vacEndDate   = vacationMode && config?.vacation_end   ? new Date(config.vacation_end   + 'T00:00:00') : null
+  const daysInMonth  = vacStartDate && vacEndDate
+    ? Math.max(1, Math.round((vacEndDate - vacStartDate) / 86400000) + 1)
+    : new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
+  const dayOfMonth   = vacStartDate
+    ? Math.max(1, Math.min(daysInMonth, Math.round((today - vacStartDate) / 86400000) + 1))
+    : today.getDate()
+  const daysLeft     = vacEndDate
+    ? Math.max(1, Math.round((vacEndDate - today) / 86400000) + 1)
+    : daysInMonth - dayOfMonth + 1
   const dagBudget    = adjustedRemaining > 0 ? adjustedRemaining / daysLeft : 0
   const projectedTotal = dayOfMonth > 1 ? (totalSpent / dayOfMonth) * daysInMonth : null
   const projectedOver  = projectedTotal !== null && projectedTotal > adjustedBase
@@ -1305,13 +1335,23 @@ export default function GeldPage({ userId, onClose }) {
         </div>
 
         {vacationMode && (
-          <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 12, background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.3)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 16 }}>✈️</span>
-            <div style={{ flex: 1 }}>
-              <p style={{ fontSize: 12, fontWeight: 700, color: '#06B6D4', margin: '0 0 1px' }}>Vakantiemodus actief</p>
-              <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>Budget: {fmt(monthlyBudget)} · Uitgaven tellen niet mee in maandbudget</p>
+          <div style={{ marginBottom: 14, padding: '12px 14px', borderRadius: 12, background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.3)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: vacStartDate && vacEndDate ? 6 : 0 }}>
+              <span style={{ fontSize: 16 }}>✈️</span>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: 12, fontWeight: 700, color: '#06B6D4', margin: 0 }}>Vakantiemodus — {fmt(monthlyBudget)} totaal</p>
+              </div>
+              <button onClick={() => setShowBudget(true)} style={{ fontSize: 11, color: '#06B6D4', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 600 }}>Wijzig</button>
             </div>
-            <button onClick={() => setShowBudget(true)} style={{ fontSize: 11, color: '#06B6D4', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 600 }}>Wijzig</button>
+            {vacStartDate && vacEndDate && (
+              <div style={{ display: 'flex', gap: 12 }}>
+                <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                  {vacStartDate.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })} – {vacEndDate.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--text-3)' }}>·</span>
+                <span style={{ fontSize: 11, color: '#06B6D4', fontWeight: 600 }}>{daysLeft} dag{daysLeft !== 1 ? 'en' : ''} over van {daysInMonth}</span>
+              </div>
+            )}
           </div>
         )}
 
