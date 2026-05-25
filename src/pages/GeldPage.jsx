@@ -381,11 +381,13 @@ function BudgetModal({ config, onClose, onSave }) {
   usePreventTouch(backdropRef)
   useScrollContain(cardRef)
 
-  const [monthly,    setMonthly]    = useState(config?.monthly_budget || 400)
-  const [cats,       setCats]       = useState(config?.category_budgets || DEFAULT_CAT_BUDGETS)
+  const [monthly,      setMonthly]      = useState(config?.monthly_budget || 400)
+  const [cats,         setCats]         = useState(config?.category_budgets || DEFAULT_CAT_BUDGETS)
   const [customCats,   setCustomCats]   = useState(config?.custom_categories || [])
   const [savingsGoal,  setSavingsGoal]  = useState(config?.savings_goal || 0)
   const [minBalance,   setMinBalance]   = useState(config?.min_balance ?? 300)
+  const [vacMode,      setVacMode]      = useState(config?.vacation_mode || false)
+  const [vacBudget,    setVacBudget]    = useState(config?.vacation_budget || '')
   const [addingCat,    setAddingCat]    = useState(false)
   const [newName,    setNewName]    = useState('')
   const [newEmoji,   setNewEmoji]   = useState('🎮')
@@ -452,6 +454,33 @@ function BudgetModal({ config, onClose, onSave }) {
               style={{ width: '100%', padding: '12px 14px 12px 30px', borderRadius: 12, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.25)', color: '#3B82F6', fontSize: 20, fontWeight: 700, colorScheme: 'dark' }} />
           </div>
           <p style={{ fontSize: 11, color: 'rgba(59,130,246,0.6)', margin: '6px 0 0' }}>Hoeveel je minimaal op je hoofdrekening wil houden na overschrijvingen.</p>
+        </div>
+
+        {/* Vakantiemodus */}
+        <div
+          onClick={() => setVacMode(v => !v)}
+          style={{ marginBottom: 20, padding: '14px 16px', borderRadius: 14, background: vacMode ? 'rgba(6,182,212,0.08)' : 'rgba(255,255,255,0.03)', border: vacMode ? '1px solid rgba(6,182,212,0.4)' : '1px solid var(--border)', cursor: 'pointer' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: vacMode ? 12 : 0 }}>
+            <div>
+              <p style={{ fontSize: 13, fontWeight: 700, color: vacMode ? '#06B6D4' : 'var(--text-2)', margin: '0 0 2px' }}>✈️ Vakantiemodus</p>
+              <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>Tijdelijk apart vakantiebudget instellen</p>
+            </div>
+            <div style={{ width: 40, height: 22, borderRadius: 11, background: vacMode ? 'rgba(6,182,212,0.5)' : 'rgba(255,255,255,0.1)', position: 'relative', flexShrink: 0, transition: 'background 0.2s' }}>
+              <div style={{ position: 'absolute', width: 18, height: 18, borderRadius: '50%', background: vacMode ? '#06B6D4' : 'rgba(255,255,255,0.35)', top: 2, left: vacMode ? 20 : 2, transition: 'left 0.2s' }} />
+            </div>
+          </div>
+          {vacMode && (
+            <div onClick={e => e.stopPropagation()} style={{ position: 'relative' }}>
+              <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 18, color: '#06B6D4' }}>€</span>
+              <input
+                type="number" placeholder="0"
+                value={vacBudget} onChange={e => setVacBudget(+e.target.value)}
+                onFocus={scrollFix}
+                style={{ width: '100%', padding: '12px 14px 12px 30px', borderRadius: 12, background: 'rgba(6,182,212,0.06)', border: '1px solid rgba(6,182,212,0.35)', color: '#06B6D4', fontSize: 20, fontWeight: 700, colorScheme: 'dark' }}
+              />
+              <p style={{ fontSize: 11, color: 'rgba(6,182,212,0.6)', margin: '6px 0 0' }}>Dagbudget en stats worden berekend op basis van dit bedrag.</p>
+            </div>
+          )}
         </div>
 
         <label style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', marginBottom: 10 }}>Per categorie</label>
@@ -534,7 +563,7 @@ function BudgetModal({ config, onClose, onSave }) {
           </span>
         </div>
 
-        <button onClick={() => onSave({ monthly_budget: monthly, category_budgets: cats, custom_categories: customCats, savings_goal: savingsGoal, min_balance: minBalance })}
+        <button onClick={() => onSave({ monthly_budget: monthly, category_budgets: cats, custom_categories: customCats, savings_goal: savingsGoal, min_balance: minBalance, vacation_mode: vacMode, vacation_budget: vacMode ? (Number(vacBudget) || 0) : 0 })}
           style={{ width: '100%', padding: '14px', borderRadius: 14, background: 'var(--accent)', border: 'none', color: '#000', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
           Opslaan
         </button>
@@ -898,99 +927,12 @@ function IncomeDayModal({ source, defaultDate, adjustedBase, savingsGoal, alread
   )
 }
 
-// ── Vacation Modal ────────────────────────────────────────────────────────────
-const VAC_EMOJIS = ['✈️','🏖️','🏔️','🌴','🗺️','🚢','🎡','🏕️','🌊','🗼']
-
-function VacationModal({ editing, onClose, onSave }) {
-  const backdropRef = useRef(null)
-  const cardRef     = useRef(null)
-  usePreventTouch(backdropRef)
-  useScrollContain(cardRef)
-
-  const [name,       setName]       = useState(editing?.name || '')
-  const [emoji,      setEmoji]      = useState(editing?.emoji || '✈️')
-  const [target,     setTarget]     = useState(editing?.target ? String(editing.target) : '')
-  const [saved,      setSaved]      = useState(editing?.saved ? String(editing.saved) : '')
-  const [targetDate, setTargetDate] = useState(editing?.target_date || '')
-
-  const targetN = parseFloat(String(target).replace(',', '.')) || 0
-  const savedN  = parseFloat(String(saved).replace(',', '.')) || 0
-  const canSave = name.trim() && targetN > 0
-
-  const handleSave = () => {
-    if (!canSave) return
-    onSave({
-      id: editing?.id || `vac_${Date.now()}`,
-      name: name.trim(), emoji, target: targetN,
-      saved: savedN, target_date: targetDate || null,
-    })
-  }
-
-  return ReactDOM.createPortal(
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 'var(--keyboard-height, 0px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div ref={backdropRef} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)', zIndex: -1 }} onClick={onClose} />
-      <div ref={cardRef} style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420, background: 'var(--bg-sidebar)', borderRadius: 22, border: '1px solid rgba(6,182,212,0.35)', padding: 24, maxHeight: 'calc(100% - 32px)', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: '#06B6D4', margin: 0 }}>
-            {editing ? '✏ Vakantiedoel bewerken' : '✈️ Vakantiedoel toevoegen'}
-          </h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)' }}><X size={18} /></button>
-        </div>
-
-        <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
-          {VAC_EMOJIS.map(e => (
-            <button key={e} onClick={() => setEmoji(e)} style={{ fontSize: 20, width: 36, height: 36, borderRadius: 10, border: emoji === e ? '2px solid #06B6D4' : '1px solid var(--border)', background: emoji === e ? 'rgba(6,182,212,0.1)' : 'var(--bg-card-2)', cursor: 'pointer' }}>{e}</button>
-          ))}
-        </div>
-
-        <input placeholder="Naam (bijv. Turkije 2026)" value={name} onChange={e => setName(e.target.value)} onFocus={scrollFix} autoFocus
-          style={{ width: '100%', padding: '10px 14px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid rgba(6,182,212,0.3)', color: 'var(--text-1)', fontSize: 14, marginBottom: 12, colorScheme: 'dark', boxSizing: 'border-box', fontFamily: 'inherit' }} />
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
-          <div>
-            <label style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, display: 'block', marginBottom: 5 }}>Doel bedrag</label>
-            <div style={{ position: 'relative' }}>
-              <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: '#06B6D4' }}>€</span>
-              <input type="text" inputMode="decimal" placeholder="2000" value={target} onChange={e => setTarget(e.target.value)} onFocus={scrollFix}
-                style={{ width: '100%', padding: '10px 10px 10px 26px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid rgba(6,182,212,0.3)', color: '#06B6D4', fontSize: 16, fontWeight: 700, colorScheme: 'dark', boxSizing: 'border-box' }} />
-            </div>
-          </div>
-          <div>
-            <label style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, display: 'block', marginBottom: 5 }}>Al gespaard</label>
-            <div style={{ position: 'relative' }}>
-              <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: '#10B981' }}>€</span>
-              <input type="text" inputMode="decimal" placeholder="0" value={saved} onChange={e => setSaved(e.target.value)} onFocus={scrollFix}
-                style={{ width: '100%', padding: '10px 10px 10px 26px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid rgba(16,185,129,0.3)', color: '#10B981', fontSize: 16, fontWeight: 700, colorScheme: 'dark', boxSizing: 'border-box' }} />
-            </div>
-          </div>
-        </div>
-
-        <div style={{ marginBottom: 18 }}>
-          <label style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, display: 'block', marginBottom: 5 }}>Doeldatum (optioneel)</label>
-          <input type="date" value={targetDate} onChange={e => setTargetDate(e.target.value)}
-            style={{ width: '100%', padding: '10px 14px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-3)', fontSize: 13, colorScheme: 'dark' }} />
-        </div>
-
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: '12px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-2)', cursor: 'pointer', fontSize: 14 }}>Annuleer</button>
-          <button onClick={handleSave} disabled={!canSave}
-            style={{ flex: 2, padding: '12px', borderRadius: 12, background: canSave ? '#06B6D4' : 'rgba(6,182,212,0.15)', border: 'none', color: canSave ? '#000' : 'rgba(6,182,212,0.4)', fontWeight: 700, fontSize: 14, cursor: canSave ? 'pointer' : 'default' }}>
-            {editing ? 'Opslaan' : 'Toevoegen'}
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body
-  )
-}
-
 // ── Main Page ─────────────────────────────────────────────────────────────────
 const GELD_TABS = [
   { id: 'weergave',   label: 'Weergave',  emoji: '📊' },
   { id: 'enveloppen', label: 'Enveloppen',emoji: '📁' },
   { id: 'inkomsten',  label: 'Inkomsten', emoji: '💚' },
   { id: 'uitgaven',   label: 'Uitgaven',  emoji: '💸' },
-  { id: 'vakantie',   label: 'Vakantie',  emoji: '✈️' },
   { id: 'jaar',       label: 'Jaar',      emoji: '📅' },
   { id: 'zoeken',     label: 'Zoeken',    emoji: '🔍' },
 ]
@@ -1016,7 +958,6 @@ export default function GeldPage({ userId, onClose }) {
   const [loanRepayments, setLoanRepayments]   = useState([])
   const [incomeDone, setIncomeDone] = useState(false)
   const [showEarlyIncome, setShowEarlyIncome] = useState(null)
-  const [showVacationModal, setShowVacationModal] = useState(null) // null | 'new' | vacationGoal object
   const [loanRepayInput, setLoanRepayInput]   = useState('')
   const [savingsInput, setSavingsInput]       = useState('')
   const _now = new Date()
@@ -1139,13 +1080,9 @@ export default function GeldPage({ userId, onClose }) {
     setShowRecurring(false); fetchAll()
   }
 
-  const saveVacationGoals = async (goals) => {
-    await supabase.from('budget_config').upsert({ vacation_goals: goals, user_id: userId, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
-    setShowVacationModal(null); fetchAll()
-  }
-
   // Derived stats
-  const monthlyBudget      = config?.monthly_budget || 400
+  const vacationMode       = config?.vacation_mode || false
+  const monthlyBudget      = vacationMode && config?.vacation_budget > 0 ? config.vacation_budget : (config?.monthly_budget || 400)
   const minBalance         = config?.min_balance ?? 300
   const catBudgets         = config?.category_budgets || DEFAULT_CAT_BUDGETS
   const customCategories   = config?.custom_categories || []
@@ -1174,7 +1111,6 @@ export default function GeldPage({ userId, onClose }) {
   const totalRepaid           = loanRepayments.reduce((s, e) => s + Number(e.amount), 0)
   const remainingLoan         = Math.max(0, openLoanTotal - totalRepaid)
 
-  const vacationGoals      = config?.vacation_goals || []
   const recurringIncome    = config?.recurring_income || []
   const recurringExpected  = calcRecurringThisMonth(recurringIncome)
   const hasRecurring       = recurringIncome.length > 0
@@ -1363,10 +1299,21 @@ export default function GeldPage({ userId, onClose }) {
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>Overzicht</h2>
-          <button onClick={() => setShowBudget(true)} style={{ padding: '8px 14px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid var(--border)', color: 'var(--text-2)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
-            Budget
+          <button onClick={() => setShowBudget(true)} style={{ padding: '8px 14px', borderRadius: 12, background: vacationMode ? 'rgba(6,182,212,0.12)' : 'var(--bg-card-2)', border: vacationMode ? '1px solid rgba(6,182,212,0.4)' : '1px solid var(--border)', color: vacationMode ? '#06B6D4' : 'var(--text-2)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+            {vacationMode ? '✈️ Vakantiemodus' : 'Budget'}
           </button>
         </div>
+
+        {vacationMode && (
+          <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 12, background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.3)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 16 }}>✈️</span>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: '#06B6D4', margin: '0 0 1px' }}>Vakantiemodus actief</p>
+              <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>Budget: {fmt(monthlyBudget)} · Uitgaven tellen niet mee in maandbudget</p>
+            </div>
+            <button onClick={() => setShowBudget(true)} style={{ fontSize: 11, color: '#06B6D4', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 600 }}>Wijzig</button>
+          </div>
+        )}
 
         {/* Alert strip: loans + savings counter */}
         {remainingLoan > 0 && (
@@ -2135,127 +2082,6 @@ export default function GeldPage({ userId, onClose }) {
           ) : null}
         </>}
 
-        {/* ── VAKANTIE ── */}
-        {subView === 'vakantie' && <>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-            <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>✈️ Vakantie</h2>
-            <button onClick={() => setShowVacationModal('new')} style={{ padding: '8px 14px', borderRadius: 12, background: 'rgba(6,182,212,0.1)', border: '1px solid rgba(6,182,212,0.35)', color: '#06B6D4', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>+ Doel toevoegen</button>
-          </div>
-
-          {vacationGoals.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-3)' }}>
-              <div style={{ fontSize: 56, marginBottom: 14 }}>✈️</div>
-              <p style={{ fontSize: 16, fontWeight: 700, margin: '0 0 6px', color: 'var(--text-2)' }}>Geen vakantiedoelen</p>
-              <p style={{ fontSize: 13, margin: '0 0 20px', lineHeight: 1.5 }}>Voeg een vakantiedoel toe om je spaarprogress bij te houden — los van je maandbudget.</p>
-              <button onClick={() => setShowVacationModal('new')} style={{ padding: '12px 24px', borderRadius: 14, background: '#06B6D4', border: 'none', color: '#000', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>+ Vakantiedoel toevoegen</button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {vacationGoals.map(vac => {
-                const pct = vac.target > 0 ? Math.min(100, (vac.saved / vac.target) * 100) : 0
-                const remaining = Math.max(0, vac.target - vac.saved)
-                const daysLeft = vac.target_date
-                  ? Math.max(0, Math.round((new Date(vac.target_date + 'T00:00:00') - new Date()) / 86400000))
-                  : null
-                const dailyNeeded = daysLeft > 0 ? remaining / daysLeft : null
-                const barColor = pct >= 100 ? '#10B981' : pct >= 60 ? '#06B6D4' : pct >= 30 ? '#F59E0B' : '#EF4444'
-
-                return (
-                  <div key={vac.id} style={{ padding: '18px 18px 16px', borderRadius: 20, background: pct >= 100 ? 'rgba(16,185,129,0.07)' : 'rgba(6,182,212,0.05)', border: `1px solid ${pct >= 100 ? 'rgba(16,185,129,0.3)' : 'rgba(6,182,212,0.25)'}` }}>
-                    {/* Header */}
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ width: 44, height: 44, borderRadius: 14, background: 'rgba(6,182,212,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>{vac.emoji}</div>
-                        <div>
-                          <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', margin: '0 0 2px' }}>{vac.name}</p>
-                          {vac.target_date && (
-                            <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>
-                              {daysLeft === 0 ? '🎉 Vandaag!' : `${daysLeft} dag${daysLeft !== 1 ? 'en' : ''} tot vertrek`}
-                              {' · '}{new Date(vac.target_date + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button onClick={() => setShowVacationModal(vac)}
-                          style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(6,182,212,0.1)', border: '1px solid rgba(6,182,212,0.3)', color: '#06B6D4', cursor: 'pointer', fontSize: 12 }}>✏</button>
-                        <button onClick={() => saveVacationGoals(vacationGoals.filter(v => v.id !== vac.id))}
-                          style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#EF4444', cursor: 'pointer', fontSize: 12 }}>✕</button>
-                      </div>
-                    </div>
-
-                    {/* Progress */}
-                    <div style={{ marginBottom: 12 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                        <span style={{ fontSize: 28, fontWeight: 800, color: barColor, lineHeight: 1 }}>{fmt(vac.saved)}</span>
-                        <div style={{ textAlign: 'right' }}>
-                          <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-3)', margin: 0 }}>van {fmt(vac.target)}</p>
-                          <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '2px 0 0' }}>{Math.round(pct)}% gespaard</p>
-                        </div>
-                      </div>
-                      <div style={{ height: 10, background: 'rgba(255,255,255,0.07)', borderRadius: 6, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${pct}%`, background: barColor, borderRadius: 6, transition: 'width 0.6s ease', boxShadow: `0 0 8px ${barColor}60` }} />
-                      </div>
-                    </div>
-
-                    {/* Stats row */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 14 }}>
-                      <div style={{ padding: '10px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
-                        <p style={{ fontSize: 10, color: 'var(--text-3)', margin: '0 0 3px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Nog nodig</p>
-                        <p style={{ fontSize: 16, fontWeight: 700, color: remaining > 0 ? 'var(--text-1)' : '#10B981', margin: 0 }}>{remaining > 0 ? fmt(remaining) : '✓ Klaar!'}</p>
-                      </div>
-                      <div style={{ padding: '10px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
-                        <p style={{ fontSize: 10, color: 'var(--text-3)', margin: '0 0 3px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Per dag</p>
-                        <p style={{ fontSize: 16, fontWeight: 700, color: dailyNeeded != null ? 'var(--text-1)' : 'var(--text-3)', margin: 0 }}>{dailyNeeded != null ? fmt(dailyNeeded) : '–'}</p>
-                      </div>
-                      <div style={{ padding: '10px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
-                        <p style={{ fontSize: 10, color: 'var(--text-3)', margin: '0 0 3px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Dagen</p>
-                        <p style={{ fontSize: 16, fontWeight: 700, color: daysLeft != null ? 'var(--text-1)' : 'var(--text-3)', margin: 0 }}>{daysLeft != null ? daysLeft : '–'}</p>
-                      </div>
-                    </div>
-
-                    {/* Update saved amount */}
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <div style={{ position: 'relative', flex: 1 }}>
-                        <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: '#10B981' }}>€</span>
-                        <input
-                          type="text" inputMode="decimal" placeholder="Nieuw gespaard bedrag"
-                          id={`vac-input-${vac.id}`}
-                          onFocus={scrollFix}
-                          style={{ width: '100%', padding: '10px 10px 10px 26px', borderRadius: 12, background: 'var(--bg-card-2)', border: '1px solid rgba(16,185,129,0.3)', color: 'var(--text-1)', fontSize: 14, colorScheme: 'dark', boxSizing: 'border-box' }} />
-                      </div>
-                      <button
-                        onClick={() => {
-                          const input = document.getElementById(`vac-input-${vac.id}`)
-                          const n = parseFloat(String(input?.value || '').replace(',', '.'))
-                          if (!n && n !== 0) return
-                          const updated = vacationGoals.map(v => v.id === vac.id ? { ...v, saved: n } : v)
-                          saveVacationGoals(updated)
-                          if (input) input.value = ''
-                        }}
-                        style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', color: '#10B981', cursor: 'pointer', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>
-                        Bijwerken
-                      </button>
-                    </div>
-
-                    {pct >= 100 && (
-                      <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 12, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', textAlign: 'center' }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: '#10B981' }}>🎉 Doel bereikt! Geniet van je vakantie!</span>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          <div style={{ marginTop: 16, padding: '12px 16px', borderRadius: 14, background: 'rgba(6,182,212,0.05)', border: '1px solid rgba(6,182,212,0.15)' }}>
-            <p style={{ fontSize: 12, color: 'rgba(6,182,212,0.7)', margin: 0, lineHeight: 1.55 }}>
-              💡 Vakantiespaargeld staat <strong>los van je maandbudget</strong>. Voer het bedrag bij dat je op je vakantierekening hebt staan en update dit wanneer je spaart.
-            </p>
-          </div>
-        </>}
-
         {subView === 'jaar' && <>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
             <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>Jaaroverzicht {selYear}</h2>
@@ -2393,7 +2219,7 @@ export default function GeldPage({ userId, onClose }) {
       </div>
 
       {/* Persistent action bar — hidden on jaar and zoeken tabs */}
-      <div style={{ padding: '10px 16px 0', flexShrink: 0, display: subView === 'jaar' || subView === 'zoeken' || subView === 'vakantie' ? 'none' : 'block' }}>
+      <div style={{ padding: '10px 16px 0', flexShrink: 0, display: subView === 'jaar' || subView === 'zoeken' ? 'none' : 'block' }}>
         <div style={{ maxWidth: 480, margin: '0 auto', display: 'flex', gap: 8, paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>
           <button onClick={() => setShowSavings(true)} style={{ flex: 1, padding: '11px 8px', borderRadius: 14, background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.3)', color: '#EF4444', cursor: 'pointer', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             <TrendingDown size={14} /> Spaar af
@@ -2446,16 +2272,6 @@ export default function GeldPage({ userId, onClose }) {
       {showSavings && <SavingsModal editing={editingSavings} onClose={() => { setShowSavings(false); setEditingSavings(null) }} onSave={async (data) => { if (editingSavings) { await supabase.from('expenses').update(data).eq('id', editingSavings.id); setEditingSavings(null); setShowSavings(false); fetchAll() } else { saveExpense(data) } }} />}
       {showBudget && <BudgetModal config={config} onClose={() => setShowBudget(false)} onSave={saveBudget} />}
       {showRecurring && <RecurringIncomeModal config={config} onClose={() => setShowRecurring(false)} onSave={saveRecurring} />}
-      {showVacationModal && (
-        <VacationModal
-          editing={showVacationModal === 'new' ? null : showVacationModal}
-          onClose={() => setShowVacationModal(null)}
-          onSave={(goal) => {
-            const existing = vacationGoals.filter(v => v.id !== goal.id)
-            saveVacationGoals([...existing, goal])
-          }}
-        />
-      )}
       {showEarlyIncome && (
         <IncomeDayModal
           source={showEarlyIncome}
