@@ -1171,10 +1171,18 @@ export default function GeldPage({ userId, onClose }) {
   const yearMonthly = Array.from({ length: 12 }, (_, m) => {
     const mStart = monthStartOf(selYear, m), mEnd = monthEndOf(selYear, m)
     const mExps  = yearExpenses.filter(e => e.date >= mStart && e.date <= mEnd)
-    const spent  = mExps.filter(e => !e.is_income && !e.is_savings_withdrawal && !e.is_savings_contribution && !e.is_loan_repayment).reduce((s,e) => s + Number(e.amount), 0)
-    const income = mExps.filter(e => e.is_income).reduce((s,e) => s + Number(e.amount), 0)
-    const hasDat = mExps.length > 0
-    return { m, spent, income, hasDat }
+    const allVacsY = [
+      ...(config?.vacation_history || []),
+      ...(vacationMode && config?.vacation_start ? [{ start: config.vacation_start, end: config.vacation_end || config.vacation_start }] : []),
+    ]
+    const vacOvY   = allVacsY.find(v => v.start <= mEnd && (v.end || v.start) >= mStart)
+    const isVacExp = e => vacOvY && e.date >= vacOvY.start && e.date <= (vacOvY.end || vacOvY.start)
+    const baseExp  = e => !e.is_income && !e.is_savings_withdrawal && !e.is_savings_contribution && !e.is_loan_repayment
+    const spent    = mExps.filter(e => baseExp(e) && !isVacExp(e)).reduce((s,e) => s + Number(e.amount), 0)
+    const vacSpent = vacOvY ? mExps.filter(e => baseExp(e) && isVacExp(e)).reduce((s,e) => s + Number(e.amount), 0) : 0
+    const income   = mExps.filter(e => e.is_income).reduce((s,e) => s + Number(e.amount), 0)
+    const hasDat   = mExps.length > 0
+    return { m, spent, income, hasDat, vacSpent, vacOvY }
   })
 
   const spentByCategory = {}
@@ -2141,11 +2149,12 @@ export default function GeldPage({ userId, onClose }) {
           {/* Yearly totals */}
           {(() => {
             const totalYearSpent  = yearMonthly.reduce((s, m) => s + m.spent, 0)
+            const totalYearVac    = yearMonthly.reduce((s, m) => s + m.vacSpent, 0)
             const totalYearIncome = yearMonthly.reduce((s, m) => s + m.income, 0)
             const maxSpent        = Math.max(...yearMonthly.map(m => m.spent), 1)
             const MONTHS_NL       = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec']
             return <>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: totalYearVac > 0 ? 8 : 16 }}>
                 <div style={{ padding: '12px 14px', borderRadius: 14, background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)' }}>
                   <p style={{ fontSize: 10, color: 'rgba(239,68,68,0.7)', margin: '0 0 4px', textTransform: 'uppercase', fontWeight: 700 }}>Totaal uitgegeven</p>
                   <p style={{ fontSize: 22, fontWeight: 800, color: '#EF4444', margin: 0 }}>{fmt(totalYearSpent)}</p>
@@ -2156,21 +2165,22 @@ export default function GeldPage({ userId, onClose }) {
                 </div>
               </div>
 
+              {totalYearVac > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 12, background: 'rgba(6,182,212,0.07)', border: '1px solid rgba(6,182,212,0.2)', marginBottom: 16 }}>
+                  <span style={{ fontSize: 15 }}>✈️</span>
+                  <span style={{ fontSize: 11, color: '#06B6D4', fontWeight: 700, textTransform: 'uppercase', flex: 1, letterSpacing: '0.05em' }}>Vakantie uitgaven</span>
+                  <span style={{ fontSize: 18, fontWeight: 800, color: '#06B6D4' }}>{fmt(totalYearVac)}</span>
+                </div>
+              )}
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {yearMonthly.map(({ m, spent, income, hasDat }) => {
+                {yearMonthly.map(({ m, spent, income, hasDat, vacSpent, vacOvY }) => {
                   const isSelMonth = m === selMonth
                   const barW = maxSpent > 0 ? (spent / maxSpent) * 100 : 0
-                  // Check if any vacation (current or history) overlaps this month
-                  const mStart = monthStartOf(selYear, m), mEnd = monthEndOf(selYear, m)
-                  const allVacs = [
-                    ...(config?.vacation_history || []),
-                    ...(vacationMode && config?.vacation_start ? [{ start: config.vacation_start, end: config.vacation_end || config.vacation_start }] : []),
-                  ]
-                  const vacOverlap = allVacs.find(v => v.start <= mEnd && (v.end || v.start) >= mStart)
                   return (
                     <button key={m} onClick={() => { setSelMonth(m); setSubView('weergave') }}
                       style={{ padding: '12px 14px', borderRadius: 14, background: isSelMonth ? 'rgba(0,255,209,0.07)' : hasDat ? 'var(--bg-card-2)' : 'rgba(255,255,255,0.02)', border: isSelMonth ? '1px solid var(--accent)' : '1px solid var(--border)', cursor: 'pointer', textAlign: 'left' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: hasDat ? 8 : 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: hasDat ? (vacOvY && vacSpent > 0 ? 6 : 8) : 0 }}>
                         <span style={{ fontSize: 12, fontWeight: 700, color: isSelMonth ? 'var(--accent)' : 'var(--text-2)', width: 28, flexShrink: 0 }}>{MONTHS_NL[m]}</span>
                         <div style={{ flex: 1 }}>
                           {hasDat ? (
@@ -2182,13 +2192,19 @@ export default function GeldPage({ userId, onClose }) {
                           )}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                          {vacOverlap && <span style={{ fontSize: 13, lineHeight: 1 }} title="Vakantie">✈️</span>}
                           {hasDat && <div style={{ textAlign: 'right' }}>
                             <span style={{ fontSize: 13, fontWeight: 700, color: '#EF4444' }}>{fmt(spent)}</span>
                             {income > 0 && <span style={{ fontSize: 11, color: '#10B981', marginLeft: 6 }}>+{fmt(income)}</span>}
                           </div>}
                         </div>
                       </div>
+                      {vacOvY && vacSpent > 0 && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingTop: 4, borderTop: '1px solid rgba(6,182,212,0.15)' }}>
+                          <span style={{ fontSize: 11 }}>✈️</span>
+                          <span style={{ fontSize: 11, color: '#06B6D4', flex: 1 }}>Vakantie</span>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: '#06B6D4' }}>{fmt(vacSpent)}</span>
+                        </div>
+                      )}
                     </button>
                   )
                 })}
