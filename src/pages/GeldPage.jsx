@@ -1117,7 +1117,7 @@ export default function GeldPage({ userId, onClose }) {
   // (savings-funded spending is tracked separately and doesn't count against budget)
   // Vaste lasten (abonnementen) worden buiten het vrije budget gehouden
   const FIXED_CAT          = 'abonnementen'
-  const budgetExpenses     = regularExpenses.filter(e => !e.paid_from_savings && e.category !== FIXED_CAT && (!e.is_planned || e.amount > 0))
+  const budgetExpenses     = regularExpenses.filter(e => !e.paid_from_savings && (vacationMode || e.category !== FIXED_CAT) && (!e.is_planned || e.amount > 0))
   const savingsExpenses    = regularExpenses.filter(e => e.paid_from_savings)
   const totalSpent         = budgetExpenses.reduce((s, e) => s + Number(e.amount), 0)
   const savingsExpTotal    = savingsExpenses.reduce((s, e) => s + Number(e.amount), 0)
@@ -1392,7 +1392,7 @@ export default function GeldPage({ userId, onClose }) {
           border: `1px solid ${adjustedRemaining < 0 ? 'rgba(239,68,68,0.35)' : adjustedRemainPct < 15 ? 'rgba(239,68,68,0.25)' : adjustedRemainPct < 40 ? 'rgba(245,158,11,0.25)' : 'rgba(0,255,209,0.2)'}`,
         }}>
           <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>
-            {adjustedRemaining < 0 ? '🚨 Budget overschreden' : 'Nog over deze maand'}
+            {adjustedRemaining < 0 ? '🚨 Budget overschreden' : vacationMode ? 'Nog over op vakantie' : 'Nog over deze maand'}
           </p>
           <p style={{ fontSize: 48, fontWeight: 800, margin: '0 0 14px', color: adjustedRemaining < 0 ? '#EF4444' : adjustedRemainPct < 15 ? '#EF4444' : adjustedRemainPct < 40 ? '#F59E0B' : 'var(--text-1)', lineHeight: 1 }}>
             {fmt(Math.abs(adjustedRemaining))}
@@ -1402,12 +1402,14 @@ export default function GeldPage({ userId, onClose }) {
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-3)' }}>
             <span>
-              {fmt(totalSpent)} budget{savingsExpTotal > 0 ? ` · 💳 ${fmt(savingsExpTotal)} spaar` : ''}{carryover > 0 ? ` · ↩ ${fmt(carryover)}` : ''}
+              {fmt(totalSpent)} uitgegeven{savingsExpTotal > 0 ? ` · 💳 ${fmt(savingsExpTotal)} spaar` : ''}{!vacationMode && carryover > 0 ? ` · ↩ ${fmt(carryover)}` : ''}
             </span>
             <span>
-              {vasteLastenBudget > 0
-                ? `Budget ${fmt(monthlyBudget)} − 🏠 ${fmt(vasteLastenBudget)} = ${fmt(adjustedBase)}`
-                : `Budget: ${fmt(adjustedBase)}`
+              {vacationMode
+                ? `Budget: ${fmt(adjustedBase)}`
+                : vasteLastenBudget > 0
+                  ? `Budget ${fmt(monthlyBudget)} − 🏠 ${fmt(vasteLastenBudget)} = ${fmt(adjustedBase)}`
+                  : `Budget: ${fmt(adjustedBase)}`
               }
             </span>
           </div>
@@ -1501,7 +1503,7 @@ export default function GeldPage({ userId, onClose }) {
                     {fmtShort(weekRemaining)}
                   </p>
                   <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '3px 0 0' }}>
-                    {weekRemaining < 0 ? `${fmt(Math.abs(weekRemaining))} over weekbudget` : 'nog over deze week'}
+                    {weekRemaining < 0 ? `${fmt(Math.abs(weekRemaining))} over weekbudget` : vacationMode ? 'nog over deze week' : 'nog over deze week'}
                   </p>
                 </div>
                 <div style={{ textAlign: 'right' }}>
