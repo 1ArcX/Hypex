@@ -1117,7 +1117,12 @@ export default function GeldPage({ userId, onClose }) {
   // (savings-funded spending is tracked separately and doesn't count against budget)
   // Vaste lasten (abonnementen) worden buiten het vrije budget gehouden
   const FIXED_CAT          = 'abonnementen'
-  const budgetExpenses     = regularExpenses.filter(e => !e.paid_from_savings && (vacationMode || e.category !== FIXED_CAT) && (!e.is_planned || e.amount > 0))
+  const budgetExpenses     = regularExpenses.filter(e =>
+    !e.paid_from_savings &&
+    (vacationMode || e.category !== FIXED_CAT) &&
+    (!e.is_planned || e.amount > 0) &&
+    (!vacationMode || !config?.vacation_start || e.date >= config.vacation_start)
+  )
   const savingsExpenses    = regularExpenses.filter(e => e.paid_from_savings)
   const totalSpent         = budgetExpenses.reduce((s, e) => s + Number(e.amount), 0)
   const savingsExpTotal    = savingsExpenses.reduce((s, e) => s + Number(e.amount), 0)
