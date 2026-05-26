@@ -1194,8 +1194,8 @@ export default function GeldPage({ userId, onClose }) {
   const prevIsMarch2026 = _prevY === 2026 && _prevM === 2
   const vasteLastenBudget = catBudgets[FIXED_CAT] || 0
   const variableBase  = Math.max(0, base - vasteLastenBudget)
-  const carryover    = prevIsMarch2026 ? 0 : Math.max(0, prevSpent - variableBase)
-  const adjustedBase = Math.max(0, variableBase - carryover)
+  const carryover    = vacationMode ? 0 : (prevIsMarch2026 ? 0 : Math.max(0, prevSpent - variableBase))
+  const adjustedBase = vacationMode ? base : Math.max(0, variableBase - carryover)
   const adjustedRemaining = adjustedBase - totalSpent
   const adjustedRemainPct = adjustedBase > 0 ? Math.max(0, Math.min(100, (adjustedRemaining / adjustedBase) * 100)) : 0
 
