@@ -2160,6 +2160,13 @@ export default function GeldPage({ userId, onClose }) {
                 {yearMonthly.map(({ m, spent, income, hasDat }) => {
                   const isSelMonth = m === selMonth
                   const barW = maxSpent > 0 ? (spent / maxSpent) * 100 : 0
+                  // Check if any vacation (current or history) overlaps this month
+                  const mStart = monthStartOf(selYear, m), mEnd = monthEndOf(selYear, m)
+                  const allVacs = [
+                    ...(config?.vacation_history || []),
+                    ...(vacationMode && config?.vacation_start ? [{ start: config.vacation_start, end: config.vacation_end || config.vacation_start }] : []),
+                  ]
+                  const vacOverlap = allVacs.find(v => v.start <= mEnd && (v.end || v.start) >= mStart)
                   return (
                     <button key={m} onClick={() => { setSelMonth(m); setSubView('weergave') }}
                       style={{ padding: '12px 14px', borderRadius: 14, background: isSelMonth ? 'rgba(0,255,209,0.07)' : hasDat ? 'var(--bg-card-2)' : 'rgba(255,255,255,0.02)', border: isSelMonth ? '1px solid var(--accent)' : '1px solid var(--border)', cursor: 'pointer', textAlign: 'left' }}>
@@ -2174,10 +2181,13 @@ export default function GeldPage({ userId, onClose }) {
                             <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Geen data</span>
                           )}
                         </div>
-                        {hasDat && <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: '#EF4444' }}>{fmt(spent)}</span>
-                          {income > 0 && <span style={{ fontSize: 11, color: '#10B981', marginLeft: 6 }}>+{fmt(income)}</span>}
-                        </div>}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                          {vacOverlap && <span style={{ fontSize: 13, lineHeight: 1 }} title="Vakantie">✈️</span>}
+                          {hasDat && <div style={{ textAlign: 'right' }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: '#EF4444' }}>{fmt(spent)}</span>
+                            {income > 0 && <span style={{ fontSize: 11, color: '#10B981', marginLeft: 6 }}>+{fmt(income)}</span>}
+                          </div>}
+                        </div>
                       </div>
                     </button>
                   )
