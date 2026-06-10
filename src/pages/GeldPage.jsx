@@ -1233,7 +1233,7 @@ export default function GeldPage({ userId, onClose }) {
     for (let i = 1; i <= recoveryMonths; i++) {
       const pY = (selMonth - i) < 0 ? selYear - 1 : selYear
       const pM = ((selMonth - i) % 12 + 12) % 12
-      if (pY === 2026 && pM === 2) continue  // March 2026 eenmalige uitzondering
+      if (pY === 2026 && pM <= 2) continue  // Jan/feb/mrt 2026 buiten beschouwing
       let pSpent = 0
       if (i === 1) {
         pSpent = prevSpent
