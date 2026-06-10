@@ -386,6 +386,7 @@ function BudgetModal({ config, onClose, onSave }) {
   const [customCats,   setCustomCats]   = useState(config?.custom_categories || [])
   const [savingsGoal,  setSavingsGoal]  = useState(config?.savings_goal || 0)
   const [minBalance,   setMinBalance]   = useState(config?.min_balance ?? 300)
+  const [recoveryMonths, setRecoveryMonths] = useState(config?.recovery_months || 3)
   const [vacMode,      setVacMode]      = useState(config?.vacation_mode || false)
   const [vacBudget,    setVacBudget]    = useState(config?.vacation_budget || '')
   const [vacStart,     setVacStart]     = useState(config?.vacation_start || '')
@@ -456,6 +457,20 @@ function BudgetModal({ config, onClose, onSave }) {
               style={{ width: '100%', padding: '12px 14px 12px 30px', borderRadius: 12, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.25)', color: '#3B82F6', fontSize: 20, fontWeight: 700, colorScheme: 'dark' }} />
           </div>
           <p style={{ fontSize: 11, color: 'rgba(59,130,246,0.6)', margin: '6px 0 0' }}>Hoeveel je minimaal op je hoofdrekening wil houden na overschrijvingen.</p>
+        </div>
+
+        {/* Overschrijding spreiden */}
+        <div style={{ marginBottom: 20, padding: '14px 16px', borderRadius: 14, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
+          <label style={{ fontSize: 11, color: '#EF4444', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', marginBottom: 10 }}>↩ Overschrijding spreiden over</label>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[2, 3, 4, 6].map(n => (
+              <button key={n} onClick={() => setRecoveryMonths(n)}
+                style={{ flex: 1, padding: '10px 0', borderRadius: 10, background: recoveryMonths === n ? 'rgba(239,68,68,0.18)' : 'var(--bg-card-2)', border: recoveryMonths === n ? '1px solid rgba(239,68,68,0.5)' : '1px solid var(--border)', color: recoveryMonths === n ? '#EF4444' : 'var(--text-2)', cursor: 'pointer', fontSize: 13, fontWeight: recoveryMonths === n ? 700 : 400 }}>
+                {n} mnd
+              </button>
+            ))}
+          </div>
+          <p style={{ fontSize: 11, color: 'rgba(239,68,68,0.6)', margin: '8px 0 0' }}>Als je budget overschreden wordt, trekt het systeem elke maand een deel af — verdeeld over dit aantal maanden.</p>
         </div>
 
         {/* Vakantiemodus */}
@@ -585,7 +600,7 @@ function BudgetModal({ config, onClose, onSave }) {
           </span>
         </div>
 
-        <button onClick={() => onSave({ monthly_budget: monthly, category_budgets: cats, custom_categories: customCats, savings_goal: savingsGoal, min_balance: minBalance, vacation_mode: vacMode, vacation_budget: vacMode ? (Number(vacBudget) || 0) : 0, vacation_start: vacMode ? vacStart : null, vacation_end: vacMode ? vacEnd : null })}
+        <button onClick={() => onSave({ monthly_budget: monthly, category_budgets: cats, custom_categories: customCats, savings_goal: savingsGoal, min_balance: minBalance, recovery_months: recoveryMonths, vacation_mode: vacMode, vacation_budget: vacMode ? (Number(vacBudget) || 0) : 0, vacation_start: vacMode ? vacStart : null, vacation_end: vacMode ? vacEnd : null })}
           style={{ width: '100%', padding: '14px', borderRadius: 14, background: 'var(--accent)', border: 'none', color: '#000', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
           Opslaan
         </button>
@@ -1037,7 +1052,7 @@ export default function GeldPage({ userId, onClose }) {
       supabase.from('expenses').select('id, amount, description, date, savings_type, repaid').eq('user_id', userId)
         .eq('is_savings_withdrawal', true)
         .gte('date', `${selYear}-01-01`),
-      supabase.from('expenses').select('amount, date, is_income, is_savings_withdrawal, is_savings_contribution, is_loan_repayment, category').eq('user_id', userId)
+      supabase.from('expenses').select('amount, date, is_income, is_savings_withdrawal, is_savings_contribution, is_loan_repayment, category, paid_from_savings, is_planned').eq('user_id', userId)
         .gte('date', `${selYear}-01-01`).lte('date', `${selYear}-12-31`),
       // Savings contributions this month
       supabase.from('expenses').select('id, amount, date, description').eq('user_id', userId)
@@ -1207,16 +1222,35 @@ export default function GeldPage({ userId, onClose }) {
       .reduce((s, e) => s + Number(e.amount), 0)
   }
 
-  // Carryover from previous month — same exclusions as budgetExpenses
-  const prevRegular  = prevExpenses.filter(e => !e.is_savings_withdrawal && !e.is_income && !e.paid_from_savings && !e.is_savings_contribution && !e.is_loan_repayment && e.category !== FIXED_CAT && (!e.is_planned || e.amount > 0))
+  // Carryover — spread past overages over recovery_months using rolling window
+  const prevRegular  = prevExpenses.filter(e => !e.is_savings_withdrawal && !e.is_income && !e.paid_from_savings && !e.is_savings_contribution && !e.is_loan_repayment && e.category !== FIXED_CAT && (!e.is_planned || e.amount > 0) && !isHistVacExp(e))
   const prevSpent    = prevRegular.reduce((s, e) => s + Number(e.amount), 0)
-  // Maart 2026 wordt buiten beschouwing gelaten voor carryover (eenmalig)
-  const _prevY = selMonth === 0 ? selYear - 1 : selYear
-  const _prevM = selMonth === 0 ? 11 : selMonth - 1
-  const prevIsMarch2026 = _prevY === 2026 && _prevM === 2
   const vasteLastenBudget = catBudgets[FIXED_CAT] || 0
   const variableBase  = Math.max(0, base - vasteLastenBudget)
-  const carryover    = vacationMode ? 0 : (prevIsMarch2026 ? 0 : Math.max(0, prevSpent - variableBase))
+  const recoveryMonths = config?.recovery_months || 3
+  let carryover = 0
+  if (!vacationMode) {
+    for (let i = 1; i <= recoveryMonths; i++) {
+      const pY = (selMonth - i) < 0 ? selYear - 1 : selYear
+      const pM = ((selMonth - i) % 12 + 12) % 12
+      if (pY === 2026 && pM === 2) continue  // March 2026 eenmalige uitzondering
+      let pSpent = 0
+      if (i === 1) {
+        pSpent = prevSpent
+      } else if (pY === selYear) {
+        const pStart = monthStartOf(pY, pM), pEnd = monthEndOf(pY, pM)
+        const pExps = yearExpenses.filter(e =>
+          e.date >= pStart && e.date <= pEnd &&
+          !e.is_savings_withdrawal && !e.is_income && !e.paid_from_savings &&
+          !e.is_savings_contribution && !e.is_loan_repayment &&
+          e.category !== FIXED_CAT && (!e.is_planned || e.amount > 0) &&
+          !isHistVacExp(e)
+        )
+        pSpent = pExps.reduce((s, e) => s + Number(e.amount), 0)
+      }
+      carryover += Math.max(0, pSpent - variableBase) / recoveryMonths
+    }
+  }
   const adjustedBase = vacationMode ? base : Math.max(0, variableBase - carryover)
   const adjustedRemaining = adjustedBase - totalSpent
   const adjustedRemainPct = adjustedBase > 0 ? Math.max(0, Math.min(100, (adjustedRemaining / adjustedBase) * 100)) : 0
@@ -1424,14 +1458,18 @@ export default function GeldPage({ userId, onClose }) {
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-3)' }}>
             <span>
-              {fmt(totalSpent)} uitgegeven{savingsExpTotal > 0 ? ` · 💳 ${fmt(savingsExpTotal)} spaar` : ''}{!vacationMode && carryover > 0 ? ` · ↩ ${fmt(carryover)}` : ''}
+              {fmt(totalSpent)} uitgegeven{savingsExpTotal > 0 ? ` · 💳 ${fmt(savingsExpTotal)} spaar` : ''}
             </span>
             <span>
               {vacationMode
                 ? `Budget: ${fmt(adjustedBase)}`
-                : vasteLastenBudget > 0
-                  ? `Budget ${fmt(monthlyBudget)} − 🏠 ${fmt(vasteLastenBudget)} = ${fmt(adjustedBase)}`
-                  : `Budget: ${fmt(adjustedBase)}`
+                : (() => {
+                    const parts = [`Budget ${fmt(monthlyBudget)}`]
+                    if (vasteLastenBudget > 0) parts.push(`🏠 ${fmt(vasteLastenBudget)}`)
+                    if (carryover > 0) parts.push(`↩ ${fmt(Math.round(carryover))}`)
+                    if (parts.length > 1) parts.push(`= ${fmt(adjustedBase)}`)
+                    return parts.length > 1 ? parts.join(' − ') : `Budget: ${fmt(adjustedBase)}`
+                  })()
               }
             </span>
           </div>
