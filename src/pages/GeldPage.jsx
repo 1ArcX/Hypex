@@ -1093,7 +1093,13 @@ export default function GeldPage({ userId, onClose }) {
   }
 
   const saveBudget = async (data) => {
-    await supabase.from('budget_config').upsert({ ...data, user_id: userId, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+    const existing = config?.vacation_history || []
+    let vacHistory = existing
+    if (!data.vacation_mode && config?.vacation_mode && config?.vacation_start) {
+      const newVac = { start: config.vacation_start, end: config.vacation_end || config.vacation_start, budget: config.vacation_budget || 0 }
+      if (!existing.some(v => v.start === newVac.start)) vacHistory = [...existing, newVac]
+    }
+    await supabase.from('budget_config').upsert({ ...data, vacation_history: vacHistory, user_id: userId, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
     setShowBudget(false); fetchAll()
   }
 
@@ -1117,11 +1123,14 @@ export default function GeldPage({ userId, onClose }) {
   // (savings-funded spending is tracked separately and doesn't count against budget)
   // Vaste lasten (abonnementen) worden buiten het vrije budget gehouden
   const FIXED_CAT          = 'abonnementen'
+  const vacHistory         = config?.vacation_history || []
+  const isHistVacExp       = (e) => vacHistory.some(v => e.date >= v.start && e.date <= (v.end || v.start))
   const budgetExpenses     = regularExpenses.filter(e =>
     !e.paid_from_savings &&
     (vacationMode || e.category !== FIXED_CAT) &&
     (!e.is_planned || e.amount > 0) &&
-    (!vacationMode || !config?.vacation_start || e.date >= config.vacation_start)
+    (!vacationMode || !config?.vacation_start || e.date >= config.vacation_start) &&
+    (vacationMode || !isHistVacExp(e))
   )
   const savingsExpenses    = regularExpenses.filter(e => e.paid_from_savings)
   const totalSpent         = budgetExpenses.reduce((s, e) => s + Number(e.amount), 0)
@@ -2119,22 +2128,49 @@ export default function GeldPage({ userId, onClose }) {
             </div>
           )}
 
-          {regularExpenses.length > 0 ? <>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
-              {(showAll ? regularExpenses : regularExpenses.slice(0, 12)).map(exp => renderTxRow(exp))}
-            </div>
-            {regularExpenses.length > 12 && (
-              <button onClick={() => setShowAll(v => !v)} style={{ width: '100%', marginBottom: 12, padding: '10px', borderRadius: 12, background: 'none', border: '1px solid var(--border)', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                {showAll ? <><ChevronUp size={14} /> Minder tonen</> : <><ChevronDown size={14} /> Alle {regularExpenses.length} tonen</>}
-              </button>
-            )}
-          </> : plannedExpenses.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-3)' }}>
-              <div style={{ fontSize: 40, marginBottom: 10 }}>💰</div>
-              <p style={{ fontSize: 15, fontWeight: 600, margin: '0 0 4px', color: 'var(--text-2)' }}>Nog geen uitgaves</p>
-              <p style={{ fontSize: 13, margin: 0 }}>Voeg je eerste uitgave toe</p>
-            </div>
-          ) : null}
+          {(() => {
+            const nonVacExps = regularExpenses.filter(e => !isHistVacExp(e))
+            const vacExps    = regularExpenses.filter(e => isHistVacExp(e))
+            const vacBudgetForExps = vacExps.length > 0 ? (() => {
+              const match = vacHistory.find(v => vacExps.some(e => e.date >= v.start && e.date <= (v.end || v.start)))
+              return match?.budget || 0
+            })() : 0
+            return <>
+              {nonVacExps.length > 0 ? <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+                  {(showAll ? nonVacExps : nonVacExps.slice(0, 12)).map(exp => renderTxRow(exp))}
+                </div>
+                {nonVacExps.length > 12 && (
+                  <button onClick={() => setShowAll(v => !v)} style={{ width: '100%', marginBottom: 12, padding: '10px', borderRadius: 12, background: 'none', border: '1px solid var(--border)', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                    {showAll ? <><ChevronUp size={14} /> Minder tonen</> : <><ChevronDown size={14} /> Alle {nonVacExps.length} tonen</>}
+                  </button>
+                )}
+              </> : plannedExpenses.length === 0 && vacExps.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-3)' }}>
+                  <div style={{ fontSize: 40, marginBottom: 10 }}>💰</div>
+                  <p style={{ fontSize: 15, fontWeight: 600, margin: '0 0 4px', color: 'var(--text-2)' }}>Nog geen uitgaves</p>
+                  <p style={{ fontSize: 13, margin: 0 }}>Voeg je eerste uitgave toe</p>
+                </div>
+              ) : null}
+
+              {vacExps.length > 0 && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <p style={{ fontSize: 11, color: '#06B6D4', margin: 0, textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700 }}>✈️ Vakantie</p>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#06B6D4' }}>
+                        {fmt(vacExps.reduce((s, e) => s + Number(e.amount), 0))}
+                        {vacBudgetForExps > 0 && <span style={{ fontSize: 11, fontWeight: 400, color: 'rgba(6,182,212,0.6)', marginLeft: 4 }}>/ {fmt(vacBudgetForExps)}</span>}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '10px 12px', borderRadius: 14, background: 'rgba(6,182,212,0.05)', border: '1px solid rgba(6,182,212,0.15)' }}>
+                    {vacExps.map(exp => renderTxRow(exp))}
+                  </div>
+                </div>
+              )}
+            </>
+          })()}
         </>}
 
         {subView === 'jaar' && <>
