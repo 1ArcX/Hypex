@@ -1,4 +1,4 @@
-import { AlertTriangle, BarChart3, Settings2 } from 'lucide-react'
+import { AlertTriangle, BarChart3, PiggyBank, Settings2 } from 'lucide-react'
 import { GlassCard, ProgressBar, SectionLabel } from '../components/ui/Glass'
 import { TransactionRow } from '../components/TransactionRow'
 import { MonthHeader } from '../components/MonthHeader'
@@ -169,13 +169,19 @@ export function HomeView({ stats, isCurrentMonth, remainingLoan, openLoansCount,
         </div>
       )}
 
-      {/* Analyse-knop */}
-      {s.regularExpenses.length > 0 && (
-        <button onClick={onOpenAnalyse}
-          className="w-full mb-3.5 px-4 py-3.5 rounded-2xl bg-white/[0.05] backdrop-blur-lg border border-white/10 text-white/70 cursor-pointer text-[13px] font-semibold flex items-center justify-center gap-2 active:scale-[0.985] transition-transform">
-          <BarChart3 size={15} className="text-teal-300" /> Analyse van deze maand
+      {/* Inkomsten & analyse */}
+      <div className={`grid ${s.regularExpenses.length > 0 ? 'grid-cols-2' : 'grid-cols-1'} gap-2 mb-3.5`}>
+        <button onClick={onOpenInkomsten}
+          className="px-4 py-3.5 rounded-2xl bg-emerald-400/[0.06] backdrop-blur-lg border border-emerald-400/25 text-emerald-400 cursor-pointer text-[13px] font-semibold flex items-center justify-center gap-2 active:scale-[0.985] transition-transform">
+          <PiggyBank size={15} /> Inkomsten & sparen
         </button>
-      )}
+        {s.regularExpenses.length > 0 && (
+          <button onClick={onOpenAnalyse}
+            className="px-4 py-3.5 rounded-2xl bg-white/[0.05] backdrop-blur-lg border border-white/10 text-white/70 cursor-pointer text-[13px] font-semibold flex items-center justify-center gap-2 active:scale-[0.985] transition-transform">
+            <BarChart3 size={15} className="text-teal-300" /> Analyse
+          </button>
+        )}
+      </div>
 
       {/* Recente transacties */}
       {s.allTransactions.length > 0 && (
