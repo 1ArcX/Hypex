@@ -68,9 +68,11 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
             ref={sheetRef}
             style={{
               position: 'absolute', bottom: 0, left: 0, right: 0,
-              background: 'var(--bg-sidebar)',
-              borderRadius: '22px 22px 0 0',
-              border: '1px solid var(--border)',
+              background: 'rgba(18,18,24,0.85)',
+              backdropFilter: 'blur(28px)',
+              WebkitBackdropFilter: 'blur(28px)',
+              borderRadius: '26px 26px 0 0',
+              border: '1px solid rgba(255,255,255,0.10)',
               borderBottom: 'none',
               padding: '12px 20px calc(20px + env(safe-area-inset-bottom))',
               animation: 'sheetUp 0.3s cubic-bezier(0.34,1.1,0.64,1)',
@@ -131,16 +133,23 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
         </div>
       )}
 
-      {/* Tab bar */}
+      {/* Tab bar — zwevende glazen pill (Frosted Glass, zelfde stijl als geld) */}
       <nav
         onTouchStart={onNavSwipeStart}
         onTouchEnd={onNavSwipeEnd}
         style={{
           display: 'flex',
-          background: 'var(--bg-sidebar)',
-          borderTop: '1px solid var(--border)',
-          paddingBottom: 'env(safe-area-inset-bottom)',
-          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100,
+          background: 'rgba(20,20,26,0.72)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          border: '1px solid rgba(255,255,255,0.10)',
+          borderRadius: 28,
+          boxShadow: '0 12px 32px rgba(0,0,0,0.45)',
+          padding: '4px 6px',
+          position: 'fixed',
+          bottom: 'calc(10px + env(safe-area-inset-bottom))',
+          left: 12, right: 12, zIndex: 100,
+          maxWidth: 480, margin: '0 auto',
         }}>
         {PRIMARY_TABS.map(({ id, Icon, label }) => {
           const active = activePage === id

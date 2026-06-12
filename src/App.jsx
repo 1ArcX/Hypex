@@ -704,7 +704,7 @@ export default function App() {
 
           {/* Mobile header */}
           <div className="md:hidden flex items-center justify-between px-4"
-            style={{ height: 52, borderBottom: '1px solid var(--border)', background: 'var(--bg-sidebar)', flexShrink: 0 }}>
+            style={{ height: 52, borderBottom: '1px solid var(--border)', background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', flexShrink: 0 }}>
             <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-1)', letterSpacing: '-0.01em' }}>
               {PAGE_NAMES[activePage] || 'Hypex'}
             </span>
@@ -853,7 +853,7 @@ export default function App() {
           </div>
 
           {/* Mobile bottom nav — fixed, spacer holds its height in the flex column */}
-          <div className="md:hidden" style={{ height: 'calc(56px + env(safe-area-inset-bottom))', flexShrink: 0 }}>
+          <div className="md:hidden" style={{ height: 'calc(72px + env(safe-area-inset-bottom))', flexShrink: 0 }}>
             <BottomNav
               activePage={activePage}
               setActivePage={handleSetActivePage}

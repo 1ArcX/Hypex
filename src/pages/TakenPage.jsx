@@ -325,8 +325,9 @@ export default function TakenPage({
         <div style={{
           position: 'fixed', bottom: 100, left: '50%', transform: 'translateX(-50%)',
           zIndex: 9997, display: 'flex', alignItems: 'center', gap: 16,
-          background: 'rgba(15,15,15,0.92)', border: '1px solid var(--border)',
-          borderRadius: 14, padding: '10px 18px',
+          background: 'rgba(20,20,26,0.8)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+          border: '1px solid var(--border)',
+          borderRadius: 16, padding: '10px 18px',
           boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
           animation: 'sheetUp 0.3s ease',
           pointerEvents: 'none',
