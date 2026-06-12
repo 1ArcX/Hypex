@@ -1,3 +1,4 @@
+// INACTIVE — Gym is hidden from navigation (June 2026). Code kept for possible reactivation.
 import React from 'react'
 import GymWidget from '../components/GymWidget'
 import { useIsDesktop } from '../hooks/useIsDesktop'

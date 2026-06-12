@@ -1,3 +1,4 @@
+// INACTIVE — School is hidden from navigation (June 2026). Code kept for possible reactivation.
 import React from 'react'
 import MagisterWidget from '../components/MagisterWidget'
 import { useIsDesktop } from '../hooks/useIsDesktop'

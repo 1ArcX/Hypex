@@ -319,7 +319,7 @@ export default function DashboardPage({
           <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0, letterSpacing: '0.03em' }}>
             {getGreeting()}{displayName ? `, ${displayName}` : ''}
           </p>
-          {showMagisterBanner && (
+          {false && showMagisterBanner && (  // INACTIVE: school hidden
             <button
               onClick={() => onNavigate('school')}
               title={magisterError || 'Koppel Magister'}
@@ -521,7 +521,7 @@ export default function DashboardPage({
           <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
             {[
               { key: 'alle',  label: 'Alle' },
-              { key: 'school', label: '📚' },
+              // { key: 'school', label: '📚' },  // INACTIVE
               { key: 'event',  label: '📅' },
               { key: 'werk',   label: '💼' },
               { key: 'taak',   label: '✅' },
