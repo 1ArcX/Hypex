@@ -76,7 +76,33 @@ html, body {
 body {
   background: var(--bg-base);
   color: var(--text-primary);
-  font-family: 'Inter', system-ui, sans-serif;
+  /* iOS-first: SF Pro op Apple-apparaten, Inter als fallback */
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ===== iOS-GEVOEL ===== */
+/* Geen blauwe/grijze tap-flits op touch */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Knoppen: subtiele krimp bij indrukken, zoals native iOS */
+button {
+  font-family: inherit;
+  -webkit-touch-callout: none;
+  user-select: none;
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+button:not([style*="translate"]):active {
+  transform: scale(0.96);
+}
+
+/* Scrollbars verbergen op touch-apparaten (iOS toont ze zelf tijdelijk) */
+@media (pointer: coarse) {
+  ::-webkit-scrollbar { display: none; }
+  * { scrollbar-width: none; }
 }
 
 /* ===== FROSTED GLASS CARDS ===== */

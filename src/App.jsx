@@ -702,12 +702,16 @@ export default function App() {
         {/* Main area */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-          {/* Mobile header */}
+          {/* Mobile header — iOS navigation bar: titel gecentreerd */}
           <div className="md:hidden flex items-center justify-between px-4"
-            style={{ height: 52, borderBottom: '1px solid var(--border)', background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', flexShrink: 0 }}>
-            <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-1)', letterSpacing: '-0.01em' }}>
+            style={{ height: 52, borderBottom: '1px solid var(--border)', background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', flexShrink: 0, position: 'relative' }}>
+            <span style={{
+              position: 'absolute', left: 0, right: 0, textAlign: 'center', pointerEvents: 'none',
+              fontWeight: 600, fontSize: 17, color: 'var(--text-1)', letterSpacing: '-0.02em',
+            }}>
               {PAGE_NAMES[activePage] || 'Hypex'}
             </span>
+            <span />
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               {/* Sync dot — tap to sync manually */}
               <button
