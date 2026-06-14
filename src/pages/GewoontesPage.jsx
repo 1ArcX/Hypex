@@ -1,3 +1,4 @@
+// INACTIVE — Gewoontes is hidden from navigation (June 2026). Code kept for possible reactivation.
 import React from 'react'
 import HabitsWidget from '../components/HabitsWidget'
 import { useIsDesktop } from '../hooks/useIsDesktop'

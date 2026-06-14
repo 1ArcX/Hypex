@@ -5,7 +5,7 @@ const PRIMARY_TABS = [
   { id: 'dashboard', Icon: Home,          label: 'Home'      },
   { id: 'agenda',    Icon: Calendar,      label: 'Agenda'    },
   { id: 'taken',     Icon: CheckSquare,   label: 'Taken'     },
-  { id: 'gewoontes', Icon: Flame,         label: 'Gewoontes' },
+  // { id: 'gewoontes', Icon: Flame, label: 'Gewoontes' },  // INACTIVE
 ]
 
 const SHEET_BASE = [
@@ -16,7 +16,7 @@ const SHEET_BASE = [
   // { id: 'gym', Icon: Dumbbell, label: 'Gym' },  // INACTIVE
 ]
 
-const PRIMARY_SWIPE_ORDER = ['dashboard', 'agenda', 'taken', 'gewoontes']
+const PRIMARY_SWIPE_ORDER = ['dashboard', 'agenda', 'taken']  // gewoontes INACTIVE
 
 export default function BottomNav({ activePage, setActivePage, isAdmin, showJumbo, hasLevelUp, hasActiveGymWorkout, hasActivePomo }) {
   const [showSheet, setShowSheet] = useState(false)

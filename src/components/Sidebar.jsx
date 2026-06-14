@@ -8,7 +8,7 @@ const NAV_ITEMS = [
   { id: 'taken',        Icon: CheckSquare,    label: 'Taken'        },
   { id: 'pomodoro',     Icon: Timer,          label: 'Pomodoro'     },
   // { id: 'school', Icon: GraduationCap, label: 'School' },  // INACTIVE
-  { id: 'gewoontes',    Icon: Flame,          label: 'Gewoontes'    },
+  // { id: 'gewoontes', Icon: Flame, label: 'Gewoontes' },  // INACTIVE
   // { id: 'gym', Icon: Dumbbell, label: 'Gym' },  // INACTIVE
   { id: 'notities',     Icon: FileText,       label: 'Notities'     },
   { id: 'statistieken', Icon: BarChart2,      label: 'Statistieken' },
