@@ -246,6 +246,15 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
   const [groupName,       setGroupName]       = useState('')
   const [recurrence,      setRecurrence]      = useState(RECURRENCE.NONE)
   const [recurrenceDays,  setRecurrenceDays]  = useState([])
+  const [showMore,        setShowMore]        = useState(false)
+
+  // Standaard compact; uitklappen bij bewerken-met-details of bij aanmaken vanuit
+  // een tijdslot (defaultTime), zodat snel-toevoegen kort blijft.
+  useEffect(() => {
+    if (defaultTime) { setShowMore(true); return }
+    const hasDetails = task && (task.description || task.subject_id || task.due_date || task.group_name || (task.start_time || task.time))
+    setShowMore(!!hasDetails)
+  }, [task, defaultTime])
 
   useEffect(() => {
     if (task) {
@@ -339,6 +348,16 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
     })
   }
 
+  const quickToday = new Date().toISOString().slice(0, 10)
+  const quickTomorrow = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10) })()
+  const chipStyle = (active, accent) => ({
+    padding: '6px 12px', borderRadius: 9,
+    border: `1px solid ${active ? (accent ? `${accent}66` : 'color-mix(in srgb, var(--accent) 50%, transparent)') : 'rgba(255,255,255,0.1)'}`,
+    background: active ? (accent ? `${accent}1f` : 'color-mix(in srgb, var(--accent) 12%, transparent)') : 'transparent',
+    color: active ? (accent || 'var(--accent)') : 'rgba(255,255,255,0.35)',
+    fontSize: 12, cursor: 'pointer', fontWeight: active ? 600 : 400, transition: 'all 0.15s',
+  })
+
   return (
     <div className={closing ? 'modal-overlay modal-closing' : 'modal-overlay'}
       style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(10px)', padding: '16px' }}
@@ -359,11 +378,26 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
 
           {/* Titel */}
           <input className="glass-input" placeholder="Titel *" value={title}
-            onChange={e => setTitle(e.target.value)} style={{ fontSize: '16px' }} />
+            onChange={e => setTitle(e.target.value)} style={{ fontSize: '16px' }} autoFocus />
 
-          {/* Beschrijving */}
-          <textarea className="glass-input" placeholder="Beschrijving (optioneel)" value={description}
-            onChange={e => setDescription(e.target.value)} style={{ resize: 'vertical', minHeight: '60px' }} />
+          {/* Wanneer — snelle datumkeuze */}
+          <div>
+            <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', display: 'block', marginBottom: '6px' }}>Wanneer</label>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              <button type="button" onClick={() => { setNoDate(false); setDate(quickToday) }}
+                style={chipStyle(!noDate && date === quickToday)}>Vandaag</button>
+              <button type="button" onClick={() => { setNoDate(false); setDate(quickTomorrow) }}
+                style={chipStyle(!noDate && date === quickTomorrow)}>Morgen</button>
+              {!isRecurring && (
+                <button type="button" onClick={() => { setNoDate(true); setAllDay(false) }}
+                  style={chipStyle(noDate, '#FACC15')}>Geen datum</button>
+              )}
+            </div>
+            {!noDate && (
+              <input type="date" className="glass-input" value={date} style={{ colorScheme: 'dark', marginTop: 8, fontSize: 13 }}
+                onChange={e => { setNoDate(false); setDate(e.target.value) }} />
+            )}
+          </div>
 
           {/* Prioriteit */}
           <div>
@@ -419,6 +453,19 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
             )}
           </div>
 
+          {/* Meer opties — uitklapbaar zodat snel-toevoegen kort blijft */}
+          <button type="button" onClick={() => setShowMore(v => !v)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.45)', fontSize: 13, padding: '2px 0', width: 'fit-content' }}>
+            <span style={{ fontSize: 12, transition: 'transform 0.2s', transform: showMore ? 'rotate(90deg)' : 'none' }}>▸</span>
+            {showMore ? 'Minder opties' : 'Meer opties'}
+          </button>
+
+          {showMore && (<>
+
+          {/* Beschrijving */}
+          <textarea className="glass-input" placeholder="Beschrijving (optioneel)" value={description}
+            onChange={e => setDescription(e.target.value)} style={{ resize: 'vertical', minHeight: '60px' }} />
+
           {/* Groep */}
           {(() => {
             const existingGroups = [...new Set((allTasks || tasks || []).map(t => t.group_name).filter(Boolean))]
@@ -447,17 +494,6 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
               </div>
             )
           })()}
-
-          {/* Nog in te plannen — niet voor herhalende taken (die hebben een startdatum) */}
-          {!isRecurring && (
-          <button type="button" onClick={() => { setNoDate(v => !v); if (!noDate) setAllDay(false) }}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', color: noDate ? '#FACC15' : 'rgba(255,255,255,0.4)', fontSize: 13, padding: 0, width: 'fit-content' }}>
-            <div style={{ width: 20, height: 20, borderRadius: 6, background: noDate ? 'rgba(250,204,21,0.15)' : 'rgba(255,255,255,0.05)', border: `1px solid ${noDate ? 'rgba(250,204,21,0.4)' : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', flexShrink: 0 }}>
-              {noDate && <span style={{ fontSize: 12 }}>✓</span>}
-            </div>
-            Nog in te plannen
-          </button>
-          )}
 
           {/* Dagvoorstellen bij "nog in te plannen" */}
           {!isRecurring && noDate && daySuggestions.length > 0 && (
@@ -512,13 +548,6 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
 
           {!noDate && (
             <>
-              {/* Datum */}
-              <div>
-                <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Datum</label>
-                <input type="date" className="glass-input" value={date} style={{ colorScheme: 'dark' }}
-                  onChange={e => setDate(e.target.value)} />
-              </div>
-
               {/* Hele dag toggle */}
               <button type="button" onClick={() => setAllDay(v => !v)}
                 style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', color: allDay ? 'var(--accent)' : 'rgba(255,255,255,0.4)', fontSize: 13, padding: 0, width: 'fit-content' }}>
@@ -610,6 +639,8 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
               ))}
             </div>
           </div>
+
+          </>)}
 
           {/* Afgerond */}
           {task && (
