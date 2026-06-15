@@ -361,7 +361,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
 
   return (
     <div className={closing ? 'modal-overlay modal-closing' : 'modal-overlay'}
-      style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(10px)', padding: '16px' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(10px)', padding: '16px', paddingBottom: 'calc(16px + var(--keyboard-height, 0px))' }}
       onMouseDown={e => { mouseDownOnOverlay.current = e.target === e.currentTarget }}
       onMouseUp={e => { if (mouseDownOnOverlay.current && e.target === e.currentTarget) handleClose(); mouseDownOnOverlay.current = false }}>
       <div className={`glass-card modal-content${closing ? ' modal-closing' : ''}`}

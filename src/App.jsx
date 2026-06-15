@@ -104,9 +104,11 @@ export default function App() {
   }, [])
 
   // Track keyboard height via visualViewport → CSS variable --keyboard-height
-  // Also resets visualViewport scroll offset to fix iOS touch target mismatch:
-  // when keyboard opens, iOS shifts the visual viewport (offsetTop > 0) but
-  // touch hit-tests remain at original coords → buttons appear offset.
+  // (gebruikt door modals/sheets om boven het toetsenbord te blijven).
+  // Geen window.scrollTo-tegenscroll meer: die vocht tegen iOS' eigen
+  // scroll-naar-invoer (scroll-lock tijdens typen) en liet na het sluiten een
+  // rest-offset achter (app bleef omhoog gesprongen). De app krimpt nu netjes
+  // mee via --app-height, dus scrollen werkt en alles veert terug.
   useEffect(() => {
     const vv = window.visualViewport
     if (!vv) return
@@ -115,15 +117,9 @@ export default function App() {
       const kh = Math.max(0, baseHeight - vv.height)
       document.documentElement.style.setProperty('--keyboard-height', `${kh}px`)
     }
-    const onScroll = () => {
-      // Counteract iOS visual viewport scroll so touch targets stay aligned
-      if (vv.offsetTop !== 0) window.scrollTo(0, vv.offsetTop)
-    }
     vv.addEventListener('resize', onResize)
-    vv.addEventListener('scroll', onScroll)
     return () => {
       vv.removeEventListener('resize', onResize)
-      vv.removeEventListener('scroll', onScroll)
       document.documentElement.style.setProperty('--keyboard-height', '0px')
     }
   }, [])

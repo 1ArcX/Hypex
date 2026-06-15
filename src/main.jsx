@@ -41,13 +41,11 @@ document.addEventListener('focusout', () => {
   setTimeout(() => window.scrollTo(0, 0), 50)
 })
 
-// Houd --app-height up-to-date met de visuele viewport.
-// Als een input/textarea gefocust is (toetsenbord open), NIET updaten:
-// het toetsenbord overlapt de app zodat de layout niet samenperst.
-// Bij geen focus (toetsenbord dicht) wél updaten zodat de app correct past.
+// Houd --app-height up-to-date met de visuele viewport — ALTIJD, ook als het
+// toetsenbord open is. Zo krimpt de app naar het zichtbare gebied boven het
+// toetsenbord, kun je in de scroll-container naar je invoer scrollen, en veert
+// de app terug zodra het toetsenbord weg is (geen blijvende sprong).
 function updateAppHeight() {
-  const active = document.activeElement
-  if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return
   const h = window.visualViewport ? window.visualViewport.height : window.innerHeight
   document.documentElement.style.setProperty('--app-height', `${h}px`)
 }
