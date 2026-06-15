@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Home, Calendar, CheckSquare, Timer, MoreHorizontal, GraduationCap, Flame, FileText, Briefcase, BarChart2, Dumbbell, Wallet } from 'lucide-react'
+import { Home, Calendar, CheckSquare, Timer, MoreHorizontal, GraduationCap, Flame, FileText, Briefcase, BarChart2, Dumbbell, Wallet, Plus } from 'lucide-react'
 
 const PRIMARY_TABS = [
   { id: 'dashboard', Icon: Home,          label: 'Home'      },
@@ -18,7 +18,7 @@ const SHEET_BASE = [
 
 const PRIMARY_SWIPE_ORDER = ['dashboard', 'agenda', 'taken', 'notities']  // gewoontes INACTIVE
 
-export default function BottomNav({ activePage, setActivePage, isAdmin, showJumbo, hasLevelUp, hasActiveGymWorkout, hasActivePomo }) {
+export default function BottomNav({ activePage, setActivePage, isAdmin, showJumbo, hasLevelUp, hasActiveGymWorkout, hasActivePomo, onNewTask }) {
   const [showSheet, setShowSheet] = useState(false)
   const sheetRef = useRef(null)
   const swipeStartX = useRef(null)
@@ -46,6 +46,34 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
 
   const handlePrimary = (id) => { setActivePage(id); setShowSheet(false) }
   const handleSheet = (id) => { setActivePage(id); setShowSheet(false) }
+
+  const renderTab = ({ id, Icon, label }) => {
+    const active = activePage === id
+    return (
+      <button
+        key={id}
+        onClick={() => handlePrimary(id)}
+        style={{
+          flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+          justifyContent: 'center', gap: 4, padding: '10px 0',
+          background: 'none', border: 'none', cursor: 'pointer',
+          color: active ? 'var(--accent)' : 'var(--text-3)',
+          transition: 'color 0.15s',
+          position: 'relative',
+        }}
+      >
+        {active && (
+          <div style={{
+            position: 'absolute', top: 6, width: 34, height: 34, borderRadius: '50%',
+            background: 'color-mix(in srgb, var(--accent) 12%, transparent)',
+            animation: 'pillIn 0.22s ease',
+          }} />
+        )}
+        <Icon size={20} strokeWidth={active ? 2.2 : 1.7} style={{ position: 'relative' }} />
+        <span style={{ fontSize: 10, fontWeight: active ? 600 : 400, position: 'relative' }}>{label}</span>
+      </button>
+    )
+  }
 
   useEffect(() => {
     if (!showSheet) return
@@ -151,33 +179,27 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
           left: 12, right: 12, zIndex: 100,
           maxWidth: 480, margin: '0 auto',
         }}>
-        {PRIMARY_TABS.map(({ id, Icon, label }) => {
-          const active = activePage === id
-          return (
-            <button
-              key={id}
-              onClick={() => handlePrimary(id)}
-              style={{
-                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-                justifyContent: 'center', gap: 4, padding: '10px 0',
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: active ? 'var(--accent)' : 'var(--text-3)',
-                transition: 'color 0.15s',
-                position: 'relative',
-              }}
-            >
-              {active && (
-                <div style={{
-                  position: 'absolute', top: 6, width: 34, height: 34, borderRadius: '50%',
-                  background: 'color-mix(in srgb, var(--accent) 12%, transparent)',
-                  animation: 'pillIn 0.22s ease',
-                }} />
-              )}
-              <Icon size={20} strokeWidth={active ? 2.2 : 1.7} style={{ position: 'relative' }} />
-              <span style={{ fontSize: 10, fontWeight: active ? 600 : 400, position: 'relative' }}>{label}</span>
-            </button>
-          )
-        })}
+        {PRIMARY_TABS.slice(0, 2).map(renderTab)}
+
+        {/* Nieuwe taak — centrale actieknop in de balk */}
+        <button
+          onClick={() => onNewTask?.()}
+          aria-label="Nieuwe taak"
+          style={{
+            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'none', border: 'none', cursor: 'pointer', padding: '6px 0',
+          }}
+        >
+          <div style={{
+            width: 46, height: 46, borderRadius: '50%', marginTop: -16,
+            background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 6px 16px color-mix(in srgb, var(--accent) 45%, transparent)',
+          }}>
+            <Plus size={24} color="#000" strokeWidth={2.6} />
+          </div>
+        </button>
+
+        {PRIMARY_TABS.slice(2).map(renderTab)}
 
         {/* Meer */}
         {(() => {

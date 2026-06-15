@@ -316,24 +316,7 @@ export default function TakenPage({
         document.body
       )}
 
-      {/* FAB — mobiel only */}
-      {!isDesktop && ReactDOM.createPortal(
-        <button
-          onClick={() => onNew?.()}
-          style={{
-            position: 'fixed', bottom: undoTask ? 148 : 88, right: 18,
-            width: 52, height: 52, borderRadius: '50%',
-            background: 'var(--accent)', color: '#000',
-            border: 'none', cursor: 'pointer', zIndex: 9996,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 26, fontWeight: 700, lineHeight: 1,
-            boxShadow: '0 4px 18px color-mix(in srgb, var(--accent) 45%, transparent)',
-            transition: 'bottom 0.2s ease',
-          }}
-          aria-label="Nieuwe taak"
-        >+</button>,
-        document.body
-      )}
+      {/* Nieuwe taak gebeurt nu via de centrale + in de onderbalk (BottomNav) */}
 
       {/* Swipe-hint overlay — éénmalig */}
       {showSwipeHint && ReactDOM.createPortal(
