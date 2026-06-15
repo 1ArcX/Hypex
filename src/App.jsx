@@ -37,45 +37,6 @@ import GeldPage from './pages/GeldPage'
 
 const ADMIN_EMAIL = 'zhafirfachri@gmail.com'
 
-// TIJDELIJK debug-balkje: toont live de viewport-getallen om de toetsenbord-
-// bug te diagnosticeren. Verwijderen zodra opgelost.
-function DebugViewport() {
-  const [info, setInfo] = useState({ iH: 0, vvH: 0, off: 0, sY: 0, vvE: 0 })
-  const vvEvents = useRef(0)
-  useEffect(() => {
-    const read = () => {
-      const vv = window.visualViewport
-      setInfo({
-        iH: window.innerHeight,
-        vvH: vv ? Math.round(vv.height) : -1,
-        off: vv ? Math.round(vv.offsetTop) : -1,
-        sY: Math.round(window.scrollY),
-        vvE: vvEvents.current,
-      })
-    }
-    const onVv = () => { vvEvents.current++; read() }
-    read()
-    const vv = window.visualViewport
-    vv?.addEventListener('resize', onVv)
-    vv?.addEventListener('scroll', onVv)
-    const id = setInterval(read, 400) // ververst weergave ook als er geen events zijn
-    return () => {
-      vv?.removeEventListener('resize', onVv)
-      vv?.removeEventListener('scroll', onVv)
-      clearInterval(id)
-    }
-  }, [])
-  return (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, zIndex: 2147483647,
-      background: 'rgba(0,0,0,0.85)', color: '#5EEAD4', font: '11px/1.4 monospace',
-      padding: '3px 6px', textAlign: 'center', pointerEvents: 'none', letterSpacing: '0.02em',
-    }}>
-      iH:{info.iH} vvH:{info.vvH} off:{info.off} sY:{info.sY} vvEvt:{info.vvE}
-    </div>
-  )
-}
-
 const PAGE_NAMES = {
   dashboard: 'Dashboard', agenda: 'Agenda', taken: 'Taken',
   pomodoro: 'Pomodoro', school: 'School',
@@ -757,7 +718,6 @@ export default function App() {
       height: '100dvh', position: 'relative',
       overflow: 'hidden', background: 'var(--bg-base)',
     }}>
-      <DebugViewport />
       {/* Blur wrapper voor focus mode */}
       <div style={{
         display: 'flex',

@@ -99,11 +99,13 @@ export default function TakenPage({
   const groups = useMemo(() => [...new Set(tasks.filter(t => t.group_name).map(t => t.group_name))], [tasks])
 
   const counts = useMemo(() => {
-    // Vandaag = nog openstaande routines van vandaag + eenmalige taken van vandaag
+    // Vandaag = openstaande routines van vandaag + taken van vandaag + te-late taken
+    // (die worden meegenomen naar vandaag)
     const openRoutines = tasks.filter(t => t.recurrence && isDueToday(t, ts) && !isDoneToday(t, ts)).length
     const todayOneoff = tasks.filter(t => !t.recurrence && !t.completed && t.date === ts).length
+    const overdueOneoff = tasks.filter(t => !t.recurrence && !t.completed && t.date && t.date < ts).length
     const base = {
-      vandaag:   openRoutines + todayOneoff,
+      vandaag:   openRoutines + todayOneoff + overdueOneoff,
       alles:     tasks.filter(t => !t.completed).length,
       morgen:    tasks.filter(t => !t.completed && t.date === tom).length,
       week:      tasks.filter(t => !t.completed && t.date && t.date >= ts && t.date <= wEnd).length,

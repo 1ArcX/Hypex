@@ -7,6 +7,16 @@ import {
 const NL_DAYS = ['zondag', 'maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag']
 const NL_MONTHS = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
 
+function daysLate(dateStr, today) {
+  return Math.round((Date.parse(today) - Date.parse(dateStr)) / 86400000)
+}
+function lateLabel(n) {
+  if (n <= 1) return 'gisteren'
+  if (n < 7) return `${n} dagen te laat`
+  if (n < 14) return '1 week te laat'
+  return `${Math.floor(n / 7)} weken te laat`
+}
+
 function CheckCircle({ done, color, onClick }) {
   return (
     <button onClick={onClick}
@@ -66,33 +76,42 @@ function RoutineRow({ task, today, onToggle, onOpen }) {
 function TaskRow({ task, subjects, today, onToggle, onOpen }) {
   const subject = subjects.find(s => s.id === task.subject_id)
   const isUrgent = (task.priority ?? 2) === 1
-  const accent = isUrgent ? '#FF6B6B' : (task.color || 'var(--accent)')
+  const overdue = task.date && task.date < today
+  const accent = (overdue || isUrgent) ? '#FF6B6B' : (task.color || 'var(--accent)')
+  const reddish = overdue || isUrgent
+  const meta = (task.start_time || task.time || subject)
+    ? `${(task.start_time || task.time) ? `${task.start_time || task.time}${task.end_time ? `–${task.end_time}` : ''}` : ''}${(task.start_time || task.time) && subject ? ' · ' : ''}${subject ? subject.name : ''}`
+    : ''
   return (
     <div onClick={() => onOpen(task)}
       style={{
         display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
         borderRadius: 14, cursor: 'pointer', marginBottom: 6,
-        background: isUrgent ? 'rgba(255,80,80,0.06)' : 'rgba(255,255,255,0.02)',
-        border: `1px solid ${isUrgent ? 'rgba(255,80,80,0.25)' : 'rgba(255,255,255,0.07)'}`,
+        background: reddish ? 'rgba(255,80,80,0.06)' : 'rgba(255,255,255,0.02)',
+        border: `1px solid ${reddish ? 'rgba(255,80,80,0.25)' : 'rgba(255,255,255,0.07)'}`,
       }}>
       <CheckCircle done={false} color={accent} onClick={(e) => { e.stopPropagation(); onToggle(task) }} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: 14, fontWeight: isUrgent ? 600 : 500, color: 'rgba(255,255,255,0.88)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <p style={{ fontSize: 14, fontWeight: reddish ? 600 : 500, color: 'rgba(255,255,255,0.88)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {task.title}
         </p>
-        {(task.start_time || task.time || subject) && (
-          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', margin: '2px 0 0' }}>
-            {(task.start_time || task.time) ? `${task.start_time || task.time}${task.end_time ? `–${task.end_time}` : ''}` : ''}
-            {(task.start_time || task.time) && subject ? ' · ' : ''}
-            {subject ? subject.name : ''}
+        {(overdue || meta) && (
+          <p style={{ fontSize: 11, margin: '2px 0 0', color: overdue ? '#ff8080' : 'rgba(255,255,255,0.3)' }}>
+            {overdue ? `⚠️ ${lateLabel(daysLate(task.date, today))}` : ''}
+            {overdue && meta ? ' · ' : ''}
+            {meta}
           </p>
         )}
       </div>
-      {isUrgent && (
+      {overdue ? (
+        <span style={{ fontSize: 10, fontWeight: 700, color: '#ff8080', background: 'rgba(255,80,80,0.12)', border: '1px solid rgba(255,80,80,0.25)', borderRadius: 5, padding: '1px 6px', flexShrink: 0 }}>
+          Te laat
+        </span>
+      ) : isUrgent ? (
         <span style={{ fontSize: 10, fontWeight: 700, color: '#ff5555', background: 'rgba(255,50,50,0.15)', border: '1px solid rgba(255,50,50,0.3)', borderRadius: 5, padding: '1px 6px', flexShrink: 0 }}>
           🔥 URGENT
         </span>
-      )}
+      ) : null}
     </div>
   )
 }
@@ -121,6 +140,12 @@ export default function TodayView({ tasks, subjects = [], onToggleRoutine, onTog
       return (b.streak || 0) - (a.streak || 0)
     })
 
+  // Te laat: eenmalige taken van vóór vandaag, niet afgerond. Worden meegenomen
+  // naar vandaag (gevlagd als te laat), zonder de opgeslagen datum te wijzigen.
+  const overdueTasks = tasks
+    .filter(t => !t.recurrence && !t.completed && t.date && t.date < today)
+    .sort((a, b) => a.date.localeCompare(b.date) || (a.priority ?? 2) - (b.priority ?? 2))
+
   // Eenmalige taken van vandaag (nog niet afgerond, geen herhaling)
   const todayTasks = tasks
     .filter(t => !t.recurrence && !t.completed && t.date === today)
@@ -130,9 +155,8 @@ export default function TodayView({ tasks, subjects = [], onToggleRoutine, onTog
       return (a.start_time || a.time || '99:99').localeCompare(b.start_time || b.time || '99:99')
     })
 
-  const overdueCount = tasks.filter(t => !t.recurrence && !t.completed && t.date && t.date < today).length
   const routinesDone = routines.filter(t => isDoneToday(t, today)).length
-  const isEmpty = routines.length === 0 && todayTasks.length === 0
+  const isEmpty = routines.length === 0 && todayTasks.length === 0 && overdueTasks.length === 0
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -145,18 +169,17 @@ export default function TodayView({ tasks, subjects = [], onToggleRoutine, onTog
         </p>
       </div>
 
-      {/* Te laat — subtiele melding */}
-      {overdueCount > 0 && (
-        <button onClick={onShowOverdue}
-          style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
-            padding: '10px 14px', borderRadius: 12, cursor: 'pointer',
-            background: 'rgba(255,80,80,0.06)', border: '1px solid rgba(255,80,80,0.22)' }}>
-          <span style={{ fontSize: 14 }}>⚠️</span>
-          <span style={{ flex: 1, fontSize: 13, color: '#ff8080', fontWeight: 600 }}>
-            {overdueCount} {overdueCount === 1 ? 'taak staat' : 'taken staan'} te laat
-          </span>
-          <span style={{ fontSize: 12, color: 'rgba(255,128,128,0.5)' }}>→</span>
-        </button>
+      {/* Te laat — meegenomen naar vandaag, gevlagd */}
+      {overdueTasks.length > 0 && (
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '0 2px 8px' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#ff8080' }}>⚠️ Te laat</span>
+            <span style={{ fontSize: 11, color: 'rgba(255,128,128,0.5)' }}>{overdueTasks.length}</span>
+          </div>
+          {overdueTasks.map(t => (
+            <TaskRow key={t.id} task={t} subjects={subjects} today={today} onToggle={onToggleTask} onOpen={onOpen} />
+          ))}
+        </div>
       )}
 
       {/* Routines */}
