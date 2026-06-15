@@ -165,6 +165,22 @@ export default function App() {
     }
   }, [])
 
+  // Scroll het gefocuste invoerveld in beeld (boven het toetsenbord). visualViewport
+  // is op deze iOS-PWA onbetrouwbaar voor toetsenbordhoogte, dus we vertrouwen op
+  // scrollIntoView binnen de scroll-container i.p.v. op de viewport-hoogte.
+  useEffect(() => {
+    const onFocusIn = (e) => {
+      const t = e.target
+      if (!t || (t.tagName !== 'INPUT' && t.tagName !== 'TEXTAREA' && !t.isContentEditable)) return
+      // Wacht tot het toetsenbord is opgekomen, scroll dan het veld naar het midden
+      setTimeout(() => {
+        try { t.scrollIntoView({ block: 'center', behavior: 'smooth' }) } catch {}
+      }, 300)
+    }
+    window.addEventListener('focusin', onFocusIn)
+    return () => window.removeEventListener('focusin', onFocusIn)
+  }, [])
+
   // Pull-to-refresh
   const pullStartY = useRef(null)
   const pullStartX = useRef(null)
@@ -738,9 +754,7 @@ export default function App() {
 
   return (
     <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0,
-      height: 'var(--app-height, 100dvh)',
-      transform: 'translateY(var(--vv-top, 0px))',
+      height: '100dvh', position: 'relative',
       overflow: 'hidden', background: 'var(--bg-base)',
     }}>
       <DebugViewport />
