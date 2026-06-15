@@ -146,7 +146,7 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
           borderRadius: 28,
           boxShadow: '0 12px 32px rgba(0,0,0,0.45)',
           padding: '4px 6px',
-          position: 'fixed',
+          position: 'absolute',
           bottom: 'calc(10px + env(safe-area-inset-bottom))',
           left: 12, right: 12, zIndex: 100,
           maxWidth: 480, margin: '0 auto',

@@ -730,8 +730,9 @@ export default function App() {
           />
         </div>
 
-        {/* Main area */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Main area — position:relative zodat de zwevende navbar hieraan ankert
+            (zelfde --app-height-referentie als de inhoud, geen verspringende band) */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
 
           {/* Mobile header — iOS navigation bar: titel gecentreerd */}
           <div className="md:hidden flex items-center justify-between px-4"
