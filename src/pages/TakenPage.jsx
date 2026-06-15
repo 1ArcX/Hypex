@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import ReactDOM from 'react-dom'
+import { Plus } from 'lucide-react'
 import TasksWidget from '../components/TasksWidget'
 import TodayView from '../components/TodayView'
 import { useIsDesktop } from '../hooks/useIsDesktop'
@@ -153,14 +154,16 @@ export default function TakenPage({
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Filter chips */}
-      <div style={{ flexShrink: 0, position: 'relative', borderTop: '2px solid rgba(0,255,209,0.2)' }}>
+      {/* Filter chips + nieuwe-taak knop */}
+      <div style={{ flexShrink: 0, position: 'relative', borderTop: '2px solid rgba(0,255,209,0.2)', display: 'flex', alignItems: 'center', gap: 8, paddingRight: 14 }}>
       <div style={{
-        padding: '16px 16px 0',
+        padding: '14px 8px 14px 16px',
         overflowX: 'auto',
         display: 'flex',
         gap: 6,
         scrollbarWidth: 'none',
+        flex: 1,
+        minWidth: 0,
       }}>
         {FILTERS.map(f => {
           const active = filter === f.id
@@ -259,8 +262,11 @@ export default function TakenPage({
           )
         })}
       </div>
-      {/* Scroll fade — hints that the chip bar is horizontally scrollable */}
-      <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 32, background: 'linear-gradient(to right, transparent, var(--bg-sidebar))', pointerEvents: 'none' }} />
+      {/* Nieuwe taak — vaste knop in het taken-menu */}
+      <button onClick={() => onNew?.()} aria-label="Nieuwe taak"
+        style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '7px 13px', borderRadius: 20, border: '1px solid color-mix(in srgb, var(--accent) 45%, transparent)', background: 'color-mix(in srgb, var(--accent) 14%, transparent)', color: 'var(--accent)', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+        <Plus size={14} /> Nieuw
+      </button>
       </div>
 
       {/* Task list */}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Home, Calendar, CheckSquare, Timer, MoreHorizontal, GraduationCap, Flame, FileText, Briefcase, BarChart2, Dumbbell, Wallet, Plus } from 'lucide-react'
+import { Home, Calendar, CheckSquare, Timer, MoreHorizontal, GraduationCap, Flame, FileText, Briefcase, BarChart2, Dumbbell, Wallet } from 'lucide-react'
 
 const PRIMARY_TABS = [
   { id: 'dashboard', Icon: Home,          label: 'Home'      },
@@ -18,7 +18,7 @@ const SHEET_BASE = [
 
 const PRIMARY_SWIPE_ORDER = ['dashboard', 'agenda', 'taken', 'notities']  // gewoontes INACTIVE
 
-export default function BottomNav({ activePage, setActivePage, isAdmin, showJumbo, hasLevelUp, hasActiveGymWorkout, hasActivePomo, onNewTask }) {
+export default function BottomNav({ activePage, setActivePage, isAdmin, showJumbo, hasLevelUp, hasActiveGymWorkout, hasActivePomo }) {
   const [showSheet, setShowSheet] = useState(false)
   const sheetRef = useRef(null)
   const swipeStartX = useRef(null)
@@ -167,39 +167,20 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
         onTouchEnd={onNavSwipeEnd}
         style={{
           display: 'flex',
-          background: 'rgba(20,20,26,0.72)',
+          background: 'rgba(18,18,24,0.82)',
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
-          border: '1px solid rgba(255,255,255,0.10)',
-          borderRadius: 28,
-          boxShadow: '0 12px 32px rgba(0,0,0,0.45)',
-          padding: '4px 6px',
+          borderTop: '1px solid rgba(255,255,255,0.10)',
+          borderRadius: '22px 22px 0 0',
+          boxShadow: '0 -6px 24px rgba(0,0,0,0.35)',
+          // Achtergrond loopt door tot de schermrand; safe-area als padding erin,
+          // zodat er geen strook onder of boven de balk ontstaat.
+          padding: '4px 8px',
+          paddingBottom: 'calc(4px + env(safe-area-inset-bottom))',
           position: 'absolute',
-          bottom: 'calc(10px + env(safe-area-inset-bottom))',
-          left: 12, right: 12, zIndex: 100,
-          maxWidth: 480, margin: '0 auto',
+          bottom: 0, left: 0, right: 0, zIndex: 100,
         }}>
-        {PRIMARY_TABS.slice(0, 2).map(renderTab)}
-
-        {/* Nieuwe taak — centrale actieknop in de balk */}
-        <button
-          onClick={() => onNewTask?.()}
-          aria-label="Nieuwe taak"
-          style={{
-            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'none', border: 'none', cursor: 'pointer', padding: '6px 0',
-          }}
-        >
-          <div style={{
-            width: 46, height: 46, borderRadius: '50%', marginTop: -16,
-            background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 6px 16px color-mix(in srgb, var(--accent) 45%, transparent)',
-          }}>
-            <Plus size={24} color="#000" strokeWidth={2.6} />
-          </div>
-        </button>
-
-        {PRIMARY_TABS.slice(2).map(renderTab)}
+        {PRIMARY_TABS.map(renderTab)}
 
         {/* Meer */}
         {(() => {

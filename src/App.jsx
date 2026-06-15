@@ -898,7 +898,6 @@ export default function App() {
               hasLevelUp={hasLevelUp}
               hasActiveGymWorkout={hasActiveGymWorkout}
               hasActivePomo={hasActivePomo}
-              onNewTask={() => openNewTask()}
             />
           </div>
         </div>
