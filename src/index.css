@@ -67,6 +67,13 @@
 }
 
 /* ===== BODY ===== */
+/* Effen donkere basiskleur (= basis van de gradient). Als het toetsenbord de
+   app omhoog duwt en de body eronder zichtbaar wordt, sluit dit naadloos aan
+   i.p.v. een zichtbare gradient-"balk". De gradient zelf zit op de app-root. */
+html, body, #root {
+  background-color: #0b0b0f;
+}
+
 html, body {
   margin: 0; padding: 0;
   min-height: 100vh;
@@ -74,7 +81,6 @@ html, body {
 }
 
 body {
-  background: var(--bg-base);
   color: var(--text-primary);
   /* iOS-first: SF Pro op Apple-apparaten, Inter als fallback */
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif;
