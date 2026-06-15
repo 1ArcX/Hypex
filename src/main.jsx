@@ -41,17 +41,24 @@ document.addEventListener('focusout', () => {
   setTimeout(() => window.scrollTo(0, 0), 50)
 })
 
-// Houd --app-height up-to-date met de visuele viewport — ALTIJD, ook als het
-// toetsenbord open is. Zo krimpt de app naar het zichtbare gebied boven het
-// toetsenbord, kun je in de scroll-container naar je invoer scrollen, en veert
-// de app terug zodra het toetsenbord weg is (geen blijvende sprong).
-function updateAppHeight() {
-  const h = window.visualViewport ? window.visualViewport.height : window.innerHeight
-  document.documentElement.style.setProperty('--app-height', `${h}px`)
+// Pin de app aan de ZICHTBARE viewport: volg live de hoogte én de top-offset
+// van visualViewport. De app-root gebruikt deze (height + translateY) zodat de
+// app altijd exact het zichtbare gebied bedekt — boven het toetsenbord. Zo
+// werkt scrollen naar je invoer, en veert alles terug zodra het toetsenbord
+// weg is (geen blijvende sprong). Werkt ongeacht of iOS de viewport-modus
+// honoreert.
+function updateViewportVars() {
+  const vv = window.visualViewport
+  const h = vv ? vv.height : window.innerHeight
+  const top = vv ? vv.offsetTop : 0
+  const s = document.documentElement.style
+  s.setProperty('--app-height', `${h}px`)
+  s.setProperty('--vv-top', `${top}px`)
 }
-updateAppHeight()
+updateViewportVars()
 if (window.visualViewport) {
-  window.visualViewport.addEventListener('resize', updateAppHeight)
+  window.visualViewport.addEventListener('resize', updateViewportVars)
+  window.visualViewport.addEventListener('scroll', updateViewportVars)
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(

@@ -52,7 +52,7 @@ export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onE
   return (
     <div
       className={closing ? 'modal-overlay modal-closing' : 'modal-overlay'}
-      style={{ position:'fixed',inset:0,zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.7)',backdropFilter:'blur(10px)',padding:'16px',paddingBottom:'calc(16px + var(--keyboard-height, 0px))' }}
+      style={{ position:'fixed',inset:0,zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.7)',backdropFilter:'blur(10px)',padding:'16px' }}
       onMouseDown={() => { mouseDownedInside.current = false }}
       onClick={() => { if (!mouseDownedInside.current) handleClose() }}
     >
