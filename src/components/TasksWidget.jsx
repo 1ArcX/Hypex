@@ -504,9 +504,14 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                           🔥 URGENT
                         </span>
                       )}
-                      {!isUrgent && dateInfo?.overdue && (
+                      {!isUrgent && dateInfo?.overdue && !task.recurrence && (
                         <span style={{ fontSize: 10, fontWeight: 700, color: '#ff8080', background: 'rgba(255,80,80,0.12)', border: '1px solid rgba(255,80,80,0.25)', borderRadius: 5, padding: '1px 6px', flexShrink: 0 }}>
                           ⚠️ Te laat
+                        </span>
+                      )}
+                      {task.recurrence && (
+                        <span style={{ fontSize: 10, fontWeight: 700, color: (task.streak > 0) ? '#FB923C' : 'rgba(255,255,255,0.4)', background: (task.streak > 0) ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.05)', border: `1px solid ${(task.streak > 0) ? 'rgba(249,115,22,0.3)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 5, padding: '1px 6px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 2 }}>
+                          🔁 {task.streak > 0 ? `🔥${task.streak}` : ''}
                         </span>
                       )}
                     </div>

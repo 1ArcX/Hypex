@@ -1,8 +1,26 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
-import { X, Trash2, Save } from 'lucide-react'
+import { X, Trash2, Save, Repeat } from 'lucide-react'
+import { RECURRENCE, recurrenceLabel } from '../utils/recurrence'
 
 const EVENT_COLORS = ['#00FFD1','#818CF8','#FF8C42','#FF6B6B','#4ADE80','#FACC15','#38BDF8']
 const DURATION_PRESETS = [15, 30, 45, 60, 90]
+
+const RECURRENCE_OPTIONS = [
+  { value: RECURRENCE.NONE,     label: 'Eenmalig' },
+  { value: RECURRENCE.DAILY,    label: 'Elke dag' },
+  { value: RECURRENCE.WEEKDAYS, label: 'Ma–Vr' },
+  { value: RECURRENCE.WEEKLY,   label: 'Weekdagen' },
+  { value: RECURRENCE.MONTHLY,  label: 'Maandelijks' },
+]
+const WEEKDAY_PILLS = [
+  { iso: 1, label: 'Ma' }, { iso: 2, label: 'Di' }, { iso: 3, label: 'Wo' },
+  { iso: 4, label: 'Do' }, { iso: 5, label: 'Vr' }, { iso: 6, label: 'Za' }, { iso: 7, label: 'Zo' },
+]
+function isoDowOf(dateStr) {
+  if (!dateStr) return 1
+  const x = new Date(dateStr + 'T00:00:00').getDay()
+  return x === 0 ? 7 : x
+}
 
 const PRIORITY_CFG = {
   1: { label: 'Urgent',  color: '#FF6B6B',               bg: 'rgba(255,107,107,0.12)', border: 'rgba(255,107,107,0.35)' },
@@ -226,6 +244,8 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
   const [durationMinutes, setDurationMinutes] = useState(30)
   const [dueDate,         setDueDate]         = useState('')
   const [groupName,       setGroupName]       = useState('')
+  const [recurrence,      setRecurrence]      = useState(RECURRENCE.NONE)
+  const [recurrenceDays,  setRecurrenceDays]  = useState([])
 
   useEffect(() => {
     if (task) {
@@ -245,6 +265,8 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
       setDurationMinutes(task.duration_minutes ?? 30)
       setDueDate(task.due_date || '')
       setGroupName(task.group_name || '')
+      setRecurrence(task.recurrence || RECURRENCE.NONE)
+      setRecurrenceDays(task.recurrence_days || [])
     } else {
       setNoDate(false)
       setDate(defaultDate || new Date().toISOString().slice(0, 10))
@@ -255,8 +277,24 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
       setDurationMinutes(30)
       setDueDate('')
       setGroupName('')
+      setRecurrence(RECURRENCE.NONE)
+      setRecurrenceDays([])
     }
   }, [task, defaultTime, defaultDate])
+
+  // Bij "Weekdagen": standaard de weekdag van de gekozen datum selecteren.
+  // Een herhalende taak heeft altijd een datum, dus "nog in te plannen" uit.
+  useEffect(() => {
+    if (recurrence === RECURRENCE.WEEKLY && recurrenceDays.length === 0) {
+      setRecurrenceDays([isoDowOf(date)])
+    }
+    if (recurrence) setNoDate(false)
+  }, [recurrence]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const isRecurring = !!recurrence
+  const toggleRecDay = (iso) => {
+    setRecurrenceDays(prev => prev.includes(iso) ? prev.filter(d => d !== iso) : [...prev, iso].sort((a, b) => a - b))
+  }
 
   // Pas eindtijd aan als duur verandert
   useEffect(() => {
@@ -283,17 +321,21 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
 
   const handleSave = () => {
     if (!title.trim()) return
+    // Een herhalende taak heeft altijd een (start)datum; "nog in te plannen" geldt niet.
+    const effectiveNoDate = isRecurring ? false : noDate
     onSave({
       id: task?.id, title, description,
-      date:       noDate ? null : date,
-      start_time: (noDate || allDay) ? null : startTime,
-      end_time:   (noDate || allDay) ? null : endTime,
-      time:       (noDate || allDay) ? null : startTime,
+      date:       effectiveNoDate ? null : date,
+      start_time: (effectiveNoDate || allDay) ? null : startTime,
+      end_time:   (effectiveNoDate || allDay) ? null : endTime,
+      time:       (effectiveNoDate || allDay) ? null : startTime,
       subject_id: subjectId || null, color, completed,
       priority,
       duration_minutes: durationMinutes,
       due_date: dueDate || null,
       group_name: groupName.trim() || null,
+      recurrence: recurrence || null,
+      recurrence_days: (recurrence === RECURRENCE.WEEKLY && recurrenceDays.length) ? recurrenceDays : null,
     })
   }
 
@@ -340,6 +382,43 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
             </div>
           </div>
 
+          {/* Herhaling */}
+          <div>
+            <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: 5, marginBottom: '6px' }}>
+              <Repeat size={11} /> Herhaling
+            </label>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {RECURRENCE_OPTIONS.map(opt => {
+                const active = recurrence === opt.value
+                return (
+                  <button key={opt.label} type="button" onClick={() => setRecurrence(opt.value)}
+                    style={{ padding: '6px 11px', borderRadius: '9px', border: `1px solid ${active ? 'color-mix(in srgb, var(--accent) 50%, transparent)' : 'rgba(255,255,255,0.1)'}`, background: active ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'transparent', color: active ? 'var(--accent)' : 'rgba(255,255,255,0.35)', fontSize: '12px', cursor: 'pointer', fontWeight: active ? 600 : 400, transition: 'all 0.15s' }}>
+                    {opt.label}
+                  </button>
+                )
+              })}
+            </div>
+            {/* Weekdag-keuze bij "Weekdagen" */}
+            {recurrence === RECURRENCE.WEEKLY && (
+              <div style={{ display: 'flex', gap: '5px', marginTop: '8px' }}>
+                {WEEKDAY_PILLS.map(d => {
+                  const active = recurrenceDays.includes(d.iso)
+                  return (
+                    <button key={d.iso} type="button" onClick={() => toggleRecDay(d.iso)}
+                      style={{ flex: 1, padding: '7px 0', borderRadius: '8px', border: `1px solid ${active ? 'color-mix(in srgb, var(--accent) 50%, transparent)' : 'rgba(255,255,255,0.1)'}`, background: active ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : 'transparent', color: active ? 'var(--accent)' : 'rgba(255,255,255,0.3)', fontSize: '11px', cursor: 'pointer', fontWeight: active ? 700 : 400, transition: 'all 0.15s' }}>
+                      {d.label}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+            {isRecurring && (
+              <p style={{ fontSize: 11, color: 'color-mix(in srgb, var(--accent) 70%, white)', margin: '8px 0 0', display: 'flex', alignItems: 'center', gap: 5 }}>
+                🔁 {recurrenceLabel(recurrence, recurrenceDays)} · vanaf {new Date(date + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })} · bouwt een streak op 🔥
+              </p>
+            )}
+          </div>
+
           {/* Groep */}
           {(() => {
             const existingGroups = [...new Set((allTasks || tasks || []).map(t => t.group_name).filter(Boolean))]
@@ -369,7 +448,8 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
             )
           })()}
 
-          {/* Nog in te plannen */}
+          {/* Nog in te plannen — niet voor herhalende taken (die hebben een startdatum) */}
+          {!isRecurring && (
           <button type="button" onClick={() => { setNoDate(v => !v); if (!noDate) setAllDay(false) }}
             style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', color: noDate ? '#FACC15' : 'rgba(255,255,255,0.4)', fontSize: 13, padding: 0, width: 'fit-content' }}>
             <div style={{ width: 20, height: 20, borderRadius: 6, background: noDate ? 'rgba(250,204,21,0.15)' : 'rgba(255,255,255,0.05)', border: `1px solid ${noDate ? 'rgba(250,204,21,0.4)' : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', flexShrink: 0 }}>
@@ -377,9 +457,10 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
             </div>
             Nog in te plannen
           </button>
+          )}
 
           {/* Dagvoorstellen bij "nog in te plannen" */}
-          {noDate && daySuggestions.length > 0 && (
+          {!isRecurring && noDate && daySuggestions.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px' }}>📅 Beschikbare momenten</label>
               {daySuggestions.slice(0, showSuggestCount).map((s, i) => (

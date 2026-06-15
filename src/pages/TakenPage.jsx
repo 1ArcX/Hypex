@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import ReactDOM from 'react-dom'
 import TasksWidget from '../components/TasksWidget'
+import TodayView from '../components/TodayView'
 import { useIsDesktop } from '../hooks/useIsDesktop'
+import { isDueToday, isDoneToday, todayISO } from '../utils/recurrence'
 
 const EMPTY_STATE = {
   alles:     { icon: '🎉', title: 'Alles gedaan', sub: 'Geen openstaande taken.' },
@@ -30,8 +32,8 @@ function EmptyState({ filter, onNew }) {
 }
 
 const FILTERS = [
-  { id: 'alles',     label: 'Alles'    },
   { id: 'vandaag',   label: 'Vandaag'  },
+  { id: 'alles',     label: 'Alles'    },
   { id: 'morgen',    label: 'Morgen'   },
   { id: 'week',      label: 'Week'     },
   { id: 'urgent',    label: 'Urgent'   },
@@ -57,7 +59,7 @@ export default function TakenPage({
   highlightFilter, onClearHighlight,
 }) {
   const isDesktop = useIsDesktop()
-  const [filter, setFilter] = useState('alles')
+  const [filter, setFilter] = useState('vandaag')
   const [undoTask, setUndoTask] = useState(null)
   const undoTimerRef = React.useRef(null)
   const [highlightedIds, setHighlightedIds] = useState(new Set())
@@ -97,13 +99,16 @@ export default function TakenPage({
   const groups = useMemo(() => [...new Set(tasks.filter(t => t.group_name).map(t => t.group_name))], [tasks])
 
   const counts = useMemo(() => {
+    // Vandaag = nog openstaande routines van vandaag + eenmalige taken van vandaag
+    const openRoutines = tasks.filter(t => t.recurrence && isDueToday(t, ts) && !isDoneToday(t, ts)).length
+    const todayOneoff = tasks.filter(t => !t.recurrence && !t.completed && t.date === ts).length
     const base = {
+      vandaag:   openRoutines + todayOneoff,
       alles:     tasks.filter(t => !t.completed).length,
-      vandaag:   tasks.filter(t => !t.completed && t.date === ts).length,
       morgen:    tasks.filter(t => !t.completed && t.date === tom).length,
       week:      tasks.filter(t => !t.completed && t.date && t.date >= ts && t.date <= wEnd).length,
       urgent:    tasks.filter(t => !t.completed && (t.priority ?? 2) === 1).length,
-      telaat:    tasks.filter(t => !t.completed && t.date && t.date < ts).length,
+      telaat:    tasks.filter(t => !t.recurrence && !t.completed && t.date && t.date < ts).length,
       ongepland: tasks.filter(t => !t.completed && !t.date).length,
     }
     for (const g of groups) base[`group:${g}`] = tasks.filter(t => !t.completed && t.group_name === g).length
@@ -120,7 +125,7 @@ export default function TakenPage({
       case 'morgen':    return tasks.filter(t => t.date === tom)
       case 'week':      return tasks.filter(t => t.date && t.date >= ts && t.date <= wEnd)
       case 'urgent':    return tasks.filter(t => (t.priority ?? 2) === 1)
-      case 'telaat':    return tasks.filter(t => t.date && t.date < ts)
+      case 'telaat':    return tasks.filter(t => !t.recurrence && t.date && t.date < ts)
       case 'ongepland': return tasks.filter(t => !t.date)
       default:          return tasks
     }
@@ -260,7 +265,17 @@ export default function TakenPage({
 
       {/* Task list */}
       <div style={{ flex: 1, overflow: 'hidden', overflowY: 'auto', padding: '12px 16px 100px' }}>
-        {filtered.length === 0 && !filter.startsWith('group:') ? (
+        {filter === 'vandaag' ? (
+          <TodayView
+            tasks={tasks}
+            subjects={subjects}
+            onToggleRoutine={onToggle}
+            onToggleTask={handleToggleWithUndo}
+            onOpen={onViewDetail || onEdit}
+            onNew={onNew}
+            onShowOverdue={() => setFilter('telaat')}
+          />
+        ) : filtered.length === 0 && !filter.startsWith('group:') ? (
           <EmptyState filter={filter} onNew={onNew} />
         ) : (
           <TasksWidget

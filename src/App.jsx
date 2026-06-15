@@ -19,6 +19,7 @@ import VersionChecker from './components/VersionChecker'
 import { callMagister } from './utils/magisterApi'
 import { ensureSomtodayCreds } from './utils/somtodayApi'
 import { awardXP, XP_TASK } from './utils/xp'
+import { advanceOnComplete, revertOnUncomplete, isDoneToday, todayISO } from './utils/recurrence'
 import { VAPID_PUBLIC, urlBase64ToUint8Array } from './utils/push'
 import XPToast from './components/XPToast'
 import BottomNav from './components/BottomNav'
@@ -551,6 +552,13 @@ export default function App() {
       due_date: taskData.due_date || null,
       group_name: taskData.group_name || null,
     }
+    // Herhaling-velden alleen meesturen als ze relevant zijn, zodat gewone taken
+    // blijven werken ook als de DB-migratie (supabase_recurrence.sql) nog niet gedraaid is.
+    const orig = taskData.id ? tasks.find(t => String(t.id) === String(taskData.id)) : null
+    if (taskData.recurrence || orig?.recurrence) {
+      fields.recurrence = taskData.recurrence || null
+      fields.recurrence_days = taskData.recurrence_days || null
+    }
     let error
     if (taskData.id) {
       ({ error } = await supabase.from('tasks').update(fields).eq('id', taskData.id).eq('user_id', user.id))
@@ -610,6 +618,28 @@ export default function App() {
   }
 
   const handleToggleTask = async (task) => {
+    // Herhalende taak: afvinken schuift door naar de volgende keer + streak,
+    // i.p.v. permanent op "afgerond" te zetten.
+    if (task.recurrence) {
+      const today = todayISO()
+      if (isDoneToday(task, today)) {
+        // Ongedaan maken (misklik): streak en datum terugdraaien
+        const upd = revertOnUncomplete(task, today)
+        navigator.vibrate?.(20)
+        await supabase.from('tasks').update({ ...upd, updated_at: new Date().toISOString() }).eq('id', task.id)
+        awardXP(user?.id, -XP_TASK)
+      } else {
+        const upd = advanceOnComplete(task, today)
+        if (!upd) return
+        navigator.vibrate?.(40)
+        await supabase.from('tasks').update({ ...upd, updated_at: new Date().toISOString() }).eq('id', task.id)
+        awardXP(user?.id, XP_TASK)
+        setXpToast({ xp: XP_TASK, icon: upd.streak > 1 ? '🔥' : '✓' })
+      }
+      fetchTasks()
+      return
+    }
+
     const completing = !task.completed
     navigator.vibrate?.(completing ? 40 : 20)
     await supabase.from('tasks').update({ completed: completing, updated_at: new Date().toISOString() }).eq('id', task.id)
