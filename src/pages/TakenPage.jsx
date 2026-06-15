@@ -316,7 +316,7 @@ export default function TakenPage({
         document.body
       )}
 
-      {/* Nieuwe taak — gecentreerde knop onderaan de Taken-tab */}
+      {/* Nieuwe taak — gecentreerde knop met label onderaan de Taken-tab */}
       {!isDesktop && ReactDOM.createPortal(
         <button
           onClick={() => onNew?.()}
@@ -324,16 +324,18 @@ export default function TakenPage({
             position: 'fixed',
             bottom: undoTask ? 'calc(150px + env(safe-area-inset-bottom))' : 'calc(84px + env(safe-area-inset-bottom))',
             left: '50%', transform: 'translateX(-50%)',
-            width: 56, height: 56, borderRadius: '50%',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+            padding: '13px 24px', borderRadius: 26,
             background: 'var(--accent)', color: '#000',
             border: 'none', cursor: 'pointer', zIndex: 9996,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 28, fontWeight: 700, lineHeight: 1,
+            fontSize: 15, fontWeight: 700, lineHeight: 1, whiteSpace: 'nowrap',
             boxShadow: '0 6px 20px color-mix(in srgb, var(--accent) 50%, transparent)',
             transition: 'bottom 0.2s ease',
           }}
           aria-label="Nieuwe taak"
-        >+</button>,
+        >
+          <span style={{ fontSize: 20, lineHeight: 1, marginTop: -1 }}>+</span> Nieuwe taak
+        </button>,
         document.body
       )}
 
