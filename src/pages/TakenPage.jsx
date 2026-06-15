@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import ReactDOM from 'react-dom'
-import { Plus } from 'lucide-react'
 import TasksWidget from '../components/TasksWidget'
 import TodayView from '../components/TodayView'
 import { useIsDesktop } from '../hooks/useIsDesktop'
@@ -154,16 +153,14 @@ export default function TakenPage({
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Filter chips + nieuwe-taak knop */}
-      <div style={{ flexShrink: 0, position: 'relative', borderTop: '2px solid rgba(0,255,209,0.2)', display: 'flex', alignItems: 'center', gap: 8, paddingRight: 14 }}>
+      {/* Filter chips */}
+      <div style={{ flexShrink: 0, position: 'relative', borderTop: '2px solid rgba(0,255,209,0.2)' }}>
       <div style={{
-        padding: '14px 8px 14px 16px',
+        padding: '16px 16px 0',
         overflowX: 'auto',
         display: 'flex',
         gap: 6,
         scrollbarWidth: 'none',
-        flex: 1,
-        minWidth: 0,
       }}>
         {FILTERS.map(f => {
           const active = filter === f.id
@@ -262,11 +259,8 @@ export default function TakenPage({
           )
         })}
       </div>
-      {/* Nieuwe taak — vaste knop in het taken-menu */}
-      <button onClick={() => onNew?.()} aria-label="Nieuwe taak"
-        style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '7px 13px', borderRadius: 20, border: '1px solid color-mix(in srgb, var(--accent) 45%, transparent)', background: 'color-mix(in srgb, var(--accent) 14%, transparent)', color: 'var(--accent)', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-        <Plus size={14} /> Nieuw
-      </button>
+      {/* Scroll fade — hints that the chip bar is horizontally scrollable */}
+      <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 32, background: 'linear-gradient(to right, transparent, var(--bg-sidebar))', pointerEvents: 'none' }} />
       </div>
 
       {/* Task list */}
@@ -322,7 +316,26 @@ export default function TakenPage({
         document.body
       )}
 
-      {/* Nieuwe taak gebeurt nu via de centrale + in de onderbalk (BottomNav) */}
+      {/* Nieuwe taak — gecentreerde knop onderaan de Taken-tab */}
+      {!isDesktop && ReactDOM.createPortal(
+        <button
+          onClick={() => onNew?.()}
+          style={{
+            position: 'fixed',
+            bottom: undoTask ? 'calc(150px + env(safe-area-inset-bottom))' : 'calc(84px + env(safe-area-inset-bottom))',
+            left: '50%', transform: 'translateX(-50%)',
+            width: 56, height: 56, borderRadius: '50%',
+            background: 'var(--accent)', color: '#000',
+            border: 'none', cursor: 'pointer', zIndex: 9996,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 28, fontWeight: 700, lineHeight: 1,
+            boxShadow: '0 6px 20px color-mix(in srgb, var(--accent) 50%, transparent)',
+            transition: 'bottom 0.2s ease',
+          }}
+          aria-label="Nieuwe taak"
+        >+</button>,
+        document.body
+      )}
 
       {/* Swipe-hint overlay — éénmalig */}
       {showSwipeHint && ReactDOM.createPortal(
