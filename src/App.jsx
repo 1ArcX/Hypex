@@ -654,7 +654,8 @@ export default function App() {
 
   const openNewTask = (time) => {
     setSelectedTask(null)
-    setDefaultTime(time || '09:00')
+    // null = generieke nieuwe taak (standaard hele dag); een echte tijd = vanuit een tijdslot
+    setDefaultTime(time || null)
     setShowTaskModal(true)
   }
 

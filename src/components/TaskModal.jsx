@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
-import { X, Trash2, Save, Repeat } from 'lucide-react'
+import { X, Trash2, Save, Repeat, Clock } from 'lucide-react'
 import { RECURRENCE, recurrenceLabel } from '../utils/recurrence'
 
 const EVENT_COLORS = ['#00FFD1','#818CF8','#FF8C42','#FF6B6B','#4ADE80','#FACC15','#38BDF8']
@@ -281,7 +281,8 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
       setDate(defaultDate || new Date().toISOString().slice(0, 10))
       setStartTime(defaultTime || '09:00')
       setEndTime(defaultTime ? (defaultTime.slice(0, 2) < '23' ? `${String(parseInt(defaultTime) + 1).padStart(2, '0')}:00` : '23:59') : '10:00')
-      setAllDay(false)
+      // Standaard hele dag; alleen met een echt tijdslot (defaultTime) een tijd
+      setAllDay(!defaultTime)
       setPriority(2)
       setDurationMinutes(30)
       setDueDate('')
@@ -396,6 +397,62 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
             {!noDate && (
               <input type="date" className="glass-input" value={date} style={{ colorScheme: 'dark', marginTop: 8, fontSize: 13 }}
                 onChange={e => { setNoDate(false); setDate(e.target.value) }} />
+            )}
+
+            {/* Tijdslot — standaard hele dag; optioneel een tijd toevoegen */}
+            {!noDate && allDay && (
+              <button type="button" onClick={() => setAllDay(false)}
+                style={{ ...chipStyle(false), marginTop: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
+                <Clock size={12} /> + Tijdslot toevoegen
+              </button>
+            )}
+            {!noDate && !allDay && (
+              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {/* Voorgestelde tijden */}
+                {suggestedSlots.length > 0 && (
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {suggestedSlots.map((slot, i) => (
+                      <button key={i} type="button"
+                        onClick={() => { setStartTime(slot.startStr); setEndTime(slot.endStr) }}
+                        style={{ padding: '5px 10px', borderRadius: '8px', border: '1px solid rgba(250,204,21,0.3)', background: 'rgba(250,204,21,0.07)', color: '#FACC15', fontSize: '12px', cursor: 'pointer' }}>
+                        ⚡ {slot.startStr}–{slot.endStr}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="time" className="glass-input" value={startTime} style={{ colorScheme: 'dark', flex: 1 }}
+                    onChange={e => { setStartTime(e.target.value); setEndTime(minsToTimeStr(timeStrToMins(e.target.value) + durationMinutes)) }} />
+                  <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>–</span>
+                  <input type="time" className="glass-input" value={endTime} style={{ colorScheme: 'dark', flex: 1 }}
+                    onChange={e => setEndTime(e.target.value)} />
+                </div>
+                {/* Duur-presets */}
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {DURATION_PRESETS.map(d => {
+                    const active = durationMinutes === d
+                    return (
+                      <button key={d} type="button" onClick={() => setDurationMinutes(d)}
+                        style={{ padding: '4px 9px', borderRadius: '8px', border: `1px solid ${active ? 'color-mix(in srgb, var(--accent) 50%, transparent)' : 'rgba(255,255,255,0.1)'}`, background: active ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'transparent', color: active ? 'var(--accent)' : 'rgba(255,255,255,0.35)', fontSize: '11px', cursor: 'pointer' }}>
+                        {d < 60 ? `${d}m` : `${d / 60}u`}
+                      </button>
+                    )
+                  })}
+                </div>
+                {/* Overlap-waarschuwing */}
+                {overlapConflicts.length > 0 && (
+                  <div style={{ display: 'flex', gap: 7, alignItems: 'flex-start', padding: '8px 10px', borderRadius: 9, background: 'rgba(250,204,21,0.06)', border: '1px solid rgba(250,204,21,0.22)' }}>
+                    <span style={{ fontSize: 13, flexShrink: 0 }}>⚠️</span>
+                    <span style={{ fontSize: 12, color: 'rgba(250,204,21,0.85)', lineHeight: 1.4 }}>
+                      Overlapt met: <strong>{overlapConflicts.join(', ')}</strong>
+                    </span>
+                  </div>
+                )}
+                <button type="button" onClick={() => setAllDay(true)}
+                  style={{ alignSelf: 'flex-start', fontSize: 11, color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0' }}>
+                  × Tijdslot verwijderen (hele dag)
+                </button>
+              </div>
             )}
           </div>
 
@@ -530,94 +587,12 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
             </div>
           )}
 
-          {/* Duur presets — altijd zichtbaar */}
+          {/* Deadline */}
           <div>
-            <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', display: 'block', marginBottom: '6px' }}>Duur</label>
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              {DURATION_PRESETS.map(d => {
-                const active = durationMinutes === d
-                return (
-                  <button key={d} type="button" onClick={() => setDurationMinutes(d)}
-                    style={{ padding: '5px 10px', borderRadius: '8px', border: `1px solid ${active ? 'color-mix(in srgb, var(--accent) 50%, transparent)' : 'rgba(255,255,255,0.1)'}`, background: active ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'transparent', color: active ? 'var(--accent)' : 'rgba(255,255,255,0.35)', fontSize: '12px', cursor: 'pointer', transition: 'all 0.15s' }}>
-                    {d < 60 ? `${d}m` : `${d / 60}u`}
-                  </button>
-                )
-              })}
-            </div>
+            <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Deadline (optioneel)</label>
+            <input type="date" className="glass-input" value={dueDate} style={{ colorScheme: 'dark' }}
+              onChange={e => setDueDate(e.target.value)} />
           </div>
-
-          {!noDate && (
-            <>
-              {/* Hele dag toggle */}
-              <button type="button" onClick={() => setAllDay(v => !v)}
-                style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', color: allDay ? 'var(--accent)' : 'rgba(255,255,255,0.4)', fontSize: 13, padding: 0, width: 'fit-content' }}>
-                <div style={{ width: 20, height: 20, borderRadius: 6, background: allDay ? 'color-mix(in srgb, var(--accent) 20%, transparent)' : 'rgba(255,255,255,0.05)', border: `1px solid ${allDay ? 'color-mix(in srgb, var(--accent) 50%, transparent)' : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', flexShrink: 0 }}>
-                  {allDay && <span style={{ fontSize: 12 }}>✓</span>}
-                </div>
-                Hele dag
-              </button>
-
-              {!allDay && (
-                <>
-                  {/* Voorgestelde tijden */}
-                  {suggestedSlots.length > 0 && (
-                    <div>
-                      <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', display: 'block', marginBottom: '6px' }}>⚡ Voorgestelde tijden</label>
-                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                        {suggestedSlots.map((slot, i) => (
-                          <button key={i} type="button"
-                            onClick={() => { setStartTime(slot.startStr); setEndTime(slot.endStr) }}
-                            style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(250,204,21,0.3)', background: 'rgba(250,204,21,0.07)', color: '#FACC15', fontSize: '12px', cursor: 'pointer', transition: 'all 0.15s' }}>
-                            {slot.startStr}–{slot.endStr}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Start- en eindtijd */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <div>
-                      <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Starttijd</label>
-                      <input type="time" className="glass-input" value={startTime} style={{ colorScheme: 'dark', width: '100%' }}
-                        onChange={e => { setStartTime(e.target.value); setEndTime(minsToTimeStr(timeStrToMins(e.target.value) + durationMinutes)) }} />
-                    </div>
-                    <div>
-                      <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Eindtijd</label>
-                      <input type="time" className="glass-input" value={endTime} style={{ colorScheme: 'dark', width: '100%' }}
-                        onChange={e => setEndTime(e.target.value)} />
-                    </div>
-                  </div>
-
-                  {/* Overlap waarschuwing */}
-                  {overlapConflicts.length > 0 && (
-                    <div style={{ display: 'flex', gap: 7, alignItems: 'flex-start', padding: '8px 10px', borderRadius: 9, background: 'rgba(250,204,21,0.06)', border: '1px solid rgba(250,204,21,0.22)' }}>
-                      <span style={{ fontSize: 13, flexShrink: 0 }}>⚠️</span>
-                      <span style={{ fontSize: 12, color: 'rgba(250,204,21,0.85)', lineHeight: 1.4 }}>
-                        Overlapt met: <strong>{overlapConflicts.join(', ')}</strong>
-                      </span>
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* Deadline */}
-              <div>
-                <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Deadline (optioneel)</label>
-                <input type="date" className="glass-input" value={dueDate} style={{ colorScheme: 'dark' }}
-                  onChange={e => setDueDate(e.target.value)} />
-              </div>
-            </>
-          )}
-
-          {/* Deadline ook zichtbaar bij "nog in te plannen" */}
-          {noDate && (
-            <div>
-              <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Deadline (optioneel)</label>
-              <input type="date" className="glass-input" value={dueDate} style={{ colorScheme: 'dark' }}
-                onChange={e => setDueDate(e.target.value)} />
-            </div>
-          )}
 
           {/* Vak */}
           <div>
