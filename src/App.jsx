@@ -112,9 +112,12 @@ export default function App() {
   useEffect(() => {
     const vv = window.visualViewport
     if (!vv) return
-    const baseHeight = vv.height
     const onResize = () => {
-      const kh = Math.max(0, baseHeight - vv.height)
+      // Zelf-aanpassend: bij resizes-content krimpt de layout (window.innerHeight)
+      // mee → verschil ≈ 0, dus geen extra verschuiving. Bij resizes-visual blijft
+      // innerHeight vol en krimpt alleen de visual viewport → verschil = toetsen-
+      // bordhoogte, zodat modals/sheets boven het toetsenbord blijven.
+      const kh = Math.max(0, window.innerHeight - vv.height)
       document.documentElement.style.setProperty('--keyboard-height', `${kh}px`)
     }
     vv.addEventListener('resize', onResize)
