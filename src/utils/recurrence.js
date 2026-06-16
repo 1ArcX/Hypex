@@ -116,6 +116,19 @@ export function recurrenceLabel(recurrence, days) {
   }
 }
 
+// Heeft deze herhalende taak een occurrence op exact deze datum (voor bv. de
+// "morgen"-weergave)? Houdt rekening met de startdatum.
+export function appliesOn(task, dateStr) {
+  const { recurrence, recurrence_days, date } = task
+  if (!recurrence || !date) return false
+  const start = snapToPattern(date, recurrence, recurrence_days)
+  if (dateStr < start) return false
+  if (recurrence === RECURRENCE.MONTHLY) {
+    return parseISO(dateStr).getDate() === parseISO(start).getDate()
+  }
+  return matchesPattern(dateStr, recurrence, recurrence_days)
+}
+
 // Staat deze herhalende taak vandaag (of eerder, gemist) op de planning?
 // Snapt de opgeslagen datum eerst naar een geldige patroon-dag, zodat een
 // routine die bv. alleen op vrijdag valt niet op dinsdag verschijnt.

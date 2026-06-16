@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom'
 import TasksWidget from '../components/TasksWidget'
 import TodayView from '../components/TodayView'
 import { useIsDesktop } from '../hooks/useIsDesktop'
-import { isDueToday, isDoneToday, todayISO } from '../utils/recurrence'
+import { isDueToday, isDoneToday, appliesOn, todayISO } from '../utils/recurrence'
 
 const EMPTY_STATE = {
   alles:     { icon: '🎉', title: 'Alles gedaan', sub: 'Geen openstaande taken.' },
@@ -107,7 +107,8 @@ export default function TakenPage({
     const base = {
       vandaag:   openRoutines + todayOneoff + overdueOneoff,
       alles:     tasks.filter(t => !t.completed).length,
-      morgen:    tasks.filter(t => !t.completed && t.date === tom).length,
+      morgen:    tasks.filter(t => !t.recurrence && !t.completed && t.date === tom).length
+                 + tasks.filter(t => t.recurrence && appliesOn(t, tom)).length,
       week:      tasks.filter(t => !t.completed && t.date && t.date >= ts && t.date <= wEnd).length,
       urgent:    tasks.filter(t => !t.completed && (t.priority ?? 2) === 1).length,
       telaat:    tasks.filter(t => !t.recurrence && !t.completed && t.date && t.date < ts).length,
@@ -267,15 +268,15 @@ export default function TakenPage({
 
       {/* Task list */}
       <div style={{ flex: 1, overflow: 'hidden', overflowY: 'auto', padding: '12px 16px 100px' }}>
-        {filter === 'vandaag' ? (
+        {(filter === 'vandaag' || filter === 'morgen') ? (
           <TodayView
             tasks={tasks}
             subjects={subjects}
+            dateOffset={filter === 'morgen' ? 1 : 0}
             onToggleRoutine={onToggle}
             onToggleTask={handleToggleWithUndo}
             onOpen={onViewDetail || onEdit}
             onNew={onNew}
-            onShowOverdue={() => setFilter('telaat')}
           />
         ) : filtered.length === 0 && !filter.startsWith('group:') ? (
           <EmptyState filter={filter} onNew={onNew} />

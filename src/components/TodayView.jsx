@@ -1,8 +1,9 @@
 import React from 'react'
 import { Flame, Plus, Repeat, Clock } from 'lucide-react'
 import {
-  todayISO, recurrenceLabel, isDueToday, isDoneToday, isStreakActive,
+  todayISO, toISO, recurrenceLabel, isDueToday, isDoneToday, isStreakActive, appliesOn,
 } from '../utils/recurrence'
+import { taskDaypart, daypartLabel, daypartEmoji, daypartOrder } from '../utils/daypart'
 
 const NL_DAYS = ['zondag', 'maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag']
 const NL_MONTHS = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
@@ -34,8 +35,8 @@ function CheckCircle({ done, color, onClick }) {
   )
 }
 
-function RoutineRow({ task, today, onToggle, onOpen }) {
-  const done = isDoneToday(task, today)
+function RoutineRow({ task, today, onToggle, onOpen, preview = false }) {
+  const done = !preview && isDoneToday(task, today)
   const active = isStreakActive(task, today)
   const streak = task.streak || 0
   const accent = task.color || 'var(--accent)'
@@ -46,9 +47,15 @@ function RoutineRow({ task, today, onToggle, onOpen }) {
         borderRadius: 14, cursor: 'pointer', marginBottom: 6,
         background: done ? 'rgba(255,255,255,0.02)' : 'color-mix(in srgb, var(--accent) 5%, transparent)',
         border: `1px solid ${done ? 'rgba(255,255,255,0.06)' : 'color-mix(in srgb, var(--accent) 22%, transparent)'}`,
-        opacity: done ? 0.6 : 1, transition: 'opacity 0.18s, background 0.18s',
+        opacity: done ? 0.6 : preview ? 0.85 : 1, transition: 'opacity 0.18s, background 0.18s',
       }}>
-      <CheckCircle done={done} color={accent} onClick={(e) => { e.stopPropagation(); onToggle(task) }} />
+      {preview ? (
+        <div style={{ width: 28, height: 28, borderRadius: '50%', border: '2px dashed rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Repeat size={12} style={{ color: 'rgba(255,255,255,0.3)' }} />
+        </div>
+      ) : (
+        <CheckCircle done={done} color={accent} onClick={(e) => { e.stopPropagation(); onToggle(task) }} />
+      )}
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.9)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: done ? 'line-through' : 'none' }}>
           {task.title}
@@ -125,47 +132,61 @@ function SectionLabel({ children, count }) {
   )
 }
 
-export default function TodayView({ tasks, subjects = [], onToggleRoutine, onToggleTask, onOpen, onNew, onShowOverdue }) {
-  const today = todayISO()
-  const d = new Date()
-  const dateLabel = `${NL_DAYS[d.getDay()]} ${d.getDate()} ${NL_MONTHS[d.getMonth()]}`
+const taskTimeSort = (a, b) => {
+  const pa = a.priority ?? 2, pb = b.priority ?? 2
+  if (pa !== pb) return pa - pb
+  return (a.start_time || a.time || '99:99').localeCompare(b.start_time || b.time || '99:99')
+}
 
-  // Routines: herhalende taken die vandaag op de planning staan of vandaag al gedaan zijn
+export default function TodayView({ tasks, subjects = [], dateOffset = 0, onToggleRoutine, onToggleTask, onOpen, onNew }) {
+  const today = todayISO()
+  const isToday = dateOffset === 0
+  const d = new Date(); d.setDate(d.getDate() + dateOffset)
+  const target = toISO(d)
+  const dateLabel = `${NL_DAYS[d.getDay()]} ${d.getDate()} ${NL_MONTHS[d.getMonth()]}`
+  const heading = isToday ? 'Vandaag' : dateOffset === 1 ? 'Morgen' : dateLabel
+
+  // Routines voor de doeldag. Vandaag: due (incl. gemist) of vandaag al gedaan.
+  // Toekomst: routines die op die dag vallen (alleen preview, geen afvinken).
   const routines = tasks
-    .filter(t => t.recurrence && (isDueToday(t, today) || isDoneToday(t, today)))
+    .filter(t => t.recurrence && (isToday ? (isDueToday(t, today) || isDoneToday(t, today)) : appliesOn(t, target)))
     .sort((a, b) => {
-      const da = isDoneToday(a, today) ? 1 : 0
-      const db = isDoneToday(b, today) ? 1 : 0
-      if (da !== db) return da - db
+      if (isToday) {
+        const da = isDoneToday(a, today) ? 1 : 0
+        const db = isDoneToday(b, today) ? 1 : 0
+        if (da !== db) return da - db
+      }
       return (b.streak || 0) - (a.streak || 0)
     })
 
-  // Te laat: eenmalige taken van vóór vandaag, niet afgerond. Worden meegenomen
-  // naar vandaag (gevlagd als te laat), zonder de opgeslagen datum te wijzigen.
-  const overdueTasks = tasks
-    .filter(t => !t.recurrence && !t.completed && t.date && t.date < today)
-    .sort((a, b) => a.date.localeCompare(b.date) || (a.priority ?? 2) - (b.priority ?? 2))
+  // Te laat (alleen op de vandaag-weergave): meegenomen naar vandaag, gevlagd.
+  const overdueTasks = isToday
+    ? tasks.filter(t => !t.recurrence && !t.completed && t.date && t.date < today)
+        .sort((a, b) => a.date.localeCompare(b.date) || (a.priority ?? 2) - (b.priority ?? 2))
+    : []
 
-  // Eenmalige taken van vandaag (nog niet afgerond, geen herhaling)
-  const todayTasks = tasks
-    .filter(t => !t.recurrence && !t.completed && t.date === today)
-    .sort((a, b) => {
-      const pa = a.priority ?? 2, pb = b.priority ?? 2
-      if (pa !== pb) return pa - pb
-      return (a.start_time || a.time || '99:99').localeCompare(b.start_time || b.time || '99:99')
-    })
+  // Eenmalige taken van de doeldag, gegroepeerd per dagdeel.
+  const dayTasks = tasks.filter(t => !t.recurrence && !t.completed && t.date === target)
+  const buckets = {}
+  for (const t of dayTasks) {
+    const dp = taskDaypart(t) || 'none'
+    ;(buckets[dp] ||= []).push(t)
+  }
+  const dayGroups = Object.keys(buckets)
+    .sort((a, b) => daypartOrder(a === 'none' ? null : a) - daypartOrder(b === 'none' ? null : b))
+    .map(dp => ({ id: dp, items: buckets[dp].sort(taskTimeSort) }))
 
-  const routinesDone = routines.filter(t => isDoneToday(t, today)).length
-  const isEmpty = routines.length === 0 && todayTasks.length === 0 && overdueTasks.length === 0
+  const routinesDone = isToday ? routines.filter(t => isDoneToday(t, today)).length : 0
+  const isEmpty = routines.length === 0 && dayTasks.length === 0 && overdueTasks.length === 0
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       {/* Datumkop */}
       <div>
-        <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-1)', margin: 0, letterSpacing: '-0.02em' }}>Vandaag</h1>
+        <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-1)', margin: 0, letterSpacing: '-0.02em' }}>{heading}</h1>
         <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', margin: '3px 0 0', textTransform: 'capitalize' }}>
           {dateLabel}
-          {routines.length > 0 ? ` · ${routinesDone}/${routines.length} routines` : ''}
+          {isToday && routines.length > 0 ? ` · ${routinesDone}/${routines.length} routines` : ''}
         </p>
       </div>
 
@@ -182,22 +203,24 @@ export default function TodayView({ tasks, subjects = [], onToggleRoutine, onTog
         </div>
       )}
 
-      {/* Routines */}
-      {routines.length > 0 && (
-        <div>
-          <SectionLabel count={`${routinesDone}/${routines.length}`}>Routines</SectionLabel>
-          {routines.map(t => (
-            <RoutineRow key={t.id} task={t} today={today} onToggle={onToggleRoutine} onOpen={onOpen} />
+      {/* Dagtaken, per dagdeel */}
+      {dayGroups.map(g => (
+        <div key={g.id}>
+          <SectionLabel count={g.items.length}>
+            {g.id === 'none' ? 'Taken' : `${daypartEmoji(g.id)} ${daypartLabel(g.id)}`}
+          </SectionLabel>
+          {g.items.map(t => (
+            <TaskRow key={t.id} task={t} subjects={subjects} today={today} onToggle={onToggleTask} onOpen={onOpen} />
           ))}
         </div>
-      )}
+      ))}
 
-      {/* Taken vandaag */}
-      {todayTasks.length > 0 && (
+      {/* Routines — onder de dagtaken */}
+      {routines.length > 0 && (
         <div>
-          <SectionLabel count={todayTasks.length}>Taken vandaag</SectionLabel>
-          {todayTasks.map(t => (
-            <TaskRow key={t.id} task={t} subjects={subjects} today={today} onToggle={onToggleTask} onOpen={onOpen} />
+          <SectionLabel count={isToday ? `${routinesDone}/${routines.length}` : routines.length}>Routines</SectionLabel>
+          {routines.map(t => (
+            <RoutineRow key={t.id} task={t} today={today} onToggle={onToggleRoutine} onOpen={onOpen} preview={!isToday} />
           ))}
         </div>
       )}
@@ -206,7 +229,7 @@ export default function TodayView({ tasks, subjects = [], onToggleRoutine, onTog
       {isEmpty && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 50, gap: 10, textAlign: 'center' }}>
           <span style={{ fontSize: 44 }}>🌤️</span>
-          <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Niets voor vandaag</p>
+          <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>{isToday ? 'Niets voor vandaag' : 'Niets gepland'}</p>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', margin: 0, maxWidth: 240 }}>
             Geen routines of taken gepland. Voeg er een toe of geniet van je vrije dag.
           </p>
@@ -217,8 +240,8 @@ export default function TodayView({ tasks, subjects = [], onToggleRoutine, onTog
         </div>
       )}
 
-      {/* Alles-gedaan vlag wanneer er routines waren maar alles af is */}
-      {!isEmpty && todayTasks.length === 0 && routines.length > 0 && routinesDone === routines.length && (
+      {/* Alles-gedaan vlag wanneer er routines waren maar alles af is (alleen vandaag) */}
+      {isToday && !isEmpty && dayTasks.length === 0 && routines.length > 0 && routinesDone === routines.length && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 12, background: 'color-mix(in srgb, var(--accent) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 25%, transparent)' }}>
           <span style={{ fontSize: 18 }}>🎉</span>
           <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)' }}>Alle routines afgevinkt vandaag — sterk!</span>

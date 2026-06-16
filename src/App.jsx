@@ -573,6 +573,11 @@ export default function App() {
       fields.recurrence = taskData.recurrence || null
       fields.recurrence_days = taskData.recurrence_days || null
     }
+    // Dagdeel alleen meesturen als relevant, zodat taken blijven werken ook als
+    // de DB-migratie (supabase_daypart.sql) nog niet gedraaid is.
+    if (taskData.daypart || orig?.daypart) {
+      fields.daypart = taskData.daypart || null
+    }
     let error
     if (taskData.id) {
       ({ error } = await supabase.from('tasks').update(fields).eq('id', taskData.id).eq('user_id', user.id))

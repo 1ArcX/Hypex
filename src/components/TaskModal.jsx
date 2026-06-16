@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { X, Trash2, Save, Repeat, Clock } from 'lucide-react'
 import { RECURRENCE, recurrenceLabel, snapToPattern } from '../utils/recurrence'
+import { DAYPARTS } from '../utils/daypart'
 
 const EVENT_COLORS = ['#00FFD1','#818CF8','#FF8C42','#FF6B6B','#4ADE80','#FACC15','#38BDF8']
 const DURATION_PRESETS = [15, 30, 45, 60, 90]
@@ -246,6 +247,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
   const [groupName,       setGroupName]       = useState('')
   const [recurrence,      setRecurrence]      = useState(RECURRENCE.NONE)
   const [recurrenceDays,  setRecurrenceDays]  = useState([])
+  const [daypart,         setDaypart]         = useState(null)
   const [showMore,        setShowMore]        = useState(false)
 
   // Standaard compact; uitklappen bij bewerken-met-details of bij aanmaken vanuit
@@ -276,6 +278,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
       setGroupName(task.group_name || '')
       setRecurrence(task.recurrence || RECURRENCE.NONE)
       setRecurrenceDays(task.recurrence_days || [])
+      setDaypart(task.daypart || null)
     } else {
       setNoDate(false)
       setDate(defaultDate || new Date().toISOString().slice(0, 10))
@@ -289,6 +292,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
       setGroupName('')
       setRecurrence(RECURRENCE.NONE)
       setRecurrenceDays([])
+      setDaypart(null)
     }
   }, [task, defaultTime, defaultDate])
 
@@ -349,6 +353,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
       group_name: groupName.trim() || null,
       recurrence: recurrence || null,
       recurrence_days: recDays,
+      daypart: daypart || null,
     })
   }
 
@@ -409,6 +414,21 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
                 <Clock size={12} /> + Tijdslot toevoegen
               </button>
             )}
+            {/* Dagdeel — grove planning, direct zichtbaar */}
+            {!noDate && (
+              <div style={{ marginTop: 10, display: 'flex', gap: 6 }}>
+                {DAYPARTS.map(dp => {
+                  const active = daypart === dp.id
+                  return (
+                    <button key={dp.id} type="button" onClick={() => setDaypart(active ? null : dp.id)}
+                      style={{ ...chipStyle(active), flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                      <span>{dp.emoji}</span> {dp.label}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
             {!noDate && !allDay && (
               <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {/* Voorgestelde tijden */}
