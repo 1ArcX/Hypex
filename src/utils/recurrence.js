@@ -39,6 +39,18 @@ function addDays(d, n) {
   return x
 }
 
+// Valt deze ISO-datum op het herhaalpatroon?
+export function matchesPattern(dateStr, recurrence, days) {
+  if (!recurrence || !dateStr) return false
+  return patternMatch(parseISO(dateStr), recurrence, days)
+}
+
+// Snap een (start)datum naar de eerstvolgende datum die op het patroon valt.
+export function snapToPattern(dateStr, recurrence, days) {
+  if (!recurrence || !dateStr) return dateStr
+  return matchesPattern(dateStr, recurrence, days) ? dateStr : nextOccurrence(dateStr, recurrence, days)
+}
+
 // Valt deze datum op het herhaalpatroon?
 function patternMatch(d, recurrence, days) {
   const dow = isoDow(d)
@@ -105,8 +117,14 @@ export function recurrenceLabel(recurrence, days) {
 }
 
 // Staat deze herhalende taak vandaag (of eerder, gemist) op de planning?
+// Snapt de opgeslagen datum eerst naar een geldige patroon-dag, zodat een
+// routine die bv. alleen op vrijdag valt niet op dinsdag verschijnt.
 export function isDueToday(task, today = todayISO()) {
-  return !!task.recurrence && !!task.date && task.date <= today
+  if (!task.recurrence || !task.date) return false
+  const due = matchesPattern(task.date, task.recurrence, task.recurrence_days)
+    ? task.date
+    : nextOccurrence(task.date, task.recurrence, task.recurrence_days)
+  return due <= today
 }
 
 // Vandaag al afgevinkt?

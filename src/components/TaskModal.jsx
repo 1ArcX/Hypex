@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { X, Trash2, Save, Repeat, Clock } from 'lucide-react'
-import { RECURRENCE, recurrenceLabel } from '../utils/recurrence'
+import { RECURRENCE, recurrenceLabel, snapToPattern } from '../utils/recurrence'
 
 const EVENT_COLORS = ['#00FFD1','#818CF8','#FF8C42','#FF6B6B','#4ADE80','#FACC15','#38BDF8']
 const DURATION_PRESETS = [15, 30, 45, 60, 90]
@@ -333,9 +333,12 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
     if (!title.trim()) return
     // Een herhalende taak heeft altijd een (start)datum; "nog in te plannen" geldt niet.
     const effectiveNoDate = isRecurring ? false : noDate
+    const recDays = (recurrence === RECURRENCE.WEEKLY && recurrenceDays.length) ? recurrenceDays : null
+    // Snap de startdatum naar de eerste echte patroon-dag (bv. eerstvolgende vrijdag).
+    const effectiveDate = effectiveNoDate ? null : (recurrence ? snapToPattern(date, recurrence, recDays) : date)
     onSave({
       id: task?.id, title, description,
-      date:       effectiveNoDate ? null : date,
+      date:       effectiveDate,
       start_time: (effectiveNoDate || allDay) ? null : startTime,
       end_time:   (effectiveNoDate || allDay) ? null : endTime,
       time:       (effectiveNoDate || allDay) ? null : startTime,
@@ -345,7 +348,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
       due_date: dueDate || null,
       group_name: groupName.trim() || null,
       recurrence: recurrence || null,
-      recurrence_days: (recurrence === RECURRENCE.WEEKLY && recurrenceDays.length) ? recurrenceDays : null,
+      recurrence_days: recDays,
     })
   }
 
