@@ -986,7 +986,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
             </div>
           </div>
         )}
-        {view === 'day'   && TimeGrid({ days: [current] })}
+        {view === 'day'   && TimeGrid({ days: [current], hideHeader: isMobile })}
       </div>
 
       {/* Lesson detail popup */}
