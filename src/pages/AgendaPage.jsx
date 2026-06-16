@@ -111,7 +111,7 @@ function WeekStrip({ selectedDay, onSelectDay, onPrevWeek, onNextWeek, tasks, ca
       onTouchEnd={handleTouchEnd}
     >
       {/* Month label + week nav */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 4px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 14px 2px' }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>{monthLabel}</span>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           {!weekDays.some(d => isSameDay(d, now)) && (
@@ -132,7 +132,7 @@ function WeekStrip({ selectedDay, onSelectDay, onPrevWeek, onNextWeek, tasks, ca
       </div>
 
       {/* Day columns */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', padding: '4px 8px 12px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', padding: '2px 8px 6px' }}>
         {weekDays.map((day, i) => {
           const isToday    = isSameDay(day, now)
           const isSelected = isSameDay(day, selectedDay)
@@ -142,11 +142,11 @@ function WeekStrip({ selectedDay, onSelectDay, onPrevWeek, onNextWeek, tasks, ca
             <div
               key={i}
               onClick={() => onSelectDay(day)}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, cursor: 'pointer', userSelect: 'none' }}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer', userSelect: 'none' }}
             >
               {/* Weekday abbreviation */}
               <span style={{
-                fontSize: 11, letterSpacing: '0.04em', fontWeight: 500, textTransform: 'uppercase',
+                fontSize: 10, letterSpacing: '0.04em', fontWeight: 500, textTransform: 'uppercase',
                 color: isToday ? 'var(--accent)' : 'var(--text-3)',
               }}>
                 {DAYS_SHORT[i]}
@@ -154,7 +154,7 @@ function WeekStrip({ selectedDay, onSelectDay, onPrevWeek, onNextWeek, tasks, ca
 
               {/* Day number circle */}
               <div style={{
-                width: 32, height: 32, borderRadius: '50%',
+                width: 30, height: 30, borderRadius: '50%',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 background: isToday
                   ? 'var(--accent)'
@@ -303,7 +303,7 @@ export default function AgendaPage({
   const nextWeek = () => setSelectedDay(d => { const n = new Date(d); n.setDate(n.getDate() + 7); return n })
 
   const tabStyle = (active) => ({
-    fontSize: 13, padding: '5px 16px', borderRadius: 20, border: 'none', cursor: 'pointer',
+    fontSize: 12, padding: '4px 14px', borderRadius: 16, border: 'none', cursor: 'pointer',
     background: active ? 'var(--accent)' : 'transparent',
     color: active ? '#000' : 'var(--text-2)',
     fontWeight: active ? 600 : 400, transition: 'all 0.12s',
@@ -333,13 +333,12 @@ export default function AgendaPage({
       {/* ── Mobile: week strip / month calendar ── */}
       <div className="md:hidden flex flex-col" style={{ height: '100%', overflow: 'hidden' }}>
 
-        {/* Toggle Dag | Lijst | Maand */}
+        {/* Toggle Dag | Lijst | Maand — compact, geen dubbele titel (globale header toont al "Agenda") */}
         <div style={{
-          flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '10px 16px', background: GLASS_BAR, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderBottom: '1px solid var(--border)',
+          flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '6px 12px', background: GLASS_BAR, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderBottom: '1px solid var(--border)',
         }}>
-          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>Agenda</span>
-          <div style={{ display: 'flex', gap: 2, background: 'rgba(255,255,255,0.05)', borderRadius: 22, padding: 3, border: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', gap: 2, background: 'rgba(255,255,255,0.05)', borderRadius: 20, padding: 2, border: '1px solid var(--border)' }}>
             <button style={tabStyle(mobileView === 'dag')}   onClick={() => setMobileView('dag')}>Dag</button>
             <button style={tabStyle(mobileView === 'lijst')} onClick={() => setMobileView('lijst')}>Lijst</button>
             <button style={tabStyle(mobileView === 'maand')} onClick={() => setMobileView('maand')}>Maand</button>

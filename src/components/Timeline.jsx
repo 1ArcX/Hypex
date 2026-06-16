@@ -543,7 +543,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
             })
             if (allDayByDay.every(arr => arr.length === 0)) return null
             return (
-              <div style={{ display: 'grid', gridTemplateColumns: `${TIME_COL}px repeat(${N}, 1fr)`, borderBottom: '1px solid rgba(255,255,255,0.07)', padding: '4px 0', position: 'sticky', top: 0, zIndex: 5, background: 'var(--bg-sidebar, #12121a)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: `${TIME_COL}px repeat(${N}, 1fr)`, borderBottom: '1px solid rgba(255,255,255,0.07)', padding: '4px 0', position: 'sticky', top: 0, zIndex: 5, background: 'var(--bg-sidebar, #12121a)', maxHeight: 92, overflowY: 'auto' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 8 }}>
                   <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.22)', letterSpacing: '0.06em', textTransform: 'uppercase', userSelect: 'none' }}>dag</span>
                 </div>
