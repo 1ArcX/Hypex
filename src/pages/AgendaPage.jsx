@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 // ChevronLeft/Right kept for WeekStrip
 import Timeline from '../components/Timeline'
+import AgendaList from '../components/AgendaList'
 import { useIsDesktop } from '../hooks/useIsDesktop'
+
+const GLASS_BAR = 'rgba(255,255,255,0.03)'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const DAYS_SHORT = ['MA', 'DI', 'WO', 'DO', 'VR', 'ZA', 'ZO']
@@ -102,7 +105,7 @@ function WeekStrip({ selectedDay, onSelectDay, onPrevWeek, onNextWeek, tasks, ca
 
   return (
     <div
-      style={{ flexShrink: 0, background: 'var(--bg-sidebar)', borderBottom: '1px solid var(--border)' }}
+      style={{ flexShrink: 0, background: GLASS_BAR, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderBottom: '1px solid var(--border)' }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -280,6 +283,7 @@ export default function AgendaPage({
   const [selectedDay, setSelectedDay] = useState(today)
   const [highlightKey, setHighlightKey] = useState(null)
   const handleSelectDay = (day) => {
+    navigator.vibrate?.(10)
     setSelectedDay(day)
     setMobileView('dag')
   }
@@ -329,15 +333,16 @@ export default function AgendaPage({
       {/* ── Mobile: week strip / month calendar ── */}
       <div className="md:hidden flex flex-col" style={{ height: '100%', overflow: 'hidden' }}>
 
-        {/* Toggle Maand | Dag */}
+        {/* Toggle Dag | Lijst | Maand */}
         <div style={{
           flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '10px 16px', background: 'var(--bg-sidebar)', borderBottom: '1px solid var(--border)',
+          padding: '10px 16px', background: GLASS_BAR, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderBottom: '1px solid var(--border)',
         }}>
           <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>Agenda</span>
-          <div style={{ display: 'flex', gap: 2, background: 'var(--bg-card-2)', borderRadius: 22, padding: 3, border: '1px solid var(--border)' }}>
-            <button style={tabStyle(mobileView === 'maand')} onClick={() => setMobileView('maand')}>Maand</button>
+          <div style={{ display: 'flex', gap: 2, background: 'rgba(255,255,255,0.05)', borderRadius: 22, padding: 3, border: '1px solid var(--border)' }}>
             <button style={tabStyle(mobileView === 'dag')}   onClick={() => setMobileView('dag')}>Dag</button>
+            <button style={tabStyle(mobileView === 'lijst')} onClick={() => setMobileView('lijst')}>Lijst</button>
+            <button style={tabStyle(mobileView === 'maand')} onClick={() => setMobileView('maand')}>Maand</button>
           </div>
         </div>
 
@@ -369,6 +374,21 @@ export default function AgendaPage({
               />
             </div>
           </>
+        )}
+
+        {/* ── Lijst view ── */}
+        {mobileView === 'lijst' && (
+          <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <AgendaList
+              tasks={tasks}
+              subjects={subjects}
+              calendarEvents={calendarEvents}
+              magisterLessons={magisterLessons}
+              onOpenDay={handleSelectDay}
+              onToggleTask={onToggleTask}
+              onViewDetail={onViewDetail}
+            />
+          </div>
         )}
 
         {/* ── Maand view ── */}
