@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient'
 import { Plus, ChevronLeft, ChevronRight, X, Save, Trash2 } from 'lucide-react'
 import { callMagister } from '../utils/magisterApi'
 import { callSomtoday, ensureSomtodayCreds } from '../utils/somtodayApi'
+import { appliesOn } from '../utils/recurrence'
 
 const HOUR_H = 56
 const TIME_COL = 48
@@ -379,11 +380,16 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
     return false
   })
 
-  const getTasksForDay = (date) => (tasks || []).filter(t => {
-    if (!t.start_time && !t.time) return false
-    const taskDate = t.date ? new Date(t.date + 'T00:00:00') : now
-    return isSameDay(taskDate, date)
-  })
+  // Alle taken voor een dag: eenmalige taken op die datum + routines die volgens
+  // hun patroon op die dag vallen. Getimede taken komen in het raster, taken
+  // zonder tijd (hele dag / dagdeel) in de dag-strip bovenaan.
+  const getTasksForDay = (date) => {
+    const ds = toDateStr(date)
+    return (tasks || []).filter(t => {
+      if (t.recurrence) return appliesOn(t, ds)
+      return t.date === ds
+    })
+  }
 
   const openNew = (date, hour) => {
     setForm(emptyForm(date || current, hour))
@@ -520,7 +526,20 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                 const title = les.vak || les.description || les.title || 'Les'
                 return { kind: 'lesson', key: `les-allday-${i}`, color, title, onClick: e => { e.stopPropagation(); setLessonDetail(les) } }
               })
-              return [...allDayEvs, ...allDayLes]
+              // Taken zonder tijd (hele dag / dagdeel) + routines op deze dag
+              const allDayTasks = getTasksForDay(d)
+                .filter(t => !t.start_time && !t.time)
+                .filter(t => t.recurrence || !t.completed)
+                .map(t => {
+                  const subject = subjects?.find(s => s.id === t.subject_id)
+                  const color = subject?.color || t.color || (t.recurrence ? '#5EEAD4' : '#818CF8')
+                  return {
+                    kind: 'task', key: `task-allday-${t.id}`, color,
+                    title: `${t.recurrence ? '🔁 ' : ''}${t.completed ? '✓ ' : ''}${t.title}`,
+                    onClick: e => { e.stopPropagation(); onViewDetail ? onViewDetail(t) : onEditTask?.(t) },
+                  }
+                })
+              return [...allDayEvs, ...allDayLes, ...allDayTasks]
             })
             if (allDayByDay.every(arr => arr.length === 0)) return null
             return (
@@ -644,8 +663,8 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                   const endMins = Math.max(startMins + 30, en.getHours()*60 + en.getMinutes())
                   return { type: 'event', key: `ev-${ev.id}`, startMins, endMins, data: ev }
                 }),
-                ...colTasks.map(task => {
-                  const timeStr = task.start_time || task.time || '08:00'
+                ...colTasks.filter(task => task.start_time || task.time).map(task => {
+                  const timeStr = task.start_time || task.time
                   const startMins = timeStrToMins(timeStr)
                   const endMins = task.end_time ? timeStrToMins(task.end_time) : startMins + 60
                   return { type: 'task', key: `task-${task.id}`, startMins, endMins, data: task }
