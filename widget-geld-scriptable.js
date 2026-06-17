@@ -54,7 +54,7 @@ function buildWidget(d) {
   const g = new LinearGradient()
   g.colors = [new Color("#1c1c1e"), new Color("#121214")]; g.locations = [0, 1]
   w.backgroundGradient = g
-  w.setPadding(15, 16, 14, 16)
+  w.setPadding(12, 16, 12, 16)
 
   if (!d || d.error) {
     const t = w.addText(d?.error ? `Fout: ${d.error}` : "Kon niet laden")
@@ -64,40 +64,34 @@ function buildWidget(d) {
 
   // Kop
   const head = w.addStack(); head.centerAlignContent()
-  const title = head.addText("💶 Budget")
-  title.font = Font.boldSystemFont(15); title.textColor = WHITE
+  const title = head.addText("💶 Nog deze maand")
+  title.font = Font.boldSystemFont(13); title.textColor = GRAY
   head.addSpacer()
   const month = head.addText(d.label || "")
   month.font = Font.mediumSystemFont(11); month.textColor = GRAY
-  w.addSpacer(9)
+  w.addSpacer(5)
 
-  // Groot: nog deze maand
-  const lab = w.addText("Nog te besteden deze maand")
-  lab.font = Font.systemFont(11); lab.textColor = GRAY
-  w.addSpacer(2)
+  // Groot bedrag
   const big = w.addText(euro(d.month))
-  big.font = Font.boldSystemFont(34); big.textColor = colMonth(d.month, d.base || 1)
-  w.addSpacer(9)
+  big.font = Font.boldSystemFont(30); big.textColor = colMonth(d.month, d.base || 1)
+  w.addSpacer(7)
 
   // Voortgangsbalk (uitgegeven / budget)
   const base = d.base || 1
   const pct = Math.max(0, Math.min(1, (base - d.month) / base))
-  const bar = w.addImage(barImage(pct, 320, 7, colMonth(d.month, base)))
-  bar.imageSize = new Size(320, 7)
-  w.addSpacer(3)
-  const sub = w.addText(`${euro(d.spent)} uitgegeven van ${euro(d.base)}`)
-  sub.font = Font.systemFont(10); sub.textColor = GRAY
-  w.addSpacer(12)
+  const bar = w.addImage(barImage(pct, 320, 6, colMonth(d.month, base)))
+  bar.imageSize = new Size(320, 6)
+  w.addSpacer(11)
 
   // Twee kolommen: vandaag | deze week
   const row = w.addStack(); row.centerAlignContent()
-  const left = row.addStack(); left.layoutVertically(); left.spacing = 2
+  const left = row.addStack(); left.layoutVertically(); left.spacing = 1
   const l1 = left.addText("Vandaag nog"); l1.font = Font.systemFont(11); l1.textColor = GRAY
-  const v1 = left.addText(euro(d.today)); v1.font = Font.boldSystemFont(19); v1.textColor = colDay(d.today)
+  const v1 = left.addText(euro(d.today)); v1.font = Font.boldSystemFont(18); v1.textColor = colDay(d.today)
   row.addSpacer()
-  const right = row.addStack(); right.layoutVertically(); right.spacing = 2
+  const right = row.addStack(); right.layoutVertically(); right.spacing = 1
   const l2 = right.addText("Deze week"); l2.font = Font.systemFont(11); l2.textColor = GRAY; l2.rightAlignText()
-  const v2 = right.addText(euro(d.week)); v2.font = Font.boldSystemFont(19); v2.textColor = colWeek(d.week); v2.rightAlignText()
+  const v2 = right.addText(euro(d.week)); v2.font = Font.boldSystemFont(18); v2.textColor = colWeek(d.week); v2.rightAlignText()
 
   w.addSpacer()
   return w
