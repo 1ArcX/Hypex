@@ -25,6 +25,15 @@ export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onE
   const [bookInput, setBookInput] = useState('')
   const [desc, setDesc] = useState(task?.description || '')
   const [descDirty, setDescDirty] = useState(false)
+  const descRef = React.useRef(null)
+
+  // Laat het beschrijvingsveld meegroeien met de inhoud (geen interne scroll)
+  const autoSize = (el) => {
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = el.scrollHeight + 'px'
+  }
+  React.useEffect(() => { autoSize(descRef.current) }, [task?.id])
 
   if (!task) return null
   const subject = subjects.find(s => s.id === task.subject_id)
@@ -58,7 +67,7 @@ export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onE
     >
       <div
         className={`glass-card modal-content${closing ? ' modal-closing' : ''}`}
-        style={{ width:'100%',maxWidth:'420px',padding:'24px' }}
+        style={{ width:'100%',maxWidth:'420px',padding:'24px',maxHeight:'88vh',overflowY:'auto' }}
         onMouseDown={e => { e.stopPropagation(); mouseDownedInside.current = true }}
         onClick={e => e.stopPropagation()}
       >
@@ -123,16 +132,16 @@ export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onE
             {descDirty && <span style={{ marginLeft:'auto',fontSize:10,color:'var(--accent)' }}>opgeslagen</span>}
           </div>
           <textarea
+            ref={descRef}
             value={desc}
-            onChange={e => { setDesc(e.target.value); setDescDirty(false) }}
+            onChange={e => { setDesc(e.target.value); setDescDirty(false); autoSize(e.target) }}
             onBlur={() => { if (onSaveDescription) { onSaveDescription(task.id, desc); setDescDirty(true) } }}
             onFocus={e => { const t = e.target; setTimeout(() => t.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 350) }}
             placeholder="Voeg een beschrijving toe..."
-            rows={3}
             style={{
               width:'100%', background:'transparent', border:'none', outline:'none',
               color:'rgba(255,255,255,0.7)', fontSize:13, lineHeight:1.5,
-              fontFamily:'inherit', resize:'vertical', boxSizing:'border-box',
+              fontFamily:'inherit', resize:'none', overflow:'hidden', minHeight:'48px', boxSizing:'border-box',
             }}
           />
         </div>
