@@ -115,7 +115,14 @@ exports.handler = async (event) => {
       daypart: t.daypart || daypartFromTime(t.start_time || t.time), done: false,
     }))
     .sort((a, b) => timeVal(a) - timeVal(b))
-  const overdue = tasks.filter(t => !t.recurrence && !t.completed && t.date && t.date < today).length
+  const overdueRows = tasks
+    .filter(t => !t.recurrence && !t.completed && t.date && t.date < today)
+    .sort((a, b) => a.date.localeCompare(b.date))
+  const overdue = overdueRows.length
+  const overdueItems = overdueRows.map(t => ({
+    title: t.title, time: t.start_time || t.time || null,
+    daysLate: Math.round((Date.parse(today) - Date.parse(t.date)) / 86400000),
+  }))
 
   // agenda-events van vandaag (geen werk-events met pmt:-prefix)
   const dayEvents = []
@@ -135,6 +142,7 @@ exports.handler = async (event) => {
     routinesDone: routines.filter(r => r.done).length,
     routinesTotal: routines.length,
     overdue,
+    overdueItems,
     items: [...dayEvents, ...routines, ...dayTasks],
     generatedAt: new Date().toISOString(),
   })
