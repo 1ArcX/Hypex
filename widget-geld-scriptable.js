@@ -74,16 +74,20 @@ function buildWidget(d) {
   month.font = Font.mediumSystemFont(11); month.textColor = GRAY
   w.addSpacer(5)
 
-  // Groot bedrag
-  const big = w.addText(euro(d.month))
+  // Groot bedrag (gecentreerd)
+  const bigRow = w.addStack(); bigRow.addSpacer()
+  const big = bigRow.addText(euro(d.month))
   big.font = Font.boldSystemFont(30); big.textColor = colMonth(d.month, d.base || 1)
+  bigRow.addSpacer()
   w.addSpacer(7)
 
-  // Voortgangsbalk (uitgegeven / budget)
+  // Voortgangsbalk (gecentreerd, past binnen de widget)
   const base = d.base || 1
   const pct = Math.max(0, Math.min(1, (base - d.month) / base))
-  const bar = w.addImage(barImage(pct, 320, 6, colMonth(d.month, base)))
-  bar.imageSize = new Size(320, 6)
+  const barRow = w.addStack(); barRow.addSpacer()
+  const bar = barRow.addImage(barImage(pct, 250, 6, colMonth(d.month, base)))
+  bar.imageSize = new Size(250, 6)
+  barRow.addSpacer()
   w.addSpacer(11)
 
   // Twee kolommen: vandaag | deze week
