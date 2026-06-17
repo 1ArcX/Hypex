@@ -8,9 +8,9 @@
 //  Tip: long-press de widget -> "Edit Widget" -> Script = dit script.
 // ============================================================================
 
-const BASE  = "https://JOUW-SITE.netlify.app/.netlify/functions/widget" // <-- pas aan
-const TOKEN = "ZET_HIER_JE_WIDGET_TOKEN"                                  // <-- pas aan
-const APP_URL = "https://JOUW-SITE.netlify.app/"                          // opent bij tikken
+const BASE  = "https://hypexdash.netlify.app/.netlify/functions/widget"
+const TOKEN = "ZET_HIER_JE_WIDGET_TOKEN"                                  // <-- jouw WIDGET_TOKEN
+const APP_URL = "https://hypexdash.netlify.app/"                          // opent bij tikken
 
 const ACCENT = new Color("#5EEAD4")
 const BG     = new Color("#0b0b0f")
