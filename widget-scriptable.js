@@ -1,26 +1,28 @@
 // ============================================================================
-//  Hypex — iOS home-screen widget (Scriptable)
-// ----------------------------------------------------------------------------
-//  1. Installeer de gratis app "Scriptable" uit de App Store.
-//  2. Nieuw script (+), plak deze hele code.
-//  3. Vul hieronder BASE en TOKEN in (TOKEN = dezelfde WIDGET_TOKEN als in Netlify).
-//  4. Voeg op je beginscherm een Scriptable-widget toe (medium), kies dit script.
-//  Tip: long-press de widget -> "Edit Widget" -> Script = dit script.
+//  Hypex — iOS home-screen widget (Scriptable), iOS-Herinneringen-stijl
+//  Beginscherm -> widget toevoegen -> Scriptable -> kies dit script
 // ============================================================================
 
-const BASE  = "https://hypexdash.netlify.app/.netlify/functions/widget"
-const TOKEN = "ZET_HIER_JE_WIDGET_TOKEN"                                  // <-- jouw WIDGET_TOKEN
-const APP_URL = "https://hypexdash.netlify.app/"                          // opent bij tikken
+const BASE    = "https://hypexdash.netlify.app/.netlify/functions/widget"
+const TOKEN   = "ZET_HIER_JE_WIDGET_TOKEN"   // <-- jouw WIDGET_TOKEN
+const APP_URL = "https://hypexdash.netlify.app/"
 
 const ACCENT = new Color("#5EEAD4")
-const BG     = new Color("#0b0b0f")
-const RED    = new Color("#ff8080")
+const RED    = new Color("#ff8079")
+const WHITE  = new Color("#f2f2f5")
+const GRAY   = new Color("#8e8e93")
+
+const family = config.widgetFamily || "medium"
+const MAX_ROWS = family === "small" ? 3 : family === "large" ? 9 : 4
 
 const data = await fetchData()
 const widget = buildWidget(data)
 widget.url = APP_URL
+widget.refreshAfterDate = new Date(Date.now() + 15 * 60 * 1000)
 
 if (config.runsInWidget) Script.setWidget(widget)
+else if (family === "small") await widget.presentSmall()
+else if (family === "large") await widget.presentLarge()
 else await widget.presentMedium()
 Script.complete()
 
@@ -29,69 +31,91 @@ async function fetchData() {
     const req = new Request(`${BASE}?token=${encodeURIComponent(TOKEN)}`)
     req.timeoutInterval = 12
     return await req.loadJSON()
-  } catch (e) {
-    return null
-  }
+  } catch (e) { return null }
+}
+
+function sym(stack, name, color, size) {
+  const sf = SFSymbol.named(name)
+  sf.applyFont(Font.systemFont(size))
+  const img = stack.addImage(sf.image)
+  img.imageSize = new Size(size + 3, size + 3)
+  img.tintColor = color
+  img.resizable = false
+  return img
 }
 
 function buildWidget(d) {
   const w = new ListWidget()
-  w.backgroundColor = BG
-  w.setPadding(14, 16, 12, 16)
+  const g = new LinearGradient()
+  g.colors = [new Color("#1c1c1e"), new Color("#141416")]
+  g.locations = [0, 1]
+  w.backgroundGradient = g
+  w.setPadding(14, 15, 12, 15)
 
   if (!d || d.error) {
     const t = w.addText(d?.error ? `Fout: ${d.error}` : "Kon niet laden")
-    t.font = Font.systemFont(13); t.textColor = Color.gray()
+    t.font = Font.systemFont(13); t.textColor = GRAY
     return w
   }
 
-  // Kop
+  // ── Kop: "Vandaag" + datum ──
   const head = w.addStack(); head.centerAlignContent()
   const title = head.addText("Vandaag")
-  title.font = Font.boldSystemFont(16); title.textColor = Color.white()
+  title.font = Font.boldSystemFont(family === "small" ? 15 : 17); title.textColor = WHITE
   head.addSpacer()
-  const date = head.addText(d.label || "")
-  date.font = Font.systemFont(12); date.textColor = ACCENT
-  w.addSpacer(7)
-
-  // Te laat
-  if (d.overdue > 0) {
-    const o = w.addText(`⚠️ ${d.overdue} te laat`)
-    o.font = Font.mediumSystemFont(11); o.textColor = RED
-    w.addSpacer(5)
+  if (family !== "small") {
+    const date = head.addText(d.label || "")
+    date.font = Font.mediumSystemFont(12); date.textColor = ACCENT
   }
+  w.addSpacer(family === "small" ? 7 : 9)
 
-  const items = (d.items || []).slice(0, 6)
-  if (items.length === 0 && !d.overdue) {
+  // ── Regels samenstellen ──
+  const rows = []
+  if (d.overdue > 0) rows.push({ overdue: true, title: `${d.overdue} te laat`, time: null })
+  for (const it of (d.items || [])) rows.push(it)
+
+  const shown = rows.slice(0, MAX_ROWS)
+  if (shown.length === 0) {
     const e = w.addText("Niets gepland 🎉")
-    e.font = Font.systemFont(13); e.textColor = Color.gray()
+    e.font = Font.systemFont(14); e.textColor = GRAY
     return w
   }
 
-  for (const it of items) {
-    const row = w.addStack(); row.centerAlignContent(); row.spacing = 6
-    const mark = it.done ? "✓" : it.kind === "routine" ? "🔁" : it.kind === "event" ? "•" : "○"
-    const m = row.addText(mark)
-    m.font = Font.systemFont(12)
-    m.textColor = it.done ? ACCENT : it.kind === "event" ? ACCENT : Color.gray()
+  for (const it of shown) {
+    const row = w.addStack(); row.centerAlignContent(); row.spacing = 8
+
+    if (it.overdue) {
+      sym(row, "exclamationmark.circle.fill", RED, 15)
+    } else if (it.kind === "event") {
+      sym(row, "circle.fill", ACCENT, 9)
+    } else if (it.done) {
+      sym(row, "checkmark.circle.fill", ACCENT, 15)
+    } else {
+      sym(row, "circle", it.kind === "routine" ? ACCENT : GRAY, 15)
+    }
+
     const tt = row.addText(it.title)
-    tt.font = Font.systemFont(13); tt.lineLimit = 1
-    tt.textColor = it.done ? Color.gray() : Color.white()
+    tt.font = Font.systemFont(14); tt.lineLimit = 1
+    tt.textColor = it.overdue ? RED : it.done ? GRAY : WHITE
     row.addSpacer()
-    const right = it.time || (it.daypart ? it.daypart : "")
+
+    let right = it.time
+    if (!right && it.kind === "routine" && it.streak > 0) right = `🔥 ${it.streak}`
+    else if (!right && it.daypart) right = it.daypart
     if (right) {
       const r = row.addText(right)
-      r.font = Font.systemFont(11); r.textColor = Color.gray()
+      r.font = Font.systemFont(12); r.textColor = GRAY
     }
-    w.addSpacer(5)
+    w.addSpacer(family === "small" ? 7 : 9)
   }
 
-  // Voettekst: routine-voortgang
-  if (d.routinesTotal > 0) {
-    w.addSpacer(2)
-    const f = w.addText(`🔥 ${d.routinesDone}/${d.routinesTotal} routines`)
-    f.font = Font.systemFont(10); f.textColor = Color.gray()
+  // "+N meer" wanneer er meer is dan past
+  const extra = rows.length - shown.length
+  if (extra > 0) {
+    const more = w.addText(`+${extra} meer`)
+    more.font = Font.systemFont(11); more.textColor = GRAY
   }
 
+  w.addSpacer() // alles bovenaan uitlijnen, nooit clippen
   return w
 }
