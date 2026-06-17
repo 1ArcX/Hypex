@@ -19,6 +19,7 @@ function monthStart(y, m) { return `${y}-${pad(m + 1)}-01` }
 function monthEnd(y, m) { return `${y}-${pad(m + 1)}-${pad(new Date(y, m + 1, 0).getDate())}` }
 function toISO(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` }
 function sum(list) { return list.reduce((s, e) => s + Number(e.amount), 0) }
+function r2(x) { return Math.round(x * 100) / 100 }
 
 function isHistVac(e, vh) { return (vh || []).some(v => e.date >= v.start && e.date <= (v.end || v.start)) }
 function filterRegular(list) {
@@ -132,11 +133,11 @@ exports.handler = async (event) => {
   const dagBudget = adjustedRemaining > 0 ? adjustedRemaining / daysLeft : 0
 
   return resp(200, {
-    month: Math.round(adjustedRemaining),
-    today: Math.round(dagBudget - todayTotal),
-    week: Math.round(weekRemaining(budgetExp, adjustedRemaining, daysInMonth, selY, selM, todayStr)),
-    base: Math.round(adjustedBase),
-    spent: Math.round(totalSpent),
+    month: r2(adjustedRemaining),
+    today: r2(dagBudget - todayTotal),
+    week: r2(weekRemaining(budgetExp, adjustedRemaining, daysInMonth, selY, selM, todayStr)),
+    base: r2(adjustedBase),
+    spent: r2(totalSpent),
     daysLeft,
     vacation: vac,
     label: `${NL_MONTHS[selM]} ${selY}`,

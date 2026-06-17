@@ -32,7 +32,8 @@ async function fetchData() {
   } catch (e) { return null }
 }
 
-function euro(n) { return (n < 0 ? "−€ " : "€ ") + Math.abs(Math.round(n)).toLocaleString("nl-NL") }
+// Zelfde formaat als de app: €123,45 (2 decimalen, komma)
+function euro(n) { return "€" + Number(n).toFixed(2).replace(".", ",") }
 function colMonth(n, base) { return n < 0 ? RED : n < base * 0.2 ? AMBER : ACCENT }
 function colDay(n) { return n < 0 ? RED : n < 5 ? AMBER : GREEN }
 function colWeek(n) { return n < 0 ? RED : n < 10 ? AMBER : GREEN }
@@ -61,6 +62,8 @@ function buildWidget(d) {
     t.font = Font.systemFont(13); t.textColor = GRAY
     return w
   }
+
+  w.addSpacer() // boven: samen met de spacer onderaan -> verticaal gecentreerd
 
   // Kop
   const head = w.addStack(); head.centerAlignContent()
@@ -93,6 +96,6 @@ function buildWidget(d) {
   const l2 = right.addText("Deze week"); l2.font = Font.systemFont(11); l2.textColor = GRAY; l2.rightAlignText()
   const v2 = right.addText(euro(d.week)); v2.font = Font.boldSystemFont(18); v2.textColor = colWeek(d.week); v2.rightAlignText()
 
-  w.addSpacer()
+  w.addSpacer() // onder: samen met de spacer bovenaan -> verticaal gecentreerd
   return w
 }
