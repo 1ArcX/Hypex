@@ -180,34 +180,38 @@ export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onE
           </div>
         )}
 
-        {/* Actions */}
-        <div style={{ display:'flex',gap:8 }}>
-          <button
-            onClick={() => onDelete(task.id)}
-            style={{ padding:'9px 14px',borderRadius:10,border:'1px solid rgba(255,80,80,0.3)',background:'rgba(255,80,80,0.08)',color:'#ff6b6b',cursor:'pointer',fontSize:12,display:'flex',alignItems:'center',gap:4 }}
-          >
-            <Trash2 size={13} /> Verwijder
-          </button>
-          <button
-            onClick={handleClose}
-            style={{ flex:1,padding:'9px',borderRadius:10,border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'rgba(255,255,255,0.35)',cursor:'pointer',fontSize:12 }}
-          >
-            Sluiten
-          </button>
-          {onStartPomodoro && (
+        {/* Actions — twee rijen zodat alles op smalle schermen past */}
+        <div style={{ display:'flex',flexDirection:'column',gap:8 }}>
+          <div style={{ display:'flex',gap:8 }}>
             <button
-              onClick={onStartPomodoro}
-              style={{ padding:'9px 12px', borderRadius:10, border:'1px solid rgba(255,100,100,0.3)', background:'rgba(255,100,100,0.08)', color:'#ff8080', cursor:'pointer', fontSize:12, display:'flex', alignItems:'center', gap:4 }}
+              onClick={() => onEdit(task)}
+              style={{ flex:1,padding:'10px',borderRadius:10,border:'1px solid color-mix(in srgb, var(--accent) 40%, transparent)',background:'color-mix(in srgb, var(--accent) 12%, transparent)',color:'var(--accent)',cursor:'pointer',fontSize:13,fontWeight:600,display:'flex',alignItems:'center',justifyContent:'center',gap:5 }}
             >
-              🍅 Pomodoro
+              <Pencil size={14} /> Bewerken
             </button>
-          )}
-          <button
-            onClick={() => onEdit(task)}
-            style={{ flex:2,padding:'9px',borderRadius:10,border:'1px solid color-mix(in srgb, var(--accent) 40%, transparent)',background:'color-mix(in srgb, var(--accent) 12%, transparent)',color:'var(--accent)',cursor:'pointer',fontSize:12,fontWeight:600,display:'flex',alignItems:'center',justifyContent:'center',gap:4 }}
-          >
-            <Pencil size={13} /> Bewerken
-          </button>
+            {onStartPomodoro && (
+              <button
+                onClick={onStartPomodoro}
+                style={{ flex:1,padding:'10px',borderRadius:10,border:'1px solid rgba(255,100,100,0.3)',background:'rgba(255,100,100,0.08)',color:'#ff8080',cursor:'pointer',fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5 }}
+              >
+                🍅 Pomodoro
+              </button>
+            )}
+          </div>
+          <div style={{ display:'flex',gap:8 }}>
+            <button
+              onClick={() => onDelete(task.id)}
+              style={{ flex:1,padding:'10px',borderRadius:10,border:'1px solid rgba(255,80,80,0.3)',background:'rgba(255,80,80,0.08)',color:'#ff6b6b',cursor:'pointer',fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5 }}
+            >
+              <Trash2 size={14} /> Verwijder
+            </button>
+            <button
+              onClick={handleClose}
+              style={{ flex:1,padding:'10px',borderRadius:10,border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'rgba(255,255,255,0.45)',cursor:'pointer',fontSize:13 }}
+            >
+              Sluiten
+            </button>
+          </div>
         </div>
       </div>
     </div>
