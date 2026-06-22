@@ -1,5 +1,5 @@
 import React from 'react'
-import { Home, Timer, Calendar, GraduationCap, CheckSquare, Flame, FileText, Briefcase, Settings, Shield, LogOut, RefreshCw, BarChart2, Dumbbell, Wallet } from 'lucide-react'
+import { Home, Timer, Calendar, GraduationCap, CheckSquare, Flame, FileText, Briefcase, Settings, Shield, LogOut, RefreshCw, BarChart2, Dumbbell, Wallet, Sparkles } from 'lucide-react'
 import VersionChecker from './VersionChecker'
 
 const NAV_ITEMS = [
@@ -27,6 +27,7 @@ export default function Sidebar({
     ...NAV_ITEMS,
     ...(showJumbo ? [{ id: 'jumbo', Icon: Briefcase, label: 'Jumbo ★' }] : []),
     ...(isAdmin ? [{ id: 'geld', Icon: Wallet, label: 'Geld' }] : []),
+    ...(isAdmin ? [{ id: 'hypexai', Icon: Sparkles, label: 'Hypex AI' }] : []),
   ]
 
   return (

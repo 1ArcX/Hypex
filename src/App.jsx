@@ -34,13 +34,14 @@ import NotitiesPage from './pages/NotitiesPage'
 import JumboPage from './pages/JumboPage'
 import StatsPage from './pages/StatsPage'
 import GeldPage from './pages/GeldPage'
+import HypexAIPage from './pages/HypexAIPage'
 
 const ADMIN_EMAIL = 'zhafirfachri@gmail.com'
 
 const PAGE_NAMES = {
   dashboard: 'Dashboard', agenda: 'Agenda', taken: 'Taken',
   pomodoro: 'Pomodoro', school: 'School',
-  gewoontes: 'Gewoontes', gym: 'Gym', notities: 'Notities', statistieken: 'Statistieken', jumbo: 'Jumbo', geld: 'Geld',
+  gewoontes: 'Gewoontes', gym: 'Gym', notities: 'Notities', statistieken: 'Statistieken', jumbo: 'Jumbo', geld: 'Geld', hypexai: 'Hypex AI',
 }
 
 const PAGE_ORDER = ['dashboard', 'agenda', 'taken', 'pomodoro', 'school', 'gewoontes', 'notities', 'statistieken']
@@ -905,6 +906,10 @@ export default function App() {
 
             {activePage === 'geld' && isAdmin && (
               <GeldPage userId={user.id} onClose={() => setActivePage('home')} />
+            )}
+
+            {activePage === 'hypexai' && isAdmin && (
+              <HypexAIPage userId={user.id} tasks={tasks} subjects={subjects} displayName={displayName} />
             )}
 
           </div>
