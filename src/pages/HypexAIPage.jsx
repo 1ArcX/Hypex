@@ -190,8 +190,8 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
       const out = reply.trim() || 'Sorry, ik kon even geen antwoord genereren.'
       setMessages(m => [...m, { id: Date.now() + 'a', isUser: false, raw: out }])
     } catch (e) {
-      const msg = /ANTHROPIC_API_KEY/.test(e.message)
-        ? 'De AI is nog niet geconfigureerd (ANTHROPIC_API_KEY ontbreekt in Netlify).'
+      const msg = /geconfigureerd|API_KEY/i.test(e.message)
+        ? 'De AI is nog niet geconfigureerd (GEMINI_API_KEY ontbreekt in Netlify).'
         : 'Er ging iets mis bij het ophalen. Probeer het zo nog eens.'
       setMessages(m => [...m, { id: Date.now() + 'a', isUser: false, raw: msg }])
     }
