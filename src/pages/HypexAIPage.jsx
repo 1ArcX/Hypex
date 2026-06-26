@@ -107,6 +107,7 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
   const [briefing, setBriefing] = useState('')
   const [briefBusy, setBriefBusy] = useState(false)
   const [kb, setKb] = useState(0)
+  const [dbg, setDbg] = useState({ iH: 0, vvH: 0, off: 0 })
   const endRef = useRef(null)
   const scrollRef = useRef(null)
 
@@ -193,19 +194,25 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
   }, 60))
 
   // Til de invoerbalk boven het toetsenbord (iOS): meet de overlap via visualViewport
-  // en krimp de pagina daarmee in, zoals een chat-app hoort te doen.
+  // en krimp de pagina daarmee in. Alleen op 'resize' (geen 'scroll' -> geen lus),
+  // met rAF-debounce.
   useEffect(() => {
     const vv = window.visualViewport
     if (!vv) return
+    let raf = 0
     const update = () => {
-      setKb(Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)))
-      scrollSoon()
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => {
+        const iH = window.innerHeight, vvH = Math.round(vv.height), off = Math.round(vv.offsetTop)
+        setDbg({ iH, vvH, off })
+        setKb(Math.max(0, Math.round(iH - vvH)))
+      })
     }
     update()
     vv.addEventListener('resize', update)
-    vv.addEventListener('scroll', update)
-    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update) }
+    return () => { vv.removeEventListener('resize', update); cancelAnimationFrame(raf) }
   }, [])
+  useEffect(() => { scrollSoon() }, [kb]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const callAI = async (msgs, system) => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -347,6 +354,9 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
 
   return (
     <div style={{ height: kb ? `calc(100% - ${kb}px)` : '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ position: 'fixed', top: 0, left: 0, zIndex: 99999, background: 'rgba(0,0,0,0.85)', color: '#5EEAD4', font: '10px monospace', padding: '2px 6px', pointerEvents: 'none' }}>
+        iH:{dbg.iH} vvH:{dbg.vvH} off:{dbg.off} kb:{kb}
+      </div>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 52, padding: '0 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', backdropFilter: 'blur(24px)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
