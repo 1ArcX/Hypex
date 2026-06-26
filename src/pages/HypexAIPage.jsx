@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { supabase } from '../supabaseClient'
-import { isDueToday, isDoneToday, appliesOn, todayISO } from '../utils/recurrence'
+import { isDueToday, isDoneToday, appliesOn, advanceOnComplete, todayISO } from '../utils/recurrence'
 
 const ACCENT = '#00FFD1'
 
@@ -77,6 +77,28 @@ function greeting() {
   return h < 12 ? 'Goedemorgen' : h < 18 ? 'Goedemiddag' : 'Goedenavond'
 }
 
+// ── agentische acties ──
+const CMD_RE = /\b(voeg|maak|zet|log|noteer|onthoud|herinner|schrijf|vink|streep|afvinken|toevoegen|gedaan|klaar|betaald|uitgegeven|gespendeerd|gekocht|uitgave|kostte|plan)\b/i
+function looksLikeCommand(t) {
+  return CMD_RE.test(t) || /gaf .* uit/i.test(t) || /^\s*(nieuwe taak|nieuwe notitie|taak:)/i.test(t)
+}
+function normDateISO(s) {
+  const v = String(s || '').toLowerCase().trim()
+  if (!v || v === 'vandaag' || v === 'today') return todayISO()
+  if (v === 'morgen' || v === 'tomorrow') { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10) }
+  const m = v.match(/(\d{4})-(\d{2})-(\d{2})/)
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : todayISO()
+}
+function addHour(hhmm) { const [h, m] = hhmm.split(':').map(Number); return String((h + 1) % 24).padStart(2, '0') + ':' + String(m).padStart(2, '0') }
+const EXP_CATS = ['eten', 'boodschappen', 'transport', 'kleding', 'abonnementen', 'sport', 'overig']
+const euro = n => '€' + Number(n).toFixed(2).replace('.', ',')
+const CARD = {
+  teal: { accent: '#00FFD1', bg: 'rgba(0,255,209,0.06)', border: 'rgba(0,255,209,0.2)', iconBg: 'rgba(0,255,209,0.12)' },
+  orange: { accent: '#FF8C42', bg: 'rgba(255,140,66,0.07)', border: 'rgba(255,140,66,0.25)', iconBg: 'rgba(255,140,66,0.14)' },
+  purple: { accent: '#A78BFA', bg: 'rgba(167,139,250,0.07)', border: 'rgba(167,139,250,0.25)', iconBg: 'rgba(167,139,250,0.14)' },
+}
+const actCard = (icon, title, detail, c) => ({ id: 'act' + Date.now() + Math.random().toString(36).slice(2, 6), isAction: true, icon, title, detail, ...c })
+
 export default function HypexAIPage({ tasks = [], subjects = [], userId, displayName = 'daar' }) {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -138,6 +160,8 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
       ``,
       `=== DATA VAN ${displayName.toUpperCase()} (vandaag) ===`,
       dataSummary,
+      ``,
+      `Je kunt ook dingen voor ${displayName} opslaan: een taak toevoegen of afvinken, een uitgave loggen, een routine afvinken of een notitie bewaren. Als hij daarom vraagt, bevestig dan kort en concreet wat je doet (de app verwerkt en toont de wijziging zelf met een kaartje). Verzin geen wijzigingen bij gewone vragen.`,
     ].join('\n')
   }, [dataSummary, displayName])
 
@@ -187,8 +211,19 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
     try {
       const history = [...messages, userMsg].filter(m => m.raw).slice(-12).map(m => ({ role: m.isUser ? 'user' : 'assistant', content: m.raw }))
       const reply = await callAI(history, systemPrompt)
-      const out = reply.trim() || 'Sorry, ik kon even geen antwoord genereren.'
+      const out = (reply.trim() || 'Sorry, ik kon even geen antwoord genereren.')
+        .replace(/```[\s\S]*?```/g, '').replace(/<action>[\s\S]*?<\/action>/gi, '').replace(/\n{3,}/g, '\n\n').trim() || 'Oké!'
       setMessages(m => [...m, { id: Date.now() + 'a', isUser: false, raw: out }])
+      setLoading(false)
+      scrollSoon()
+      // Agentisch: voer eventuele wijzigingen echt uit
+      if (looksLikeCommand(t)) {
+        const acts = await parseIntent(t)
+        const cards = []
+        for (const a of acts) { const c = await executeAction(a); if (c) cards.push(c) }
+        if (cards.length) { setMessages(m => [...m, ...cards]); scrollSoon() }
+      }
+      return
     } catch (e) {
       const msg = /geconfigureerd|API_KEY/i.test(e.message)
         ? 'De AI is nog niet geconfigureerd (GEMINI_API_KEY ontbreekt in Netlify).'
@@ -210,6 +245,82 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
       if (reply.trim()) setBriefing(reply.trim())
     } catch { /* laat huidige staan */ }
     setBriefBusy(false)
+  }
+
+  // Intent-parser: vraagt de AI om uitsluitend JSON-acties (of NONE)
+  const parseIntent = async (text) => {
+    try {
+      const routineTitles = tasks.filter(t => t.recurrence).map(t => t.title)
+      const prompt = [
+        'Je bent een intent-parser voor de Hypex-app. Bepaal of de invoer vraagt om een DATA-WIJZIGING.',
+        'Antwoord met UITSLUITEND een JSON-array van acties (geen andere tekst), of exact NONE als het geen wijziging is (bijv. een vraag).',
+        'Toegestane acties:',
+        '{"type":"add_task","titel":"...","datum":"vandaag|morgen|YYYY-MM-DD","tijd":"HH:MM of null","prioriteit":"urgent|normaal","vak":"... of null"}',
+        '{"type":"complete_task","titel":"..."}',
+        '{"type":"add_expense","bedrag":12.5,"categorie":"eten|boodschappen|transport|kleding|abonnementen|sport|overig","omschrijving":"..."}',
+        '{"type":"routine_done","naam":"..."}',
+        '{"type":"add_note","tekst":"..."}',
+        routineTitles.length ? `Routines heten exact: ${routineTitles.join(', ')}.` : '',
+        '"vandaag" is de standaard-datum. Geef alleen acties die de gebruiker echt vraagt.',
+        '',
+        'Invoer: ' + text,
+      ].filter(Boolean).join('\n')
+      const r = await callAI([{ role: 'user', content: prompt }])
+      const s = String(r || '').trim()
+      if (/^\s*none\b/i.test(s)) return []
+      const m = s.match(/\[[\s\S]*\]/)
+      if (m) { try { const arr = JSON.parse(m[0]); if (Array.isArray(arr)) return arr.filter(a => a && a.type) } catch {} }
+      const one = s.match(/\{[\s\S]*\}/)
+      if (one) { try { const o = JSON.parse(one[0]); if (o && o.type) return [o] } catch {} }
+      return []
+    } catch { return [] }
+  }
+
+  // Voert een actie echt uit (schrijft naar Supabase) en geeft een kaartje terug
+  const executeAction = async (a) => {
+    const today = todayISO()
+    try {
+      if (a.type === 'add_task') {
+        const date = normDateISO(a.datum)
+        const tm = (a.tijd && String(a.tijd).match(/\d{1,2}:\d{2}/)) ? String(a.tijd).match(/\d{1,2}:\d{2}/)[0] : null
+        const titel = a.titel || 'Nieuwe taak'
+        const urgent = a.prioriteit === 'urgent'
+        const subj = a.vak ? subjects.find(s => s.name.toLowerCase().includes(String(a.vak).toLowerCase())) : null
+        await supabase.from('tasks').insert({ user_id: userId, title: titel, date, time: tm, start_time: tm, end_time: tm ? addHour(tm) : null, priority: urgent ? 1 : 2, subject_id: subj?.id || null, completed: false })
+        window.dispatchEvent(new Event('refreshTasks'))
+        return actCard('✅', 'Taak toegevoegd', `${titel} · ${date === today ? 'vandaag' : date}${tm ? ' om ' + tm : ''}${urgent ? ' · urgent' : ''}`, CARD.teal)
+      }
+      if (a.type === 'complete_task') {
+        const key = String(a.titel || '').toLowerCase().slice(0, 10)
+        const t = tasks.find(x => !x.completed && x.title.toLowerCase().includes(key))
+        if (t) {
+          if (t.recurrence) { const upd = advanceOnComplete(t, today); if (upd) await supabase.from('tasks').update({ ...upd, updated_at: new Date().toISOString() }).eq('id', t.id) }
+          else await supabase.from('tasks').update({ completed: true, updated_at: new Date().toISOString() }).eq('id', t.id)
+          window.dispatchEvent(new Event('refreshTasks'))
+          return actCard('☑️', 'Taak afgevinkt', t.title, CARD.teal)
+        }
+        return actCard('☑️', 'Taak afgevinkt', a.titel || 'Taak', CARD.teal)
+      }
+      if (a.type === 'add_expense') {
+        const bedrag = Number(a.bedrag) || 0
+        const cat = EXP_CATS.includes(a.categorie) ? a.categorie : 'overig'
+        await supabase.from('expenses').insert({ user_id: userId, amount: bedrag, category: cat, description: a.omschrijving || '', date: today, is_income: false, is_savings_withdrawal: false, is_savings_contribution: false, is_loan_repayment: false, paid_from_savings: false, is_planned: false })
+        return actCard('💸', 'Uitgave gelogd', `${euro(bedrag)} · ${cat}${a.omschrijving ? ' · ' + a.omschrijving : ''}`, CARD.orange)
+      }
+      if (a.type === 'routine_done') {
+        const key = String(a.naam || '').toLowerCase().slice(0, 5)
+        const t = tasks.find(x => x.recurrence && x.title.toLowerCase().includes(key))
+        if (t && !isDoneToday(t, today)) { const upd = advanceOnComplete(t, today); if (upd) await supabase.from('tasks').update({ ...upd, updated_at: new Date().toISOString() }).eq('id', t.id); window.dispatchEvent(new Event('refreshTasks')) }
+        return actCard('🔥', 'Routine afgevinkt', `${t ? t.title : (a.naam || 'Routine')}${t ? ` · streak ${(t.streak || 0) + 1} dagen` : ''}`, CARD.orange)
+      }
+      if (a.type === 'add_note') {
+        const tekst = String(a.tekst || '')
+        const title = (tekst.split('\n')[0] || 'Notitie').slice(0, 40)
+        await supabase.from('notes').insert({ user_id: userId, title, content: tekst, folder_id: null })
+        return actCard('📝', 'Notitie opgeslagen', tekst.length > 44 ? tekst.slice(0, 44) + '…' : tekst, CARD.purple)
+      }
+    } catch { /* stil */ }
+    return null
   }
 
   const canSend = input.trim().length > 0 && !loading
@@ -264,7 +375,18 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
         )}
 
         {/* Messages */}
-        {messages.map(m => m.isUser ? (
+        {messages.map(m => m.isAction ? (
+          <div key={m.id} style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 11, width: '92%', padding: '11px 13px', borderRadius: 14, background: m.bg, border: `1px solid ${m.border}` }}>
+              <div style={{ flex: 'none', width: 30, height: 30, borderRadius: 9, background: m.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15 }}>{m.icon}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: 0, fontSize: 12.5, fontWeight: 700, color: m.accent }}>{m.title}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 12, color: 'rgba(255,255,255,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.detail}</p>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={m.accent} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: 'none' }}><polyline points="20 6 9 17 4 12" /></svg>
+            </div>
+          </div>
+        ) : m.isUser ? (
           <div key={m.id} style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <div style={{ maxWidth: '82%', padding: '11px 14px', borderRadius: '18px 18px 5px 18px', background: 'linear-gradient(140deg, rgba(0,255,209,0.92), rgba(0,210,200,0.82))', color: '#042420', fontSize: 14, lineHeight: 1.5, fontWeight: 500, whiteSpace: 'pre-wrap' }}>
               {m.raw}
