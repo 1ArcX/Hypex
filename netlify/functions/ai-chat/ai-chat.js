@@ -7,7 +7,7 @@ const { createClient } = require('@supabase/supabase-js')
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 const KEY = process.env.GEMINI_API_KEY
-const MODEL = process.env.AI_MODEL || 'gemini-2.0-flash'
+const MODEL = process.env.AI_MODEL || 'gemini-2.5-flash'
 const ADMIN = (process.env.WIDGET_USER_EMAIL || 'zhafirfachri@gmail.com').toLowerCase()
 
 exports.handler = async (event) => {
