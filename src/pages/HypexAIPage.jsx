@@ -106,6 +106,7 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
   const [budgetLine, setBudgetLine] = useState('')
   const [briefing, setBriefing] = useState('')
   const [briefBusy, setBriefBusy] = useState(false)
+  const [kb, setKb] = useState(0)
   const endRef = useRef(null)
   const scrollRef = useRef(null)
 
@@ -190,6 +191,21 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
   const scrollSoon = () => requestAnimationFrame(() => setTimeout(() => {
     try { scrollRef.current?.scrollTo({ top: 999999, behavior: 'smooth' }) } catch {}
   }, 60))
+
+  // Til de invoerbalk boven het toetsenbord (iOS): meet de overlap via visualViewport
+  // en krimp de pagina daarmee in, zoals een chat-app hoort te doen.
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const update = () => {
+      setKb(Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)))
+      scrollSoon()
+    }
+    update()
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update) }
+  }, [])
 
   const callAI = async (msgs, system) => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -330,7 +346,7 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
   const canSend = input.trim().length > 0 && !loading
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={{ height: kb ? `calc(100% - ${kb}px)` : '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 52, padding: '0 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', backdropFilter: 'blur(24px)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
