@@ -65,7 +65,7 @@ function Blocks({ blocks, boldColor }) {
 }
 
 const CHIPS = [
-  { icon: '🗓️', label: 'Plan mijn dag', prompt: 'Plan mijn dag in op basis van mijn taken en routines van vandaag. Geef een realistisch, kort tijdschema.' },
+  { icon: '🗓️', label: 'Plan mijn dag', prompt: 'Plan mijn dag in op basis van mijn taken van vandaag, mijn te-late taken en mijn routines. Geef een realistisch, kort tijdschema vanaf nu.' },
   { icon: '✅', label: 'Wat is nu belangrijk?', prompt: 'Wat is op dit moment het belangrijkste om op te pakken?' },
   { icon: '🔥', label: 'Hoe gaan mijn routines?', prompt: 'Hoe staan mijn routines en streaks ervoor vandaag? Wat moet ik nog doen?' },
   { icon: '💸', label: 'Hoe staat mijn budget?', prompt: 'Hoe staat mijn budget deze maand ervoor en kan ik nog iets besparen?' },
@@ -159,6 +159,7 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
     return [
       `Je bent "Hypex AI", de persoonlijke assistent binnen Hypex — het productiviteits- & planningsdashboard van ${displayName}. Je spreekt Nederlands. Vandaag is ${datum} en het is nu ${tijd}.`,
       `Houd rekening met het HUIDIGE TIJDSTIP (${tijd}): plan en adviseer alleen voor de tijd die vandaag nog resteert. Stel dus geen ochtend- of voorbije momenten meer voor als die al gepasseerd zijn, en houd realistische blokken aan vanaf nu.`,
+      `Als je de dag plant, neem dan ook de TE LATE taken mee (zet die bij voorkeur als eerste in het schema, zodat de achterstand wordt ingelopen).`,
       `Antwoord BONDIG (meestal 2–5 zinnen of een korte lijst), tenzij om een plan of uitleg wordt gevraagd. Gebruik **vetgedrukt** voor cijfers, namen, tijden en data, en opsommingen met "- " waar dat helpt. Max 1 emoji per bericht. Verzin GEEN data die hieronder niet staat; zeg eerlijk als iets ontbreekt.`,
       ``,
       `=== DATA VAN ${displayName.toUpperCase()} (vandaag) ===`,
