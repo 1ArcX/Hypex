@@ -192,7 +192,7 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
     } catch (e) {
       const msg = /geconfigureerd|API_KEY/i.test(e.message)
         ? 'De AI is nog niet geconfigureerd (GEMINI_API_KEY ontbreekt in Netlify).'
-        : 'Er ging iets mis bij het ophalen. Probeer het zo nog eens.'
+        : `Er ging iets mis: ${e.message || 'onbekende fout'}`
       setMessages(m => [...m, { id: Date.now() + 'a', isUser: false, raw: msg }])
     }
     setLoading(false)
