@@ -151,19 +151,22 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
     ].filter(Boolean).join('\n')
   }, [tasks, subjects, budgetLine])
 
-  const systemPrompt = useMemo(() => {
+  // Bij elke vraag opnieuw opgebouwd, zodat de actuele datum én tijd kloppen
+  const buildSystem = () => {
     const d = new Date()
     const datum = d.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })
+    const tijd = d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
     return [
-      `Je bent "Hypex AI", de persoonlijke assistent binnen Hypex — het productiviteits- & planningsdashboard van ${displayName}. Je spreekt Nederlands. Vandaag is ${datum}.`,
-      `Antwoord BONDIG (meestal 2–5 zinnen of een korte lijst), tenzij om een plan of uitleg wordt gevraagd. Gebruik **vetgedrukt** voor cijfers, namen en data, en opsommingen met "- " waar dat helpt. Max 1 emoji per bericht. Verzin GEEN data die hieronder niet staat; zeg eerlijk als iets ontbreekt.`,
+      `Je bent "Hypex AI", de persoonlijke assistent binnen Hypex — het productiviteits- & planningsdashboard van ${displayName}. Je spreekt Nederlands. Vandaag is ${datum} en het is nu ${tijd}.`,
+      `Houd rekening met het HUIDIGE TIJDSTIP (${tijd}): plan en adviseer alleen voor de tijd die vandaag nog resteert. Stel dus geen ochtend- of voorbije momenten meer voor als die al gepasseerd zijn, en houd realistische blokken aan vanaf nu.`,
+      `Antwoord BONDIG (meestal 2–5 zinnen of een korte lijst), tenzij om een plan of uitleg wordt gevraagd. Gebruik **vetgedrukt** voor cijfers, namen, tijden en data, en opsommingen met "- " waar dat helpt. Max 1 emoji per bericht. Verzin GEEN data die hieronder niet staat; zeg eerlijk als iets ontbreekt.`,
       ``,
       `=== DATA VAN ${displayName.toUpperCase()} (vandaag) ===`,
       dataSummary,
       ``,
       `Je kunt ook dingen voor ${displayName} opslaan: een taak toevoegen of afvinken, een uitgave loggen, een routine afvinken of een notitie bewaren. Als hij daarom vraagt, bevestig dan kort en concreet wat je doet (de app verwerkt en toont de wijziging zelf met een kaartje). Verzin geen wijzigingen bij gewone vragen.`,
     ].join('\n')
-  }, [dataSummary, displayName])
+  }
 
   // Standaard-briefing uit echte data
   useEffect(() => {
@@ -210,7 +213,7 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
     scrollSoon()
     try {
       const history = [...messages, userMsg].filter(m => m.raw).slice(-12).map(m => ({ role: m.isUser ? 'user' : 'assistant', content: m.raw }))
-      const reply = await callAI(history, systemPrompt)
+      const reply = await callAI(history, buildSystem())
       const out = (reply.trim() || 'Sorry, ik kon even geen antwoord genereren.')
         .replace(/```[\s\S]*?```/g, '').replace(/<action>[\s\S]*?<\/action>/gi, '').replace(/\n{3,}/g, '\n\n').trim() || 'Oké!'
       setMessages(m => [...m, { id: Date.now() + 'a', isUser: false, raw: out }])
@@ -239,8 +242,8 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
     setBriefBusy(true)
     try {
       const reply = await callAI(
-        [{ role: 'user', content: 'Schrijf een korte ochtendbriefing (3–4 zinnen) over mijn dag. Begin NIET met een begroeting. Noem het belangrijkste qua taken, routines en budget. Gebruik **vet** voor cijfers. Max 1 emoji.' }],
-        systemPrompt,
+        [{ role: 'user', content: 'Schrijf een korte briefing (3–4 zinnen) over mijn dag vanaf nu. Begin NIET met een begroeting. Noem het belangrijkste qua taken, routines en budget, rekening houdend met het huidige tijdstip. Gebruik **vet** voor cijfers. Max 1 emoji.' }],
+        buildSystem(),
       )
       if (reply.trim()) setBriefing(reply.trim())
     } catch { /* laat huidige staan */ }
