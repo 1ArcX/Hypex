@@ -107,9 +107,10 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
   const [briefing, setBriefing] = useState('')
   const [briefBusy, setBriefBusy] = useState(false)
   const [appH, setAppH] = useState(0)
-  const [dbg, setDbg] = useState({ iH: 0, vvH: 0, off: 0 })
+  const [dbg, setDbg] = useState({ iH: 0, top: 0, parentH: 0, h: 0 })
   const endRef = useRef(null)
   const scrollRef = useRef(null)
+  const pageRef = useRef(null)
 
   // Budgetsamenvatting van deze maand ophalen (indicatief)
   useEffect(() => {
@@ -193,18 +194,24 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
     try { scrollRef.current?.scrollTo({ top: 999999, behavior: 'smooth' }) } catch {}
   }, 60))
 
-  // Op dit toestel krimpt window.innerHeight mét het toetsenbord (793 -> ~428),
-  // maar 100dvh niet. Maak de pagina exact innerHeight hoog, zodat de invoerbalk
-  // boven het toetsenbord komt. Geen vv.height/offset -> geen terugspring-lus.
+  // window.innerHeight krimpt op dit toestel mét het toetsenbord (793 -> ~428).
+  // De pagina mag niet hoger zijn dan (a) zijn container, en (b) tot de boven-
+  // kant van het toetsenbord (innerHeight - eigen top-offset). Pak de kleinste;
+  // is dat de container, dan gewoon 100% (toetsenbord dicht).
   useEffect(() => {
     const vv = window.visualViewport
     let raf = 0
     const update = () => {
       cancelAnimationFrame(raf)
       raf = requestAnimationFrame(() => {
+        const el = pageRef.current
         const iH = window.innerHeight
-        setDbg({ iH, vvH: vv ? Math.round(vv.height) : 0, off: vv ? Math.round(vv.offsetTop) : 0 })
-        setAppH(iH)
+        const top = el ? Math.round(el.getBoundingClientRect().top) : 0
+        const parentH = el && el.parentElement ? el.parentElement.clientHeight : iH
+        const limited = iH - top
+        const h = (limited < parentH - 8) ? Math.max(120, limited) : 0
+        setDbg({ iH, top, parentH, h })
+        setAppH(h)
         scrollSoon()
       })
     }
@@ -353,9 +360,9 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
   const canSend = input.trim().length > 0 && !loading
 
   return (
-    <div style={{ height: appH ? `${appH}px` : '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div ref={pageRef} style={{ height: appH ? `${appH}px` : '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div style={{ position: 'fixed', top: 0, left: 0, zIndex: 99999, background: 'rgba(0,0,0,0.85)', color: '#5EEAD4', font: '10px monospace', padding: '2px 6px', pointerEvents: 'none' }}>
-        iH:{dbg.iH} vvH:{dbg.vvH} off:{dbg.off} appH:{appH}
+        iH:{dbg.iH} top:{dbg.top} pH:{dbg.parentH} appH:{appH}
       </div>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 52, padding: '0 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', backdropFilter: 'blur(24px)', flexShrink: 0 }}>
