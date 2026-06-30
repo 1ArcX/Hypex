@@ -90,6 +90,15 @@ function normDateISO(s) {
   return m ? `${m[1]}-${m[2]}-${m[3]}` : todayISO()
 }
 function addHour(hhmm) { const [h, m] = hhmm.split(':').map(Number); return String((h + 1) % 24).padStart(2, '0') + ':' + String(m).padStart(2, '0') }
+const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()
+// Vind de bedoelde taak/routine op naam (soepel: bevat in beide richtingen, anders eerste woord)
+function matchTask(want, list) {
+  const w = norm(want)
+  if (!w) return null
+  return list.find(x => { const tt = norm(x.title); return tt.includes(w) || w.includes(tt) })
+    || list.find(x => { const fw = w.split(' ')[0]; return fw.length > 2 && norm(x.title).includes(fw) })
+    || null
+}
 const EXP_CATS = ['eten', 'boodschappen', 'transport', 'kleding', 'abonnementen', 'sport', 'overig']
 const euro = n => '€' + Number(n).toFixed(2).replace('.', ',')
 const CARD = {
@@ -316,15 +325,14 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
         return actCard('✅', 'Taak toegevoegd', `${titel} · ${date === today ? 'vandaag' : date}${tm ? ' om ' + tm : ''}${urgent ? ' · urgent' : ''}`, CARD.teal)
       }
       if (a.type === 'complete_task') {
-        const key = String(a.titel || '').toLowerCase().slice(0, 10)
-        const t = tasks.find(x => !x.completed && x.title.toLowerCase().includes(key))
-        if (t) {
-          if (t.recurrence) { const upd = advanceOnComplete(t, today); if (upd) await supabase.from('tasks').update({ ...upd, updated_at: new Date().toISOString() }).eq('id', t.id) }
-          else await supabase.from('tasks').update({ completed: true, updated_at: new Date().toISOString() }).eq('id', t.id)
-          window.dispatchEvent(new Event('refreshTasks'))
-          return actCard('☑️', 'Taak afgevinkt', t.title, CARD.teal)
-        }
-        return actCard('☑️', 'Taak afgevinkt', a.titel || 'Taak', CARD.teal)
+        const t = matchTask(a.titel, tasks.filter(x => !x.completed))
+        if (!t) return actCard('🔍', 'Taak niet gevonden', a.titel || '', CARD.purple)
+        let error
+        if (t.recurrence) { const upd = advanceOnComplete(t, today); if (upd) ({ error } = await supabase.from('tasks').update({ ...upd, updated_at: new Date().toISOString() }).eq('id', t.id)) }
+        else ({ error } = await supabase.from('tasks').update({ completed: true, updated_at: new Date().toISOString() }).eq('id', t.id))
+        if (error) return actCard('⚠️', 'Kon niet afvinken', error.message, CARD.orange)
+        window.dispatchEvent(new Event('refreshTasks'))
+        return actCard('☑️', 'Taak afgevinkt', t.title, CARD.teal)
       }
       if (a.type === 'add_expense') {
         const bedrag = Number(a.bedrag) || 0
@@ -334,10 +342,14 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
         return actCard('💸', 'Uitgave gelogd', `${euro(bedrag)} · ${cat}${a.omschrijving ? ' · ' + a.omschrijving : ''}`, CARD.orange)
       }
       if (a.type === 'routine_done') {
-        const key = String(a.naam || '').toLowerCase().slice(0, 5)
-        const t = tasks.find(x => x.recurrence && x.title.toLowerCase().includes(key))
-        if (t && !isDoneToday(t, today)) { const upd = advanceOnComplete(t, today); if (upd) await supabase.from('tasks').update({ ...upd, updated_at: new Date().toISOString() }).eq('id', t.id); window.dispatchEvent(new Event('refreshTasks')) }
-        return actCard('🔥', 'Routine afgevinkt', `${t ? t.title : (a.naam || 'Routine')}${t ? ` · streak ${(t.streak || 0) + 1} dagen` : ''}`, CARD.orange)
+        const t = matchTask(a.naam, tasks.filter(x => x.recurrence))
+        if (!t) return actCard('🔍', 'Routine niet gevonden', a.naam || '', CARD.purple)
+        if (!isDoneToday(t, today)) {
+          const upd = advanceOnComplete(t, today)
+          if (upd) { const { error } = await supabase.from('tasks').update({ ...upd, updated_at: new Date().toISOString() }).eq('id', t.id); if (error) return actCard('⚠️', 'Kon routine niet afvinken', error.message, CARD.orange) }
+          window.dispatchEvent(new Event('refreshTasks'))
+        }
+        return actCard('🔥', 'Routine afgevinkt', `${t.title} · streak ${(t.streak || 0) + 1} dagen`, CARD.orange)
       }
       if (a.type === 'add_note') {
         const tekst = String(a.tekst || '')
