@@ -33,6 +33,8 @@ exports.handler = async (event) => {
   if (!messages.length) return resp(400, { error: 'no messages' })
   const system = typeof body.system === 'string' && body.system.trim() ? body.system : undefined
   const maxTokens = Math.min(2048, Math.max(256, Number(body.max_tokens) || 1024))
+  const temperature = (typeof body.temperature === 'number') ? body.temperature : 0.7
+  const wantJson = body.json === true
 
   const contents = messages.map(m => ({
     role: m.role === 'assistant' ? 'model' : 'user',
@@ -41,7 +43,11 @@ exports.handler = async (event) => {
   const payload = {
     contents,
     ...(system ? { system_instruction: { parts: [{ text: system }] } } : {}),
-    generationConfig: { maxOutputTokens: maxTokens, temperature: 0.7 },
+    generationConfig: {
+      maxOutputTokens: maxTokens,
+      temperature,
+      ...(wantJson ? { responseMimeType: 'application/json' } : {}),
+    },
   }
 
   try {

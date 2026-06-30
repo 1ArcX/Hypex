@@ -221,13 +221,17 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
     return () => { window.removeEventListener('resize', update); vv?.removeEventListener('resize', update); cancelAnimationFrame(raf) }
   }, [])
 
-  const callAI = async (msgs, system) => {
+  const callAI = async (msgs, system, opts = {}) => {
     const { data: { session } } = await supabase.auth.getSession()
     const token = session?.access_token
     const r = await fetch('/.netlify/functions/ai-chat', {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-      body: JSON.stringify({ system, messages: msgs }),
+      body: JSON.stringify({
+        system, messages: msgs,
+        ...(opts.json ? { json: true } : {}),
+        ...(opts.temperature != null ? { temperature: opts.temperature } : {}),
+      }),
     })
     const j = await r.json()
     if (!r.ok) throw new Error(j?.error || 'AI-fout')
@@ -281,14 +285,14 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
     setBriefBusy(false)
   }
 
-  // Intent-parser: vraagt de AI om uitsluitend JSON-acties (of NONE)
+  // Intent-parser: forceert geldige JSON via Gemini's JSON-modus
   const parseIntent = async (text) => {
     try {
       const routineTitles = tasks.filter(t => t.recurrence).map(t => t.title)
       const prompt = [
-        'Je bent een intent-parser voor de Hypex-app. Bepaal of de invoer vraagt om een DATA-WIJZIGING.',
-        'Antwoord met UITSLUITEND een JSON-array van acties (geen andere tekst), of exact NONE als het geen wijziging is (bijv. een vraag).',
-        'Toegestane acties:',
+        'Bepaal of de invoer vraagt om een DATA-WIJZIGING in de Hypex-app.',
+        'Geef een JSON-object van de vorm: {"acties": [ ... ]}. Lege array als het geen wijziging is (bijv. een vraag).',
+        'Mogelijke acties (elk een object in de array):',
         '{"type":"add_task","titel":"...","datum":"vandaag|morgen|YYYY-MM-DD","tijd":"HH:MM of null","prioriteit":"urgent|normaal","vak":"... of null"}',
         '{"type":"complete_task","titel":"..."}',
         '{"type":"add_expense","bedrag":12.5,"categorie":"eten|boodschappen|transport|kleding|abonnementen|sport|overig","omschrijving":"..."}',
@@ -299,14 +303,13 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
         '',
         'Invoer: ' + text,
       ].filter(Boolean).join('\n')
-      const r = await callAI([{ role: 'user', content: prompt }])
-      const s = String(r || '').trim()
-      if (/^\s*none\b/i.test(s)) return []
-      const m = s.match(/\[[\s\S]*\]/)
-      if (m) { try { const arr = JSON.parse(m[0]); if (Array.isArray(arr)) return arr.filter(a => a && a.type) } catch {} }
-      const one = s.match(/\{[\s\S]*\}/)
-      if (one) { try { const o = JSON.parse(one[0]); if (o && o.type) return [o] } catch {} }
-      return []
+      const r = await callAI([{ role: 'user', content: prompt }], undefined, { json: true, temperature: 0 })
+      let acts = []
+      try {
+        const o = JSON.parse(String(r || '').trim())
+        acts = Array.isArray(o) ? o : (Array.isArray(o?.acties) ? o.acties : (o?.type ? [o] : []))
+      } catch {}
+      return acts.filter(a => a && a.type)
     } catch { return [] }
   }
 
@@ -320,7 +323,8 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
         const titel = a.titel || 'Nieuwe taak'
         const urgent = a.prioriteit === 'urgent'
         const subj = a.vak ? subjects.find(s => s.name.toLowerCase().includes(String(a.vak).toLowerCase())) : null
-        await supabase.from('tasks').insert({ user_id: userId, title: titel, date, time: tm, start_time: tm, end_time: tm ? addHour(tm) : null, priority: urgent ? 1 : 2, subject_id: subj?.id || null, completed: false })
+        const { error } = await supabase.from('tasks').insert({ user_id: userId, title: titel, date, time: tm, start_time: tm, end_time: tm ? addHour(tm) : null, priority: urgent ? 1 : 2, subject_id: subj?.id || null, completed: false })
+        if (error) return actCard('⚠️', 'Kon taak niet opslaan', error.message, CARD.orange)
         window.dispatchEvent(new Event('refreshTasks'))
         return actCard('✅', 'Taak toegevoegd', `${titel} · ${date === today ? 'vandaag' : date}${tm ? ' om ' + tm : ''}${urgent ? ' · urgent' : ''}`, CARD.teal)
       }
@@ -338,7 +342,8 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
       if (a.type === 'add_expense') {
         const bedrag = Number(a.bedrag) || 0
         const cat = EXP_CATS.includes(a.categorie) ? a.categorie : 'overig'
-        await supabase.from('expenses').insert({ user_id: userId, amount: bedrag, category: cat, description: a.omschrijving || '', date: today, is_income: false, is_savings_withdrawal: false, is_savings_contribution: false, is_loan_repayment: false, paid_from_savings: false, is_planned: false })
+        const { error } = await supabase.from('expenses').insert({ user_id: userId, amount: bedrag, category: cat, description: a.omschrijving || '', date: today, is_income: false, is_savings_withdrawal: false, is_savings_contribution: false, is_loan_repayment: false, paid_from_savings: false, is_planned: false })
+        if (error) return actCard('⚠️', 'Kon uitgave niet opslaan', error.message, CARD.orange)
         return actCard('💸', 'Uitgave gelogd', `${euro(bedrag)} · ${cat}${a.omschrijving ? ' · ' + a.omschrijving : ''}`, CARD.orange)
       }
       if (a.type === 'routine_done') {
@@ -350,7 +355,8 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
       if (a.type === 'add_note') {
         const tekst = String(a.tekst || '')
         const title = (tekst.split('\n')[0] || 'Notitie').slice(0, 40)
-        await supabase.from('notes').insert({ user_id: userId, title, content: tekst, folder_id: null })
+        const { error } = await supabase.from('notes').insert({ user_id: userId, title, content: tekst, folder_id: null })
+        if (error) return actCard('⚠️', 'Kon notitie niet opslaan', error.message, CARD.purple)
         return actCard('📝', 'Notitie opgeslagen', tekst.length > 44 ? tekst.slice(0, 44) + '…' : tekst, CARD.purple)
       }
     } catch { /* stil */ }
