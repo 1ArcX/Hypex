@@ -46,6 +46,9 @@ exports.handler = async (event) => {
     generationConfig: {
       maxOutputTokens: maxTokens,
       temperature,
+      // Zet "thinking" uit: anders eten redeneer-tokens de output-limiet op,
+      // waardoor antwoorden halverwege afgekapt worden (en meer quota kosten).
+      thinkingConfig: { thinkingBudget: 0 },
       ...(wantJson ? { responseMimeType: 'application/json' } : {}),
     },
   }
