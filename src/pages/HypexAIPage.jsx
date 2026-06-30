@@ -159,6 +159,7 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
     const d = new Date()
     const datum = d.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })
     const tijd = d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
+    const routineTitles = tasks.filter(t => t.recurrence).map(t => t.title)
     return [
       `Je bent "Hypex AI", de persoonlijke assistent binnen Hypex — het productiviteits- & planningsdashboard van ${displayName}. Je spreekt Nederlands. Vandaag is ${datum} en het is nu ${tijd}.`,
       `Houd rekening met het HUIDIGE TIJDSTIP (${tijd}): plan en adviseer alleen voor de tijd die vandaag nog resteert. Stel dus geen ochtend- of voorbije momenten meer voor als die al gepasseerd zijn, en houd realistische blokken aan vanaf nu.`,
@@ -168,7 +169,16 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
       `=== DATA VAN ${displayName.toUpperCase()} (vandaag) ===`,
       dataSummary,
       ``,
-      `Je kunt ook dingen voor ${displayName} opslaan: een taak toevoegen of afvinken, een uitgave loggen, een routine afvinken of een notitie bewaren. Als hij daarom vraagt, bevestig dan kort en concreet wat je doet (de app verwerkt en toont de wijziging zelf met een kaartje). Verzin geen wijzigingen bij gewone vragen.`,
+      `Je kunt ook dingen voor ${displayName} OPSLAAN. Als (en alleen als) hij daar duidelijk om vraagt, bevestig je kort in je antwoord en zet je daarna op een NIEUWE laatste regel: @@ACTIES@@ gevolgd door een JSON-array met de wijzigingen. Bij een gewone vraag (geen wijziging) laat je die regel volledig weg.`,
+      `Actie-vormen (objecten in de array):`,
+      `{"type":"add_task","titel":"...","datum":"vandaag|morgen|YYYY-MM-DD","tijd":"HH:MM of null","prioriteit":"urgent|normaal","vak":"... of null"}`,
+      `{"type":"complete_task","titel":"..."}`,
+      `{"type":"add_expense","bedrag":12.5,"categorie":"eten|boodschappen|transport|kleding|abonnementen|sport|overig","omschrijving":"..."}`,
+      `{"type":"routine_done","naam":"..."}`,
+      `{"type":"add_note","tekst":"..."}`,
+      routineTitles.length ? `Routines heten exact: ${routineTitles.join(', ')}.` : '',
+      `Voorbeeld — gebruiker: "log 12 euro boodschappen" -> jouw antwoord eindigt met:`,
+      `@@ACTIES@@ [{"type":"add_expense","bedrag":12,"categorie":"boodschappen","omschrijving":""}]`,
     ].join('\n')
   }
 
@@ -249,14 +259,19 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
     try {
       const history = [...messages, userMsg].filter(m => m.raw).slice(-12).map(m => ({ role: m.isUser ? 'user' : 'assistant', content: m.raw }))
       const reply = await callAI(history, buildSystem())
-      const out = (reply.trim() || 'Sorry, ik kon even geen antwoord genereren.')
-        .replace(/```[\s\S]*?```/g, '').replace(/<action>[\s\S]*?<\/action>/gi, '').replace(/\n{3,}/g, '\n\n').trim() || 'Oké!'
+      let raw = reply.trim() || 'Sorry, ik kon even geen antwoord genereren.'
+      // Acties staan achter de marker in hetzelfde antwoord (1 call i.p.v. 2)
+      let actsRaw = null
+      const mk = raw.match(/@@ACTIES@@/i)
+      if (mk) { actsRaw = raw.slice(mk.index + mk[0].length); raw = raw.slice(0, mk.index).trim() }
+      const out = raw.replace(/```[\s\S]*?```/g, '').replace(/<action>[\s\S]*?<\/action>/gi, '').replace(/\n{3,}/g, '\n\n').trim() || 'Oké!'
       setMessages(m => [...m, { id: Date.now() + 'a', isUser: false, raw: out }])
       setLoading(false)
       scrollSoon()
-      // Agentisch: voer eventuele wijzigingen echt uit
-      if (looksLikeCommand(t)) {
-        const acts = await parseIntent(t)
+      if (actsRaw) {
+        let acts = []
+        const arr = actsRaw.match(/\[[\s\S]*\]/)
+        if (arr) { try { const p = JSON.parse(arr[0]); if (Array.isArray(p)) acts = p.filter(a => a && a.type) } catch {} }
         const cards = []
         for (const a of acts) { const c = await executeAction(a); if (c) cards.push(c) }
         if (cards.length) { setMessages(m => [...m, ...cards]); scrollSoon() }
@@ -283,34 +298,6 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
       if (reply.trim()) setBriefing(reply.trim())
     } catch { /* laat huidige staan */ }
     setBriefBusy(false)
-  }
-
-  // Intent-parser: forceert geldige JSON via Gemini's JSON-modus
-  const parseIntent = async (text) => {
-    try {
-      const routineTitles = tasks.filter(t => t.recurrence).map(t => t.title)
-      const prompt = [
-        'Bepaal of de invoer vraagt om een DATA-WIJZIGING in de Hypex-app.',
-        'Geef een JSON-object van de vorm: {"acties": [ ... ]}. Lege array als het geen wijziging is (bijv. een vraag).',
-        'Mogelijke acties (elk een object in de array):',
-        '{"type":"add_task","titel":"...","datum":"vandaag|morgen|YYYY-MM-DD","tijd":"HH:MM of null","prioriteit":"urgent|normaal","vak":"... of null"}',
-        '{"type":"complete_task","titel":"..."}',
-        '{"type":"add_expense","bedrag":12.5,"categorie":"eten|boodschappen|transport|kleding|abonnementen|sport|overig","omschrijving":"..."}',
-        '{"type":"routine_done","naam":"..."}',
-        '{"type":"add_note","tekst":"..."}',
-        routineTitles.length ? `Routines heten exact: ${routineTitles.join(', ')}.` : '',
-        '"vandaag" is de standaard-datum. Geef alleen acties die de gebruiker echt vraagt.',
-        '',
-        'Invoer: ' + text,
-      ].filter(Boolean).join('\n')
-      const r = await callAI([{ role: 'user', content: prompt }], undefined, { json: true, temperature: 0 })
-      let acts = []
-      try {
-        const o = JSON.parse(String(r || '').trim())
-        acts = Array.isArray(o) ? o : (Array.isArray(o?.acties) ? o.acties : (o?.type ? [o] : []))
-      } catch {}
-      return acts.filter(a => a && a.type)
-    } catch { return [] }
   }
 
   // Voert een actie echt uit (schrijft naar Supabase) en geeft een kaartje terug
