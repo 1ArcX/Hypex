@@ -171,7 +171,7 @@ export default function GeldPage({ userId }: { userId: string; onClose?: () => v
           }} />
       )}
       {showBudget && (
-        <BudgetModal config={config} onClose={() => setShowBudget(false)}
+        <BudgetModal config={config} year={selYear} month={selMonth} onClose={() => setShowBudget(false)}
           onSave={async (data) => { await saveBudget(data); setShowBudget(false) }} />
       )}
       {showRecurring && (

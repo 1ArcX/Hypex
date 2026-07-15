@@ -1,6 +1,13 @@
 import type { BudgetConfig, CategoryConfig, Expense, VacationEntry } from '../types'
 import { FIXED_CAT } from './categories'
-import { monthStartOf, monthEndOf } from './format'
+import { monthStartOf, monthEndOf, pad2 } from './format'
+
+export function monthKey(y: number, m: number): string { return `${y}-${pad2(m + 1)}` }
+
+// Per-maand budgetaanpassing (0 als er geen is)
+export function monthAdjustment(config: BudgetConfig | null, y: number, m: number): number {
+  return config?.month_adjustments?.[monthKey(y, m)] || 0
+}
 
 // Valt de uitgave binnen een eerdere (gearchiveerde) vakantie?
 export function isHistVacationExpense(e: Expense, vacHistory: VacationEntry[]): boolean {
@@ -44,14 +51,16 @@ export interface CarryoverArgs {
   vacationMode: boolean
   prevSpent: number // budget-uitgaven van de vorige maand (aparte query)
   yearExpenses: Expense[]
-  variableBase: number
   vacHistory: VacationEntry[]
+  baseMonthly: number // maandbudget zónder maand-aanpassing
+  vasteLasten: number
+  adjustments?: Record<string, number>
 }
 
 // Overschrijding van vorige maanden gespreid terugbetalen via een rollend
 // venster van `recoveryMonths` maanden
 export function calcCarryover(args: CarryoverArgs): number {
-  const { selYear, selMonth, recoveryMonths, vacationMode, prevSpent, yearExpenses, variableBase, vacHistory } = args
+  const { selYear, selMonth, recoveryMonths, vacationMode, prevSpent, yearExpenses, vacHistory, baseMonthly, vasteLasten, adjustments } = args
   if (vacationMode) return 0
   let carryover = 0
   for (let i = 1; i <= recoveryMonths; i++) {
@@ -72,7 +81,8 @@ export function calcCarryover(args: CarryoverArgs): number {
       )
       pSpent = sumAmounts(pExps)
     }
-    carryover += Math.max(0, pSpent - variableBase) / recoveryMonths
+    const thr = Math.max(0, baseMonthly + (adjustments?.[monthKey(pY, pM)] || 0) - vasteLasten)
+    carryover += Math.max(0, pSpent - thr) / recoveryMonths
   }
   return carryover
 }

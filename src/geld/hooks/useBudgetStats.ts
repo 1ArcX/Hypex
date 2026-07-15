@@ -4,7 +4,7 @@ import { CATEGORIES, DEFAULT_CAT_BUDGETS, FIXED_CAT } from '../lib/categories'
 import { todayStr } from '../lib/format'
 import {
   activeMonthlyBudget, calcCarryover, calcEnvelopeScale, effectiveBudget,
-  filterBudgetExpenses, filterRegular, isHistVacationExpense, sumAmounts, sumByCategory,
+  filterBudgetExpenses, filterRegular, isHistVacationExpense, monthAdjustment, sumAmounts, sumByCategory,
 } from '../lib/budget'
 import { calcRecurringThisMonth } from '../lib/recurring'
 import { calcWeekBudget, calcWeekTotals, weekIndexOfDay } from '../lib/weekBudget'
@@ -25,7 +25,8 @@ export function useBudgetStats({ expenses, prevExpenses, yearExpenses, config }:
 
   return useMemo(() => {
     const vacationMode = config?.vacation_mode || false
-    const monthlyBudget = activeMonthlyBudget(config)
+    const baseMonthly = activeMonthlyBudget(config)
+    const monthlyBudget = baseMonthly + monthAdjustment(config, selYear, selMonth)
     const minBalance = config?.min_balance ?? 300
     const catBudgets = config?.category_budgets || DEFAULT_CAT_BUDGETS
     const customCategories = config?.custom_categories || []
@@ -75,7 +76,8 @@ export function useBudgetStats({ expenses, prevExpenses, yearExpenses, config }:
     const variableBase = Math.max(0, base - vasteLastenBudget)
     const carryover = calcCarryover({
       selYear, selMonth, recoveryMonths, vacationMode,
-      prevSpent, yearExpenses, variableBase, vacHistory,
+      prevSpent, yearExpenses, vacHistory,
+      baseMonthly, vasteLasten: vasteLastenBudget, adjustments: config?.month_adjustments || {},
     })
     const adjustedBase = vacationMode ? base : Math.max(0, variableBase - carryover)
     const adjustedRemaining = adjustedBase - totalSpent

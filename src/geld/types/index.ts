@@ -73,6 +73,8 @@ export interface BudgetConfig {
   recurring_income?: RecurringSource[]
   // per datum (YYYY-MM-DD) de ids van bevestigde recurring-bronnen
   income_confirmed_dates?: Record<string, string[]>
+  // per maand (YYYY-MM) een extra bedrag dat alleen die maand geldt (+ of −)
+  month_adjustments?: Record<string, number>
   updated_at?: string
 }
 
@@ -88,4 +90,5 @@ export interface BudgetConfigInput {
   vacation_budget: number
   vacation_start: string | null
   vacation_end: string | null
+  month_adjustments?: Record<string, number>
 }

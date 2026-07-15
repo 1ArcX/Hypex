@@ -5,17 +5,23 @@ import { glassInput } from '../components/ui/Glass'
 import { scrollFix } from '../hooks/useIosScroll'
 import type { BudgetConfig, BudgetConfigInput, CategoryConfig } from '../types'
 import { CATEGORIES, CAT_COLORS, CAT_EMOJIS, DEFAULT_CAT_BUDGETS } from '../lib/categories'
-import { fmtShort, parseAmount } from '../lib/format'
+import { fmtShort, parseAmount, pad2 } from '../lib/format'
 
 const label = 'text-[11px] font-semibold uppercase tracking-[0.07em] block mb-2'
+const NL_MONTHS = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december']
 
 // Budget-instellingen: maandbudget, spaardoel, min. saldo, spreiding,
 // vakantiemodus en enveloppen (incl. eigen categorieën)
-export function BudgetModal({ config, onClose, onSave }: {
+export function BudgetModal({ config, year, month, onClose, onSave }: {
   config: BudgetConfig | null
+  year: number
+  month: number
   onClose: () => void
   onSave: (data: BudgetConfigInput) => void
 }) {
+  const mKey = `${year}-${pad2(month + 1)}`
+  const monthLabel = `${NL_MONTHS[month]} ${year}`
+  const [extra, setExtra] = useState<number>(config?.month_adjustments?.[mKey] || 0)
   const [monthly, setMonthly] = useState(config?.monthly_budget || 400)
   const [cats, setCats] = useState<Record<string, number>>(config?.category_budgets || DEFAULT_CAT_BUDGETS)
   const [customCats, setCustomCats] = useState<CategoryConfig[]>(config?.custom_categories || [])
@@ -70,6 +76,14 @@ export function BudgetModal({ config, onClose, onSave }: {
         <label className={`${label} text-white/35`}>Maandbudget (fallback)</label>
         {euroInput(monthly, setMonthly, 'text-white/30')}
         <p className="text-[11px] text-white/30 mt-1.5">Wordt gebruikt als je geen terugkerend inkomen hebt ingesteld.</p>
+      </div>
+
+      <div className="mb-4 p-4 rounded-2xl bg-teal-300/[0.05] border border-teal-300/20">
+        <label className={`${label} text-teal-300`}>➕ Extra budget — {monthLabel}</label>
+        {euroInput(extra, setExtra, 'text-teal-300')}
+        <p className="text-[11px] text-teal-300/60 mt-1.5">
+          Geldt <b>alleen deze maand</b>. Positief = meer te besteden, negatief = minder. Werkt door in je dag-, week- en envelopbudgetten en telt niet als overschrijding.
+        </p>
       </div>
 
       <div className="mb-4 p-4 rounded-2xl bg-emerald-400/[0.05] border border-emerald-400/20">
@@ -211,12 +225,19 @@ export function BudgetModal({ config, onClose, onSave }: {
       </div>
 
       <button
-        onClick={() => onSave({
-          monthly_budget: monthly, category_budgets: cats, custom_categories: customCats,
-          savings_goal: savingsGoal, min_balance: minBalance, recovery_months: recoveryMonths,
-          vacation_mode: vacMode, vacation_budget: vacMode ? (Number(vacBudget) || 0) : 0,
-          vacation_start: vacMode ? vacStart : null, vacation_end: vacMode ? vacEnd : null,
-        })}
+        onClick={() => {
+          const adjustments = { ...(config?.month_adjustments || {}) }
+          if (extra) adjustments[mKey] = Number(extra)
+          else delete adjustments[mKey]
+          const hadAdj = config?.month_adjustments !== undefined
+          onSave({
+            monthly_budget: monthly, category_budgets: cats, custom_categories: customCats,
+            savings_goal: savingsGoal, min_balance: minBalance, recovery_months: recoveryMonths,
+            vacation_mode: vacMode, vacation_budget: vacMode ? (Number(vacBudget) || 0) : 0,
+            vacation_start: vacMode ? vacStart : null, vacation_end: vacMode ? vacEnd : null,
+            ...((Object.keys(adjustments).length || hadAdj) ? { month_adjustments: adjustments } : {}),
+          })
+        }}
         className="w-full py-3.5 rounded-2xl bg-teal-300 border-none text-black text-[15px] font-bold cursor-pointer shadow-[0_0_20px_rgba(94,234,212,0.3)]">
         Opslaan
       </button>
