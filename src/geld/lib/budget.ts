@@ -57,7 +57,7 @@ export function calcCarryover(args: CarryoverArgs): number {
   for (let i = 1; i <= recoveryMonths; i++) {
     const pY = (selMonth - i) < 0 ? selYear - 1 : selYear
     const pM = ((selMonth - i) % 12 + 12) % 12
-    if (pY === 2026 && pM <= 2) continue // Jan/feb/mrt 2026 buiten beschouwing
+    if (pY === 2026 && pM <= 5) continue // t/m juni 2026 buiten beschouwing (carryover-reset per juli 2026)
     let pSpent = 0
     if (i === 1) {
       pSpent = prevSpent
