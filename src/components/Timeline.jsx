@@ -144,7 +144,11 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
   useEffect(() => {
     fetchEvents()
     window.addEventListener('refreshCalendarEvents', fetchEvents)
-    return () => window.removeEventListener('refreshCalendarEvents', fetchEvents)
+    window.addEventListener('refreshExternalCalendarEvents', fetchEvents)
+    return () => {
+      window.removeEventListener('refreshCalendarEvents', fetchEvents)
+      window.removeEventListener('refreshExternalCalendarEvents', fetchEvents)
+    }
   }, [])
   useEffect(() => { onLessonsChange?.([...magisterLessons, ...somtodayLessons]) }, [magisterLessons, somtodayLessons])
   useEffect(() => { onEventsChange?.(events) }, [events])
@@ -337,8 +341,12 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
   }, [toDateStr(getWeekDays(current)[0]), scheduleVersion])
 
   const fetchEvents = async () => {
-    const { data } = await supabase.from('calendar_events').select('*').eq('user_id', userId)
-    if (data) setEvents(data)
+    const [own, external] = await Promise.all([
+      supabase.from('calendar_events').select('*').eq('user_id', userId),
+      supabase.from('external_calendar_events').select('*'),
+    ])
+    const imported = (external.data || []).map(ev => ({ ...ev, id: `external:${ev.id}`, external: true, description: ev.description || '' }))
+    if (own.data) setEvents([...own.data, ...imported])
   }
 
   const getWorkShiftsForDay = (date) => {
@@ -398,6 +406,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
 
   const openEditEvent = (ev, e) => {
     e?.stopPropagation()
+    if (ev.external) return
     const s = new Date(ev.start_time), en = new Date(ev.end_time)
     const isAllDay = s.getHours() === 0 && s.getMinutes() === 0 && en.getHours() === 23 && en.getMinutes() === 59
     const startDs = toDateStr(s), endDs = toDateStr(en)
@@ -442,7 +451,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
   }
 
   const handleDelete = async () => {
-    if (!modal?.event) return
+    if (!modal?.event || modal.event.external) return
     await supabase.from('calendar_events').delete().eq('id', modal.event.id)
     setModal(null); fetchEvents()
   }
@@ -747,7 +756,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                           onClick={e => openEditEvent(ev, e)}
                           style={{ position: 'absolute', top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, background: ev.color + '22', borderLeft: `3px solid ${ev.color}`, borderRadius: '5px', padding: '3px 7px', overflow: 'hidden', cursor: 'pointer', zIndex: 2, boxSizing: 'border-box', marginLeft: '2px', ...hlStyle }}>
                           <div style={{ fontSize: '11px', fontWeight: 600, color: ev.color, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {ev.title}
+                            {ev.external ? '↗ ' : ''}{ev.title}
                           </div>
                           {showDetail && (
                             <div style={{ fontSize: '10px', color: ev.color + 'bb', lineHeight: 1.2, marginTop: '1px' }}>

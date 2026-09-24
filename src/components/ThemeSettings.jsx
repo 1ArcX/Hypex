@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { X, Palette, RotateCcw, LogOut, Bell, BellOff } from 'lucide-react'
 import { pushSupported, requestAndSubscribe } from '../utils/push'
+import CalendarConnections from './CalendarConnections'
 
 const PRESETS = [
   { name: 'Neon Cyan', accent: '#00FFD1', bg1: '#0a0a1a', bg2: '#0d1117' },
@@ -22,6 +23,7 @@ export default function ThemeSettings({ onClose, theme, setTheme, onLogout, user
   const [somtodayColor, setSomtodayColorState] = useState(() => {
     try { return localStorage.getItem('somtoday_lesson_color') || '#FACC15' } catch { return '#FACC15' }
   })
+  const [showCalendarConnections, setShowCalendarConnections] = useState(false)
 
   const applySomtodayColor = (color) => {
     setSomtodayColorState(color)
@@ -144,6 +146,15 @@ export default function ThemeSettings({ onClose, theme, setTheme, onLogout, user
           )}
         </div>
 
+        <div className="mb-5">
+          <p className="text-xs font-medium mb-2" style={{ color: 'rgba(255,255,255,0.5)' }}>Externe agenda's</p>
+          <button onClick={() => setShowCalendarConnections(true)}
+            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-sm"
+            style={{ background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.25)', color: '#7DD3FC', cursor: 'pointer' }}>
+            Google Agenda of MijnX koppelen
+          </button>
+        </div>
+
         <button onClick={resetTheme}
           className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-sm"
           style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', marginBottom: 8 }}>
@@ -160,6 +171,7 @@ export default function ThemeSettings({ onClose, theme, setTheme, onLogout, user
           </button>
         )}
       </div>
+      {showCalendarConnections && <CalendarConnections onClose={() => setShowCalendarConnections(false)} />}
     </div>
   )
 }
