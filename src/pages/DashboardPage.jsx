@@ -12,6 +12,7 @@ import TodayWidget from '../components/dashboard/TodayWidget'
 import { Card, CardHeader, CardLink, KpiTile, ListRow, CheckButton, Pill, IconButton, FilterTabs, EmptyState } from '../components/ui'
 import { taskCategory, eventCategory, categoryColor } from '../utils/category'
 import { isOverdue, isUrgent, daysLate, shortDate } from '../utils/taskStatus'
+import { eventDisplay } from '../utils/eventTitle'
 
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -33,15 +34,16 @@ function longDate(d = new Date()) {
 
 const hhmm = d => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
 
-// "Over 14 min" / "Over 2u 10m" / "Morgen 09:00" / "do 1 okt 19:00"
+// "Over 14 min" / "Over 2u 10m" / "Morgen" / "Over 3 dagen" — de datum/tijd staat eronder
 function countdownLabel(ts, now = new Date()) {
   const mins = Math.round((ts - now) / 60000)
   const sameDay = ts.toDateString() === now.toDateString()
   if (sameDay && mins < 60) return mins <= 0 ? 'Nu' : `Over ${mins} min`
   if (sameDay) return `Over ${Math.floor(mins / 60)}u${mins % 60 ? ` ${mins % 60}m` : ''}`
-  const tom = new Date(now); tom.setDate(now.getDate() + 1)
-  if (ts.toDateString() === tom.toDateString()) return `Morgen ${hhmm(ts)}`
-  return `${ts.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })} ${hhmm(ts)}`
+  const a = new Date(now); a.setHours(0, 0, 0, 0)
+  const b = new Date(ts); b.setHours(0, 0, 0, 0)
+  const days = Math.round((b - a) / 86400000)
+  return days === 1 ? 'Morgen' : `Over ${days} dagen`
 }
 
 // ── Vandaag-strip: haal alle geplande items van vandaag op ─────────────────────
@@ -87,6 +89,24 @@ function useTodayItems(tasks, magisterLessons, calendarEvents) {
         type: 'task',
         raw: t,
         end: t.end_time?.slice(0,5) || null,
+      })
+    }
+
+    // Agenda-items (eigen + geïmporteerd), niet hele-dag
+    for (const ev of calendarEvents || []) {
+      if (!ev.start_time || ev.all_day) continue
+      const s = new Date(ev.start_time)
+      const d = `${s.getFullYear()}-${pad2(s.getMonth()+1)}-${pad2(s.getDate())}`
+      if (d !== today) continue
+      const e = ev.end_time ? new Date(ev.end_time) : null
+      items.push({
+        sortMins: s.getHours()*60 + s.getMinutes(),
+        time: hhmm(s),
+        label: eventDisplay(ev).title,
+        color: categoryColor(eventCategory(ev)),
+        type: 'event',
+        end: e ? hhmm(e) : null,
+        highlightKey: `event:${ev.id}`,
       })
     }
 
@@ -140,7 +160,7 @@ function useNextEvent({ tasks, calendarEvents, magisterLessons, skip, typeFilter
       ...allLessons.filter(l => l.start && !l.uitgevallen && new Date(l.start) >= now)
         .map(l => ({ label: l.vak || 'Les', ts: new Date(l.start), end: l.einde ? new Date(l.einde) : null, location: l.lokaal || l.location, type: 'lesson', cat: 'school', highlightKey: `lesson:${l.start}` })),
       ...calendarEvents.filter(ev => ev.start_time && new Date(ev.start_time) >= now)
-        .map(ev => ({ label: ev.title, ts: new Date(ev.start_time), end: ev.end_time ? new Date(ev.end_time) : null, location: ev.location, type: 'event', raw: ev, cat: eventCategory(ev), highlightKey: `event:${ev.id}` })),
+        .map(ev => ({ label: eventDisplay(ev).title, code: eventDisplay(ev).code, ts: new Date(ev.start_time), end: ev.end_time ? new Date(ev.end_time) : null, location: ev.location, type: 'event', raw: ev, cat: eventCategory(ev), highlightKey: `event:${ev.id}` })),
       ...shifts.filter(s => s.date && (s.start_time || s.start))
         .map(s => {
           const timeStr = s.start_time || s.start || '09:00'
@@ -295,10 +315,11 @@ export default function DashboardPage({
                       <ListRow key={t.id}
                         dot={categoryColor(taskCategory(t))}
                         title={t.title}
-                        subtitle={[late ? `${n} ${n === 1 ? 'dag' : 'dagen'} te laat` : 'Urgent', subj].filter(Boolean).join(' · ')}
-                        trailing={late
-                          ? <Pill tone="danger">{shortDate(t.date, today)}</Pill>
-                          : <Pill tone="danger">{t.date ? shortDate(t.date, today) : 'Urgent'}</Pill>}
+                        subtitle={[late ? `${n} ${n === 1 ? 'dag' : 'dagen'} te laat` : (t.date ? null : 'Nog niet ingepland'), subj].filter(Boolean).join(' · ') || null}
+                        trailing={<>
+                          {!late && <Pill tone="danger">Urgent</Pill>}
+                          {t.date && <Pill tone={late ? 'danger' : 'neutral'}>{shortDate(t.date, today)}</Pill>}
+                        </>}
                         action={<CheckButton checked={false} onChange={() => onToggleTask?.(t)} label={`Markeer "${t.title}" als gedaan`} tone="success" />}
                         onClick={() => setDetailTask(t)}
                       />
@@ -363,6 +384,7 @@ export default function DashboardPage({
                       {ev.ts.toDateString() !== new Date().toDateString() && `${ev.ts.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })} · `}
                       {hhmm(ev.ts)}{ev.end ? ` – ${hhmm(ev.end)}` : ''}
                     </span>
+                    {ev.code && <span className="t-meta" style={{ display: 'block', fontSize: 11, marginTop: 2, letterSpacing: '0.02em' }}>{ev.code}</span>}
                     {ev.location && (
                       <span className="t-meta" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, marginTop: 2 }}>
                         <MapPin size={11} aria-hidden="true" /> {ev.location}

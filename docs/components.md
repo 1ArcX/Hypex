@@ -157,6 +157,7 @@ Self-contained money/budget app, mounted via [pages/GeldPage.jsx](../src/pages/G
   - `IconButton` — [IconButton.jsx](../src/components/ui/IconButton.jsx) (requires `label`). `EmptyState` — [EmptyState.jsx](../src/components/ui/EmptyState.jsx).
   - `toneColor` / `tint` — [tone.js](../src/components/ui/tone.js): tone name → token color.
 - **Task status** — [utils/taskStatus.js](../src/utils/taskStatus.js): `isOverdue` (excl. routines), `isUrgent`, `daysLate`, `shortDate` — one definition for Dashboard, Sidebar badge, Taken.
+- **Event names** — [utils/eventTitle.js](../src/utils/eventTitle.js): `eventDisplay(ev)` → readable course name + code for MyX events.
 - **Category colors** — [utils/category.js](../src/utils/category.js): `taskCategory`, `eventCategory`, `CATEGORIES`
   (School/Werk/Persoonlijk/Routine/Overig, derived from the item's source).
 - `src/geld/components/ui/` — [Glass.tsx](../src/geld/components/ui/Glass.tsx) (glass card + `Spinner`),

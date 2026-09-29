@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { Search, Home, Calendar, CheckSquare, Timer, FileText, BarChart2, Briefcase, Wallet, Sparkles, Plus, CornerDownLeft, StickyNote } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { taskCategory, eventCategory, categoryColor } from '../utils/category'
+import { eventDisplay } from '../utils/eventTitle'
 
 // "Zoek in Hypex" (Ctrl/⌘K) — client-side zoeken over wat al geladen is (taken, agenda-items)
 // plus notitie-titels (lichte select bij openen) en paginanavigatie. Geen nieuwe backend.
@@ -67,11 +68,17 @@ export default function CommandPalette({ open, onClose, userId, tasks = [], cale
     const now = new Date()
     const eventHits = calendarEvents
       .filter(ev => match(ev.title, ev.description, ev.location))
-      .sort((a, b) => Math.abs(new Date(a.start_time) - now) - Math.abs(new Date(b.start_time) - now))
+      // eerst komende (oplopend), daarna voorbije (meest recent eerst)
+      .sort((a, b) => {
+        const ta = new Date(a.start_time), tb = new Date(b.start_time)
+        const fa = ta >= now, fb = tb >= now
+        if (fa !== fb) return fa ? -1 : 1
+        return fa ? ta - tb : tb - ta
+      })
       .slice(0, 6)
       .map(ev => ({
-        key: `event:${ev.id}`, group: 'Agenda', dot: categoryColor(eventCategory(ev)), title: ev.title,
-        meta: fmtDate(ev.start_time), run: () => onOpenEvent(ev),
+        key: `event:${ev.id}`, group: 'Agenda', dot: categoryColor(eventCategory(ev)), title: eventDisplay(ev).title,
+        meta: `${fmtDate(ev.start_time)} ${new Date(ev.start_time).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}`, run: () => onOpenEvent(ev),
       }))
     const noteHits = notes
       .filter(n => match(n.title, n.content))

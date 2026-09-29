@@ -78,6 +78,9 @@ export default function App() {
   const [noteJump, setNoteJump] = useState(null)
   const [magisterLessons, setMagisterLessons] = useState([])
   const [calendarEvents, setCalendarEvents] = useState([])
+  // Geïmporteerde agenda's (MyX/Google) — alleen-lezen, voor Dashboard "Volgende afspraak" en zoeken.
+  // Los van calendarEvents zodat de Timeline haar eigen (bewerkbare) lijst houdt.
+  const [externalEvents, setExternalEvents] = useState([])
   const [magisterError, setMagisterError] = useState(null)
   const [detailTask, setDetailTask] = useState(null)
   const [subjectLinks, setSubjectLinks] = useState({})
@@ -391,10 +394,17 @@ export default function App() {
     })
   }, [user?.id])
 
+  const fetchExternalEvents = useCallback(async () => {
+    const since = new Date(Date.now() - 86400000).toISOString()
+    const { data, error } = await supabase.from('external_calendar_events').select('*').gte('end_time', since).order('start_time').limit(500)
+    if (error || !data) return
+    setExternalEvents(data.map(ev => ({ ...ev, id: `external:${ev.id}`, external: true, description: ev.description || '' })))
+  }, [])
+
   // Load data
   useEffect(() => {
     if (session && user?.id) {
-      fetchTasks(); fetchSubjects(); fetchProfiles(); fetchSubjectLinks()
+      fetchTasks(); fetchSubjects(); fetchProfiles(); fetchSubjectLinks(); fetchExternalEvents()
       supabase.from('calendar_events').select('*').eq('user_id', user.id).then(({ data }) => {
         if (data) setCalendarEvents(data)
       })
@@ -496,6 +506,8 @@ export default function App() {
     return () => window.removeEventListener('refreshCalendarEvents', handler)
   }, [user?.id])
 
+  const allEvents = useMemo(() => [...calendarEvents, ...externalEvents], [calendarEvents, externalEvents])
+
   // Auto-sync elke 30 seconden
   const doSync = useCallback(async () => {
     if (!user?.id) return
@@ -503,6 +515,7 @@ export default function App() {
     await Promise.all([
       fetchTasks(),
       fetchSubjects(),
+      fetchExternalEvents(),
       supabase.from('calendar_events').select('*').eq('user_id', user.id).then(({ data }) => {
         if (data) setCalendarEvents(data)
       }),
@@ -830,7 +843,7 @@ export default function App() {
                 isBreak={isBreak}
                 tasks={tasks}
                 subjects={subjects}
-                calendarEvents={calendarEvents}
+                calendarEvents={allEvents}
                 magisterLessons={magisterLessons}
                 magisterError={magisterError}
                 displayName={displayName}
@@ -960,7 +973,7 @@ export default function App() {
         onClose={() => setPaletteOpen(false)}
         userId={user?.id}
         tasks={tasks}
-        calendarEvents={calendarEvents}
+        calendarEvents={allEvents}
         isAdmin={isAdmin}
         showJumbo={isAdmin || !!userProfile?.werk_tab}
         onNavigate={handleSetActivePage}

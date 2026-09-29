@@ -50,5 +50,9 @@ Branch `redesign/hypex-v2`, one commit per phase. Analysis & proposal: [phase1-a
   Taken showed 1.
 - **Deviation:** the Pomodoro widget's play button opens the Pomodoro page instead of starting the timer
   there — starting would need a second copy of the timer logic.
-- **Open question:** "Volgende afspraak" doesn't include MyX/Google events (App doesn't load
-  `external_calendar_events`; only the Agenda does). Adding that read query needs approval.
+- Approved follow-up: App now also loads `external_calendar_events` (read-only, from yesterday onward) for the
+  Dashboard ("Volgende afspraak", "Schema vandaag") and search. The Timeline keeps its own list.
+- **D3 resolved from real data:** MyX `description` = "<code> <opleiding> <periode> <cursusnaam>", so the readable
+  name is parsed by `utils/eventTitle.js` (no mapping needed). Items without a name (e.g. "MATH0") keep the code.
+- Verified in the browser with real data: dashboard rows, next appointment (name + code + location), search
+  (Ctrl K, event → Agenda with highlight, "Nieuwe taak"), Geld widget matches the Geld page.
