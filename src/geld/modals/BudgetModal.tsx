@@ -69,7 +69,7 @@ export function BudgetModal({ config, year, month, onClose, onSave }: {
     <CenterModal onClose={onClose}>
       <div className="flex items-center justify-between mb-5">
         <h3 className="text-[16px] font-bold text-white/90 m-0">Budget instellen</h3>
-        <button onClick={onClose} className="bg-transparent border-none cursor-pointer text-white/35"><X size={18} /></button>
+        <button aria-label="Sluiten" onClick={onClose} className="bg-transparent border-none cursor-pointer text-white/35"><X size={18} /></button>
       </div>
 
       <div className="mb-4">

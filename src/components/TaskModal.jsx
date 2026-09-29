@@ -380,7 +380,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
           <h2 style={{ color: 'white', fontWeight: 700, fontSize: '16px', margin: 0 }}>
             {task ? '✏️ Taak bewerken' : '📝 Nieuwe taak'}
           </h2>
-          <button onClick={handleClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)' }}><X size={18} /></button>
+          <button aria-label="Sluiten" onClick={handleClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)' }}><X size={18} /></button>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>

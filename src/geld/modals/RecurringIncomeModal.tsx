@@ -107,7 +107,7 @@ export function RecurringIncomeModal({ config, onClose, onSave }: {
     <CenterModal onClose={handleClose}>
       <div className="flex items-center justify-between mb-5">
         <h3 className="text-[16px] font-bold text-white/90 m-0">Terugkerend inkomen</h3>
-        <button onClick={handleClose} className="bg-transparent border-none cursor-pointer text-white/35"><X size={18} /></button>
+        <button aria-label="Sluiten" onClick={handleClose} className="bg-transparent border-none cursor-pointer text-white/35"><X size={18} /></button>
       </div>
 
       {sources.length > 0 && (

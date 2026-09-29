@@ -45,7 +45,7 @@ export default function AdminPanel({ onClose, profiles = [], onProfilesChange })
               <p style={{ color: 'var(--c-text-3)', fontSize: 12, margin: 0 }}>Gebruikersbeheer</p>
             </div>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)' }}>
+          <button aria-label="Sluiten" onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)' }}>
             <X size={20} />
           </button>
         </div>

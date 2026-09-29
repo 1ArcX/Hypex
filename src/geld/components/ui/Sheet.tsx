@@ -26,7 +26,7 @@ export function Sheet({ onClose, title, children, accentColor }: {
         {title !== undefined && (
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-[16px] font-bold m-0" style={{ color: accentColor || 'rgba(255,255,255,0.9)' }}>{title}</h3>
-            <button onClick={onClose} className="bg-white/[0.06] border border-white/10 rounded-full p-1.5 text-white/40 cursor-pointer">
+            <button aria-label="Sluiten" onClick={onClose} className="bg-white/[0.06] border border-white/10 rounded-full p-1.5 text-white/40 cursor-pointer">
               <X size={15} />
             </button>
           </div>

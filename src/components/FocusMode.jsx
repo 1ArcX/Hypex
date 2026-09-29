@@ -38,7 +38,7 @@ export default function FocusMode({
       <div className="focus-blob focus-blob--3" style={{ background: `radial-gradient(circle, color-mix(in srgb, ${color} 8%, transparent) 0%, transparent 70%)` }} />
 
       {/* Close button — does NOT stop timer */}
-      <button className="focus-close-btn" onClick={onClose} title="Sluit focusmodus (timer loopt door)">
+      <button aria-label="Sluiten" className="focus-close-btn" onClick={onClose} title="Sluit focusmodus (timer loopt door)">
         <X size={20} />
       </button>
 

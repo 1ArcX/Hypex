@@ -74,7 +74,7 @@ export function IncomeDayModal({ source, defaultDate, adjustedBase, savingsGoal,
           <p className="text-[12px] text-white/35 m-0">Vul in wat je hebt ontvangen</p>
         </div>
         {isManual && (
-          <button onClick={onLater} className="bg-transparent border-none cursor-pointer text-white/30 p-1"><X size={18} /></button>
+          <button aria-label="Sluiten" onClick={onLater} className="bg-transparent border-none cursor-pointer text-white/30 p-1"><X size={18} /></button>
         )}
       </div>
 

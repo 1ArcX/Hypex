@@ -819,6 +819,7 @@ export default function App() {
               </button>
               <button
                 onClick={() => setShowThemeSettings(true)}
+                aria-label="Instellingen"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: '6px', display: 'flex', alignItems: 'center', borderRadius: 8 }}
               >
                 <Settings size={17} />

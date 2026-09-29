@@ -82,7 +82,7 @@ export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onE
               </div>
             )}
           </div>
-          <button onClick={handleClose} style={{ background:'none',border:'none',cursor:'pointer',color:'var(--c-text-3)',flexShrink:0 }}>
+          <button aria-label="Sluiten" onClick={handleClose} style={{ background:'none',border:'none',cursor:'pointer',color:'var(--c-text-3)',flexShrink:0 }}>
             <X size={18} />
           </button>
         </div>

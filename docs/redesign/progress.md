@@ -134,3 +134,37 @@ suggestions and, on mobile, the Taken filters).
 - Agenda legend rail only ≥1280; Taken filters wrap on desktop, scroll on mobile; Notities split view on
   desktop, list → detail on mobile; Statistieken week cards 2-col when ≥ ~760px content width.
 - "Schema vandaag" past items are dimmed instead of struck through (strike-through read as "done").
+
+## Phase 8 — Polish & final check
+
+- Contrast: `--c-text-3` 0.40 → 0.50 (≈5.3:1 on the background, ≈4.8:1 on raised surfaces, AA for small
+  text); `--c-text-2` 0.60 → 0.66 to keep the hierarchy step.
+- Keyboard: global `:focus-visible` outline (accent); Agenda blocks (lessons, events, tasks) now focusable with
+  Enter/Space; list rows, task rows, notes rows, KPI tiles, palette options are buttons/role=button.
+- Labels: `aria-label` added to 13 icon-only close buttons (TaskModal, TaskDetailModal, AdminPanel, Calendar,
+  FocusMode, Geld sheets/modals, …), mobile settings button, all new `IconButton`s (label required).
+- Motion: all new transitions use `--t-fast/--t-base`; `prefers-reduced-motion` disables animations,
+  infinite pulses and press-scale.
+- Glow rules applied: resting cards no shadow; hover = light accent border; primary/active = glow; urgent =
+  subtle static red glow; Pomodoro ring glows only while running; chart bars no glow.
+- Final run: no JS errors on any page (only known network failures: Netlify functions not served by Vite,
+  Buienalarm CORS from localhost).
+
+## Final comparison with the mockup
+
+| Panel | Result | Deviations (why) |
+|---|---|---|
+| 1 Dashboard | Header row, 4 KPI tiles, overdue/urgent + next appointment, 4 compact widgets, sidebar with badge | "Vandaag" KPI counts open tasks for today (data); Pomodoro play opens the Pomodoro page (no second timer engine); extra Level-2 row (Schema vandaag, Deadlines, Nog in te plannen, regen) kept because those features exist; search is Ctrl K (not ⌘K) on Windows |
+| 2 Agenda | Category colors, readable name + code, legend + mini month, calmer grid, now-pill, today circle | Legend rail only ≥1280 px; "Werk"/"Persoonlijk" for own events follow the user's chosen palette color |
+| 3 Taken | Progress header, filter tabs with counts, Urgent / Te laat / dagdelen / Routines, compact rows | Extra filters (Morgen, Urgent, Ongepland, groups) kept; "Deze week" = "Week" (next 7 days) |
+| 4 Notities | Split view, search, sort, colored dots, folder tag, edit/delete | Tags = folders (no tag data); edits save automatically (no separate edit button) |
+| 5 Geld | Hero KPI + progress + spent/budget, Vandaag/Deze week/Inkomsten, Prognose/Spaarstreak/Analyse | Hero label keeps existing copy "Nog over deze maand"; hero turns red when <15% left (existing rule) |
+| 6 Instellingen | Preset grid, eigen kleur, live preview mini-UI | Preview is a mini dashboard (nav, KPI, pill, progress, buttons, bottom nav) rather than an exact copy |
+
+## Deferred / open
+
+- D7 Pomodoro session → task link, D8 "XP this week" (need new data).
+- Hypex AI budget line vs Geld numbers (would change AI prompt data) — your call.
+- Routines per-day chart in Statistieken (no per-day completion history).
+- Not exercised against the database (would change real data): completing/deleting tasks, creating notes,
+  saving events. The handlers are unchanged; opening/reading was verified.

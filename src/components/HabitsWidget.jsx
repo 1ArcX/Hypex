@@ -420,7 +420,7 @@ function NoteModal({ habit, date, onClose }) {
             <span style={{ fontSize: 22 }}>{habit.icon}</span>
             <span style={{ fontSize: 15, fontWeight: 600, color: 'white' }}>Notitie voor vandaag</span>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)' }}><X size={18} /></button>
+          <button aria-label="Sluiten" onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)' }}><X size={18} /></button>
         </div>
         <textarea
           autoFocus
@@ -738,7 +738,7 @@ function WeeklyReviewModal({ habits, completions, counterConfig, counterValues, 
             <h2 style={{ fontSize:17, fontWeight:700, color:'white', margin:'0 0 3px' }}>Week samenvatting 📊</h2>
             <p style={{ fontSize:12, color:'var(--c-text-3)', margin:0 }}>{weekLabel}</p>
           </div>
-          <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--c-text-3)', padding:4 }}><X size={18}/></button>
+          <button aria-label="Sluiten" onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--c-text-3)', padding:4 }}><X size={18}/></button>
         </div>
 
         {/* Overall score */}
@@ -844,7 +844,7 @@ function HabitModal({ habit, presetData, onSave, onClose, onDelete, onPause, cou
       <div className="glass-card" style={{ width: '100%', maxWidth: 400, padding: 24, position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h2 style={{ fontSize: 16, fontWeight: 700, color: 'white', margin: 0 }}>{habit ? 'Bewerken' : 'Nieuwe gewoonte'}</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', padding: 4 }}><X size={18} /></button>
+          <button aria-label="Sluiten" onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', padding: 4 }}><X size={18} /></button>
         </div>
 
         {/* Naam */}

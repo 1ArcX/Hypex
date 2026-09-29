@@ -21,6 +21,11 @@ function blockStyle(color, extra = {}) {
     ...extra,
   }
 }
+// Toetsenbord-toegang voor klikbare blokken (Enter/Spatie = klik)
+const kbdClick = (label, fn) => ({
+  role: 'button', tabIndex: 0, 'aria-label': label,
+  onKeyDown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(e) } },
+})
 const blockTitle = (color, extra = {}) => ({ fontSize: '11px', fontWeight: 700, color: `color-mix(in srgb, ${color} 55%, white)`, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', ...extra })
 const blockMeta = (color) => ({ fontSize: '10px', color: `color-mix(in srgb, ${color} 45%, var(--c-text-2))`, lineHeight: 1.3, marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' })
 
@@ -723,6 +728,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                         <div key={item.key}
                           ref={isHL ? highlightRef : undefined}
                           onClick={e => { e.stopPropagation(); setLessonDetail(les) }}
+                          {...kbdClick(`Les ${lesTitle}`, e => { e.stopPropagation(); setLessonDetail(les) })}
                           style={blockStyle(color, { top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, zIndex: 1, opacity: cancelled ? 0.55 : 1, ...hlStyle })}>
                           <div style={blockTitle(color, { textDecoration: cancelled ? 'line-through' : 'none' })}>
                             {lesTitle}
@@ -745,6 +751,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                         <div key={item.key}
                           ref={isHL ? highlightRef : undefined}
                           onClick={e => openEditEvent(ev, e)}
+                          {...kbdClick(`${disp.title}, ${fmtTime(s)} tot ${fmtTime(en)}`, e => openEditEvent(ev, e))}
                           title={[disp.title, disp.code, ev.location].filter(Boolean).join(' · ')}
                           style={blockStyle(color, { top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, zIndex: 2, ...hlStyle })}>
                           <div style={blockTitle(color)}>
@@ -772,6 +779,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                           draggable
                           onDragStart={e => e.dataTransfer.setData('taskId', task.id)}
                           onClick={e => { e.stopPropagation(); onViewDetail ? onViewDetail(task) : onEditTask?.(task) }}
+                          {...kbdClick(`Taak ${task.title}`, e => { e.stopPropagation(); onViewDetail ? onViewDetail(task) : onEditTask?.(task) })}
                           style={blockStyle(color, { top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, zIndex: 3, opacity: task.completed ? 0.55 : 1, ...hlStyle })}>
                           <div style={blockTitle(color, { textDecoration: task.completed ? 'line-through' : 'none' })}>
                             {task.completed ? '✓ ' : ''}{task.title}
