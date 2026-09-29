@@ -852,3 +852,12 @@ select {
   font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
 }
 .notes-content:focus { border-color: var(--accent-border); }
+
+/* ===== STATISTIEKEN (v2) ===== */
+.stats-page { height: 100%; overflow-y: auto; padding: 24px 28px 100px; box-sizing: border-box; }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 12px; align-items: start; }
+.stats-grid:empty { display: none; }
+@media (max-width: 767px) {
+  .stats-page { padding: 14px 16px 100px; }
+  .stats-grid { grid-template-columns: minmax(0, 1fr); }
+}

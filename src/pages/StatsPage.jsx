@@ -46,10 +46,10 @@ function BarChart({ days, values, todayStr, formatLabel, color = 'var(--accent)'
             <div style={{ height: BAR_MAX_H, display: 'flex', alignItems: 'flex-end', width: '100%' }}>
               <div style={{
                 width: '100%', height: barH || 3, borderRadius: 4,
-                background: isFuture ? 'rgba(255,255,255,0.06)'
-                  : val === 0 ? 'rgba(255,255,255,0.08)'
+                background: isFuture ? 'var(--c-surface-2)'
+                  : val === 0 ? 'var(--c-surface-3)'
                   : isToday ? color : dimColor,
-                boxShadow: isToday && val > 0 ? `0 0 8px color-mix(in srgb, ${color} 33%, transparent)` : 'none',
+
                 transition: 'height 0.35s ease',
               }} />
             </div>
@@ -72,7 +72,7 @@ const LEVEL_NAMES = ['Beginner', 'Leerling', 'Gevorderd', 'Expert', 'Meester', '
 function getLevel(xp) { return Math.floor(xp / LEVEL_XP) + 1 }
 function getLevelName(xp) { return LEVEL_NAMES[Math.min(getLevel(xp) - 1, LEVEL_NAMES.length - 1)] }
 
-function XPCard({ userId }) {
+function XPCard({ userId, rank }) {
   const [xp, setXp] = useState(() => { try { return parseInt(localStorage.getItem('habit_xp') || '0') } catch { return 0 } })
   const [achievements, setAchievements] = useState([])
 
@@ -91,20 +91,25 @@ function XPCard({ userId }) {
   const labelMap = { streak_7:'🔥 7d', streak_14:'🔥 14d', streak_30:'🔥 30d', perfect_3:'💎 3d', perfect_7:'💎 7d', level_5:'⭐ Lvl5', level_10:'🌟 Lvl10' }
 
   return (
-    <div className="card" style={{ padding: '18px 20px', border: '1px solid rgba(250,204,21,0.25)', background: 'rgba(250,204,21,0.04)' }}>
+    <div className="card card-tone" style={{ '--tone': '#FACC15', padding: '18px 20px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <div style={{ width: 56, height: 56, borderRadius: 16, flexShrink: 0, background: 'rgba(250,204,21,0.1)', border: '2px solid rgba(250,204,21,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>
+        <div aria-hidden="true" style={{ width: 56, height: 56, borderRadius: 'var(--r-lg)', flexShrink: 0, background: 'rgba(250,204,21,0.1)', border: '2px solid rgba(250,204,21,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>
           {level >= 5 ? '🌟' : level >= 3 ? '⭐' : '✨'}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>{levelName}</span>
-            <span style={{ fontSize: 12, color: '#FACC15', fontWeight: 700 }}>Lvl {level}</span>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--c-text)' }}>{levelName}</span>
+            <span className="tnum" style={{ fontSize: 13, color: '#FACC15', fontWeight: 700 }}>Lvl {level}</span>
+            {rank && (
+              <span className="tnum" style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: 'var(--c-text-2)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                🏆 Rang #{rank.pos} <span style={{ color: 'var(--c-text-3)', fontWeight: 500 }}>van {rank.total}</span>
+              </span>
+            )}
           </div>
-          <div style={{ margin: '6px 0 4px', height: 7, background: 'rgba(255,255,255,0.08)', borderRadius: 4, overflow: 'hidden' }}>
+          <div role="progressbar" aria-label="XP naar volgend level" aria-valuemin={0} aria-valuemax={LEVEL_XP} aria-valuenow={xpIn} style={{ margin: '8px 0 5px', height: 7, background: 'var(--c-surface-3)', borderRadius: 4, overflow: 'hidden' }}>
             <div style={{ height: '100%', width: `${xpIn}%`, borderRadius: 4, background: 'linear-gradient(90deg,#FACC15,#F59E0B)', transition: 'width 0.5s ease' }} />
           </div>
-          <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{xpIn}/{LEVEL_XP} XP naar volgende level · {xp} XP totaal</span>
+          <span className="t-meta tnum">{xpIn}/{LEVEL_XP} XP naar volgende level · {xp} XP totaal</span>
         </div>
       </div>
       {achievements.length > 0 && (
@@ -159,7 +164,7 @@ function FocusCard({ userId, weekOffset }) {
   return (
     <div className="card" style={{ padding: '18px 20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>Focus (Pomodoro)</span>
+        <span className="t-card">Focus (Pomodoro)</span>
         {total > 0 && <span style={{ fontSize: 15, color: 'var(--accent)', fontWeight: 700 }}>{fmtMins(total)}</span>}
       </div>
       <div style={{ marginBottom: 14, minHeight: 16 }}>
@@ -195,7 +200,7 @@ function TakenCard({ tasks, weekOffset }) {
   return (
     <div className="card" style={{ padding: '18px 20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>Taken</span>
+        <span className="t-card">Taken</span>
         <span style={{ fontSize: 15, color: 'var(--accent)', fontWeight: 700 }}>{completedThisWeek.length} voltooid</span>
       </div>
       <div style={{ marginBottom: 14 }}>
@@ -269,7 +274,7 @@ function GewoontesCard({ userId, weekOffset }) {
 
   if (loading) return (
     <div className="card" style={{ padding: '18px 20px' }}>
-      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>Gewoontes</span>
+      <span className="t-card">Gewoontes</span>
       <div style={{ marginTop: 16, color: 'var(--text-3)', fontSize: 12 }}>Laden…</div>
     </div>
   )
@@ -281,7 +286,7 @@ function GewoontesCard({ userId, weekOffset }) {
   return (
     <div className="card" style={{ padding: '18px 20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>Gewoontes</span>
+        <span className="t-card">Gewoontes</span>
         {totalScheduled > 0 && <span style={{ fontSize: 15, color: overallPct >= 80 ? 'var(--accent)' : 'var(--text-2)', fontWeight: 700 }}>{overallPct}%</span>}
       </div>
 
@@ -297,7 +302,7 @@ function GewoontesCard({ userId, weekOffset }) {
               return (
                 <div key={d} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
                   <div style={{ height: BAR_MAX_H, display: 'flex', alignItems: 'flex-end', width: '100%' }}>
-                    <div style={{ width: '100%', height: barH || 3, borderRadius: 4, background: isFuture ? 'rgba(255,255,255,0.06)' : val === 0 ? 'rgba(255,255,255,0.08)' : isToday ? '#A78BFA' : 'rgba(167,139,250,0.4)', transition: 'height 0.35s ease' }} />
+                    <div style={{ width: '100%', height: barH || 3, borderRadius: 4, background: isFuture ? 'var(--c-surface-2)' : val === 0 ? 'var(--c-surface-3)' : isToday ? '#A78BFA' : 'rgba(167,139,250,0.4)', transition: 'height 0.35s ease' }} />
                   </div>
                   <span style={{ fontSize: 9, color: isToday ? '#A78BFA' : 'var(--text-3)', fontWeight: isToday ? 700 : 400 }}>{DAYS[i]}</span>
                   <span style={{ fontSize: 9, color: 'var(--text-3)' }}>{isFuture ? '' : tot > 0 ? `${val}/${tot}` : '—'}</span>
@@ -363,7 +368,7 @@ function JumboCard() {
   return (
     <div className="card" style={{ padding: '18px 20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>Jumbo — {MONTHS[now.getMonth()]}</span>
+        <span className="t-card">Jumbo — {MONTHS[now.getMonth()]}</span>
         <span style={{ fontSize: 15, color: '#FACC15', fontWeight: 700 }}>{hStr}</span>
       </div>
       <div style={{ marginBottom: 14 }}>
@@ -377,7 +382,7 @@ function JumboCard() {
           return (
             <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
               <div style={{ height: 64, display: 'flex', alignItems: 'flex-end', width: '100%' }}>
-                <div style={{ width: '100%', height: barH, borderRadius: 4, background: w.mins === 0 ? 'rgba(255,255,255,0.07)' : 'rgba(250,204,21,0.55)', boxShadow: w.mins > 0 ? '0 0 6px rgba(250,204,21,0.2)' : 'none', transition: 'height 0.4s ease' }} />
+                <div style={{ width: '100%', height: barH, borderRadius: 4, background: w.mins === 0 ? 'rgba(255,255,255,0.07)' : 'rgba(250,204,21,0.55)', transition: 'height 0.4s ease' }} />
               </div>
               <span style={{ fontSize: 9, color: 'var(--text-3)' }}>{w.label}</span>
               <span style={{ fontSize: 9, color: 'var(--text-3)' }}>{w.mins > 0 ? `${Math.floor(w.mins/60)}u` : '—'}</span>
@@ -411,36 +416,28 @@ function WeekNav({ weekOffset, onChange }) {
 }
 
 // ── Leaderboard ───────────────────────────────────────────────────────────────
-function LeaderboardCard({ userId, profiles }) {
-  const [xpMap, setXpMap] = useState({})
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    supabase.from('habit_achievements').select('user_id, xp')
-      .then(({ data }) => {
-        const map = {}
-        for (const r of (data || [])) map[r.user_id] = r.xp || 0
-        setXpMap(map)
-        setLoading(false)
-      })
-  }, [])
-
-  const entries = profiles
+function leaderboardEntries(profiles, xpMap) {
+  return profiles
     .filter(p => p.id)
     .map(p => ({
       id: p.id,
       name: p.full_name || p.email?.split('@')[0] || 'Gebruiker',
-      xp: xpMap[p.id] ?? p.xp ?? 0,
+      xp: xpMap?.[p.id] ?? p.xp ?? 0,
     }))
     .sort((a, b) => b.xp - a.xp)
+}
+
+function LeaderboardCard({ userId, profiles, xpMap }) {
+  const loading = xpMap === null
+  const entries = leaderboardEntries(profiles, xpMap)
 
   const MEDALS = ['🥇', '🥈', '🥉']
 
   return (
     <div className="card" style={{ padding: '18px 20px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>🏆 Leaderboard</span>
-        <span style={{ fontSize: 10, color: 'var(--text-3)' }}>Gewoontes XP</span>
+        <h2 className="t-card" style={{ margin: 0 }}>🏆 Leaderboard</h2>
+        <span className="t-meta">Gewoontes XP</span>
       </div>
       {loading ? (
         <div style={{ color: 'var(--text-3)', fontSize: 12 }}>Laden…</div>
@@ -575,6 +572,23 @@ export default function StatsPage({ tasks, userId, profiles = [], onLevelUpSeen 
     } catch { return null }
   })
 
+  // XP van alle gebruikers — gedeeld door rang (XP-kaart) en leaderboard
+  const [xpMap, setXpMap] = useState(null)
+  useEffect(() => {
+    supabase.from('habit_achievements').select('user_id, xp')
+      .then(({ data }) => {
+        const map = {}
+        for (const r of (data || [])) map[r.user_id] = r.xp || 0
+        setXpMap(map)
+      })
+  }, [])
+  const rank = (() => {
+    if (!xpMap || !userId) return null
+    const entries = leaderboardEntries(profiles, xpMap)
+    const pos = entries.findIndex(e => e.id === userId)
+    return pos >= 0 ? { pos: pos + 1, total: entries.length } : null
+  })()
+
   const handleLevelUpClose = () => {
     localStorage.removeItem('levelup_pending')
     setLevelUpData(null)
@@ -582,22 +596,25 @@ export default function StatsPage({ tasks, userId, profiles = [], onLevelUpSeen 
   }
 
   return (
-    <div style={{ height: '100%', overflowY: 'auto', padding: '20px 16px 100px' }}>
-      <div style={{ maxWidth: 600, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--accent)', margin: 0, borderLeft: '3px solid color-mix(in srgb, var(--accent) 50%, transparent)', paddingLeft: 12 }}>Statistieken</h1>
-        </div>
+    <div className="stats-page">
+      <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <h1 className="t-page" style={{ margin: 0 }}>Statistieken</h1>
 
         {levelUpData && <LevelUpPopup newLevel={levelUpData.newLevel} onClose={handleLevelUpClose} />}
-        <XPCard userId={userId} />
-        <LeaderboardCard userId={userId} profiles={profiles} />
+        {/* Level 1: persoonlijke voortgang */}
+        <XPCard userId={userId} rank={rank} />
 
+        {/* Level 2: deze week */}
         <WeekNav weekOffset={weekOffset} onChange={setWeekOffset} />
+        <div className="stats-grid">
+          <FocusCard userId={userId} weekOffset={weekOffset} />
+          <TakenCard tasks={tasks} weekOffset={weekOffset} />
+          <GewoontesCard userId={userId} weekOffset={weekOffset} />
+          <JumboCard />
+        </div>
 
-        <FocusCard userId={userId} weekOffset={weekOffset} />
-        <TakenCard tasks={tasks} weekOffset={weekOffset} />
-        <GewoontesCard userId={userId} weekOffset={weekOffset} />
-        <JumboCard />
+        {/* Level 3: vergelijken */}
+        <LeaderboardCard userId={userId} profiles={profiles} xpMap={xpMap} />
       </div>
     </div>
   )
