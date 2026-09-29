@@ -75,3 +75,19 @@ Branch `redesign/hypex-v2`, one commit per phase. Analysis & proposal: [phase1-a
     right and Sunday's blocks were clipped.
   - Month grid columns grew with long titles (`1fr` → `minmax(0, 1fr)`), so dates landed under the wrong weekday.
   - Sticky all-day row was translucent; events showed through when scrolling.
+
+## Phase 5 — Taken
+
+- Page header "Taken" + "+ Taak" (desktop), shared `FilterTabs` with counts: Vandaag · Morgen · Week · Alles ·
+  Te laat · Urgent · Ongepland + task groups (all existing filters kept; red counts for Te laat/Urgent).
+- Vandaag: progress header "X van Y voltooid" + % + bar (routines + today's one-off tasks, open and done);
+  collapsible sections Urgent → Te laat → dagdelen (tasks without a day part = "Overig") → Routines.
+  Collapse state remembered per device (localStorage).
+- Shared compact `TaskRow` for every list: category dot, title, one-line subtitle, date/streak pill, urgent flag,
+  delete on hover (desktop), checkbox on the right. Drag-reorder, drag-to-group, swipe complete/delete kept.
+- **Bug fixed (pre-existing):** Taken used UTC dates (`toISOString`), so between 00:00 and 02:00 local time
+  "Vandaag" showed yesterday. Now local dates, same as the rest of the app.
+- **Deviation:** mockup filter "Deze week" is labelled "Week" because the existing filter is the next 7 days,
+  not the calendar week.
+- Not exercised against the database: completing/deleting tasks (would change real data). The handlers passed
+  to the rows are the same functions as before.

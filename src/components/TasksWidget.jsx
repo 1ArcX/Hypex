@@ -67,6 +67,9 @@ function SwipeableRow({ onSwipeRight, onSwipeLeft, children }) {
   )
 }
 import { Plus, GripVertical, Trash2, CheckCircle2, Circle, X, AlertCircle, Flag, ChevronDown, ChevronRight, CheckSquare } from 'lucide-react'
+import TaskRow from './tasks/TaskRow'
+import { todayISO } from '../utils/recurrence'
+import { isOverdue } from '../utils/taskStatus'
 
 const PRIORITY_DOT = {
   1: '#FF6B6B',
@@ -75,7 +78,7 @@ const PRIORITY_DOT = {
 }
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10)
+  return todayISO()
 }
 
 function timeStrToMins(str) {
@@ -106,7 +109,7 @@ function getTimeStatus(dateStr, startTime, endTime) {
   return { label: 'Vandaag', overdue: false }
 }
 
-export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle, onEdit, onDragStart, onViewDetail, onNew, onMoveToGroup, onReorder, onReorderGroups, groupOrder = [], seamless = false, highlightedIds = new Set() }) {
+export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle, onEdit, onDragStart, onViewDetail, onNew, onMoveToGroup, onReorder, onReorderGroups, groupOrder = [], seamless = false, highlightedIds = new Set(), hideHeader = false }) {
   const [adding, setAdding] = useState(false)
   const [collapsedGroups, setCollapsedGroups] = useState(new Set())
   const [showCompleted, setShowCompleted] = useState(false)
@@ -253,12 +256,9 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
     .sort((a, b) => (b.updated_at || '0000').localeCompare(a.updated_at || '0000'))
 
   return (
-    <div className={seamless ? '' : 'glass-card p-4'} style={seamless ? {} : {
-      borderLeft: '3px solid color-mix(in srgb, var(--accent) 40%, transparent)',
-      background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent) 4%, transparent) 0%, transparent 60%)',
-    }}>
+    <div className={seamless || hideHeader ? '' : 'card'} style={seamless || hideHeader ? {} : { padding: 16 }}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
+      {!hideHeader && <div className="flex items-center justify-between mb-3">
         {!seamless && <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
           <div style={{ width: 24, height: 24, borderRadius: 8, background: 'color-mix(in srgb, var(--accent) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <CheckSquare size={12} style={{ color: 'var(--accent)' }} />
@@ -271,7 +271,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
           {adding && !onNew ? <X size={12} /> : <Plus size={12} />}
           {adding && !onNew ? 'Annuleer' : 'Nieuw'}
         </button>
-      </div>
+      </div>}
 
       {/* Inline aanmaken */}
       {adding && (
@@ -332,7 +332,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
       {/* Lege staat */}
       {incomplete.length === 0 && !adding && (
         <p style={{ color: 'var(--c-text-3)', fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>
-          Geen taken — klik op Nieuw om te beginnen
+          Geen open taken in deze selectie.
         </p>
       )}
 
@@ -357,16 +357,16 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                   clearDrag()
                 }}
                 style={{
-                  fontSize: 10, color: dropGroup === null ? 'var(--accent)' : 'var(--c-text-3)',
-                  fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase',
-                  padding: '4px 4px 2px', display: 'flex', alignItems: 'center', gap: 5,
+                  fontSize: 12, color: dropGroup === null ? 'var(--accent)' : 'var(--c-text-2)',
+                  fontWeight: 700,
+                  padding: '4px 4px 6px', display: 'flex', alignItems: 'center', gap: 6,
                   borderRadius: 6, background: dropGroup === null ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'transparent',
                   transition: 'all 0.15s', marginBottom: 2,
                 }}
               >
-                <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'inline-block', flexShrink: 0 }} />
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--c-text-3)', display: 'inline-block', flexShrink: 0 }} />
                 Overige taken
-                <span style={{ marginLeft: 'auto', fontWeight: 400, color: 'rgba(255,255,255,0.15)', textTransform: 'none', letterSpacing: 0 }}>
+                <span className="tnum" style={{ marginLeft: 'auto', fontWeight: 500, color: 'var(--c-text-3)', textTransform: 'none', letterSpacing: 0 }}>
                   {section.items.length} {section.items.length === 1 ? 'taak' : 'taken'}
                 </span>
                 {dropGroup === null && <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700 }}>↓</span>}
@@ -397,20 +397,22 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                   onDragOver={e => overGroup(e, section.name)}
                   onDragLeave={() => { setDropGroup(undefined); setDropGroupTarget(null) }}
                   onDrop={e => dropOnGroup(e, section.name)}
-                  style={{ fontSize: 11, color: isTaskDropTarget ? 'var(--accent)' : 'var(--c-text-3)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', padding: '8px 4px 4px', display: 'flex', alignItems: 'center', gap: 5, cursor: 'grab', userSelect: 'none', borderRadius: 8, background: isTaskDropTarget ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'transparent', transition: 'background 0.15s, color 0.15s, opacity 0.15s', opacity: isDraggingThis ? 0.3 : 1 }}
+                  role="button" tabIndex={0} aria-expanded={!isCollapsed}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click() } }}
+                  style={{ fontSize: 12, color: isTaskDropTarget ? 'var(--accent)' : 'var(--c-text-2)', fontWeight: 700, padding: '10px 4px 6px', display: 'flex', alignItems: 'center', gap: 6, cursor: 'grab', userSelect: 'none', borderRadius: 8, background: isTaskDropTarget ? 'var(--accent-soft)' : 'transparent', transition: 'background 0.15s, color 0.15s, opacity 0.15s', opacity: isDraggingThis ? 0.3 : 1 }}
                 >
-                  <GripVertical size={11} style={{ flexShrink: 0, color: 'rgba(255,255,255,0.2)' }} />
+                  <GripVertical size={12} aria-hidden="true" style={{ flexShrink: 0, color: 'var(--c-text-3)', opacity: 0.5 }} />
                   {isCollapsed
                     ? <ChevronRight size={11} style={{ flexShrink: 0, color: 'var(--c-text-3)' }} />
                     : <ChevronDown size={11} style={{ flexShrink: 0, color: 'var(--c-text-3)' }} />}
-                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block', flexShrink: 0 }} />
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--cat-school)', display: 'inline-block', flexShrink: 0 }} />
                   {section.name}
                   {durLabel && (
-                    <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.2)', letterSpacing: 0, textTransform: 'none', marginLeft: 2 }}>
+                    <span style={{ fontWeight: 500, color: 'var(--c-text-3)', marginLeft: 2 }}>
                       · {durLabel}
                     </span>
                   )}
-                  <span style={{ marginLeft: 'auto', fontSize: 10, color: 'rgba(255,255,255,0.18)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
+                  <span className="tnum" style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--c-text-3)', fontWeight: 500 }}>
                     {section.items.length} {section.items.length === 1 ? 'taak' : 'taken'}
                   </span>
                   {isTaskDropTarget && <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700 }}>↓</span>}
@@ -422,129 +424,38 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
             {dropGroupTarget?.name === section.name && dropGroupTarget.pos === 'after' && (
               <div style={{ height: 2, borderRadius: 2, background: 'var(--accent)', margin: '0 4px 4px', opacity: 0.85 }} />
             )}
-            {!collapsedGroups.has(section.name) && section.items.map((task, _idx) => {
+            {!collapsedGroups.has(section.name) && <div className="task-list">{section.items.map(task => {
               const subject = subjects.find(s => s.id === task.subject_id)
-              const dateInfo = getTimeStatus(task.date, task.start_time || task.time, task.end_time)
-              const isUrgent = (task.priority ?? 2) === 1
-              const isLow = (task.priority ?? 2) === 3
-
-              // Card styling by urgency level
-              const cardBg = isUrgent
-                ? 'linear-gradient(135deg, rgba(255,50,50,0.1) 0%, rgba(255,50,50,0.05) 100%)'
-                : dateInfo?.overdue ? 'rgba(255,80,80,0.06)'
-                : dateInfo?.active ? 'color-mix(in srgb, var(--accent) 5%, transparent)'
-                : 'rgba(255,255,255,0.02)'
-              const cardBgHover = isUrgent
-                ? 'linear-gradient(135deg, rgba(255,50,50,0.14) 0%, rgba(255,50,50,0.07) 100%)'
-                : dateInfo?.overdue ? 'rgba(255,80,80,0.09)'
-                : dateInfo?.active ? 'color-mix(in srgb, var(--accent) 8%, transparent)'
-                : 'color-mix(in srgb, var(--accent) 4%, transparent)'
-              const cardBorder = isUrgent
-                ? '1px solid rgba(255,60,60,0.35)'
-                : dateInfo?.overdue ? '1px solid rgba(255,100,100,0.25)'
-                : dateInfo?.active ? '1px solid color-mix(in srgb, var(--accent) 30%, transparent)'
-                : '1px solid rgba(255,255,255,0.07)'
-              const circleColor = isUrgent ? 'rgba(255,60,60,0.7)'
-                : dateInfo?.overdue ? 'rgba(255,100,100,0.5)'
-                : dateInfo?.active ? 'var(--accent)'
-                : isLow ? 'rgba(255,255,255,0.12)'
-                : 'rgba(255,255,255,0.2)'
-
               const isDragging = dragId === task.id
               const isDropBefore = dropTarget?.id === task.id && dropTarget.pos === 'before'
               const isDropAfter  = dropTarget?.id === task.id && dropTarget.pos === 'after'
+              const today = todayStr()
               return (
                 <React.Fragment key={task.id}>
-                {isDropBefore && <div style={{ height: 2, borderRadius: 2, background: 'var(--accent)', margin: '2px 8px', opacity: 0.85, transition: 'opacity 0.1s' }} />}
+                {isDropBefore && <div style={{ height: 2, borderRadius: 2, background: 'var(--accent)', margin: '2px 8px', opacity: 0.85 }} />}
                 <SwipeableRow onSwipeRight={() => onToggle(task)} onSwipeLeft={() => onDelete(task.id)}>
-                <div
-                  draggable
-                  onDragStart={e => startDrag(e, task)}
-                  onDragEnd={clearDrag}
-                  onDragOver={e => overTask(e, task.id)}
-                  onDrop={e => dropOnTask(e, task.id)}
-                  onClick={() => onViewDetail ? onViewDetail(task) : onEdit?.(task)}
-                  className={[isUrgent ? 'urgent-task' : '', highlightedIds.has(task.id) ? 'task-flash' : ''].filter(Boolean).join(' ') || undefined}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 12,
-                    padding: isUrgent ? '13px 14px' : '12px 14px',
-                    borderRadius: 14,
-                    border: cardBorder,
-                    borderLeft: isUrgent ? '3px solid rgba(255,60,60,0.75)' : cardBorder,
-                    cursor: 'grab',
-                    background: cardBg,
-                    transition: 'background 0.15s, opacity 0.15s, transform 0.15s',
-                    marginBottom: 3,
-                    opacity: isDragging ? 0.3 : 1,
-                    transform: isDragging ? 'scale(0.98)' : 'scale(1)',
-                    userSelect: 'none',
-                    WebkitUserSelect: 'none',
-                    WebkitTouchCallout: 'none',
-                  }}
-                  onMouseEnter={e => { if (!isDragging) e.currentTarget.style.background = cardBgHover }}
-                  onMouseLeave={e => e.currentTarget.style.background = cardBg}>
-                  <GripVertical size={13} style={{ color: 'rgba(255,255,255,0.12)', flexShrink: 0 }} />
-                  <button onClick={e => { e.stopPropagation(); onToggle(task) }}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
-                    <div style={{
-                      width: 28, height: 28, borderRadius: '50%',
-                      border: `2px solid ${circleColor}`,
-                      background: isUrgent ? 'rgba(255,60,60,0.08)' : 'transparent',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      transition: 'all 0.15s',
-                    }} />
-                  </button>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: isUrgent || dateInfo?.overdue ? 3 : 2 }}>
-                      <p style={{ fontSize: '14px', color: isUrgent ? 'rgba(255,255,255,0.95)' : 'var(--c-text)', fontWeight: isUrgent ? 600 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0, flex: 1, minWidth: 0 }}>
-                        {task.title}
-                      </p>
-                      {isUrgent && (
-                        <span style={{ fontSize: 10, fontWeight: 700, color: '#ff5555', background: 'rgba(255,50,50,0.15)', border: '1px solid rgba(255,50,50,0.3)', borderRadius: 5, padding: '1px 6px', flexShrink: 0, letterSpacing: '0.03em' }}>
-                          🔥 URGENT
-                        </span>
-                      )}
-                      {!isUrgent && dateInfo?.overdue && !task.recurrence && (
-                        <span style={{ fontSize: 10, fontWeight: 700, color: '#ff8080', background: 'rgba(255,80,80,0.12)', border: '1px solid rgba(255,80,80,0.25)', borderRadius: 5, padding: '1px 6px', flexShrink: 0 }}>
-                          ⚠️ Te laat
-                        </span>
-                      )}
-                      {task.recurrence && (
-                        <span style={{ fontSize: 10, fontWeight: 700, color: (task.streak > 0) ? '#FB923C' : 'var(--c-text-3)', background: (task.streak > 0) ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.05)', border: `1px solid ${(task.streak > 0) ? 'rgba(249,115,22,0.3)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 5, padding: '1px 6px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 2 }}>
-                          🔁 {task.streak > 0 ? `🔥${task.streak}` : ''}
-                        </span>
-                      )}
-                    </div>
-                    <p style={{ fontSize: '11px', margin: 0, display: 'flex', alignItems: 'center', gap: 3 }}>
-                      <span style={{ color: isUrgent ? 'rgba(255,100,100,0.7)' : dateInfo?.overdue ? '#ff8080' : dateInfo?.active ? 'var(--accent)' : 'rgba(255,255,255,0.28)' }}>
-                        {dateInfo?.active ? '• Nu' : dateInfo?.label || ''}
-                        {(task.start_time || task.time) ? ` · ${task.start_time || task.time}` : ''}
-                        {task.end_time ? `–${task.end_time}` : ''}
-                        {subject ? ` · ${subject.name}` : ''}
-                        {task.duration_minutes ? ` · ${task.duration_minutes}min` : ''}
-                        {task.due_date && task.due_date !== task.date ? ` · ⏰ ${new Date(task.due_date + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}` : ''}
-                      </span>
-                    </p>
-                    {task.description ? (
-                      <p style={{ fontSize: 11, margin: '2px 0 0', color: 'var(--c-text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {task.description}
-                      </p>
-                    ) : null}
-                  </div>
-                  <button
-                    onClick={e => { e.stopPropagation(); onDelete(task.id) }}
-                    title="Verwijderen"
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,80,80,0.3)', padding: '3px', flexShrink: 0, borderRadius: '4px' }}
-                    onMouseEnter={e => e.currentTarget.style.color = '#ff6b6b'}
-                    onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,80,80,0.3)'}>
-                    <Trash2 size={12} />
-                  </button>
-                </div>
+                  <TaskRow
+                    task={task} today={today} subjectName={subject?.name}
+                    late={isOverdue(task, today)}
+                    grip
+                    onToggle={onToggle}
+                    onOpen={t => onViewDetail ? onViewDetail(t) : onEdit?.(t)}
+                    onDelete={onDelete}
+                    className={highlightedIds.has(task.id) ? 'task-flash' : undefined}
+                    style={{ opacity: isDragging ? 0.3 : undefined, transform: isDragging ? 'scale(0.98)' : undefined, WebkitTouchCallout: 'none' }}
+                    dragProps={{
+                      draggable: true,
+                      onDragStart: e => startDrag(e, task),
+                      onDragEnd: clearDrag,
+                      onDragOver: e => overTask(e, task.id),
+                      onDrop: e => dropOnTask(e, task.id),
+                    }}
+                  />
                 </SwipeableRow>
-                {isDropAfter && <div style={{ height: 2, borderRadius: 2, background: 'var(--accent)', margin: '2px 8px', opacity: 0.85, transition: 'opacity 0.1s' }} />}
+                {isDropAfter && <div style={{ height: 2, borderRadius: 2, background: 'var(--accent)', margin: '2px 8px', opacity: 0.85 }} />}
                 </React.Fragment>
               )
-            })}
+            })}</div>}
           </div>
         ))}
       </div>
@@ -556,23 +467,23 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
             onClick={() => setShowCompleted(v => !v)}
             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 6px', display: 'flex', alignItems: 'center', gap: 5, width: '100%' }}
           >
-            <CheckCircle2 size={11} style={{ color: 'rgba(255,255,255,0.2)', flexShrink: 0 }} />
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', fontWeight: 500 }}>
+            <CheckCircle2 size={12} aria-hidden="true" style={{ color: 'var(--c-text-3)', flexShrink: 0 }} />
+            <span style={{ fontSize: 12, color: 'var(--c-text-3)', fontWeight: 600 }}>
               Afgerond ({complete.length})
             </span>
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.15)', marginLeft: 'auto' }}>
+            <span aria-hidden="true" style={{ fontSize: 10, color: 'var(--c-text-3)', marginLeft: 'auto' }}>
               {showCompleted ? '▲' : '▼'}
             </span>
           </button>
           {showCompleted && complete.map(task => (
-            <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', opacity: 0.45 }}>
-              <button onClick={() => onToggle(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
+            <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', opacity: 0.55 }}>
+              <button onClick={() => onToggle(task)} aria-label={`Markeer "${task.title}" als niet gedaan`} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
                 <CheckCircle2 size={15} style={{ color: 'var(--accent)' }} />
               </button>
               <p style={{ flex: 1, fontSize: '12px', color: 'var(--c-text-3)', textDecoration: 'line-through', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {task.title}
               </p>
-              <button onClick={() => onDelete(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,80,80,0.3)', padding: '2px', flexShrink: 0 }}>
+              <button onClick={() => onDelete(task.id)} aria-label={`Verwijder "${task.title}"`} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', padding: '2px', flexShrink: 0 }}>
                 <Trash2 size={12} />
               </button>
             </div>

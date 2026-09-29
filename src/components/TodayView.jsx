@@ -1,12 +1,19 @@
-import React from 'react'
-import { Flame, Plus, Repeat, Clock } from 'lucide-react'
+import React, { useState } from 'react'
+import { Flame, Plus, AlertTriangle, Repeat, ListTodo, Sun, Sunset, Moon } from 'lucide-react'
 import {
   todayISO, toISO, recurrenceLabel, isDueToday, isDoneToday, isStreakActive, appliesOn,
 } from '../utils/recurrence'
-import { taskDaypart, daypartLabel, daypartEmoji, daypartOrder } from '../utils/daypart'
+import { taskDaypart, daypartLabel, daypartOrder } from '../utils/daypart'
+import { ProgressBar, SectionHeader, EmptyState } from './ui'
+import TaskRow from './tasks/TaskRow'
+
+// Vandaag / Morgen (mockup paneel 3): voortgangskop + gegroepeerde, inklapbare secties
+// Urgent → Te laat → dagdelen (Ochtend/Middag/Avond/Overig) → Routines.
 
 const NL_DAYS = ['zondag', 'maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag']
 const NL_MONTHS = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
+const DAYPART_ICON = { ochtend: Sun, middag: Sunset, avond: Moon }
+const COLLAPSE_KEY = 'taken_collapsed_v2'
 
 function daysLate(dateStr, today) {
   return Math.round((Date.parse(today) - Date.parse(dateStr)) / 86400000)
@@ -18,133 +25,35 @@ function lateLabel(n) {
   return `${Math.floor(n / 7)} weken te laat`
 }
 
-function CheckCircle({ done, color, onClick }) {
-  return (
-    <button onClick={onClick}
-      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
-      <div style={{
-        width: 28, height: 28, borderRadius: '50%',
-        border: `2px solid ${done ? color : 'var(--c-text-3)'}`,
-        background: done ? color : 'transparent',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        transition: 'all 0.18s',
-      }}>
-        {done && <span style={{ fontSize: 14, color: '#000', fontWeight: 800, lineHeight: 1 }}>✓</span>}
-      </div>
-    </button>
-  )
-}
-
-function RoutineRow({ task, today, onToggle, onOpen, preview = false }) {
-  const done = !preview && isDoneToday(task, today)
-  const active = isStreakActive(task, today)
-  const streak = task.streak || 0
-  const accent = task.color || 'var(--accent)'
-  return (
-    <div onClick={() => onOpen(task)}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
-        borderRadius: 14, cursor: 'pointer', marginBottom: 6,
-        background: done ? 'rgba(255,255,255,0.02)' : 'color-mix(in srgb, var(--accent) 5%, transparent)',
-        border: `1px solid ${done ? 'rgba(255,255,255,0.06)' : 'color-mix(in srgb, var(--accent) 22%, transparent)'}`,
-        opacity: done ? 0.6 : preview ? 0.85 : 1, transition: 'opacity 0.18s, background 0.18s',
-      }}>
-      {preview ? (
-        <div style={{ width: 28, height: 28, borderRadius: '50%', border: '2px dashed rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Repeat size={12} style={{ color: 'var(--c-text-3)' }} />
-        </div>
-      ) : (
-        <CheckCircle done={done} color={accent} onClick={(e) => { e.stopPropagation(); onToggle(task) }} />
-      )}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--c-text)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: done ? 'line-through' : 'none' }}>
-          {task.title}
-        </p>
-        <p style={{ fontSize: 11, color: 'var(--c-text-3)', margin: '2px 0 0', display: 'flex', alignItems: 'center', gap: 4 }}>
-          <Repeat size={10} /> {recurrenceLabel(task.recurrence, task.recurrence_days)}
-          {(task.start_time || task.time) ? <> · <Clock size={10} /> {task.start_time || task.time}</> : null}
-        </p>
-      </div>
-      {streak > 0 && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0,
-          padding: '4px 9px', borderRadius: 20,
-          background: active ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.04)',
-          border: `1px solid ${active ? 'rgba(249,115,22,0.3)' : 'rgba(255,255,255,0.08)'}`,
-        }}>
-          <Flame size={13} style={{ color: active ? '#FB923C' : 'var(--c-text-3)' }} />
-          <span style={{ fontSize: 13, fontWeight: 700, color: active ? '#FB923C' : 'var(--c-text-3)' }}>{streak}</span>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function TaskRow({ task, subjects, today, onToggle, onOpen }) {
-  const subject = subjects.find(s => s.id === task.subject_id)
-  const isUrgent = (task.priority ?? 2) === 1
-  const overdue = task.date && task.date < today
-  const accent = (overdue || isUrgent) ? '#FF6B6B' : (task.color || 'var(--accent)')
-  const reddish = overdue || isUrgent
-  const meta = (task.start_time || task.time || subject)
-    ? `${(task.start_time || task.time) ? `${task.start_time || task.time}${task.end_time ? `–${task.end_time}` : ''}` : ''}${(task.start_time || task.time) && subject ? ' · ' : ''}${subject ? subject.name : ''}`
-    : ''
-  return (
-    <div onClick={() => onOpen(task)}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
-        borderRadius: 14, cursor: 'pointer', marginBottom: 6,
-        background: reddish ? 'rgba(255,80,80,0.06)' : 'rgba(255,255,255,0.02)',
-        border: `1px solid ${reddish ? 'rgba(255,80,80,0.25)' : 'rgba(255,255,255,0.07)'}`,
-      }}>
-      <CheckCircle done={false} color={accent} onClick={(e) => { e.stopPropagation(); onToggle(task) }} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: 14, fontWeight: reddish ? 600 : 500, color: 'var(--c-text)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {task.title}
-        </p>
-        {(overdue || meta) && (
-          <p style={{ fontSize: 11, margin: '2px 0 0', color: overdue ? '#ff8080' : 'var(--c-text-3)' }}>
-            {overdue ? `⚠️ ${lateLabel(daysLate(task.date, today))}` : ''}
-            {overdue && meta ? ' · ' : ''}
-            {meta}
-          </p>
-        )}
-      </div>
-      {overdue ? (
-        <span style={{ fontSize: 10, fontWeight: 700, color: '#ff8080', background: 'rgba(255,80,80,0.12)', border: '1px solid rgba(255,80,80,0.25)', borderRadius: 5, padding: '1px 6px', flexShrink: 0 }}>
-          Te laat
-        </span>
-      ) : isUrgent ? (
-        <span style={{ fontSize: 10, fontWeight: 700, color: '#ff5555', background: 'rgba(255,50,50,0.15)', border: '1px solid rgba(255,50,50,0.3)', borderRadius: 5, padding: '1px 6px', flexShrink: 0 }}>
-          🔥 URGENT
-        </span>
-      ) : null}
-    </div>
-  )
-}
-
-function SectionLabel({ children, count }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '0 2px 8px' }}>
-      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--c-text-3)' }}>{children}</span>
-      {count != null && <span style={{ fontSize: 11, color: 'var(--c-text-3)' }}>{count}</span>}
-    </div>
-  )
-}
-
 const taskTimeSort = (a, b) => {
   const pa = a.priority ?? 2, pb = b.priority ?? 2
   if (pa !== pb) return pa - pb
   return (a.start_time || a.time || '99:99').localeCompare(b.start_time || b.time || '99:99')
 }
 
+// Inklapstatus per sectie onthouden (per apparaat, alleen gemak)
+function useCollapsed() {
+  const [set, setSet] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(COLLAPSE_KEY)) || []) } catch { return new Set() }
+  })
+  const toggle = (id) => setSet(prev => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...next])) } catch {}
+    return next
+  })
+  return [set, toggle]
+}
+
 export default function TodayView({ tasks, subjects = [], dateOffset = 0, onToggleRoutine, onToggleTask, onOpen, onNew }) {
+  const [collapsed, toggleCollapsed] = useCollapsed()
   const today = todayISO()
   const isToday = dateOffset === 0
   const d = new Date(); d.setDate(d.getDate() + dateOffset)
   const target = toISO(d)
   const dateLabel = `${NL_DAYS[d.getDay()]} ${d.getDate()} ${NL_MONTHS[d.getMonth()]}`
   const heading = isToday ? 'Vandaag' : dateOffset === 1 ? 'Morgen' : dateLabel
+  const subjectName = t => subjects.find(s => s.id === t.subject_id)?.name
 
   // Routines voor de doeldag. Vandaag: due (incl. gemist) of vandaag al gedaan.
   // Toekomst: routines die op die dag vallen (alleen preview, geen afvinken).
@@ -165,10 +74,12 @@ export default function TodayView({ tasks, subjects = [], dateOffset = 0, onTogg
         .sort((a, b) => a.date.localeCompare(b.date) || (a.priority ?? 2) - (b.priority ?? 2))
     : []
 
-  // Eenmalige taken van de doeldag, gegroepeerd per dagdeel.
+  // Eenmalige taken van de doeldag: urgent apart, de rest per dagdeel.
   const dayTasks = tasks.filter(t => !t.recurrence && !t.completed && t.date === target)
+  const urgentTasks = dayTasks.filter(t => (t.priority ?? 2) === 1).sort(taskTimeSort)
   const buckets = {}
   for (const t of dayTasks) {
+    if ((t.priority ?? 2) === 1) continue
     const dp = taskDaypart(t) || 'none'
     ;(buckets[dp] ||= []).push(t)
   }
@@ -176,75 +87,89 @@ export default function TodayView({ tasks, subjects = [], dateOffset = 0, onTogg
     .sort((a, b) => daypartOrder(a === 'none' ? null : a) - daypartOrder(b === 'none' ? null : b))
     .map(dp => ({ id: dp, items: buckets[dp].sort(taskTimeSort) }))
 
+  // Voortgang: routines van vandaag + eenmalige taken met datum vandaag (open én afgerond)
+  const doneOneoff = isToday ? tasks.filter(t => !t.recurrence && t.completed && t.date === today).length : 0
   const routinesDone = isToday ? routines.filter(t => isDoneToday(t, today)).length : 0
+  const total = routines.length + dayTasks.length + doneOneoff
+  const done = routinesDone + doneOneoff
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0
   const isEmpty = routines.length === 0 && dayTasks.length === 0 && overdueTasks.length === 0
 
+  const section = (id, props, rows) => (
+    <section key={id}>
+      <SectionHeader {...props} collapsible open={!collapsed.has(id)} onToggle={() => toggleCollapsed(id)} />
+      {!collapsed.has(id) && <div className="task-list">{rows}</div>}
+    </section>
+  )
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      {/* Datumkop */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Voortgangskop */}
       <div>
-        <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-1)', margin: 0, letterSpacing: '-0.02em' }}>{heading}</h1>
-        <p style={{ fontSize: 13, color: 'var(--c-text-3)', margin: '3px 0 0', textTransform: 'capitalize' }}>
-          {dateLabel}
-          {isToday && routines.length > 0 ? ` · ${routinesDone}/${routines.length} routines` : ''}
-        </p>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+          <h2 className="t-page" style={{ margin: 0 }}>{heading}</h2>
+          <span className="t-meta" style={{ fontSize: 12, textTransform: 'capitalize' }}>{dateLabel}</span>
+        </div>
+        {isToday && total > 0 && (
+          <div style={{ marginTop: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ fontSize: 12, color: 'var(--c-text-2)' }}>
+                <strong className="tnum" style={{ color: 'var(--c-text)' }}>{done} van {total}</strong> voltooid
+              </span>
+              <span className="tnum" style={{ fontSize: 12, fontWeight: 700, color: pct === 100 ? 'var(--c-success)' : 'var(--accent)' }}>{pct}%</span>
+            </div>
+            <ProgressBar value={done} max={total} tone={pct === 100 ? 'success' : 'accent'} height={6} label="Voortgang vandaag" />
+          </div>
+        )}
+        {!isToday && total > 0 && (
+          <p className="t-meta" style={{ margin: '4px 0 0', fontSize: 12 }}>
+            {dayTasks.length} {dayTasks.length === 1 ? 'taak' : 'taken'}{routines.length ? ` · ${routines.length} ${routines.length === 1 ? 'routine' : 'routines'}` : ''}
+          </p>
+        )}
       </div>
 
-      {/* Te laat — meegenomen naar vandaag, gevlagd */}
-      {overdueTasks.length > 0 && (
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '0 2px 8px' }}>
-            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#ff8080' }}>⚠️ Te laat</span>
-            <span style={{ fontSize: 11, color: 'rgba(255,128,128,0.5)' }}>{overdueTasks.length}</span>
-          </div>
-          {overdueTasks.map(t => (
-            <TaskRow key={t.id} task={t} subjects={subjects} today={today} onToggle={onToggleTask} onOpen={onOpen} />
-          ))}
-        </div>
-      )}
+      {urgentTasks.length > 0 && section('urgent', { icon: Flame, title: 'Urgent', count: urgentTasks.length, tone: 'danger' },
+        urgentTasks.map(t => (
+          <TaskRow key={t.id} task={t} today={today} subjectName={subjectName(t)} onToggle={onToggleTask} onOpen={onOpen} />
+        )))}
 
-      {/* Dagtaken, per dagdeel */}
-      {dayGroups.map(g => (
-        <div key={g.id}>
-          <SectionLabel count={g.items.length}>
-            {g.id === 'none' ? 'Taken' : `${daypartEmoji(g.id)} ${daypartLabel(g.id)}`}
-          </SectionLabel>
-          {g.items.map(t => (
-            <TaskRow key={t.id} task={t} subjects={subjects} today={today} onToggle={onToggleTask} onOpen={onOpen} />
-          ))}
-        </div>
-      ))}
+      {overdueTasks.length > 0 && section('telaat', { icon: AlertTriangle, title: 'Te laat', count: overdueTasks.length, tone: 'danger' },
+        overdueTasks.map(t => (
+          <TaskRow key={t.id} task={t} today={today} late
+            subtitle={[lateLabel(daysLate(t.date, today)), subjectName(t)].filter(Boolean).join(' · ')}
+            onToggle={onToggleTask} onOpen={onOpen} />
+        )))}
 
-      {/* Routines — onder de dagtaken */}
-      {routines.length > 0 && (
-        <div>
-          <SectionLabel count={isToday ? `${routinesDone}/${routines.length}` : routines.length}>Routines</SectionLabel>
-          {routines.map(t => (
-            <RoutineRow key={t.id} task={t} today={today} onToggle={onToggleRoutine} onOpen={onOpen} preview={!isToday} />
-          ))}
-        </div>
-      )}
+      {dayGroups.map(g => section(`dp:${g.id}`, {
+        icon: DAYPART_ICON[g.id] || ListTodo,
+        title: g.id === 'none' ? 'Overig' : daypartLabel(g.id),
+        count: g.items.length,
+      }, g.items.map(t => (
+        <TaskRow key={t.id} task={t} today={today} subjectName={subjectName(t)} showDate={false} onToggle={onToggleTask} onOpen={onOpen} />
+      ))))}
+
+      {routines.length > 0 && section('routines', {
+        icon: Repeat, title: 'Routines', tone: 'routine',
+        count: isToday ? `${routinesDone}/${routines.length}` : routines.length,
+      }, routines.map(t => (
+        <TaskRow key={t.id} task={t} today={today}
+          done={isToday && isDoneToday(t, today)} preview={!isToday} streakActive={isStreakActive(t, today)}
+          subtitle={[recurrenceLabel(t.recurrence, t.recurrence_days), t.start_time || t.time].filter(Boolean).join(' · ')}
+          onToggle={onToggleRoutine} onOpen={onOpen} />
+      )))}
 
       {/* Lege staat */}
       {isEmpty && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 50, gap: 10, textAlign: 'center' }}>
-          <span style={{ fontSize: 44 }}>🌤️</span>
-          <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>{isToday ? 'Niets voor vandaag' : 'Niets gepland'}</p>
-          <p style={{ fontSize: 13, color: 'var(--c-text-3)', margin: 0, maxWidth: 240 }}>
-            Geen routines of taken gepland. Voeg er een toe of geniet van je vrije dag.
-          </p>
-          <button onClick={onNew}
-            style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6, background: 'color-mix(in srgb, var(--accent) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', color: 'var(--accent)', borderRadius: 12, padding: '9px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
-            <Plus size={15} /> Nieuwe taak
-          </button>
-        </div>
+        <EmptyState icon={Sun} title={isToday ? 'Niets voor vandaag' : 'Niets gepland'}
+          text="Geen routines of taken gepland. Voeg er een toe of geniet van je vrije dag."
+          action={<button onClick={onNew} className="btn-primary"><Plus size={15} aria-hidden="true" /> Nieuwe taak</button>} />
       )}
 
-      {/* Alles-gedaan vlag wanneer er routines waren maar alles af is (alleen vandaag) */}
-      {isToday && !isEmpty && dayTasks.length === 0 && routines.length > 0 && routinesDone === routines.length && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 12, background: 'color-mix(in srgb, var(--accent) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 25%, transparent)' }}>
-          <span style={{ fontSize: 18 }}>🎉</span>
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)' }}>Alle routines afgevinkt vandaag — sterk!</span>
+      {/* Alles-gedaan melding wanneer er routines waren maar alles af is (alleen vandaag) */}
+      {isToday && !isEmpty && dayTasks.length === 0 && overdueTasks.length === 0 && routines.length > 0 && routinesDone === routines.length && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 'var(--r-md)', background: 'color-mix(in srgb, var(--c-success) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--c-success) 25%, transparent)' }}>
+          <span aria-hidden="true" style={{ fontSize: 16 }}>🎉</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--c-success)' }}>Alle routines afgevinkt vandaag — sterk!</span>
         </div>
       )}
     </div>

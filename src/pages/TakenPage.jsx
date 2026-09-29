@@ -3,7 +3,9 @@ import ReactDOM from 'react-dom'
 import TasksWidget from '../components/TasksWidget'
 import TodayView from '../components/TodayView'
 import { useIsDesktop } from '../hooks/useIsDesktop'
-import { isDueToday, isDoneToday, appliesOn, todayISO } from '../utils/recurrence'
+import { Plus, CheckCircle2 } from 'lucide-react'
+import { isDueToday, isDoneToday, appliesOn, todayISO, toISO } from '../utils/recurrence'
+import { FilterTabs, EmptyState as UiEmptyState } from '../components/ui'
 
 const EMPTY_STATE = {
   alles:     { icon: '🎉', title: 'Alles gedaan', sub: 'Geen openstaande taken.' },
@@ -18,37 +20,32 @@ const EMPTY_STATE = {
 function EmptyState({ filter, onNew }) {
   const s = EMPTY_STATE[filter] || EMPTY_STATE.alles
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 60, gap: 10, textAlign: 'center' }}>
-      <span style={{ fontSize: 40 }}>{s.icon}</span>
-      <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>{s.title}</p>
-      <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>{s.sub}</p>
-      {filter === 'alles' && (
-        <button onClick={() => onNew?.()} style={{ marginTop: 8, background: 'color-mix(in srgb, var(--accent) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', color: 'var(--accent)', borderRadius: 10, padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
-          + Taak toevoegen
-        </button>
-      )}
-    </div>
+    <UiEmptyState icon={CheckCircle2} title={`${s.icon} ${s.title}`} text={s.sub}
+      style={{ paddingTop: 48 }}
+      action={filter === 'alles' && <button onClick={() => onNew?.()} className="btn-primary"><Plus size={15} aria-hidden="true" /> Taak toevoegen</button>} />
   )
 }
 
+// Volgorde volgt de mockup (Vandaag · Week · Alle · Te laat), aangevuld met de bestaande filters
 const FILTERS = [
   { id: 'vandaag',   label: 'Vandaag'  },
-  { id: 'alles',     label: 'Alles'    },
   { id: 'morgen',    label: 'Morgen'   },
   { id: 'week',      label: 'Week'     },
-  { id: 'urgent',    label: 'Urgent'   },
-  { id: 'telaat',    label: 'Te laat'  },
+  { id: 'alles',     label: 'Alles'    },
+  { id: 'telaat',    label: 'Te laat',  tone: 'danger' },
+  { id: 'urgent',    label: 'Urgent',   tone: 'danger' },
   { id: 'ongepland', label: 'Ongepland' },
 ]
 
-function todayStr() { return new Date().toISOString().slice(0, 10) }
+// Lokale datums (toISOString is UTC en gaf tussen 00:00–02:00 de datum van gisteren)
+function todayStr() { return todayISO() }
 function tomorrowStr() {
   const d = new Date(); d.setDate(d.getDate() + 1)
-  return d.toISOString().slice(0, 10)
+  return toISO(d)
 }
 function weekEndStr() {
   const d = new Date(); d.setDate(d.getDate() + 7)
-  return d.toISOString().slice(0, 10)
+  return toISO(d)
 }
 
 const SWIPE_HINT_KEY = 'swipe_hint_seen_v1'
@@ -157,118 +154,27 @@ export default function TakenPage({
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Filter chips */}
-      <div style={{ flexShrink: 0, position: 'relative', borderTop: '2px solid color-mix(in srgb, var(--accent) 20%, transparent)' }}>
-      <div style={{
-        padding: '16px 16px 0',
-        overflowX: 'auto',
-        display: 'flex',
-        gap: 6,
-        scrollbarWidth: 'none',
-      }}>
-        {FILTERS.map(f => {
-          const active = filter === f.id
-          const cnt = counts[f.id]
-          const isUrgentChip = f.id === 'urgent'
-          const urgentHasItems = isUrgentChip && cnt > 0
-          return (
-            <button
-              key={f.id}
-              onClick={() => setFilter(f.id)}
-              style={{
-                flexShrink: 0,
-                padding: '6px 12px',
-                borderRadius: 20,
-                border: active
-                  ? isUrgentChip ? '1px solid rgba(255,60,60,0.55)' : '1px solid color-mix(in srgb, var(--accent) 50%, transparent)'
-                  : urgentHasItems ? '1px solid rgba(255,60,60,0.3)' : '1px solid rgba(255,255,255,0.1)',
-                background: active
-                  ? isUrgentChip ? 'rgba(255,50,50,0.15)' : 'color-mix(in srgb, var(--accent) 12%, transparent)'
-                  : urgentHasItems ? 'rgba(255,50,50,0.06)' : 'rgba(255,255,255,0.03)',
-                color: active
-                  ? isUrgentChip ? '#ff5555' : 'var(--accent)'
-                  : urgentHasItems ? 'rgba(255,80,80,0.75)' : 'var(--text-3)',
-                fontSize: 12,
-                fontWeight: active || urgentHasItems ? 600 : 400,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 5,
-                transition: 'all 0.15s',
-              }}
-            >
-              {isUrgentChip ? '🔥 ' : ''}{f.label}
-              {cnt > 0 && (
-                <span style={{
-                  fontSize: 10,
-                  background: active
-                    ? isUrgentChip ? 'rgba(255,50,50,0.25)' : 'color-mix(in srgb, var(--accent) 25%, transparent)'
-                    : urgentHasItems ? 'rgba(255,50,50,0.12)' : 'rgba(255,255,255,0.08)',
-                  color: active
-                    ? isUrgentChip ? '#ff5555' : 'var(--accent)'
-                    : urgentHasItems ? 'rgba(255,80,80,0.8)' : 'var(--text-3)',
-                  borderRadius: 10,
-                  padding: '1px 5px',
-                  fontWeight: 700,
-                }}>
-                  {cnt}
-                </span>
-              )}
-            </button>
-          )
-        })}
-        {/* Groep chips */}
-        {groups.map(g => {
-          const id = `group:${g}`
-          const active = filter === id
-          const cnt = counts[id]
-          return (
-            <button
-              key={id}
-              onClick={() => setFilter(active ? 'alles' : id)}
-              style={{
-                flexShrink: 0,
-                padding: '6px 12px',
-                borderRadius: 20,
-                border: active
-                  ? '1px solid rgba(250,204,21,0.5)'
-                  : '1px solid rgba(250,204,21,0.2)',
-                background: active
-                  ? 'rgba(250,204,21,0.12)'
-                  : 'rgba(250,204,21,0.04)',
-                color: active ? '#FACC15' : 'rgba(250,204,21,0.5)',
-                fontSize: 12,
-                fontWeight: active ? 600 : 400,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 5,
-                transition: 'all 0.15s',
-              }}
-            >
-              {g}
-              {cnt > 0 && (
-                <span style={{
-                  fontSize: 10,
-                  background: active ? 'rgba(250,204,21,0.25)' : 'rgba(250,204,21,0.08)',
-                  color: active ? '#FACC15' : 'rgba(250,204,21,0.5)',
-                  borderRadius: 10,
-                  padding: '1px 5px',
-                  fontWeight: 600,
-                }}>
-                  {cnt}
-                </span>
-              )}
-            </button>
-          )
-        })}
-      </div>
-      {/* Scroll fade — hints that the chip bar is horizontally scrollable */}
-      <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 32, background: 'linear-gradient(to right, transparent, var(--bg-sidebar))', pointerEvents: 'none' }} />
+      {/* Kop + filters */}
+      <div className="taken-head">
+        {isDesktop && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <h1 className="t-page" style={{ margin: 0 }}>Taken</h1>
+            <button className="btn-primary" onClick={() => onNew?.()}><Plus size={15} aria-hidden="true" /> Taak</button>
+          </div>
+        )}
+        <FilterTabs
+          label="Filter taken"
+          value={filter}
+          onChange={v => setFilter(v === filter && v.startsWith('group:') ? 'alles' : v)}
+          items={[
+            ...FILTERS.map(f => ({ value: f.id, label: f.label, count: counts[f.id] || undefined, tone: counts[f.id] ? f.tone : undefined })),
+            ...groups.map(g => ({ value: `group:${g}`, label: g, count: counts[`group:${g}`] || undefined, tone: 'school' })),
+          ]}
+        />
       </div>
 
       {/* Task list */}
-      <div style={{ flex: 1, overflow: 'hidden', overflowY: 'auto', padding: '12px 16px 100px' }}>
+      <div className="taken-body">
         {(filter === 'vandaag' || filter === 'morgen') ? (
           <TodayView
             tasks={tasks}
@@ -296,6 +202,7 @@ export default function TakenPage({
             onReorderGroups={onReorderGroups}
             groupOrder={groupOrder}
             seamless={!isDesktop}
+            hideHeader
             highlightedIds={highlightedIds}
           />
         )}
@@ -303,16 +210,16 @@ export default function TakenPage({
 
       {undoTask && ReactDOM.createPortal(
         <div style={{
-          position: 'fixed', bottom: isDesktop ? 24 : 90, left: isDesktop ? 'calc(220px + 50%)' : '50%', transform: 'translateX(-50%)',
+          position: 'fixed', bottom: isDesktop ? 24 : 90, left: isDesktop ? 'calc(104px + 50%)' : '50%', transform: 'translateX(-50%)',
           zIndex: 9998, display: 'flex', alignItems: 'center', gap: 10,
-          background: 'var(--bg-sidebar)', border: '1px solid var(--border)',
-          borderRadius: 14, padding: '10px 16px', boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
+          background: 'var(--c-surface-solid)', border: '1px solid var(--c-border-strong)',
+          borderRadius: 'var(--r-md)', padding: '10px 12px 10px 16px', boxShadow: 'var(--shadow-float)',
           animation: 'sheetUp 0.3s ease', whiteSpace: 'nowrap',
-        }}>
-          <span style={{ fontSize: 13, color: 'var(--text-1)' }}>✓ Afgerond</span>
+        }} role="status">
+          <span style={{ fontSize: 13, color: 'var(--c-text)' }}>✓ Afgerond</span>
           <button
             onClick={() => { onToggle({ ...undoTask, completed: true }); setUndoTask(null); clearTimeout(undoTimerRef.current) }}
-            style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 35%, transparent)', color: 'var(--accent)', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+            className="btn-ghost" style={{ color: 'var(--accent)' }}
           >
             Ongedaan maken
           </button>
@@ -330,7 +237,7 @@ export default function TakenPage({
             left: '50%', transform: 'translateX(-50%)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
             padding: '13px 24px', borderRadius: 26,
-            background: 'var(--accent)', color: '#000',
+            background: 'var(--accent)', color: 'var(--on-accent)',
             border: 'none', cursor: 'pointer', zIndex: 9996,
             fontSize: 15, fontWeight: 700, lineHeight: 1, whiteSpace: 'nowrap',
             boxShadow: '0 6px 20px color-mix(in srgb, var(--accent) 50%, transparent)',

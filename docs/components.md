@@ -25,7 +25,7 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 |---|---|---|---|---|
 | `dashboard` | [pages/DashboardPage.jsx](../src/pages/DashboardPage.jsx) | Dashboard / Home | Clock, FocusCard, SpotifyWidget, WeatherWidget | all |
 | `agenda` | [pages/AgendaPage.jsx](../src/pages/AgendaPage.jsx) | Agenda | Timeline (desktop), AgendaList (mobile) | all |
-| `taken` | [pages/TakenPage.jsx](../src/pages/TakenPage.jsx) | Taken | TasksWidget, TodayView | all |
+| `taken` | [pages/TakenPage.jsx](../src/pages/TakenPage.jsx) | Taken | FilterTabs, TodayView (Vandaag/Morgen), TasksWidget (other filters) | all |
 | `pomodoro` | [pages/PomodoroPage.jsx](../src/pages/PomodoroPage.jsx) | Pomodoro / (in "Meer") | PomodoroTimer, StudieBuddiesWidget, PomodoroStats | all |
 | `notities` | [pages/NotitiesPage.jsx](../src/pages/NotitiesPage.jsx) | Notities | NotesWidget | all |
 | `statistieken` | [pages/StatsPage.jsx](../src/pages/StatsPage.jsx) | Statistieken / Stats | (self-contained SVG bar charts) | all |
@@ -77,7 +77,8 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 
 ### Tasks / taken
 - **TasksWidget** — [components/TasksWidget.jsx](../src/components/TasksWidget.jsx) — main task list with groups, drag-reorder, complete. Aliases: "takenlijst", "taken widget", "de takenlijst".
-- **TodayView** — [components/TodayView.jsx](../src/components/TodayView.jsx) — mobile "today" heading + task view inside TakenPage. Aliases: "vandaag view", "vandaag-lijst".
+- **TodayView** — [components/TodayView.jsx](../src/components/TodayView.jsx) — Vandaag/Morgen view inside TakenPage: progress header ("X van Y voltooid" + bar), collapsible sections Urgent / Te laat / dagdelen (Overig) / Routines. Aliases: "vandaag view", "vandaag-lijst", "voortgang".
+- **TaskRow** — [components/tasks/TaskRow.jsx](../src/components/tasks/TaskRow.jsx) — shared compact task row (dot, title, subtitle, date/streak pill, flag, delete-on-hover, checkbox right); used by TodayView + TasksWidget. Styles `.task-row*` in index.css. Aliases: "taakrij", "task row".
 - **TaskModal** — [components/TaskModal.jsx](../src/components/TaskModal.jsx) — create/edit a task (title, time, subject, priority, recurrence, daypart). Aliases: "taak toevoegen", "nieuwe taak", "taak bewerken", "task modal", "task popup".
 - **TaskDetailModal** — [components/TaskDetailModal.jsx](../src/components/TaskDetailModal.jsx) — read-only task detail + start pomodoro + edit/delete. Aliases: "taak detail", "taakdetail popup".
 
