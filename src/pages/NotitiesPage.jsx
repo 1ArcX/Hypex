@@ -5,9 +5,19 @@ import { useIsDesktop } from '../hooks/useIsDesktop'
 export default function NotitiesPage({ userId, syncTrigger, openNoteId }) {
   const isDesktop = useIsDesktop()
   return (
-    <div style={{ height: '100%', overflowY: 'auto', padding: isDesktop ? '24px 28px' : '12px 16px 100px' }}>
-      {isDesktop && <h2 style={{ margin: '0 0 16px', fontSize: 20, fontWeight: 700, color: '#F59E0B', borderLeft: '3px solid rgba(245,158,11,0.5)', paddingLeft: 12 }}>Notities</h2>}
-      <NotesWidget userId={userId} syncTrigger={syncTrigger} fullHeight seamless={!isDesktop} openNoteId={openNoteId} />
-    </div>
+    isDesktop ? (
+      // Desktop: split view (lijst links, geselecteerde notitie rechts)
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', padding: '24px 28px', boxSizing: 'border-box' }}>
+        <h1 className="t-page" style={{ margin: '0 0 16px', flexShrink: 0 }}>Notities</h1>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <NotesWidget userId={userId} syncTrigger={syncTrigger} fullHeight split openNoteId={openNoteId} />
+        </div>
+      </div>
+    ) : (
+      // Mobiel: lijst → detail
+      <div style={{ height: '100%', overflowY: 'auto', padding: '12px 16px 100px' }}>
+        <NotesWidget userId={userId} syncTrigger={syncTrigger} fullHeight seamless openNoteId={openNoteId} />
+      </div>
+    )
   )
 }

@@ -11,9 +11,11 @@
     <link rel="apple-touch-icon" href="/icon.png" />
     <title>Hypex</title>
     <style>
-      /* Prevent iOS zoom on input focus */
-      input, textarea, select { font-size: 16px !important; }
-      input[type="time"], input[type="date"] { font-size: 16px !important; }
+      /* Prevent iOS zoom on input focus — alleen op touch-apparaten, desktop gebruikt de designmaten */
+      @media (pointer: coarse) {
+        input, textarea, select { font-size: 16px !important; }
+        input[type="time"], input[type="date"] { font-size: 16px !important; }
+      }
 
       /* Prevent body scroll jump when keyboard opens */
       html, body { height: 100%; overflow: hidden; }

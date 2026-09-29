@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { StickyNote, Plus, FolderPlus, ChevronLeft, Trash2, Check, Loader } from 'lucide-react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { StickyNote, Plus, FolderPlus, ChevronLeft, Trash2, Check, Loader, Search, X } from 'lucide-react'
 import { supabase } from '../supabaseClient'
+import { IconButton, Pill, EmptyState } from './ui'
 
 /*
   Voer dit SQL uit in Supabase → SQL Editor:
@@ -27,10 +28,7 @@ import { supabase } from '../supabaseClient'
   create policy "Users own notes" on notes for all using (auth.uid() = user_id);
 */
 
-const btnBase = {
-  background: 'none', border: 'none', cursor: 'pointer',
-  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
-}
+const MONTHS = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec']
 
 function formatRelTime(iso) {
   if (!iso) return ''
@@ -44,13 +42,33 @@ function formatRelTime(iso) {
   if (hours < 24) return `${hours}u geleden`
   const days = Math.floor(hours / 24)
   if (days < 7) return `${days}d geleden`
-  const months = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec']
-  return `${d.getDate()} ${months[d.getMonth()]}`
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}`
+}
+function formatLongDate(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`
 }
 
-export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 0, seamless = false, openNoteId = null }) {
+// Mappen hebben geen kleur in de database (beslissing D5/D6): vaste kleur afgeleid van het map-id.
+const FOLDER_COLORS = ['#FACC15', '#FB923C', '#A78BFA', '#34D399', '#60A5FA', '#F472B6', '#2DD4BF', '#F87171']
+export function folderColor(id) {
+  if (!id) return 'var(--c-text-3)'
+  let h = 0
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
+  return FOLDER_COLORS[h % FOLDER_COLORS.length]
+}
+
+const SORTS = [
+  { id: 'updated', label: 'Laatst bewerkt' },
+  { id: 'created', label: 'Nieuwste eerst' },
+  { id: 'title',   label: 'Titel A–Z' },
+]
+
+export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 0, seamless = false, openNoteId = null, split = false }) {
   const [folders, setFolders]       = useState([])
   const [notes, setNotes]           = useState([])
+  const [loaded, setLoaded]         = useState(false)
   const [activeNote, setActiveNote] = useState(null)
   const [filterFolder, setFilterFolder] = useState(null) // null = all
   const [saving, setSaving]         = useState(false)
@@ -58,8 +76,11 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
   const [newFolderMode, setNewFolderMode] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
   const [dbError, setDbError]       = useState(false)
+  const [query, setQuery]           = useState('')
+  const [sort, setSort]             = useState(() => { try { return localStorage.getItem('notes_sort') || 'updated' } catch { return 'updated' } })
   const saveTimer = useRef(null)
   const activeNoteIdRef = useRef(null)
+  const pendingRef = useRef(null) // { noteId, fields } — nog niet opgeslagen wijzigingen
 
   const fetchFolders = useCallback(async () => {
     if (!userId) return
@@ -75,6 +96,7 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
       .from('notes').select('*').eq('user_id', userId).order('updated_at', { ascending: false })
     if (error) { setDbError(true); return }
     setNotes(data || [])
+    setLoaded(true)
   }, [userId])
 
   useEffect(() => {
@@ -89,7 +111,26 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
     fetchNotes()
   }, [syncTrigger])
 
+  // ── Opslaan: wijzigingen per notitie bundelen, zodat snel wisselen tussen titel/inhoud
+  //    of naar een andere notitie geen eerdere wijziging laat vallen ──
+  const flushSave = useCallback(async () => {
+    clearTimeout(saveTimer.current)
+    const p = pendingRef.current
+    if (!p) return
+    pendingRef.current = null
+    setSaving(true)
+    await supabase.from('notes')
+      .update({ ...p.fields, updated_at: new Date().toISOString() })
+      .eq('id', p.noteId)
+    setSaving(false)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 1500)
+  }, [])
+
+  useEffect(() => () => { flushSave() }, [flushSave]) // bij unmount niets verliezen
+
   const createNote = async () => {
+    await flushSave()
     const { data } = await supabase.from('notes').insert({
       user_id: userId,
       title: 'Naamloos',
@@ -114,6 +155,9 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
   }
 
   const deleteNote = async (id) => {
+    const note = notes.find(n => n.id === id)
+    if (!window.confirm(`Notitie "${note?.title || 'Naamloos'}" verwijderen?`)) return
+    if (pendingRef.current?.noteId === id) { clearTimeout(saveTimer.current); pendingRef.current = null }
     await supabase.from('notes').delete().eq('id', id)
     setNotes(prev => prev.filter(n => n.id !== id))
     setActiveNote(null)
@@ -129,20 +173,16 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
   const handleNoteChange = (field, value) => {
     const noteId = activeNoteIdRef.current
     setActiveNote(prev => ({ ...prev, [field]: value }))
-    setNotes(prev => prev.map(n => n.id === noteId ? { ...n, [field]: value } : n))
+    setNotes(prev => prev.map(n => n.id === noteId ? { ...n, [field]: value, updated_at: new Date().toISOString() } : n))
+    if (pendingRef.current && pendingRef.current.noteId !== noteId) flushSave()
+    pendingRef.current = { noteId, fields: { ...(pendingRef.current?.fields || {}), [field]: value } }
     clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(async () => {
-      setSaving(true)
-      await supabase.from('notes')
-        .update({ [field]: value, updated_at: new Date().toISOString() })
-        .eq('id', noteId)
-      setSaving(false)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 1500)
-    }, 600)
+    saveTimer.current = setTimeout(flushSave, 600)
   }
 
-  const openNote = (note) => {
+  const openNote = async (note) => {
+    if (activeNoteIdRef.current === note.id) return
+    await flushSave()
     setActiveNote(note)
     activeNoteIdRef.current = note.id
   }
@@ -155,128 +195,150 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
     if (note) { openedFromJumpRef.current = openNoteId; openNote(note) }
   }, [openNoteId, notes])
 
-  const goBack = () => {
+  const goBack = async () => {
+    await flushSave()
     setActiveNote(null)
     activeNoteIdRef.current = null
     fetchNotes()
   }
 
-  const filteredNotes = filterFolder
-    ? notes.filter(n => n.folder_id === filterFolder)
-    : notes
+  const changeSort = (v) => { setSort(v); try { localStorage.setItem('notes_sort', v) } catch {} }
+
+  const visibleNotes = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    let list = filterFolder ? notes.filter(n => n.folder_id === filterFolder) : notes
+    if (q) list = list.filter(n => (n.title || '').toLowerCase().includes(q) || (n.content || '').toLowerCase().includes(q))
+    const sorted = [...list]
+    if (sort === 'title') sorted.sort((a, b) => (a.title || '').localeCompare(b.title || '', 'nl'))
+    else if (sort === 'created') sorted.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+    else sorted.sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''))
+    return sorted
+  }, [notes, filterFolder, query, sort])
+
+  const folderOf = (id) => folders.find(f => f.id === id)
 
   // --- DB tabellen bestaan niet ---
   if (dbError) return (
-    <div className="glass-card p-4 text-center" style={fullHeight ? { height: '100%' } : {}}>
-      <StickyNote size={20} style={{ color: 'rgba(255,255,255,0.2)', margin: '0 auto 8px' }} />
-      <p style={{ fontSize: 11, color: 'var(--c-text-3)', lineHeight: 1.5 }}>
-        Notities tabel niet gevonden.<br />Voer het SQL-script uit in Supabase.
-      </p>
+    <div className="card" style={{ padding: 16, ...(fullHeight ? { height: '100%' } : {}) }}>
+      <EmptyState icon={StickyNote} text={<>Notities tabel niet gevonden.<br />Voer het SQL-script uit in Supabase.</>} />
     </div>
   )
 
-  // ─── Editor view ─────────────────────────────────────────────
-  if (activeNote) return (
-    <div className="glass-card p-4" style={{ display: 'flex', flexDirection: 'column' }}>
-      {/* Editor header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, flexShrink: 0 }}>
-        <button onClick={goBack} style={{ ...btnBase, color: 'var(--c-text-3)', gap: 3 }}>
-          <ChevronLeft size={15} />
-          <span style={{ fontSize: 11 }}>Terug</span>
-        </button>
+  // ─── Detail / editor ─────────────────────────────────────────
+  const editor = activeNote && (
+    <div className={split ? 'notes-detail' : 'card'} style={split ? undefined : { padding: 16, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexShrink: 0 }}>
+        {!split && (
+          <button onClick={goBack} className="btn-ghost" style={{ padding: '4px 10px 4px 6px' }}>
+            <ChevronLeft size={15} aria-hidden="true" /> Terug
+          </button>
+        )}
         <div style={{ flex: 1 }} />
-        {saving && <Loader size={11} style={{ color: 'var(--c-text-3)', animation: 'spin 1s linear infinite' }} />}
-        {saved && !saving && <span style={{ fontSize: 9, color: '#1DB954', display: 'flex', alignItems: 'center', gap: 3 }}><Check size={10} />Opgeslagen</span>}
-        <select
-          value={activeNote.folder_id || ''}
-          onChange={e => handleNoteChange('folder_id', e.target.value || null)}
-          style={{ fontSize: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--c-border-strong)', borderRadius: 4, color: 'var(--c-text-3)', padding: '2px 6px', cursor: 'pointer' }}
-        >
-          <option value="">Geen map</option>
-          {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-        </select>
-        <button onClick={() => deleteNote(activeNote.id)} style={{ ...btnBase, color: 'rgba(255,80,80,0.5)', padding: '0 2px' }}>
-          <Trash2 size={13} />
-        </button>
+        <span aria-live="polite" style={{ display: 'flex', alignItems: 'center', minWidth: 80, justifyContent: 'flex-end' }}>
+          {saving && <Loader size={12} aria-label="Opslaan…" style={{ color: 'var(--c-text-3)', animation: 'spin 1s linear infinite' }} />}
+          {saved && !saving && <span style={{ fontSize: 11, color: 'var(--c-success)', display: 'flex', alignItems: 'center', gap: 3 }}><Check size={11} aria-hidden="true" />Opgeslagen</span>}
+        </span>
+        <IconButton icon={Trash2} label="Notitie verwijderen" tone="danger" variant="soft" onClick={() => deleteNote(activeNote.id)} />
       </div>
 
-      {/* Titel */}
       <input
         value={activeNote.title}
         onChange={e => handleNoteChange('title', e.target.value)}
         placeholder="Titel..."
+        aria-label="Titel"
         style={{
           background: 'transparent', border: 'none', outline: 'none',
-          color: 'white', fontWeight: 600, fontSize: 15, width: '100%',
-          marginBottom: 6, flexShrink: 0, fontFamily: 'inherit',
+          color: 'var(--c-text)', fontWeight: 700, fontSize: 20, width: '100%',
+          marginBottom: 4, flexShrink: 0, fontFamily: 'inherit', letterSpacing: '-0.01em',
         }}
       />
-      <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', marginBottom: 8, flexShrink: 0 }} />
+      <p className="t-meta" style={{ margin: '0 0 10px', fontSize: 12 }}>
+        Bewerkt {formatLongDate(activeNote.updated_at || activeNote.created_at)}
+      </p>
 
-      {/* Inhoud — groeit met content mee, page-scroll (niet inner scroll) */}
+      {/* Map als tag (+ wijzigen) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap', flexShrink: 0 }}>
+        {activeNote.folder_id && folderOf(activeNote.folder_id) && (
+          <Pill tone={folderColor(activeNote.folder_id)} dot>{folderOf(activeNote.folder_id).name}</Pill>
+        )}
+        <select
+          value={activeNote.folder_id || ''}
+          onChange={e => handleNoteChange('folder_id', e.target.value || null)}
+          aria-label="Map"
+          style={{ fontSize: 11, height: 22, border: '1px solid var(--c-border)', borderRadius: 'var(--r-xs)', color: 'var(--c-text-2)', padding: '0 24px 0 8px', cursor: 'pointer', backgroundPosition: 'right 0.4rem center', backgroundSize: '0.8em' }}
+        >
+          <option value="">{activeNote.folder_id ? 'Uit map halen' : 'Geen map'}</option>
+          {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+        </select>
+      </div>
+
       <textarea
         value={activeNote.content}
         onChange={e => {
           handleNoteChange('content', e.target.value)
-          // auto-grow
-          e.target.style.height = 'auto'
-          e.target.style.height = e.target.scrollHeight + 'px'
+          if (!split) { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }
         }}
         onFocus={e => {
-          e.target.style.height = 'auto'
-          e.target.style.height = e.target.scrollHeight + 'px'
+          if (!split) { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }
         }}
         placeholder="Begin met typen..."
-        style={{
-          background: 'transparent', border: 'none', outline: 'none',
-          color: 'var(--c-text-2)', lineHeight: '1.6', fontSize: 13,
-          fontFamily: 'inherit', resize: 'none', overflow: 'hidden',
-          minHeight: 'calc(var(--app-height, 100vh) + 60px)', width: '100%', boxSizing: 'border-box',
-        }}
+        aria-label="Inhoud"
+        className="notes-content"
+        style={split ? undefined : { minHeight: 'calc(var(--app-height, 100vh) + 60px)', overflow: 'hidden' }}
       />
     </div>
   )
 
-  // ─── List view ────────────────────────────────────────────────
-  return (
-    <div className={seamless ? 'flex flex-col' : 'glass-card p-4 flex flex-col'} style={{
-      ...(fullHeight ? { height: '100%' } : {}),
-      ...(seamless ? {} : { borderLeft: '3px solid rgba(245,158,11,0.45)', background: 'linear-gradient(135deg, rgba(245,158,11,0.05) 0%, transparent 60%)' }),
-    }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexShrink: 0 }}>
-        {!seamless && <div style={{ width: 24, height: 24, borderRadius: 8, background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <StickyNote size={12} style={{ color: '#F59E0B' }} />
-        </div>}
-        {!seamless && <span style={{ fontSize: 10, color: '#F59E0B', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Notities</span>}
-        <div style={{ flex: 1 }} />
-        <button
-          onClick={() => { setNewFolderMode(v => !v); setNewFolderName('') }}
-          style={{ ...btnBase, color: 'var(--c-text-3)', marginRight: 4 }}
-          title="Nieuwe map"
-        >
-          <FolderPlus size={14} />
-        </button>
-        {filterFolder && (
-          <button
-            onClick={() => {
-              if (window.confirm(`Map "${folders.find(f=>f.id===filterFolder)?.name}" verwijderen? Notities blijven bewaard.`))
-                deleteFolder(filterFolder)
-            }}
-            style={{ ...btnBase, color: 'rgba(255,80,80,0.35)', marginRight: 4 }}
-            title="Map verwijderen"
-          >
-            <Trash2 size={13} />
-          </button>
-        )}
-        <button onClick={createNote} style={{ ...btnBase, color: 'var(--accent)' }} title="Nieuwe notitie">
-          <Plus size={17} />
+  // ─── Lijst ────────────────────────────────────────────────────
+  const list = (
+    <div className={split ? 'notes-list' : seamless ? 'flex flex-col' : 'card flex flex-col'}
+      style={split ? undefined : { ...(seamless ? {} : { padding: 16 }), ...(fullHeight ? { height: '100%' } : {}) }}>
+      {/* Kop: zoeken + nieuw */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexShrink: 0 }}>
+        <div className="notes-search">
+          <Search size={14} aria-hidden="true" />
+          <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Zoek notities…" aria-label="Zoek notities" />
+          {query && <button onClick={() => setQuery('')} aria-label="Zoekopdracht wissen" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', display: 'flex', padding: 0 }}><X size={13} /></button>}
+        </div>
+        <button onClick={createNote} className="btn-primary" style={{ flexShrink: 0 }}>
+          <Plus size={15} aria-hidden="true" /> Nieuw
         </button>
       </div>
 
-      {/* Nieuwe map input */}
+      {/* Mappen + sorteren */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, flexShrink: 0, flexWrap: 'wrap' }}>
+        {[{ id: null, name: 'Alles' }, ...folders].map(f => {
+          const active = filterFolder === f.id
+          return (
+            <button key={f.id ?? 'all'} onClick={() => setFilterFolder(f.id)} aria-pressed={active}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5, height: 24, padding: '0 9px', borderRadius: 'var(--r-xs)', cursor: 'pointer',
+                fontSize: 11, fontWeight: active ? 700 : 500,
+                border: `1px solid ${active ? 'var(--accent-border)' : 'var(--c-border)'}`,
+                background: active ? 'var(--accent-soft)' : 'transparent',
+                color: active ? 'var(--accent)' : 'var(--c-text-2)',
+              }}>
+              {f.id && <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: '50%', background: folderColor(f.id) }} />}
+              {f.name}
+            </button>
+          )
+        })}
+        <IconButton icon={FolderPlus} label="Nieuwe map" size={24} iconSize={13} onClick={() => { setNewFolderMode(v => !v); setNewFolderName('') }} />
+        {filterFolder && (
+          <IconButton icon={Trash2} label="Map verwijderen" size={24} iconSize={12} tone="danger"
+            onClick={() => {
+              if (window.confirm(`Map "${folders.find(f => f.id === filterFolder)?.name}" verwijderen? Notities blijven bewaard.`))
+                deleteFolder(filterFolder)
+            }} />
+        )}
+        <select value={sort} onChange={e => changeSort(e.target.value)} aria-label="Sorteren"
+          style={{ marginLeft: 'auto', fontSize: 11, height: 24, border: '1px solid var(--c-border)', borderRadius: 'var(--r-xs)', color: 'var(--c-text-2)', padding: '0 24px 0 8px', cursor: 'pointer', backgroundPosition: 'right 0.4rem center', backgroundSize: '0.8em' }}>
+          {SORTS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+        </select>
+      </div>
+
       {newFolderMode && (
-        <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexShrink: 0 }}>
           <input
             autoFocus
             value={newFolderName}
@@ -286,81 +348,62 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
               if (e.key === 'Escape') setNewFolderMode(false)
             }}
             placeholder="Mapnaam..."
-            style={{
-              flex: 1, fontSize: 12, background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6,
-              padding: '5px 8px', color: 'white', outline: 'none', fontFamily: 'inherit',
-            }}
+            aria-label="Naam nieuwe map"
+            className="glass-input"
+            style={{ flex: 1, padding: '6px 10px' }}
           />
-          <button onClick={createFolder} style={{
-            fontSize: 11, padding: '5px 10px', background: 'rgba(255,255,255,0.06)',
-            border: '1px solid var(--c-border-strong)', borderRadius: 6, color: 'var(--accent)', cursor: 'pointer',
-          }}>OK</button>
+          <button onClick={createFolder} className="btn-ghost">OK</button>
         </div>
       )}
 
-      {/* Folder filter pills */}
-      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 10, flexShrink: 0 }}>
-        {[{ id: null, name: 'Alles' }, ...folders].map(f => (
-          <div key={f.id ?? 'all'} style={{ display: 'flex', alignItems: 'center' }}>
-            <button
-              onClick={() => setFilterFolder(f.id)}
-              style={{
-                fontSize: 10, padding: '2px 8px', borderRadius: 12, cursor: 'pointer',
-                border: '1px solid',
-                borderColor: filterFolder === f.id ? 'color-mix(in srgb, var(--accent) 40%, transparent)' : 'rgba(255,255,255,0.1)',
-                background: filterFolder === f.id ? 'color-mix(in srgb, var(--accent) 10%, transparent)' : 'transparent',
-                color: filterFolder === f.id ? 'var(--accent)' : 'var(--c-text-3)',
-              }}
-            >
-              {f.name}
-            </button>
-          </div>
-        ))}
-      </div>
-
       {/* Notitieslijst */}
-      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-        {filteredNotes.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '20px 0' }}>
-            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', marginBottom: 10 }}>Geen notities</p>
-            <button onClick={createNote} style={{
-              ...btnBase, display: 'inline-flex', gap: 4,
-              fontSize: 11, color: 'var(--accent)',
-              border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
-              background: 'color-mix(in srgb, var(--accent) 8%, transparent)',
-              borderRadius: 8, padding: '6px 12px',
-            }}>
-              <Plus size={12} /> Nieuwe notitie
-            </button>
-          </div>
-        ) : (
-          filteredNotes.map((note, i) => (
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {!loaded ? (
+          <p className="t-meta" style={{ padding: '16px 4px', margin: 0 }}>Notities laden…</p>
+        ) : visibleNotes.length === 0 ? (
+          <EmptyState icon={StickyNote} compact
+            title={query ? 'Geen resultaten' : 'Geen notities'}
+            text={query ? `Niets gevonden voor “${query}”.` : undefined}
+            action={!query && <button onClick={createNote} className="btn-ghost"><Plus size={13} aria-hidden="true" /> Nieuwe notitie</button>} />
+        ) : visibleNotes.map(note => {
+          const active = activeNote?.id === note.id
+          return (
             <button
               key={note.id}
               onClick={() => openNote(note)}
-              style={{
-                display: 'flex', alignItems: 'center', width: '100%',
-                background: 'none', border: 'none', cursor: 'pointer',
-                padding: '7px 0', textAlign: 'left', gap: 8,
-                borderBottom: i < filteredNotes.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-              }}
+              aria-current={active ? 'true' : undefined}
+              className={`notes-row${active ? ' is-active' : ''}`}
             >
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, color: 'white', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {note.title || 'Naamloos'}
-                </div>
-                <div style={{ fontSize: 10, color: 'var(--c-text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>
-                  {note.content ? note.content.replace(/\n/g, ' ').slice(0, 55) : 'Leeg'}
-                </div>
-              </div>
-              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', flexShrink: 0, textAlign: 'right' }}>
-                {formatRelTime(note.updated_at)}
+              <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: folderColor(note.folder_id), flexShrink: 0, marginTop: 5 }} />
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: 'var(--c-text)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {note.title || 'Naamloos'}
+                  </span>
+                  <span className="t-meta tnum" style={{ flexShrink: 0 }}>{formatRelTime(note.updated_at)}</span>
+                </span>
+                <span className="t-meta" style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
+                  {note.content ? note.content.replace(/\n/g, ' ').slice(0, 90) : 'Leeg'}
+                </span>
               </span>
             </button>
-          ))
-        )}
+          )
+        })}
       </div>
     </div>
   )
+
+  if (split) return (
+    <div className="notes-split" style={fullHeight ? { height: '100%' } : undefined}>
+      {list}
+      {editor || (
+        <div className="notes-detail" style={{ justifyContent: 'center' }}>
+          <EmptyState icon={StickyNote} title="Geen notitie geselecteerd" text="Kies een notitie links of maak een nieuwe."
+            action={<button onClick={createNote} className="btn-primary"><Plus size={15} aria-hidden="true" /> Nieuwe notitie</button>} />
+        </div>
+      )}
+    </div>
+  )
+
+  return activeNote ? editor : list
 }

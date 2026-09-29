@@ -822,3 +822,33 @@ select {
   .taken-head { padding: 12px 16px 0; }
   .taken-body > * { padding: 12px 16px 120px; }
 }
+
+/* ===== NOTITIES (v2 split view) ===== */
+.notes-split { display: grid; grid-template-columns: clamp(240px, 38%, 380px) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 12px; min-height: 0; flex: 1; }
+.notes-list, .notes-detail {
+  background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-lg);
+  display: flex; flex-direction: column; min-height: 0; min-width: 0;
+}
+.notes-list { padding: 14px; }
+.notes-detail { padding: 20px 22px; }
+.notes-search {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px;
+  height: 32px; padding: 0 10px; border-radius: var(--r-sm);
+  background: var(--c-surface-2); border: 1px solid var(--c-border); color: var(--c-text-3);
+}
+.notes-search:focus-within { border-color: var(--accent-border); }
+.notes-search input { flex: 1; min-width: 0; background: none; border: none; outline: none; color: var(--c-text); font-size: 13px; font-family: inherit; }
+.notes-row {
+  display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left;
+  padding: 9px 10px; border-radius: var(--r-sm); border: none; background: transparent; cursor: pointer;
+  transition: background var(--t-fast) ease;
+}
+.notes-row:hover { background: var(--c-surface-2); }
+.notes-row.is-active { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
+.notes-content {
+  flex: 1; min-height: 240px; width: 100%; box-sizing: border-box; resize: none; outline: none;
+  background: var(--c-surface-2); border: 1px solid var(--c-border); border-radius: var(--r-md);
+  padding: 14px 16px; color: var(--c-text); font-size: 13px; line-height: 1.65;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+}
+.notes-content:focus { border-color: var(--accent-border); }
