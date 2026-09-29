@@ -430,7 +430,8 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
 
   const openEditEvent = (ev, e) => {
     e?.stopPropagation()
-    if (ev.external) return
+    // Geïmporteerde items (Google / MyX) zijn read-only: alleen details tonen
+    if (ev.external) { setModal({ mode: 'view', event: ev }); return }
     const s = new Date(ev.start_time), en = new Date(ev.end_time)
     const isAllDay = s.getHours() === 0 && s.getMinutes() === 0 && en.getHours() === 23 && en.getMinutes() === 59
     const startDs = toDateStr(s), endDs = toDateStr(en)
@@ -1052,9 +1053,9 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
 
       {/* Lesson detail popup (fixed, dus positie in de flex-rij maakt niet uit) */}
       {lessonDetail && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(12px)', padding: '16px' }}
+        <div className="modal-overlay" style={{ padding: '16px' }}
           onClick={() => setLessonDetail(null)}>
-          <div className="glass-card" style={{ width: '100%', maxWidth: '340px', padding: '20px' }}
+          <div className="glass-card modal-content" style={{ width: '100%', maxWidth: '340px', padding: '20px' }}
             onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1117,11 +1118,61 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
         </div>
       )}
 
+      {/* Geïmporteerd event (read-only) */}
+      {modal?.mode === 'view' && (() => {
+        const ev = modal.event
+        const { title, code } = eventDisplay(ev)
+        const s = new Date(ev.start_time), en = new Date(ev.end_time)
+        const allDay = ev.all_day || (s.getHours() === 0 && s.getMinutes() === 0 && en.getHours() === 23 && en.getMinutes() === 59)
+        const dateLabel = s.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })
+        const rawDesc = ev.description || ''
+        // HTML (Google) → tekst met behoud van regeleinden; platte tekst (MyX/ICS) blijft zoals hij is
+        const description = (/<[a-z/][^>]*>/i.test(rawDesc)
+          ? rawDesc.replace(/<br\s*\/?>|<\/p>|<\/li>/gi, '\n').replace(/<[^>]*>/g, '')
+              .replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+              .replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n')
+          : rawDesc).trim()
+        const row = (label, value, extra) => (
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+            <span style={{ fontSize: '11px', color: 'var(--c-text-3)', width: '72px', flexShrink: 0, paddingTop: '2px' }}>{label}</span>
+            <span style={{ fontSize: '13px', color: 'var(--c-text)', fontWeight: 500, lineHeight: 1.4, minWidth: 0, overflowWrap: 'anywhere', ...extra }}>{value}</span>
+          </div>
+        )
+        return (
+          <div className="modal-overlay" style={{ padding: '16px' }} onClick={() => setModal(null)}>
+            <div className="glass-card modal-content" style={{ width: '100%', maxWidth: '400px', padding: '24px', maxHeight: '90vh', overflowY: 'auto' }}
+              onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '20px' }}>
+                <div style={{ minWidth: 0 }}>
+                  <h2 style={{ color: 'white', fontWeight: 700, fontSize: '16px', margin: 0, overflowWrap: 'anywhere' }}>{title}</h2>
+                  <span style={{ display: 'inline-block', marginTop: '6px', fontSize: '10px', fontWeight: 600, color: 'var(--c-text-2)', background: 'var(--c-surface-2)', border: '1px solid var(--c-border)', borderRadius: '6px', padding: '1px 6px' }}>
+                    Geïmporteerd
+                  </span>
+                </div>
+                <button onClick={() => setModal(null)} aria-label="Sluiten" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', flexShrink: 0 }}>
+                  <X size={18} />
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {row('Tijd', <span style={{ textTransform: 'capitalize' }}>{dateLabel} · {allDay ? 'Hele dag' : `${fmtTime(s)} – ${fmtTime(en)}`}</span>)}
+                {code && row('Code', code)}
+                {ev.location && row('Locatie', ev.location)}
+                {description && row('Beschrijving', description, { fontSize: '12px', fontWeight: 400, color: 'var(--c-text-2)', whiteSpace: 'pre-wrap' })}
+              </div>
+              <button onClick={() => setModal(null)}
+                style={{ width: '100%', marginTop: '20px', padding: '9px', borderRadius: '10px', border: '1px solid var(--c-border-strong)', background: 'transparent', color: 'var(--c-text-2)', cursor: 'pointer', fontSize: '12px' }}>
+                Sluiten
+              </button>
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Event modal */}
-      {modal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(12px)', padding: '16px' }}
+      {modal && modal.mode !== 'view' && (
+        <div className="modal-overlay" style={{ padding: '16px' }}
           onClick={() => setModal(null)}>
-          <div className="glass-card" style={{ width: '100%', maxWidth: '400px', padding: '24px', maxHeight: '90vh', overflowY: 'auto' }}
+          <div className="glass-card modal-content" style={{ width: '100%', maxWidth: '400px', padding: '24px', maxHeight: '90vh', overflowY: 'auto' }}
             onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <h2 style={{ color: 'white', fontWeight: 700, fontSize: '16px', margin: 0 }}>
