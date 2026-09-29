@@ -250,7 +250,7 @@ function RouteMap({ routeStops, vehiclePos, onClose, tripLabel }) {
       <div style={{
         width: '100%', maxWidth: '860px', height: 'min(80vh, 600px)',
         borderRadius: '16px', overflow: 'hidden', position: 'relative',
-        border: '1px solid rgba(255,255,255,0.1)',
+        border: '1px solid var(--c-border-strong)',
         boxShadow: '0 24px 80px rgba(0,0,0,0.7)',
       }} onClick={e => e.stopPropagation()}>
         {/* Header */}
@@ -266,7 +266,7 @@ function RouteMap({ routeStops, vehiclePos, onClose, tripLabel }) {
           <button onClick={onClose} style={{
             background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)',
             borderRadius: '8px', padding: '4px 10px', cursor: 'pointer',
-            color: 'rgba(255,255,255,0.7)', fontSize: '12px', fontWeight: 500,
+            color: 'var(--c-text-2)', fontSize: '12px', fontWeight: 500,
           }}>✕ Sluiten</button>
         </div>
         <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
@@ -558,10 +558,10 @@ export default function VrachttijdenWidget() {
             <Truck size={12} style={{ color:'#FF8C42' }} />
           </div>
           <span style={{ fontSize: 10, color: '#FF8C42', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Vrachttijden</span>
-          {lastUpdate && selectedDate === today && <span style={{ fontSize:'10px', color:'rgba(255,255,255,0.3)' }}>{lastUpdate.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})}</span>}
+          {lastUpdate && selectedDate === today && <span style={{ fontSize:'10px', color:'var(--c-text-3)' }}>{lastUpdate.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})}</span>}
         </div>
         <div style={{ display:'flex', gap:'4px', alignItems:'center' }}>
-          {tokens && <button onClick={() => fetchStops()} disabled={loading} style={{ background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.3)', padding:'3px', borderRadius:'6px' }} onMouseEnter={e=>e.currentTarget.style.color='var(--accent)'} onMouseLeave={e=>e.currentTarget.style.color='rgba(255,255,255,0.3)'}><RefreshCw size={13} style={{ animation:loading?'spin 1s linear infinite':'none' }} /></button>}
+          {tokens && <button onClick={() => fetchStops()} disabled={loading} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--c-text-3)', padding:'3px', borderRadius:'6px' }} onMouseEnter={e=>e.currentTarget.style.color='var(--accent)'} onMouseLeave={e=>e.currentTarget.style.color='rgba(255,255,255,0.3)'}><RefreshCw size={13} style={{ animation:loading?'spin 1s linear infinite':'none' }} /></button>}
         </div>
       </div>
 
@@ -569,12 +569,12 @@ export default function VrachttijdenWidget() {
       {tokens && (
         <div style={{ display:'flex', alignItems:'center', gap:'6px', marginBottom:'10px' }}>
           <button onClick={() => { const d=new Date(selectedDate); d.setDate(d.getDate()-1); changeDate(d.toISOString().slice(0,10)) }}
-            style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'8px', padding:'4px 8px', cursor:'pointer', color:'rgba(255,255,255,0.6)', fontSize:'16px', lineHeight:1 }}>‹</button>
+            style={{ background:'rgba(255,255,255,0.06)', border:'1px solid var(--c-border-strong)', borderRadius:'8px', padding:'4px 8px', cursor:'pointer', color:'var(--c-text-2)', fontSize:'16px', lineHeight:1 }}>‹</button>
           <input type="date" value={selectedDate} onChange={e => { if (e.target.value) changeDate(e.target.value) }}
-            style={{ flex:1, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'8px', padding:'4px 8px', color:'white', fontSize:'12px', textAlign:'center', cursor:'pointer' }} />
+            style={{ flex:1, background:'rgba(255,255,255,0.05)', border:'1px solid var(--c-border-strong)', borderRadius:'8px', padding:'4px 8px', color:'white', fontSize:'12px', textAlign:'center', cursor:'pointer' }} />
           <button onClick={() => { const d=new Date(selectedDate); d.setDate(d.getDate()+1); changeDate(d.toISOString().slice(0,10)) }}
-            style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'8px', padding:'4px 8px', cursor:'pointer', color:'rgba(255,255,255,0.6)', fontSize:'16px', lineHeight:1 }}>›</button>
-          {selectedDate !== today && <button onClick={() => changeDate(today)} style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'8px', padding:'4px 7px', cursor:'pointer', color:'rgba(255,255,255,0.5)', fontSize:'10px', whiteSpace:'nowrap' }}>Vandaag</button>}
+            style={{ background:'rgba(255,255,255,0.06)', border:'1px solid var(--c-border-strong)', borderRadius:'8px', padding:'4px 8px', cursor:'pointer', color:'var(--c-text-2)', fontSize:'16px', lineHeight:1 }}>›</button>
+          {selectedDate !== today && <button onClick={() => changeDate(today)} style={{ background:'rgba(255,255,255,0.06)', border:'1px solid var(--c-border-strong)', borderRadius:'8px', padding:'4px 7px', cursor:'pointer', color:'var(--c-text-2)', fontSize:'10px', whiteSpace:'nowrap' }}>Vandaag</button>}
         </div>
       )}
 
@@ -582,7 +582,7 @@ export default function VrachttijdenWidget() {
       {!tokens && (
         <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'10px', padding:'20px 0' }}>
           <Truck size={28} style={{ color:'var(--accent)', opacity:0.5 }} />
-          <p style={{ fontSize:'12px', color:'rgba(255,255,255,0.4)', margin:0, textAlign:'center' }}>Log eenmalig in — daarna werkt het automatisch op alle apparaten.</p>
+          <p style={{ fontSize:'12px', color:'var(--c-text-3)', margin:0, textAlign:'center' }}>Log eenmalig in — daarna werkt het automatisch op alle apparaten.</p>
           <button onClick={handleLogin} disabled={loginLoading}
             style={{ display:'flex', alignItems:'center', gap:'8px', padding:'9px 20px', borderRadius:'10px', border:accentBorder(40), background:accentBg(12), color:'var(--accent)', cursor:loginLoading?'wait':'pointer', fontSize:'13px', fontWeight:600 }}>
             {loginLoading ? <><RefreshCw size={14} style={{ animation:'spin 1s linear infinite' }} /> Bezig...</> : <><LogIn size={14} /> Inloggen met Simacan</>}
@@ -595,7 +595,7 @@ export default function VrachttijdenWidget() {
       {tokens && (
         <>
           {loading && !stops && (
-            <div style={{ textAlign:'center', padding:'20px', color:'rgba(255,255,255,0.3)', fontSize:'12px' }}>
+            <div style={{ textAlign:'center', padding:'20px', color:'var(--c-text-3)', fontSize:'12px' }}>
               <RefreshCw size={16} style={{ animation:'spin 1s linear infinite', display:'block', margin:'0 auto 6px' }} />Laden...
             </div>
           )}
@@ -608,7 +608,7 @@ export default function VrachttijdenWidget() {
           {stops && (
             <>
               {sorted.length === 0 ? (
-                <p style={{ fontSize:'12px', color:'rgba(255,255,255,0.4)', textAlign:'center', padding:'12px 0' }}>Geen ritten voor {selectedDate === today ? 'vandaag' : selectedDate}</p>
+                <p style={{ fontSize:'12px', color:'var(--c-text-3)', textAlign:'center', padding:'12px 0' }}>Geen ritten voor {selectedDate === today ? 'vandaag' : selectedDate}</p>
               ) : (
                 <div style={{ display:'flex', flexDirection:'column', gap:'4px' }}>
                   {sorted.map((stop, i) => {
@@ -635,10 +635,10 @@ export default function VrachttijdenWidget() {
                         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:'8px' }}>
                           <div style={{ display:'flex', alignItems:'center', gap:'6px', minWidth:0 }}>
                             <Truck size={12} style={{ color, flexShrink:0 }} />
-                            <span style={{ fontSize:'12px', color:'rgba(255,255,255,0.85)', fontWeight:500, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                            <span style={{ fontSize:'12px', color:'var(--c-text)', fontWeight:500, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                               {stop.trip?.tripId || `Rit ${i+1}`}
                             </span>
-                            {stop.tripStatus?.vehicleType && <span style={{ fontSize:'10px', color:'rgba(255,255,255,0.3)', flexShrink:0 }}>{stop.tripStatus.vehicleType}</span>}
+                            {stop.tripStatus?.vehicleType && <span style={{ fontSize:'10px', color:'var(--c-text-3)', flexShrink:0 }}>{stop.tripStatus.vehicleType}</span>}
                           </div>
                           <div style={{ display:'flex', alignItems:'center', gap:'6px', flexShrink:0 }}>
                             {badge && <span style={{ fontSize:'10px', color:badge.color, fontWeight:600 }}>{badge.text}</span>}
@@ -655,23 +655,23 @@ export default function VrachttijdenWidget() {
 
                         {/* Rij 2: vervoerder + status + tijdvenster */}
                         <div style={{ display:'flex', justifyContent:'space-between', marginTop:'3px', gap:'8px' }}>
-                          <span style={{ fontSize:'10px', color:'rgba(255,255,255,0.4)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                          <span style={{ fontSize:'10px', color:'var(--c-text-3)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                             {[dc, carrier].filter(Boolean).join(' · ')}
                           </span>
                           <div style={{ display:'flex', gap:'6px', flexShrink:0 }}>
                             {stop.timeWindowStart && stop.timeWindowEnd && (
-                              <span style={{ fontSize:'10px', color:'rgba(255,255,255,0.3)' }}>{fmt(stop.timeWindowStart)}–{fmt(stop.timeWindowEnd)}</span>
+                              <span style={{ fontSize:'10px', color:'var(--c-text-3)' }}>{fmt(stop.timeWindowStart)}–{fmt(stop.timeWindowEnd)}</span>
                             )}
                             <span style={{ fontSize:'10px', color }}>{activityLabel(activity)}</span>
                           </div>
                         </div>
 
                         {/* Pallets */}
-                        {palletStr && <div style={{ fontSize:'10px', color:'rgba(255,255,255,0.3)', marginTop:'2px' }}>{palletStr}</div>}
+                        {palletStr && <div style={{ fontSize:'10px', color:'var(--c-text-3)', marginTop:'2px' }}>{palletStr}</div>}
 
                         {/* Detail panel */}
                         {isSel && (
-                          <div style={{ marginTop:'8px', paddingTop:'8px', borderTop:'1px solid rgba(255,255,255,0.08)' }} onClick={e => e.stopPropagation()}>
+                          <div style={{ marginTop:'8px', paddingTop:'8px', borderTop:'1px solid var(--c-border)' }} onClick={e => e.stopPropagation()}>
                             <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
                               {[
                                 ['Route',      stop.trip?.tripId],
@@ -687,8 +687,8 @@ export default function VrachttijdenWidget() {
                                 ...Object.entries(pallets).map(([t,n]) => [PALLET_LABELS[t]||t, `${n} pallets`])
                               ].filter(([,v]) => v && v !== '—').map(([label, value]) => (
                                 <div key={label} style={{ display:'flex', justifyContent:'space-between', fontSize:'11px' }}>
-                                  <span style={{ color:'rgba(255,255,255,0.35)' }}>{label}</span>
-                                  <span style={{ color:'rgba(255,255,255,0.8)' }}>{value}</span>
+                                  <span style={{ color:'var(--c-text-3)' }}>{label}</span>
+                                  <span style={{ color:'var(--c-text-2)' }}>{value}</span>
                                 </div>
                               ))}
                             </div>
@@ -702,7 +702,7 @@ export default function VrachttijdenWidget() {
                                 padding: '7px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', fontWeight: 600,
                                 border: mapShown ? accentBorder(40) : '1px solid rgba(255,255,255,0.12)',
                                 background: mapShown ? accentBg(12) : 'rgba(255,255,255,0.05)',
-                                color: mapShown ? 'var(--accent)' : 'rgba(255,255,255,0.6)',
+                                color: mapShown ? 'var(--accent)' : 'var(--c-text-2)',
                                 transition: 'all 0.15s'
                               }}>
                               {rd?.loading

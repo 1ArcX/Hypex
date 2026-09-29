@@ -5,7 +5,7 @@ import PomodoroStats from '../components/PomodoroStats'
 
 const SESSION_LOG_KEY = 'pomodoro_session_log'
 const MODE_META = {
-  work:      { label: 'Focus',       icon: '🎯', color: '#00FFD1' },
+  work:      { label: 'Focus',       icon: '🎯', color: 'var(--accent)' },
   break:     { label: 'Pauze',       icon: '☕', color: '#FF8C42' },
   longBreak: { label: 'Lange pauze', icon: '🌙', color: '#A78BFA' },
 }
@@ -40,7 +40,7 @@ function SessionRow({ session }) {
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0' }}>
       <div style={{
         width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-        background: m.color + '18', border: `1px solid ${m.color}33`,
+        background: `color-mix(in srgb, ${m.color} 9%, transparent)`, border: `1px solid color-mix(in srgb, ${m.color} 20%, transparent)`,
         display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
       }}>
         {m.icon}
@@ -55,7 +55,7 @@ function SessionRow({ session }) {
       </div>
       <span style={{
         fontSize: 11, color: m.color, fontWeight: 600, flexShrink: 0,
-        background: m.color + '15', border: `1px solid ${m.color}30`,
+        background: `color-mix(in srgb, ${m.color} 8%, transparent)`, border: `1px solid color-mix(in srgb, ${m.color} 19%, transparent)`,
         borderRadius: 6, padding: '2px 8px',
       }}>
         {m.label}
@@ -72,7 +72,7 @@ function DayLog({ label, sessions }) {
   const totalStr = h > 0 ? `${h}u ${m}m` : `${totalMins}m`
 
   return (
-    <div className="card" style={{ padding: '14px 16px', borderLeft: '3px solid rgba(0,255,209,0.25)', background: 'linear-gradient(135deg, rgba(0,255,209,0.02) 0%, transparent 60%)' }}>
+    <div className="card" style={{ padding: '14px 16px', borderLeft: '3px solid color-mix(in srgb, var(--accent) 25%, transparent)', background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent) 2%, transparent) 0%, transparent 60%)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <p style={{ fontSize: 10, color: 'var(--text-3)', margin: 0, letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 600 }}>
           {label}

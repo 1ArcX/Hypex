@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 
 const MODES = {
-  work:      { label: 'Focus',       color: '#00FFD1' },
+  work:      { label: 'Focus',       color: 'var(--accent)' },
   break:     { label: 'Pauze',       color: '#FF8C42' },
   longBreak: { label: 'Lang',        color: '#A78BFA' },
 }
@@ -51,15 +51,15 @@ export default function Clock({ isBreak }) {
         {hours}<span style={{ opacity: 0.6, animation: 'blink 1s step-end infinite' }}>:</span>{minutes}
         <span className="ml-2" style={{ fontSize: '0.4em', opacity: 0.7 }}>{seconds}</span>
       </div>
-      <p className="mt-1 text-sm font-medium" style={{ color: 'rgba(255,255,255,0.4)' }}>{dateStr}</p>
+      <p className="mt-1 text-sm font-medium" style={{ color: 'var(--c-text-3)' }}>{dateStr}</p>
 
       {/* Pomodoro timer indicator */}
       {pomodoro && (
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: 8,
           marginTop: 10, padding: '6px 14px', borderRadius: 20,
-          background: `${pomColor}12`,
-          border: `1px solid ${pomColor}35`,
+          background: `color-mix(in srgb, ${pomColor} 7%, transparent)`,
+          border: `1px solid color-mix(in srgb, ${pomColor} 21%, transparent)`,
         }}>
           {/* Running dot */}
           <div style={{
@@ -70,7 +70,7 @@ export default function Clock({ isBreak }) {
           <span style={{ fontFamily: 'monospace', fontSize: 18, fontWeight: 700, color: pomColor, letterSpacing: 1 }}>
             {pomodoro.time}
           </span>
-          <span style={{ fontSize: 11, color: `${pomColor}99`, fontWeight: 500 }}>
+          <span style={{ fontSize: 11, color: `color-mix(in srgb, ${pomColor} 60%, transparent)`, fontWeight: 500 }}>
             {MODES[pomodoro.mode]?.label}
           </span>
         </div>

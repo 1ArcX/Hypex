@@ -208,18 +208,18 @@ export default function WorkWidget({ userId = null }) {
         <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
           {creds && !showSettings && (
             <button onClick={() => fetchSchedule(creds, week, year)} disabled={loading}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '3px', borderRadius: '6px' }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', padding: '3px', borderRadius: '6px' }}
               onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
               onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.3)'}>
               <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
             </button>
           )}
           <button onClick={() => setShowSettings(!showSettings)}
-            style={{ background: showSettings ? accentBg(15) : 'rgba(255,255,255,0.05)', border: showSettings ? accentBorder(40) : '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '3px 7px', cursor: 'pointer', color: showSettings ? 'var(--accent)' : 'rgba(255,255,255,0.4)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            style={{ background: showSettings ? accentBg(15) : 'rgba(255,255,255,0.05)', border: showSettings ? accentBorder(40) : '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '3px 7px', cursor: 'pointer', color: showSettings ? 'var(--accent)' : 'var(--c-text-3)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
             <Settings size={11} /> {creds ? (showSettings ? 'Sluiten' : 'Instelling') : 'Inloggen'}
           </button>
           <button onClick={() => setExpanded(!expanded)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '2px' }}>
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', padding: '2px' }}>
             {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
         </div>
@@ -229,8 +229,8 @@ export default function WorkWidget({ userId = null }) {
         <>
           {/* Login / settings form */}
           {showForm && (
-            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '14px', marginBottom: creds ? '12px' : 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', margin: 0 }}>
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--c-border)', borderRadius: '12px', padding: '14px', marginBottom: creds ? '12px' : 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <p style={{ color: 'var(--c-text-2)', fontSize: '11px', margin: 0 }}>
                 Log in met je PMT-account om je Jumbo werkrooster te bekijken.
               </p>
               <input className="glass-input" placeholder="Gebruikersnaam" value={formCreds.username}
@@ -266,21 +266,21 @@ export default function WorkWidget({ userId = null }) {
               {/* Week navigation */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                 <button onClick={() => navigateWeek(-1)}
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '4px 8px', cursor: 'pointer', color: 'rgba(255,255,255,0.5)', lineHeight: 0 }}>
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--c-border)', borderRadius: '8px', padding: '4px 8px', cursor: 'pointer', color: 'var(--c-text-2)', lineHeight: 0 }}>
                   <ChevronLeft size={14} />
                 </button>
-                <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>
+                <span style={{ fontSize: '12px', color: 'var(--c-text-2)', fontWeight: 500 }}>
                   Week {week} / {year}
                 </span>
                 <button onClick={() => navigateWeek(1)}
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '4px 8px', cursor: 'pointer', color: 'rgba(255,255,255,0.5)', lineHeight: 0 }}>
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--c-border)', borderRadius: '8px', padding: '4px 8px', cursor: 'pointer', color: 'var(--c-text-2)', lineHeight: 0 }}>
                   <ChevronRight size={14} />
                 </button>
               </div>
 
               {/* Loading */}
               {loading && (
-                <div style={{ textAlign: 'center', padding: '20px', color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>
+                <div style={{ textAlign: 'center', padding: '20px', color: 'var(--c-text-3)', fontSize: '12px' }}>
                   <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite', display: 'block', margin: '0 auto 6px' }} />
                   Laden...
                 </div>
@@ -289,7 +289,7 @@ export default function WorkWidget({ userId = null }) {
               {/* API unknown fallback */}
               {!loading && apiUnknown && (
                 <div style={{ padding: '12px', borderRadius: '10px', background: 'rgba(250,204,21,0.06)', border: '1px solid rgba(250,204,21,0.2)', textAlign: 'center' }}>
-                  <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', margin: '0 0 10px' }}>
+                  <p style={{ fontSize: '12px', color: 'var(--c-text-2)', margin: '0 0 10px' }}>
                     Rooster kon niet automatisch geladen worden.
                   </p>
                   <a href={pmtUrl} target="_blank" rel="noopener noreferrer"
@@ -316,7 +316,7 @@ export default function WorkWidget({ userId = null }) {
               {!loading && !error && shifts !== null && !apiUnknown && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   {shifts.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '16px 0', color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>
+                    <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--c-text-3)', fontSize: '13px' }}>
                       Vrije week 🎉
                     </div>
                   ) : (
@@ -327,7 +327,7 @@ export default function WorkWidget({ userId = null }) {
                         <Briefcase size={13} style={{ color: 'var(--accent)', opacity: 0.7, flexShrink: 0 }} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.85)', fontWeight: 500 }}>
+                            <span style={{ fontSize: '12px', color: 'var(--c-text)', fontWeight: 500 }}>
                               {formatShiftDate(shift.date)}
                             </span>
                             <span style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 600, flexShrink: 0 }}>
@@ -335,14 +335,14 @@ export default function WorkWidget({ userId = null }) {
                             </span>
                           </div>
                           {shift.label && (
-                            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <p style={{ fontSize: '11px', color: 'var(--c-text-3)', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {shift.label}
                             </p>
                           )}
                         </div>
                         {selectedDay === shift.date
                           ? <ChevronUp size={12} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                          : <ChevronDown size={12} style={{ color: 'rgba(255,255,255,0.25)', flexShrink: 0 }} />
+                          : <ChevronDown size={12} style={{ color: 'var(--c-text-3)', flexShrink: 0 }} />
                         }
                       </div>
                     ))
@@ -350,19 +350,19 @@ export default function WorkWidget({ userId = null }) {
 
                   {/* Day planning panel */}
                   {selectedDay && (
-                    <div style={{ borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', padding: '10px 12px', marginTop: '2px' }}>
+                    <div style={{ borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--c-border)', padding: '10px 12px', marginTop: '2px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', fontWeight: 500 }}>
+                        <span style={{ fontSize: '11px', color: 'var(--c-text-2)', fontWeight: 500 }}>
                           Andere afdelingen op {formatShiftDate(selectedDay)}
                         </span>
                         <button onClick={() => setSelectedDay(null)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '0', lineHeight: 0 }}>
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', padding: '0', lineHeight: 0 }}>
                           <ChevronUp size={12} />
                         </button>
                       </div>
 
                       {dayLoading && (
-                        <div style={{ textAlign: 'center', padding: '8px', color: 'rgba(255,255,255,0.3)', fontSize: '11px' }}>
+                        <div style={{ textAlign: 'center', padding: '8px', color: 'var(--c-text-3)', fontSize: '11px' }}>
                           <RefreshCw size={12} style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }} />
                         </div>
                       )}
@@ -375,7 +375,7 @@ export default function WorkWidget({ userId = null }) {
                               .slice(dayShifts.ownDeptCount)
                               .sort((a, b) => (a.start || '99:99').localeCompare(b.start || '99:99'))
                             if (otherShifts.length === 0) return (
-                              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: 0, textAlign: 'center' }}>Geen shifts van andere afdelingen</p>
+                              <p style={{ fontSize: '11px', color: 'var(--c-text-3)', margin: 0, textAlign: 'center' }}>Geen shifts van andere afdelingen</p>
                             )
                             return (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
@@ -386,15 +386,15 @@ export default function WorkWidget({ userId = null }) {
                                     border: '1px solid rgba(255,255,255,0.05)' }}>
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
-                                        <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.85)',
+                                        <span style={{ fontSize: '11px', color: 'var(--c-text)',
                                           fontWeight: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                           {s.name ? s.name.split(' ')[0] : '—'}
                                         </span>
-                                        <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 500, flexShrink: 0 }}>
+                                        <span style={{ fontSize: '11px', color: 'var(--c-text-2)', fontWeight: 500, flexShrink: 0 }}>
                                           {s.start && s.end ? `${s.start} – ${s.end}` : '—'}
                                         </span>
                                       </div>
-                                      <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', margin: '1px 0 0' }}>
+                                      <p style={{ fontSize: '10px', color: 'var(--c-text-3)', margin: '1px 0 0' }}>
                                         {s.department}
                                       </p>
                                     </div>
@@ -405,7 +405,7 @@ export default function WorkWidget({ userId = null }) {
                           })()}
                           <div style={{ marginTop: '8px', textAlign: 'center' }}>
                             <a href={toPmtDayUrl(selectedDay)} target="_blank" rel="noopener noreferrer"
-                              style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                              style={{ fontSize: '10px', color: 'var(--c-text-3)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
                               onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
                               onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.25)'}>
                               <ExternalLink size={10} /> Open dag planning in PMT
@@ -433,7 +433,7 @@ export default function WorkWidget({ userId = null }) {
                     const m = totalMins % 60
                     return (
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', borderRadius: 10, background: accentBg(4), border: accentBorder(12), marginTop: 4 }}>
-                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Uren deze maand</span>
+                        <span style={{ fontSize: 11, color: 'var(--c-text-3)' }}>Uren deze maand</span>
                         <span style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 700 }}>
                           {h}u{m > 0 ? ` ${m}m` : ''} · {monthShifts.length} dienst{monthShifts.length !== 1 ? 'en' : ''}
                         </span>

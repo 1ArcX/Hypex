@@ -369,7 +369,7 @@ function AchievementToast({ achievement, onDone }) {
         <span style={{ fontSize: 32, lineHeight: 1 }}>{achievement.icon}</span>
         <div>
           <p style={{ color: '#FACC15', fontWeight: 700, fontSize: 14, margin: 0 }}>{achievement.title}</p>
-          <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12, margin: '3px 0 0' }}>{achievement.desc}</p>
+          <p style={{ color: 'var(--c-text-3)', fontSize: 12, margin: '3px 0 0' }}>{achievement.desc}</p>
         </div>
       </div>
       <style>{`@keyframes habitSlideUp { from { opacity:0; transform:translateX(-50%) translateY(24px) scale(0.9); } to { opacity:1; transform:translateX(-50%) translateY(0) scale(1); } }`}</style>
@@ -381,11 +381,11 @@ function AchievementToast({ achievement, onDone }) {
 function PerfectDayBanner({ onDone }) {
   useEffect(() => { const t = setTimeout(onDone, 3200); return () => clearTimeout(t) }, [onDone])
   return (
-    <div style={{ margin: '0 0 10px', padding: '12px 16px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(0,255,209,0.12), rgba(129,140,248,0.12))', border: '1px solid rgba(0,255,209,0.35)', animation: 'habitPop 0.5s cubic-bezier(0.34,1.56,0.64,1)', display: 'flex', alignItems: 'center', gap: 10 }}>
+    <div style={{ margin: '0 0 10px', padding: '12px 16px', borderRadius: 14, background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, transparent), rgba(129,140,248,0.12))', border: '1px solid color-mix(in srgb, var(--accent) 35%, transparent)', animation: 'habitPop 0.5s cubic-bezier(0.34,1.56,0.64,1)', display: 'flex', alignItems: 'center', gap: 10 }}>
       <span style={{ fontSize: 24 }}>🌟</span>
       <div>
         <p style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 13, margin: 0 }}>Perfecte dag!</p>
-        <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, margin: '2px 0 0' }}>Alle gewoontes van vandaag gedaan 💪</p>
+        <p style={{ color: 'var(--c-text-3)', fontSize: 11, margin: '2px 0 0' }}>Alle gewoontes van vandaag gedaan 💪</p>
       </div>
       <style>{`@keyframes habitPop { from { opacity:0; transform:scale(0.92); } to { opacity:1; transform:scale(1); } }`}</style>
     </div>
@@ -420,7 +420,7 @@ function NoteModal({ habit, date, onClose }) {
             <span style={{ fontSize: 22 }}>{habit.icon}</span>
             <span style={{ fontSize: 15, fontWeight: 600, color: 'white' }}>Notitie voor vandaag</span>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}><X size={18} /></button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)' }}><X size={18} /></button>
         </div>
         <textarea
           autoFocus
@@ -428,7 +428,7 @@ function NoteModal({ habit, date, onClose }) {
           onChange={e => setText(e.target.value)}
           placeholder="Hoe ging het? Wat viel je op?"
           rows={3}
-          style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '10px 12px', color: 'white', fontSize: 16, resize: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
+          style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--c-border-strong)', borderRadius: 12, padding: '10px 12px', color: 'white', fontSize: 16, resize: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
         />
         <button onClick={save} style={{ marginTop: 10, width: '100%', padding: '12px', borderRadius: 14, background: `${habit.color}22`, border: `1px solid ${habit.color}50`, color: habit.color, fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
           Opslaan
@@ -511,7 +511,7 @@ function HabitDetailModal({ habit, completions, counterConfig, counterValues, on
           <div style={{ width: 52, height: 52, borderRadius: 16, background: `${habit.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}>{habit.icon}</div>
           <div>
             <div style={{ fontSize: 18, fontWeight: 700, color: 'white' }}>{habit.name}</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Statistieken</div>
+            <div style={{ fontSize: 12, color: 'var(--c-text-3)', marginTop: 2 }}>Statistieken</div>
           </div>
         </div>
 
@@ -524,17 +524,17 @@ function HabitDetailModal({ habit, completions, counterConfig, counterValues, on
           ].map(s => (
             <div key={s.label} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: '14px 12px', textAlign: 'center' }}>
               <div style={{ fontSize: 26, fontWeight: 700, color: habit.color }}>{s.value}</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{s.label}</div>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)' }}>{s.sub}</div>
+              <div style={{ fontSize: 10, color: 'var(--c-text-3)', marginTop: 2 }}>{s.label}</div>
+              <div style={{ fontSize: 9, color: 'var(--c-text-3)' }}>{s.sub}</div>
             </div>
           ))}
         </div>
 
         {/* Calendar heatmap */}
         <div style={{ padding: '0 20px' }}>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginBottom: 10, fontWeight: 500 }}>Laatste 30 dagen</div>
+          <div style={{ fontSize: 12, color: 'var(--c-text-3)', marginBottom: 10, fontWeight: 500 }}>Laatste 30 dagen</div>
           <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
-            {DAY_LABELS.map(l => <div key={l} style={{ flex: 1, textAlign: 'center', fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>{l}</div>)}
+            {DAY_LABELS.map(l => <div key={l} style={{ flex: 1, textAlign: 'center', fontSize: 10, color: 'var(--c-text-3)' }}>{l}</div>)}
           </div>
           {weeks.map((w, wi) => {
             // For times_per_week: check if this week's target was met
@@ -567,15 +567,15 @@ function HabitDetailModal({ habit, completions, counterConfig, counterValues, on
           })}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
             <div style={{ width: 10, height: 10, borderRadius: 3, background: habit.color }} />
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Gedaan</span>
+            <span style={{ fontSize: 10, color: 'var(--c-text-3)' }}>Gedaan</span>
             <div style={{ width: 10, height: 10, borderRadius: 3, background: 'rgba(255,255,255,0.07)', marginLeft: 8 }} />
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Gemist</span>
+            <span style={{ fontSize: 10, color: 'var(--c-text-3)' }}>Gemist</span>
           </div>
         </div>
 
         {/* Completion bar */}
         <div style={{ padding: '20px 20px 0' }}>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginBottom: 8, fontWeight: 500 }}>
+          <div style={{ fontSize: 12, color: 'var(--c-text-3)', marginBottom: 8, fontWeight: 500 }}>
             {freqType === 'times_per_week' ? 'Weken voltooid (laatste 30 dagen)' : freqType === 'monthly' ? 'Maanden voltooid (laatste 30 dagen)' : 'Voltooiing afgelopen 30 dagen'}
           </div>
           <div style={{ height: 8, background: 'rgba(255,255,255,0.06)', borderRadius: 8, overflow: 'hidden' }}>
@@ -634,7 +634,7 @@ function HabitLibraryModal({ onPick, onCreateOwn, onClose }) {
               style={{ background: 'none', border: 'none', color: 'white', fontSize: 15, flex: 1, outline: 'none', fontFamily: 'inherit' }}
               autoFocus
             />
-            {query && <button onClick={() => setQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: 0, lineHeight: 0 }}><X size={14} /></button>}
+            {query && <button onClick={() => setQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', padding: 0, lineHeight: 0 }}><X size={14} /></button>}
           </div>
         </div>
       )}
@@ -644,14 +644,14 @@ function HabitLibraryModal({ onPick, onCreateOwn, onClose }) {
         {results && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {results.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '40px 0', color: 'rgba(255,255,255,0.3)', fontSize: 14 }}>Geen resultaten</div>
+              <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--c-text-3)', fontSize: 14 }}>Geen resultaten</div>
             )}
             {results.map((h, i) => (
               <button key={i} onClick={() => onPick(h)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderRadius: 16, background: 'rgba(255,255,255,0.05)', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
                 <div style={{ width: 44, height: 44, borderRadius: 12, background: `${h.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>{h.icon}</div>
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 600, color: 'white' }}>{h.name}</div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>{h._cat}</div>
+                  <div style={{ fontSize: 11, color: 'var(--c-text-3)', marginTop: 2 }}>{h._cat}</div>
                 </div>
               </button>
             ))}
@@ -668,7 +668,7 @@ function HabitLibraryModal({ onPick, onCreateOwn, onClose }) {
                   <div style={{ fontSize: 15, fontWeight: 600, color: 'white' }}>{h.name}</div>
                   {h.type === 'counter' && <div style={{ fontSize: 11, color: h.color, marginTop: 2 }}>Doel: {h.target} {h.unit}</div>}
                 </div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>→</div>
+                <div style={{ fontSize: 12, color: 'var(--c-text-3)' }}>→</div>
               </button>
             ))}
           </div>
@@ -681,7 +681,7 @@ function HabitLibraryModal({ onPick, onCreateOwn, onClose }) {
               <button key={cat.key} onClick={() => setCatKey(cat.key)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px', borderRadius: 18, background: 'rgba(255,255,255,0.055)', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
                 <div>
                   <div style={{ fontSize: 16, fontWeight: 700, color: 'white', marginBottom: 4 }}>{cat.label}</div>
-                  <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>{cat.desc}</div>
+                  <div style={{ fontSize: 13, color: 'var(--c-text-3)' }}>{cat.desc}</div>
                 </div>
                 <span style={{ fontSize: 36, lineHeight: 1 }}>{cat.emoji}</span>
               </button>
@@ -736,25 +736,25 @@ function WeeklyReviewModal({ habits, completions, counterConfig, counterValues, 
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:20 }}>
           <div>
             <h2 style={{ fontSize:17, fontWeight:700, color:'white', margin:'0 0 3px' }}>Week samenvatting 📊</h2>
-            <p style={{ fontSize:12, color:'rgba(255,255,255,0.35)', margin:0 }}>{weekLabel}</p>
+            <p style={{ fontSize:12, color:'var(--c-text-3)', margin:0 }}>{weekLabel}</p>
           </div>
-          <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.4)', padding:4 }}><X size={18}/></button>
+          <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--c-text-3)', padding:4 }}><X size={18}/></button>
         </div>
 
         {/* Overall score */}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:20 }}>
           <div style={{ padding:'14px', borderRadius:14, background: overallPct >= 80 ? 'rgba(34,197,94,0.1)' : overallPct >= 50 ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)', border:`1px solid ${overallPct >= 80 ? 'rgba(34,197,94,0.3)' : overallPct >= 50 ? 'rgba(245,158,11,0.3)' : 'rgba(239,68,68,0.3)'}` }}>
             <div style={{ fontSize:28, fontWeight:800, color: overallPct >= 80 ? '#22C55E' : overallPct >= 50 ? '#F59E0B' : '#EF4444' }}>{overallPct}%</div>
-            <div style={{ fontSize:11, color:'rgba(255,255,255,0.4)', marginTop:2 }}>Totaal score</div>
+            <div style={{ fontSize:11, color:'var(--c-text-3)', marginTop:2 }}>Totaal score</div>
           </div>
           <div style={{ padding:'14px', borderRadius:14, background:'rgba(250,204,21,0.08)', border:'1px solid rgba(250,204,21,0.25)' }}>
             <div style={{ fontSize:28, fontWeight:800, color:'#FACC15' }}>+{xpThisWeek}</div>
-            <div style={{ fontSize:11, color:'rgba(255,255,255,0.4)', marginTop:2 }}>XP verdiend</div>
+            <div style={{ fontSize:11, color:'var(--c-text-3)', marginTop:2 }}>XP verdiend</div>
           </div>
         </div>
 
         {/* Per habit */}
-        <p style={{ fontSize:10, color:'rgba(255,255,255,0.3)', textTransform:'uppercase', letterSpacing:'0.07em', fontWeight:600, margin:'0 0 10px' }}>Per gewoonte</p>
+        <p style={{ fontSize:10, color:'var(--c-text-3)', textTransform:'uppercase', letterSpacing:'0.07em', fontWeight:600, margin:'0 0 10px' }}>Per gewoonte</p>
         <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:20 }}>
           {habitRows.map(({ habit, pct, done, scheduled, streak }) => {
             const emoji = pct === null ? '–' : pct >= 80 ? '✅' : pct >= 50 ? '⚠️' : '❌'
@@ -762,14 +762,14 @@ function WeeklyReviewModal({ habits, completions, counterConfig, counterValues, 
               <div key={habit.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:12, background:'rgba(255,255,255,0.04)' }}>
                 <span style={{ fontSize:20 }}>{habit.icon}</span>
                 <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:13, fontWeight:600, color:'rgba(255,255,255,0.85)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{habit.name}</div>
+                  <div style={{ fontSize:13, fontWeight:600, color:'var(--c-text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{habit.name}</div>
                   <div style={{ height:4, background:'rgba(255,255,255,0.08)', borderRadius:2, marginTop:5, overflow:'hidden' }}>
                     <div style={{ height:'100%', width:`${pct ?? 0}%`, background: pct >= 80 ? '#22C55E' : pct >= 50 ? '#F59E0B' : '#EF4444', borderRadius:2, transition:'width 0.5s' }}/>
                   </div>
                 </div>
                 <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:2 }}>
                   <span style={{ fontSize:12 }}>{emoji}</span>
-                  <span style={{ fontSize:10, color:'rgba(255,255,255,0.3)' }}>{done}/{scheduled}</span>
+                  <span style={{ fontSize:10, color:'var(--c-text-3)' }}>{done}/{scheduled}</span>
                 </div>
                 {streak >= 7 && <span style={{ fontSize:11 }}>🔥</span>}
               </div>
@@ -782,14 +782,14 @@ function WeeklyReviewModal({ habits, completions, counterConfig, counterValues, 
           <div style={{ padding:'12px 14px', borderRadius:12, background:'rgba(239,68,68,0.07)', border:'1px solid rgba(239,68,68,0.2)', marginBottom:20 }}>
             <p style={{ fontSize:11, fontWeight:600, color:'#EF4444', margin:'0 0 8px', textTransform:'uppercase', letterSpacing:'0.06em' }}>Aandachtspunten</p>
             {struggling.slice(0,3).map(r => (
-              <div key={r.habit.id} style={{ fontSize:13, color:'rgba(255,255,255,0.6)', padding:'2px 0' }}>
+              <div key={r.habit.id} style={{ fontSize:13, color:'var(--c-text-2)', padding:'2px 0' }}>
                 {r.habit.icon} {r.habit.name} — {r.pct}% gehaald
               </div>
             ))}
           </div>
         )}
 
-        <button onClick={onClose} style={{ width:'100%', padding:'12px', borderRadius:12, border:'1px solid rgba(0,255,209,0.3)', background:'rgba(0,255,209,0.08)', color:'var(--accent, #00FFD1)', cursor:'pointer', fontSize:14, fontWeight:600 }}>
+        <button onClick={onClose} style={{ width:'100%', padding:'12px', borderRadius:12, border:'1px solid color-mix(in srgb, var(--accent) 30%, transparent)', background:'color-mix(in srgb, var(--accent) 8%, transparent)', color:'var(--accent, #00FFD1)', cursor:'pointer', fontSize:14, fontWeight:600 }}>
           Aan de slag deze week 💪
         </button>
       </div>
@@ -844,39 +844,39 @@ function HabitModal({ habit, presetData, onSave, onClose, onDelete, onPause, cou
       <div className="glass-card" style={{ width: '100%', maxWidth: 400, padding: 24, position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h2 style={{ fontSize: 16, fontWeight: 700, color: 'white', margin: 0 }}>{habit ? 'Bewerken' : 'Nieuwe gewoonte'}</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', padding: 4 }}><X size={18} /></button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', padding: 4 }}><X size={18} /></button>
         </div>
 
         {/* Naam */}
         <div style={{ marginBottom: 14 }}>
-          <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, display: 'block', marginBottom: 6 }}>Naam</label>
+          <label style={{ color: 'var(--c-text-3)', fontSize: 11, display: 'block', marginBottom: 6 }}>Naam</label>
           <div style={{ display: 'flex', gap: 8 }}>
-            <div style={{ fontSize: 22, width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, flexShrink: 0 }}>{icon}</div>
+            <div style={{ fontSize: 22, width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--c-border)', borderRadius: 12, flexShrink: 0 }}>{icon}</div>
             <input className="glass-input" placeholder="bijv. Sporten, Lezen…" value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSave()} autoFocus style={{ flex: 1, fontSize: 14 }} />
           </div>
         </div>
 
         {/* Type */}
         <div style={{ marginBottom: 14 }}>
-          <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, display: 'block', marginBottom: 6 }}>Type</label>
+          <label style={{ color: 'var(--c-text-3)', fontSize: 11, display: 'block', marginBottom: 6 }}>Type</label>
           <div style={{ display: 'flex', gap: 6, padding: 3, background: 'rgba(255,255,255,0.04)', borderRadius: 10 }}>
             {[['check','Aanvinken ✓'],['counter','Teller 🔢']].map(([val, lbl]) => (
-              <button key={val} onClick={() => setHabitType(val)} style={{ flex: 1, padding: '6px 0', borderRadius: 8, border: 'none', cursor: 'pointer', background: habitType === val ? `${color}20` : 'transparent', color: habitType === val ? color : 'rgba(255,255,255,0.35)', fontSize: 12, fontWeight: habitType === val ? 600 : 400, transition: 'all 0.15s' }}>{lbl}</button>
+              <button key={val} onClick={() => setHabitType(val)} style={{ flex: 1, padding: '6px 0', borderRadius: 8, border: 'none', cursor: 'pointer', background: habitType === val ? `color-mix(in srgb, ${color} 13%, transparent)` : 'transparent', color: habitType === val ? color : 'var(--c-text-3)', fontSize: 12, fontWeight: habitType === val ? 600 : 400, transition: 'all 0.15s' }}>{lbl}</button>
             ))}
           </div>
         </div>
 
         {habitType === 'counter' && (
-          <div style={{ marginBottom: 14, padding: 12, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div style={{ marginBottom: 14, padding: 12, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--c-border)' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div>
-                <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, display: 'block', marginBottom: 4 }}>Eenheid</label>
+                <label style={{ color: 'var(--c-text-3)', fontSize: 11, display: 'block', marginBottom: 4 }}>Eenheid</label>
                 <select className="glass-input" value={counterUnit} onChange={e => setCounterUnit(e.target.value)} style={{ fontSize: 12, colorScheme: 'dark', width: '100%' }}>
                   {COUNTER_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
                 </select>
               </div>
               <div>
-                <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, display: 'block', marginBottom: 4 }}>Doel</label>
+                <label style={{ color: 'var(--c-text-3)', fontSize: 11, display: 'block', marginBottom: 4 }}>Doel</label>
                 <input type="number" className="glass-input" value={counterTarget} min={1} onChange={e => setCounterTarget(Math.max(1, +e.target.value))} style={{ fontSize: 12, colorScheme: 'dark', width: '100%' }} />
               </div>
             </div>
@@ -885,7 +885,7 @@ function HabitModal({ habit, presetData, onSave, onClose, onDelete, onPause, cou
 
         {/* Icoon */}
         <div style={{ marginBottom: 14 }}>
-          <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, display: 'block', marginBottom: 6 }}>Icoon</label>
+          <label style={{ color: 'var(--c-text-3)', fontSize: 11, display: 'block', marginBottom: 6 }}>Icoon</label>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: 3 }}>
             {EMOJIS.map(e => (
               <button key={e} onClick={() => setIcon(e)} style={{ fontSize: 17, padding: '4px 0', borderRadius: 8, cursor: 'pointer', background: icon === e ? 'rgba(255,255,255,0.12)' : 'transparent', border: icon === e ? '1px solid rgba(255,255,255,0.2)' : '1px solid transparent', transition: 'all 0.1s' }}>{e}</button>
@@ -895,7 +895,7 @@ function HabitModal({ habit, presetData, onSave, onClose, onDelete, onPause, cou
 
         {/* Kleur */}
         <div style={{ marginBottom: 14 }}>
-          <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, display: 'block', marginBottom: 6 }}>Kleur</label>
+          <label style={{ color: 'var(--c-text-3)', fontSize: 11, display: 'block', marginBottom: 6 }}>Kleur</label>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {COLORS.map(c => (
               <button key={c} onClick={() => setColor(c)} style={{ width: 28, height: 28, borderRadius: '50%', cursor: 'pointer', background: c, border: color === c ? '2px solid white' : '2px solid transparent', boxShadow: color === c ? `0 0 10px ${c}90` : 'none', transition: 'all 0.15s' }} />
@@ -905,28 +905,28 @@ function HabitModal({ habit, presetData, onSave, onClose, onDelete, onPause, cou
 
         {/* Herhaling */}
         <div style={{ marginBottom: 14 }}>
-          <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, display: 'block', marginBottom: 6 }}>Herhaling</label>
+          <label style={{ color: 'var(--c-text-3)', fontSize: 11, display: 'block', marginBottom: 6 }}>Herhaling</label>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, marginBottom: 10 }}>
             {[['specific_days','Specifieke dagen'],['times_per_week','X/week'],['every_n_days','Om de N dagen'],['monthly','Maandelijks']].map(([val, lbl]) => (
-              <button key={val} onClick={() => setFreqType(val)} style={{ padding: '6px 4px', borderRadius: 8, fontSize: 10, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', background: freqType === val ? `${color}20` : 'rgba(255,255,255,0.05)', color: freqType === val ? color : 'rgba(255,255,255,0.35)', border: freqType === val ? `1px solid ${color}` : '1px solid rgba(255,255,255,0.07)' }}>{lbl}</button>
+              <button key={val} onClick={() => setFreqType(val)} style={{ padding: '6px 4px', borderRadius: 8, fontSize: 10, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', background: freqType === val ? `color-mix(in srgb, ${color} 13%, transparent)` : 'rgba(255,255,255,0.05)', color: freqType === val ? color : 'var(--c-text-3)', border: freqType === val ? `1px solid ${color}` : '1px solid rgba(255,255,255,0.07)' }}>{lbl}</button>
             ))}
           </div>
           {freqType === 'specific_days' && (
             <div style={{ display: 'flex', gap: 5 }}>
               {DAY_LABELS.map((label, i) => (
-                <button key={i} onClick={() => toggleDay(i)} style={{ flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', background: frequency.includes(i) ? color : 'rgba(255,255,255,0.05)', color: frequency.includes(i) ? '#000' : 'rgba(255,255,255,0.35)', border: frequency.includes(i) ? `1px solid ${color}` : '1px solid rgba(255,255,255,0.07)', boxShadow: frequency.includes(i) ? `0 0 8px ${color}40` : 'none' }}>{label}</button>
+                <button key={i} onClick={() => toggleDay(i)} style={{ flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', background: frequency.includes(i) ? color : 'rgba(255,255,255,0.05)', color: frequency.includes(i) ? '#000' : 'var(--c-text-3)', border: frequency.includes(i) ? `1px solid ${color}` : '1px solid rgba(255,255,255,0.07)', boxShadow: frequency.includes(i) ? `0 0 8px color-mix(in srgb, ${color} 25%, transparent)` : 'none' }}>{label}</button>
               ))}
             </div>
           )}
           {(freqType === 'times_per_week' || freqType === 'every_n_days' || freqType === 'monthly') && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--c-border)' }}>
+              <span style={{ fontSize: 13, color: 'var(--c-text-2)', flex: 1 }}>
                 {freqType === 'times_per_week' ? 'Keer per week' : freqType === 'every_n_days' ? 'Elke hoeveel dagen' : 'Dag van de maand'}
               </span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <button onClick={() => setFreqValue(v => Math.max(freqType === 'every_n_days' ? 2 : 1, v - 1))} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', cursor: 'pointer', color: 'white', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                <button onClick={() => setFreqValue(v => Math.max(freqType === 'every_n_days' ? 2 : 1, v - 1))} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid var(--c-border-strong)', background: 'rgba(255,255,255,0.05)', cursor: 'pointer', color: 'white', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
                 <span style={{ fontSize: 20, fontWeight: 700, color, minWidth: 28, textAlign: 'center' }}>{freqValue}</span>
-                <button onClick={() => setFreqValue(v => Math.min(freqType === 'times_per_week' ? 7 : freqType === 'monthly' ? 28 : 30, v + 1))} style={{ width: 30, height: 30, borderRadius: '50%', border: `1px solid ${color}60`, background: `${color}20`, cursor: 'pointer', color, fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                <button onClick={() => setFreqValue(v => Math.min(freqType === 'times_per_week' ? 7 : freqType === 'monthly' ? 28 : 30, v + 1))} style={{ width: 30, height: 30, borderRadius: '50%', border: `1px solid color-mix(in srgb, ${color} 38%, transparent)`, background: `color-mix(in srgb, ${color} 13%, transparent)`, cursor: 'pointer', color, fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
               </div>
             </div>
           )}
@@ -934,19 +934,19 @@ function HabitModal({ habit, presetData, onSave, onClose, onDelete, onPause, cou
 
         {/* Herinnering */}
         <div style={{ marginBottom: 20 }}>
-          <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, display: 'block', marginBottom: 6 }}>Herinnering <span style={{ opacity: 0.45 }}>(optioneel)</span></label>
+          <label style={{ color: 'var(--c-text-3)', fontSize: 11, display: 'block', marginBottom: 6 }}>Herinnering <span style={{ opacity: 0.45 }}>(optioneel)</span></label>
           <div style={{ display: 'flex', gap: 6 }}>
             {[['ochtend','☀️','Ochtend'],['middag','🌤','Middag'],['avond','🌙','Avond']].map(([slot, emoji, label]) => {
               const active = slot in remindTimes
               return (
                 <div key={slot} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  <button onClick={() => toggleRemind(slot)} style={{ width: '100%', padding: '8px 4px', borderRadius: 10, cursor: 'pointer', transition: 'all 0.15s', background: active ? `${color}18` : 'rgba(255,255,255,0.04)', color: active ? color : 'rgba(255,255,255,0.3)', border: active ? `1px solid ${color}60` : '1px solid rgba(255,255,255,0.07)', fontWeight: active ? 600 : 400 }}>
+                  <button onClick={() => toggleRemind(slot)} style={{ width: '100%', padding: '8px 4px', borderRadius: 10, cursor: 'pointer', transition: 'all 0.15s', background: active ? `color-mix(in srgb, ${color} 9%, transparent)` : 'rgba(255,255,255,0.04)', color: active ? color : 'var(--c-text-3)', border: active ? `1px solid color-mix(in srgb, ${color} 38%, transparent)` : '1px solid rgba(255,255,255,0.07)', fontWeight: active ? 600 : 400 }}>
                     <div style={{ fontSize: 16 }}>{emoji}</div>
                     <div style={{ fontSize: 11, marginTop: 2 }}>{label}</div>
                     <div style={{ fontSize: 9, opacity: 0.55, marginTop: 1 }}>{active ? remindTimes[slot] : REMIND_DEFAULTS[slot]}</div>
                   </button>
                   {active && (
-                    <select value={remindTimes[slot]} onChange={e => setRemindTime(slot, e.target.value)} style={{ width: '100%', padding: '5px 4px', borderRadius: 8, fontSize: 11, background: 'rgba(255,255,255,0.06)', color, border: `1px solid ${color}40`, colorScheme: 'dark', textAlign: 'center', cursor: 'pointer' }}>
+                    <select value={remindTimes[slot]} onChange={e => setRemindTime(slot, e.target.value)} style={{ width: '100%', padding: '5px 4px', borderRadius: 8, fontSize: 11, background: 'rgba(255,255,255,0.06)', color, border: `1px solid color-mix(in srgb, ${color} 25%, transparent)`, colorScheme: 'dark', textAlign: 'center', cursor: 'pointer' }}>
                       {REMIND_OPTIONS[slot].map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                   )}
@@ -963,14 +963,14 @@ function HabitModal({ habit, presetData, onSave, onClose, onDelete, onPause, cou
               <button onClick={() => onDelete(habit.id)} style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(255,80,80,0.3)', background: 'rgba(255,80,80,0.07)', color: '#FF6B6B', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
                 <Trash2 size={14} />
               </button>
-              <button onClick={() => onPause(habit)} style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}>
+              <button onClick={() => onPause(habit)} style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--c-border-strong)', background: 'rgba(255,255,255,0.05)', color: 'var(--c-text-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}>
                 {habit.paused ? <PlayCircle size={14} /> : <PauseCircle size={14} />}
                 {habit.paused ? 'Hervatten' : 'Pauzeren'}
               </button>
             </>
           )}
-          <button onClick={onClose} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.45)', cursor: 'pointer', fontSize: 13 }}>Annuleer</button>
-          <button onClick={handleSave} disabled={!name.trim()} style={{ flex: 2, padding: '10px', borderRadius: 10, border: `1px solid ${color}50`, background: `${color}15`, color, cursor: 'pointer', fontSize: 13, fontWeight: 600, opacity: !name.trim() ? 0.4 : 1 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid var(--c-border)', background: 'rgba(255,255,255,0.03)', color: 'var(--c-text-3)', cursor: 'pointer', fontSize: 13 }}>Annuleer</button>
+          <button onClick={handleSave} disabled={!name.trim()} style={{ flex: 2, padding: '10px', borderRadius: 10, border: `1px solid color-mix(in srgb, ${color} 31%, transparent)`, background: `color-mix(in srgb, ${color} 8%, transparent)`, color, cursor: 'pointer', fontSize: 13, fontWeight: 600, opacity: !name.trim() ? 0.4 : 1 }}>
             {habit ? 'Opslaan' : '+ Toevoegen'}
           </button>
         </div>
@@ -1280,15 +1280,15 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
       <div className={seamless ? '' : 'glass-card'} style={{ padding: '14px 16px', ...(seamless ? {} : { borderLeft: '3px solid rgba(34,197,94,0.45)', background: 'linear-gradient(135deg, rgba(34,197,94,0.05) 0%, transparent 60%)' }) }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           {!seamless && <span style={{ fontSize: 10, color: '#22C55E', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Gewoontes</span>}
-          {todayHabits.length > 0 && <span style={{ fontSize: 11, color: doneToday === todayHabits.length ? 'var(--accent)' : 'rgba(255,255,255,0.3)', fontWeight: 600 }}>{doneToday}/{todayHabits.length}</span>}
+          {todayHabits.length > 0 && <span style={{ fontSize: 11, color: doneToday === todayHabits.length ? 'var(--accent)' : 'var(--c-text-3)', fontWeight: 600 }}>{doneToday}/{todayHabits.length}</span>}
         </div>
         {todayHabits.length > 0 && (
           <div style={{ height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 4, marginBottom: 10, overflow: 'hidden' }}>
             <div style={{ height: '100%', width: `${(doneToday / todayHabits.length) * 100}%`, background: doneToday === todayHabits.length ? 'linear-gradient(90deg, var(--accent), #818CF8)' : 'var(--accent)', borderRadius: 4, transition: 'width 0.4s' }} />
           </div>
         )}
-        {loading ? <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>Laden...</div> :
-          todayHabits.length === 0 ? <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', textAlign: 'center', padding: '4px 0' }}>Geen gewoontes voor vandaag</div> :
+        {loading ? <div style={{ fontSize: 11, color: 'var(--c-text-3)', textAlign: 'center' }}>Laden...</div> :
+          todayHabits.length === 0 ? <div style={{ fontSize: 11, color: 'var(--c-text-3)', textAlign: 'center', padding: '4px 0' }}>Geen gewoontes voor vandaag</div> :
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {todayHabits.slice(0, 6).map(habit => {
               const done = isHabitDone(habit)
@@ -1298,7 +1298,7 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
                 <div key={habit.id} onClick={() => cfg?.type === 'counter' ? adjustCounter(habit, 1) : toggleCompletion(habit, true)}
                   style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 20, cursor: 'pointer', background: done ? `${habit.color}18` : 'rgba(255,255,255,0.05)', border: done ? `1px solid ${habit.color}40` : '1px solid rgba(255,255,255,0.08)' }}>
                   <span style={{ fontSize: 14 }}>{habit.icon}</span>
-                  {cfg?.type === 'counter' ? <span style={{ fontSize: 11, color: done ? habit.color : 'rgba(255,255,255,0.5)' }}>{count}/{cfg.target}</span> : done && <span style={{ fontSize: 11, color: habit.color }}>✓</span>}
+                  {cfg?.type === 'counter' ? <span style={{ fontSize: 11, color: done ? habit.color : 'var(--c-text-2)' }}>{count}/{cfg.target}</span> : done && <span style={{ fontSize: 11, color: habit.color }}>✓</span>}
                 </div>
               )
             })}
@@ -1376,10 +1376,10 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
 
         {/* Text */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.2, color: done ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.95)', textDecoration: done && !isCounter ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>
+          <div style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.2, color: done ? 'rgba(255,255,255,0.35)' : 'var(--c-text)', textDecoration: done && !isCounter ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>
             {habit.name}
           </div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>{subLine}</div>
+          <div style={{ fontSize: 12, color: 'var(--c-text-3)' }}>{subLine}</div>
         </div>
 
         {/* Right: action buttons */}
@@ -1395,13 +1395,13 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
               <div style={{ minWidth: 58, padding: '7px 10px', borderRadius: 13, background: done ? `${habit.color}25` : 'rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
                   <span style={{ fontSize: 19, fontWeight: 700, color: done ? habit.color : 'white' }}>{count}</span>
-                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>/{target}</span>
+                  <span style={{ fontSize: 11, color: 'var(--c-text-3)' }}>/{target}</span>
                 </div>
-                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', marginTop: 1 }}>{cfg.unit}</span>
+                <span style={{ fontSize: 9, color: 'var(--c-text-3)', marginTop: 1 }}>{cfg.unit}</span>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
                 <button onClick={e => { e.stopPropagation(); adjustCounter(habit, -1) }}
-                  style={{ width: 26, height: 26, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.45)' }}>
+                  style={{ width: 26, height: 26, borderRadius: '50%', border: '1px solid var(--c-border-strong)', background: 'rgba(255,255,255,0.05)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--c-text-3)' }}>
                   <Minus size={11} />
                 </button>
                 <button onClick={e => { e.stopPropagation(); adjustCounter(habit, 1) }}
@@ -1435,7 +1435,7 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
   }
 
   function SectionHeader({ label }) {
-    return <div style={{ fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.3)', padding: '10px 4px 5px', letterSpacing: '0.03em' }}>{label}</div>
+    return <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--c-text-3)', padding: '10px 4px 5px', letterSpacing: '0.03em' }}>{label}</div>
   }
 
   const activeSlotHabits = slotHabits[activeTab] || []
@@ -1447,9 +1447,9 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 18, fontWeight: 700, color: 'rgba(255,255,255,0.92)' }}>Gewoontes</span>
+            <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--c-text)' }}>Gewoontes</span>
             {todayHabits.length > 0 && (
-              <span style={{ fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.07)', color: doneToday === todayHabits.length ? '#22C55E' : 'rgba(255,255,255,0.4)' }}>
+              <span style={{ fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.07)', color: doneToday === todayHabits.length ? '#22C55E' : 'var(--c-text-3)' }}>
                 {doneToday}/{todayHabits.length}
               </span>
             )}
@@ -1468,15 +1468,15 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
         {/* Stats row */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
           <div style={{ flex: 1, padding: '8px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.05)' }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: weekPct >= 80 ? '#22C55E' : weekPct >= 50 ? '#F59E0B' : 'rgba(255,255,255,0.8)' }}>{weekPct}%</div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>Deze week</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: weekPct >= 80 ? '#22C55E' : weekPct >= 50 ? '#F59E0B' : 'var(--c-text-2)' }}>{weekPct}%</div>
+            <div style={{ fontSize: 10, color: 'var(--c-text-3)', marginTop: 1 }}>Deze week</div>
           </div>
           <div style={{ flex: 1, padding: '8px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.05)' }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: '#FACC15' }}>⭐ {perfectTotal}</div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>Perfecte dagen</div>
+            <div style={{ fontSize: 10, color: 'var(--c-text-3)', marginTop: 1 }}>Perfecte dagen</div>
           </div>
           <div style={{ flex: 2, padding: '8px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', overflow: 'hidden' }}>
-            <div style={{ fontSize: 11, fontWeight: 500, color: 'rgba(255,255,255,0.55)', lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+            <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--c-text-2)', lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
               "{quote.text}"
             </div>
           </div>
@@ -1495,7 +1495,7 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
         {/* Time tabs */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 18, overflowX: 'auto', paddingBottom: 2, scrollbarWidth: 'none' }}>
           {TABS.map(tab => (
-            <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{ padding: '7px 18px', borderRadius: 22, border: 'none', cursor: 'pointer', fontWeight: 500, fontSize: 14, flexShrink: 0, transition: 'all 0.18s', background: activeTab === tab.key ? 'rgba(255,255,255,0.14)' : 'transparent', color: activeTab === tab.key ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.35)' }}>
+            <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{ padding: '7px 18px', borderRadius: 22, border: 'none', cursor: 'pointer', fontWeight: 500, fontSize: 14, flexShrink: 0, transition: 'all 0.18s', background: activeTab === tab.key ? 'rgba(255,255,255,0.14)' : 'transparent', color: activeTab === tab.key ? 'rgba(255,255,255,0.9)' : 'var(--c-text-3)' }}>
               {tab.label}
             </button>
           ))}
@@ -1512,7 +1512,7 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
         {!loading && habits.length === 0 && (
           <div style={{ textAlign: 'center', padding: '32px 0' }}>
             <div style={{ fontSize: 36, marginBottom: 10 }}>🌱</div>
-            <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 15, fontWeight: 500, margin: '0 0 4px' }}>Nog geen gewoontes</p>
+            <p style={{ color: 'var(--c-text-3)', fontSize: 15, fontWeight: 500, margin: '0 0 4px' }}>Nog geen gewoontes</p>
             <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13, margin: 0 }}>Tik op + om te beginnen</p>
           </div>
         )}
@@ -1536,7 +1536,7 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
             )}
 
             {altijdHabits.length === 0 && activeSlotHabits.length === 0 && todayHabits.length > 0 && (
-              <div style={{ textAlign: 'center', padding: '24px 0', color: 'rgba(255,255,255,0.25)', fontSize: 13 }}>
+              <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--c-text-3)', fontSize: 13 }}>
                 Geen gewoontes voor {TABS.find(t => t.key === activeTab)?.label.toLowerCase()}
               </div>
             )}
@@ -1548,8 +1548,8 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
                 {otherHabits.map(habit => (
                   <div key={habit.id} onClick={() => setModalHabit(habit)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 18, cursor: 'pointer', background: 'rgba(255,255,255,0.03)', opacity: 0.4, marginBottom: 6 }}>
                     <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>{habit.icon}</div>
-                    <span style={{ fontSize: 15, color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>{habit.name}</span>
-                    <span style={{ marginLeft: 'auto', fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>{freqLabel(habit)}</span>
+                    <span style={{ fontSize: 15, color: 'var(--c-text-2)', fontWeight: 500 }}>{habit.name}</span>
+                    <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--c-text-3)' }}>{freqLabel(habit)}</span>
                   </div>
                 ))}
               </div>
@@ -1562,8 +1562,8 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
                 {pausedHabits.map(habit => (
                   <div key={habit.id} onClick={() => setModalHabit(habit)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 18, cursor: 'pointer', background: 'rgba(255,255,255,0.03)', opacity: 0.35, marginBottom: 6 }}>
                     <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>{habit.icon}</div>
-                    <span style={{ fontSize: 15, color: 'rgba(255,255,255,0.5)', fontWeight: 500 }}>{habit.name}</span>
-                    <span style={{ marginLeft: 'auto', fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>gepauzeerd</span>
+                    <span style={{ fontSize: 15, color: 'var(--c-text-2)', fontWeight: 500 }}>{habit.name}</span>
+                    <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--c-text-3)' }}>gepauzeerd</span>
                   </div>
                 ))}
               </div>

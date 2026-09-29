@@ -184,7 +184,7 @@ export function RecurringIncomeModal({ config, onClose, onSave }: {
       )}
 
       <button onClick={handleClose}
-        className="w-full py-3 rounded-2xl bg-teal-300 border-none text-black text-[15px] font-bold cursor-pointer">
+        className="w-full py-3 rounded-2xl bg-accent border-none text-black text-[15px] font-bold cursor-pointer">
         Opslaan
       </button>
     </CenterModal>

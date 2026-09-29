@@ -92,7 +92,7 @@ export default function GeldPage({ userId }: { userId: string; onClose?: () => v
 
   return (
     <div className="h-full relative overflow-hidden"
-      style={{ background: 'radial-gradient(1100px 500px at 80% -10%, rgba(45,212,191,0.07), transparent 60%), radial-gradient(900px 500px at -10% 100%, rgba(52,211,153,0.05), transparent 55%), #0b0b0f' }}>
+      style={{ background: 'radial-gradient(1100px 500px at 80% -10%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 60%), radial-gradient(900px 500px at -10% 100%, rgba(52,211,153,0.05), transparent 55%), #0b0b0f' }}>
       <div className="h-full overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
         <div className="max-w-[480px] mx-auto px-4 pt-5" style={{ paddingBottom: 'calc(110px + env(safe-area-inset-bottom))' }}>
           {activeTab === 'home' && (

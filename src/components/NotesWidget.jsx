@@ -161,7 +161,7 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
   if (dbError) return (
     <div className="glass-card p-4 text-center" style={fullHeight ? { height: '100%' } : {}}>
       <StickyNote size={20} style={{ color: 'rgba(255,255,255,0.2)', margin: '0 auto 8px' }} />
-      <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', lineHeight: 1.5 }}>
+      <p style={{ fontSize: 11, color: 'var(--c-text-3)', lineHeight: 1.5 }}>
         Notities tabel niet gevonden.<br />Voer het SQL-script uit in Supabase.
       </p>
     </div>
@@ -172,17 +172,17 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
     <div className="glass-card p-4" style={{ display: 'flex', flexDirection: 'column' }}>
       {/* Editor header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, flexShrink: 0 }}>
-        <button onClick={goBack} style={{ ...btnBase, color: 'rgba(255,255,255,0.45)', gap: 3 }}>
+        <button onClick={goBack} style={{ ...btnBase, color: 'var(--c-text-3)', gap: 3 }}>
           <ChevronLeft size={15} />
           <span style={{ fontSize: 11 }}>Terug</span>
         </button>
         <div style={{ flex: 1 }} />
-        {saving && <Loader size={11} style={{ color: 'rgba(255,255,255,0.25)', animation: 'spin 1s linear infinite' }} />}
+        {saving && <Loader size={11} style={{ color: 'var(--c-text-3)', animation: 'spin 1s linear infinite' }} />}
         {saved && !saving && <span style={{ fontSize: 9, color: '#1DB954', display: 'flex', alignItems: 'center', gap: 3 }}><Check size={10} />Opgeslagen</span>}
         <select
           value={activeNote.folder_id || ''}
           onChange={e => handleNoteChange('folder_id', e.target.value || null)}
-          style={{ fontSize: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, color: 'rgba(255,255,255,0.4)', padding: '2px 6px', cursor: 'pointer' }}
+          style={{ fontSize: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--c-border-strong)', borderRadius: 4, color: 'var(--c-text-3)', padding: '2px 6px', cursor: 'pointer' }}
         >
           <option value="">Geen map</option>
           {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
@@ -221,7 +221,7 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
         placeholder="Begin met typen..."
         style={{
           background: 'transparent', border: 'none', outline: 'none',
-          color: 'rgba(255,255,255,0.7)', lineHeight: '1.6', fontSize: 13,
+          color: 'var(--c-text-2)', lineHeight: '1.6', fontSize: 13,
           fontFamily: 'inherit', resize: 'none', overflow: 'hidden',
           minHeight: 'calc(var(--app-height, 100vh) + 60px)', width: '100%', boxSizing: 'border-box',
         }}
@@ -244,7 +244,7 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
         <div style={{ flex: 1 }} />
         <button
           onClick={() => { setNewFolderMode(v => !v); setNewFolderName('') }}
-          style={{ ...btnBase, color: 'rgba(255,255,255,0.3)', marginRight: 4 }}
+          style={{ ...btnBase, color: 'var(--c-text-3)', marginRight: 4 }}
           title="Nieuwe map"
         >
           <FolderPlus size={14} />
@@ -286,7 +286,7 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
           />
           <button onClick={createFolder} style={{
             fontSize: 11, padding: '5px 10px', background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: 'var(--accent)', cursor: 'pointer',
+            border: '1px solid var(--c-border-strong)', borderRadius: 6, color: 'var(--accent)', cursor: 'pointer',
           }}>OK</button>
         </div>
       )}
@@ -302,7 +302,7 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
                 border: '1px solid',
                 borderColor: filterFolder === f.id ? 'color-mix(in srgb, var(--accent) 40%, transparent)' : 'rgba(255,255,255,0.1)',
                 background: filterFolder === f.id ? 'color-mix(in srgb, var(--accent) 10%, transparent)' : 'transparent',
-                color: filterFolder === f.id ? 'var(--accent)' : 'rgba(255,255,255,0.4)',
+                color: filterFolder === f.id ? 'var(--accent)' : 'var(--c-text-3)',
               }}
             >
               {f.name}
@@ -342,7 +342,7 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
                 <div style={{ fontSize: 12, color: 'white', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {note.title || 'Naamloos'}
                 </div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>
+                <div style={{ fontSize: 10, color: 'var(--c-text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>
                   {note.content ? note.content.replace(/\n/g, ' ').slice(0, 55) : 'Leeg'}
                 </div>
               </div>

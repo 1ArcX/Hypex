@@ -493,7 +493,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
           <div style={{
             display: 'grid',
             gridTemplateColumns: `${TIME_COL}px repeat(${N}, 1fr)`,
-            borderBottom: '1px solid rgba(255,255,255,0.07)',
+            borderBottom: '1px solid var(--c-border)',
             flexShrink: 0,
           }}>
             <div />
@@ -501,12 +501,12 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
               const isToday = isSameDay(d, now)
               return (
                 <div key={i} style={{ padding: '8px 6px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 500, letterSpacing: '0.06em', color: isToday ? 'var(--accent, #00FFD1)' : 'rgba(255,255,255,0.35)', marginBottom: '4px', textTransform: 'uppercase' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 500, letterSpacing: '0.06em', color: isToday ? 'var(--accent, #00FFD1)' : 'var(--c-text-3)', marginBottom: '4px', textTransform: 'uppercase' }}>
                     {DAYS_SHORT[d.getDay()]}
                   </div>
                   <div
                     onClick={() => { if (!isDay) { setCurrent(d); setView('day') } }}
-                    style={{ width: isDay ? '36px' : '28px', height: isDay ? '36px' : '28px', borderRadius: '50%', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', background: isToday ? 'var(--accent, #00FFD1)' : 'transparent', color: isToday ? '#000' : 'rgba(255,255,255,0.85)', fontSize: isDay ? '18px' : '13px', fontWeight: isToday ? 700 : 400, cursor: isDay ? 'default' : 'pointer', transition: 'background 0.15s' }}>
+                    style={{ width: isDay ? '36px' : '28px', height: isDay ? '36px' : '28px', borderRadius: '50%', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', background: isToday ? 'var(--accent, #00FFD1)' : 'transparent', color: isToday ? '#000' : 'var(--c-text)', fontSize: isDay ? '18px' : '13px', fontWeight: isToday ? 700 : 400, cursor: isDay ? 'default' : 'pointer', transition: 'background 0.15s' }}>
                     {d.getDate()}
                   </div>
                 </div>
@@ -552,7 +552,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
             })
             if (allDayByDay.every(arr => arr.length === 0)) return null
             return (
-              <div style={{ display: 'grid', gridTemplateColumns: `${TIME_COL}px repeat(${N}, 1fr)`, borderBottom: '1px solid rgba(255,255,255,0.07)', padding: '4px 0', position: 'sticky', top: 0, zIndex: 5, background: 'var(--bg-sidebar, #12121a)', maxHeight: 92, overflowY: 'auto' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: `${TIME_COL}px repeat(${N}, 1fr)`, borderBottom: '1px solid var(--c-border)', padding: '4px 0', position: 'sticky', top: 0, zIndex: 5, background: 'var(--bg-sidebar, #12121a)', maxHeight: 92, overflowY: 'auto' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 8 }}>
                   <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.22)', letterSpacing: '0.06em', textTransform: 'uppercase', userSelect: 'none' }}>dag</span>
                 </div>
@@ -606,9 +606,9 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                 position: 'absolute', top: 0, height: '100%',
                 left: `calc(${TIME_COL}px + ${di} * (100% - ${TIME_COL}px) / ${N})`,
                 width: `calc((100% - ${TIME_COL}px) / ${N})`,
-                background: 'rgba(0,255,209,0.04)',
-                borderLeft: '1px solid rgba(0,255,209,0.1)',
-                borderRight: '1px solid rgba(0,255,209,0.1)',
+                background: 'color-mix(in srgb, var(--accent) 4%, transparent)',
+                borderLeft: '1px solid color-mix(in srgb, var(--accent) 10%, transparent)',
+                borderRight: '1px solid color-mix(in srgb, var(--accent) 10%, transparent)',
                 pointerEvents: 'none', zIndex: 0,
               }} />
             ))}
@@ -734,12 +734,12 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                         <div key={item.key}
                           ref={isHL ? highlightRef : undefined}
                           onClick={e => { e.stopPropagation(); setLessonDetail(les) }}
-                          style={{ position: 'absolute', top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, background: color + '18', borderLeft: `3px solid ${borderColor}`, borderRadius: '5px', padding: '3px 7px', overflow: 'hidden', cursor: 'pointer', zIndex: 1, boxSizing: 'border-box', marginLeft: '2px', opacity: cancelled ? 0.5 : 0.85, ...hlStyle }}>
+                          style={{ position: 'absolute', top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, background: `color-mix(in srgb, ${color} 9%, transparent)`, borderLeft: `3px solid ${borderColor}`, borderRadius: '5px', padding: '3px 7px', overflow: 'hidden', cursor: 'pointer', zIndex: 1, boxSizing: 'border-box', marginLeft: '2px', opacity: cancelled ? 0.5 : 0.85, ...hlStyle }}>
                           <div style={{ fontSize: '11px', fontWeight: 600, color, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: cancelled ? 'line-through' : 'none' }}>
                             🎓 {lesTitle}
                           </div>
                           {showDetail && subLabel && (
-                            <div style={{ fontSize: '10px', color: color + 'aa', lineHeight: 1.3, marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: '10px', color: `color-mix(in srgb, ${color} 67%, transparent)`, lineHeight: 1.3, marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {subLabel}
                             </div>
                           )}
@@ -777,12 +777,12 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                           draggable
                           onDragStart={e => e.dataTransfer.setData('taskId', task.id)}
                           onClick={e => { e.stopPropagation(); onViewDetail ? onViewDetail(task) : onEditTask?.(task) }}
-                          style={{ position: 'absolute', top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, background: color + '18', borderLeft: `3px solid ${color}`, borderRadius: '5px', padding: '3px 7px', overflow: 'hidden', cursor: 'pointer', zIndex: 3, boxSizing: 'border-box', marginLeft: '2px', opacity: task.completed ? 0.55 : 1, ...hlStyle }}>
+                          style={{ position: 'absolute', top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, background: `color-mix(in srgb, ${color} 9%, transparent)`, borderLeft: `3px solid ${color}`, borderRadius: '5px', padding: '3px 7px', overflow: 'hidden', cursor: 'pointer', zIndex: 3, boxSizing: 'border-box', marginLeft: '2px', opacity: task.completed ? 0.55 : 1, ...hlStyle }}>
                           <div style={{ fontSize: '11px', fontWeight: 600, color, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: task.completed ? 'line-through' : 'none' }}>
                             {task.completed ? '✓ ' : ''}{task.title}
                           </div>
                           {showDetail && subject && (
-                            <div style={{ fontSize: '10px', color: color + 'aa', lineHeight: 1.2, marginTop: '1px' }}>
+                            <div style={{ fontSize: '10px', color: `color-mix(in srgb, ${color} 67%, transparent)`, lineHeight: 1.2, marginTop: '1px' }}>
                               {subject.name}
                             </div>
                           )}
@@ -822,13 +822,13 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
       <div key={key} ref={el => { monthItemRefs.current[key] = el }} data-month={key}
         style={{ flexShrink: 0 }}>
         {/* Month label */}
-        <div style={{ padding: '12px 12px 6px', fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.85)', letterSpacing: '0.02em', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ padding: '12px 12px 6px', fontSize: 14, fontWeight: 700, color: 'var(--c-text)', letterSpacing: '0.02em', borderTop: '1px solid var(--c-border)' }}>
           {MONTHS_FULL[monthDate.getMonth()]} {monthDate.getFullYear()}
         </div>
         {/* Day-of-week header */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
           {['Ma','Di','Wo','Do','Vr','Za','Zo'].map(d => (
-            <div key={d} style={{ padding: '4px', textAlign: 'center', fontSize: '10px', fontWeight: 500, color: 'rgba(255,255,255,0.25)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{d}</div>
+            <div key={d} style={{ padding: '4px', textAlign: 'center', fontSize: '10px', fontWeight: 500, color: 'var(--c-text-3)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{d}</div>
           ))}
         </div>
         {/* Day cells */}
@@ -847,9 +847,9 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
             const isWeekend = date.getDay() === 0 || date.getDay() === 6
             return (
               <div key={i} onClick={() => { setCurrent(date); setView('day') }}
-                style={{ padding: '4px 5px', borderRight: '1px solid rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', background: isToday ? 'rgba(0,255,209,0.04)' : isWeekend ? 'rgba(255,255,255,0.01)' : 'transparent', minHeight: '64px' }}>
+                style={{ padding: '4px 5px', borderRight: '1px solid rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', background: isToday ? 'color-mix(in srgb, var(--accent) 4%, transparent)' : isWeekend ? 'rgba(255,255,255,0.01)' : 'transparent', minHeight: '64px' }}>
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '3px' }}>
-                  <div style={{ width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: isToday ? 'var(--accent, #00FFD1)' : 'transparent', color: isToday ? '#000' : isWeekend ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.75)', fontSize: '11px', fontWeight: isToday ? 700 : 400 }}>
+                  <div style={{ width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: isToday ? 'var(--accent, #00FFD1)' : 'transparent', color: isToday ? '#000' : isWeekend ? 'rgba(255,255,255,0.35)' : 'var(--c-text-2)', fontSize: '11px', fontWeight: isToday ? 700 : 400 }}>
                     {date.getDate()}
                   </div>
                 </div>
@@ -858,13 +858,13 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                     const color = item.color || (item.vak ? '#FACC15' : subjects?.find(s => s.id === item.subject_id)?.color || '#818CF8')
                     const label = item.title || item.vak || '–'
                     return (
-                      <div key={item.id || idx} style={{ background: color + '28', borderLeft: `2px solid ${color}`, borderRadius: '3px', padding: '1px 5px', fontSize: '9px', color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>
+                      <div key={item.id || idx} style={{ background: `color-mix(in srgb, ${color} 16%, transparent)`, borderLeft: `2px solid ${color}`, borderRadius: '3px', padding: '1px 5px', fontSize: '9px', color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>
                         {label}
                       </div>
                     )
                   })}
                   {all.length > 2 && (
-                    <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.25)', paddingLeft: '5px' }}>+{all.length - 2}</div>
+                    <div style={{ fontSize: '9px', color: 'var(--c-text-3)', paddingLeft: '5px' }}>+{all.length - 2}</div>
                   )}
                 </div>
               </div>
@@ -902,8 +902,8 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
               style={{
                 flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
                 padding: '6px 2px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                background: isSel ? 'var(--accent)' : isToday ? 'rgba(0,255,209,0.1)' : 'transparent',
-                color: isSel ? '#000' : isToday ? 'var(--accent)' : 'rgba(255,255,255,0.45)',
+                background: isSel ? 'var(--accent)' : isToday ? 'color-mix(in srgb, var(--accent) 10%, transparent)' : 'transparent',
+                color: isSel ? '#000' : isToday ? 'var(--accent)' : 'var(--c-text-3)',
                 transition: 'background 0.15s',
               }}>
               <span style={{ fontSize: 9, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase' }}>{DAYS_SHORT[d.getDay()]}</span>
@@ -918,16 +918,16 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderRadius: '16px', background: 'rgba(255,255,255,0.015)' }}>
       {/* Toolbar */}
-      {!hideToolbar && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0, gap: '8px', flexWrap: 'wrap' }}>
+      {!hideToolbar && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid var(--c-border)', flexShrink: 0, gap: '8px', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <button onClick={() => setCurrent(new Date())}
-            style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)', fontSize: '11px', cursor: 'pointer', fontWeight: 500 }}>
+            style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid var(--c-border-strong)', background: 'rgba(255,255,255,0.06)', color: 'var(--c-text-2)', fontSize: '11px', cursor: 'pointer', fontWeight: 500 }}>
             Vandaag
           </button>
-          <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', padding: '4px', display: 'flex', borderRadius: '6px' }}>
+          <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', padding: '4px', display: 'flex', borderRadius: '6px' }}>
             <ChevronLeft size={16} />
           </button>
-          <button onClick={() => navigate(1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', padding: '4px', display: 'flex', borderRadius: '6px' }}>
+          <button onClick={() => navigate(1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', padding: '4px', display: 'flex', borderRadius: '6px' }}>
             <ChevronRight size={16} />
           </button>
           <span style={{ color: 'white', fontWeight: 600, fontSize: '13px', whiteSpace: 'nowrap' }}>
@@ -946,10 +946,10 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '2px', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '2px', border: '1px solid var(--c-border)' }}>
             {(isMobile ? [['week','Week'], ['month','Maand']] : [['day','Dag'], ['week','Week'], ['month','Maand']]).map(([v, label]) => (
               <button key={v} onClick={() => setView(v)}
-                style={{ padding: '3px 10px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', border: 'none', background: view === v ? 'rgba(255,255,255,0.15)' : 'transparent', color: view === v ? 'white' : 'rgba(255,255,255,0.4)', fontWeight: view === v ? 600 : 400 }}>
+                style={{ padding: '3px 10px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', border: 'none', background: view === v ? 'rgba(255,255,255,0.15)' : 'transparent', color: view === v ? 'white' : 'var(--c-text-3)', fontWeight: view === v ? 600 : 400 }}>
                 {label}
               </button>
             ))}
@@ -1016,7 +1016,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                   </span>
                 )}
               </div>
-              <button onClick={() => setLessonDetail(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}>
+              <button onClick={() => setLessonDetail(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)' }}>
                 <X size={16} />
               </button>
             </div>
@@ -1025,7 +1025,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
               {/* Tijd */}
               {lessonDetail.start && (
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', width: '60px', flexShrink: 0 }}>Tijd</span>
+                  <span style={{ fontSize: '11px', color: 'var(--c-text-3)', width: '60px', flexShrink: 0 }}>Tijd</span>
                   <span style={{ fontSize: '13px', color: 'white', fontWeight: 500 }}>
                     {fmtTime(new Date(lessonDetail.start))}
                     {(lessonDetail.einde || lessonDetail.end) ? ` – ${fmtTime(new Date(lessonDetail.einde || lessonDetail.end))}` : ''}
@@ -1035,29 +1035,29 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
               {/* Lokaal */}
               {(lessonDetail.lokaal || lessonDetail.location) && (
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', width: '60px', flexShrink: 0 }}>Lokaal</span>
+                  <span style={{ fontSize: '11px', color: 'var(--c-text-3)', width: '60px', flexShrink: 0 }}>Lokaal</span>
                   <span style={{ fontSize: '13px', color: 'white', fontWeight: 500 }}>{lessonDetail.lokaal || lessonDetail.location}</span>
                 </div>
               )}
               {/* Docent */}
               {(lessonDetail.docent || lessonDetail.teachers?.length > 0) && (
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', width: '60px', flexShrink: 0 }}>Docent</span>
+                  <span style={{ fontSize: '11px', color: 'var(--c-text-3)', width: '60px', flexShrink: 0 }}>Docent</span>
                   <span style={{ fontSize: '13px', color: 'white', fontWeight: 500 }}>{lessonDetail.docent || lessonDetail.teachers?.join(', ')}</span>
                 </div>
               )}
               {/* Huiswerk */}
               {lessonDetail.huiswerk && (
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', width: '60px', flexShrink: 0, paddingTop: '2px' }}>Huiswerk</span>
+                  <span style={{ fontSize: '11px', color: 'var(--c-text-3)', width: '60px', flexShrink: 0, paddingTop: '2px' }}>Huiswerk</span>
                   <span style={{ fontSize: '12px', color: '#FACC15', fontWeight: 500, lineHeight: 1.4 }}>{stripHtml(lessonDetail.huiswerk)}</span>
                 </div>
               )}
               {/* Omschrijving */}
               {lessonDetail.omschrijving && (
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', width: '60px', flexShrink: 0, paddingTop: '2px' }}>Info</span>
-                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', lineHeight: 1.4 }}>{stripHtml(lessonDetail.omschrijving)}</span>
+                  <span style={{ fontSize: '11px', color: 'var(--c-text-3)', width: '60px', flexShrink: 0, paddingTop: '2px' }}>Info</span>
+                  <span style={{ fontSize: '12px', color: 'var(--c-text-2)', lineHeight: 1.4 }}>{stripHtml(lessonDetail.omschrijving)}</span>
                 </div>
               )}
             </div>
@@ -1075,7 +1075,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
               <h2 style={{ color: 'white', fontWeight: 700, fontSize: '16px', margin: 0 }}>
                 {modal.mode === 'edit' ? 'Bewerk event' : 'Nieuw event'}
               </h2>
-              <button onClick={() => setModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}>
+              <button onClick={() => setModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)' }}>
                 <X size={18} />
               </button>
             </div>
@@ -1093,17 +1093,17 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                   style={{ width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', background: form.allDay ? 'var(--accent, #00FFD1)' : 'rgba(255,255,255,0.14)', position: 'relative', transition: 'background 0.2s', flexShrink: 0, padding: 0 }}>
                   <span style={{ position: 'absolute', top: 2, left: form.allDay ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: form.allDay ? '#000' : 'rgba(255,255,255,0.7)', transition: 'left 0.2s' }} />
                 </button>
-                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>Hele dag</span>
+                <span style={{ fontSize: 12, color: 'var(--c-text-2)' }}>Hele dag</span>
               </div>
               {/* Date range */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 <div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginBottom: 4, letterSpacing: '0.05em' }}>Van</div>
+                  <div style={{ fontSize: 10, color: 'var(--c-text-3)', marginBottom: 4, letterSpacing: '0.05em' }}>Van</div>
                   <input type="date" className="glass-input" value={form.date}
                     onChange={e => setForm(p => ({ ...p, date: e.target.value }))} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginBottom: 4, letterSpacing: '0.05em' }}>Tot</div>
+                  <div style={{ fontSize: 10, color: 'var(--c-text-3)', marginBottom: 4, letterSpacing: '0.05em' }}>Tot</div>
                   <input type="date" className="glass-input" value={form.endDate || form.date} min={form.date}
                     onChange={e => { const v = e.target.value; setForm(p => ({ ...p, endDate: v === p.date ? '' : v })) }} />
                 </div>
@@ -1135,7 +1135,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                     return (
                       <button key={i} type="button"
                         onClick={() => setForm(p => ({ ...p, recurrence_days: sel ? p.recurrence_days.filter(x => x !== dayNum) : [...p.recurrence_days, dayNum] }))}
-                        style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', border: '1px solid', borderColor: sel ? 'rgba(0,255,209,0.5)' : 'rgba(255,255,255,0.1)', background: sel ? 'rgba(0,255,209,0.15)' : 'transparent', color: sel ? '#00FFD1' : 'rgba(255,255,255,0.4)' }}>
+                        style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', border: '1px solid', borderColor: sel ? 'color-mix(in srgb, var(--accent) 50%, transparent)' : 'rgba(255,255,255,0.1)', background: sel ? 'color-mix(in srgb, var(--accent) 15%, transparent)' : 'transparent', color: sel ? 'var(--accent)' : 'var(--c-text-3)' }}>
                         {d}
                       </button>
                     )
@@ -1151,7 +1151,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                 <label title="Eigen kleur" style={{ width: 24, height: 24, borderRadius: '50%', overflow: 'hidden', cursor: 'pointer', flexShrink: 0, border: !EVENT_COLORS.includes(form.color) ? '2px solid white' : '2px solid transparent', boxSizing: 'border-box', transform: !EVENT_COLORS.includes(form.color) ? 'scale(1.2)' : 'scale(1)', transition: 'transform 0.1s', background: form.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <input type="color" value={form.color} onChange={e => setForm(p => ({ ...p, color: e.target.value }))}
                     style={{ opacity: 0, position: 'absolute', width: 1, height: 1, pointerEvents: 'none' }} />
-                  {EVENT_COLORS.includes(form.color) && <span style={{ fontSize: 12, lineHeight: 1, color: 'rgba(255,255,255,0.7)', pointerEvents: 'none' }}>+</span>}
+                  {EVENT_COLORS.includes(form.color) && <span style={{ fontSize: 12, lineHeight: 1, color: 'var(--c-text-2)', pointerEvents: 'none' }}>+</span>}
                 </label>
               </div>
             </div>
@@ -1163,7 +1163,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                 </button>
               )}
               <button onClick={() => setModal(null)}
-                style={{ flex: 1, padding: '9px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '12px' }}>
+                style={{ flex: 1, padding: '9px', borderRadius: '10px', border: '1px solid var(--c-border-strong)', background: 'transparent', color: 'var(--c-text-3)', cursor: 'pointer', fontSize: '12px' }}>
                 Annuleer
               </button>
               <button onClick={handleSave} disabled={!form.title.trim() || saving}

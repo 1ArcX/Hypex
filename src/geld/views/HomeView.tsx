@@ -22,7 +22,7 @@ export function HomeView({ stats, isCurrentMonth, remainingLoan, openLoansCount,
 }) {
   const s = stats
   const heroColor = s.adjustedRemaining < 0 || s.adjustedRemainPct < 15 ? '#F87171'
-    : s.adjustedRemainPct < 40 ? '#FBBF24' : '#5EEAD4'
+    : s.adjustedRemainPct < 40 ? '#FBBF24' : 'var(--accent)'
 
   const dagColor = s.dagBudget > 15 ? '#34D399' : s.dagBudget > 5 ? '#FBBF24' : '#F87171'
   const w = s.week
@@ -178,7 +178,7 @@ export function HomeView({ stats, isCurrentMonth, remainingLoan, openLoansCount,
         {s.regularExpenses.length > 0 && (
           <button onClick={onOpenAnalyse}
             className="px-4 py-3.5 rounded-2xl bg-white/[0.05] backdrop-blur-lg border border-white/10 text-white/70 cursor-pointer text-[13px] font-semibold flex items-center justify-center gap-2 active:scale-[0.985] transition-transform">
-            <BarChart3 size={15} className="text-teal-300" /> Analyse
+            <BarChart3 size={15} className="text-accent" /> Analyse
           </button>
         )}
       </div>
@@ -188,7 +188,7 @@ export function HomeView({ stats, isCurrentMonth, remainingLoan, openLoansCount,
         <div className="mb-2">
           <div className="flex items-center justify-between mb-2.5">
             <SectionLabel className="!mb-0">Recent</SectionLabel>
-            <button onClick={onOpenUitgaven} className="text-[12px] text-teal-300 bg-transparent border-none cursor-pointer p-0 font-semibold">
+            <button onClick={onOpenUitgaven} className="text-[12px] text-accent bg-transparent border-none cursor-pointer p-0 font-semibold">
               Alles →
             </button>
           </div>

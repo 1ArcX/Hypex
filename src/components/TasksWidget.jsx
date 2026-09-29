@@ -254,13 +254,13 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
 
   return (
     <div className={seamless ? '' : 'glass-card p-4'} style={seamless ? {} : {
-      borderLeft: '3px solid rgba(0,255,209,0.4)',
-      background: 'linear-gradient(135deg, rgba(0,255,209,0.04) 0%, transparent 60%)',
+      borderLeft: '3px solid color-mix(in srgb, var(--accent) 40%, transparent)',
+      background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent) 4%, transparent) 0%, transparent 60%)',
     }}>
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         {!seamless && <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <div style={{ width: 24, height: 24, borderRadius: 8, background: 'rgba(0,255,209,0.12)', border: '1px solid rgba(0,255,209,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <div style={{ width: 24, height: 24, borderRadius: 8, background: 'color-mix(in srgb, var(--accent) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <CheckSquare size={12} style={{ color: 'var(--accent)' }} />
           </div>
           <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Taken</span>
@@ -287,7 +287,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
           />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
             <div>
-              <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Datum</label>
+              <label style={{ color: 'var(--c-text-3)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Datum</label>
               <input
                 type="date"
                 className="glass-input"
@@ -297,7 +297,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
               />
             </div>
             <div>
-              <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Vak</label>
+              <label style={{ color: 'var(--c-text-3)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Vak</label>
               <select
                 className="glass-input"
                 value={newSubject}
@@ -310,12 +310,12 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
             <div>
-              <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Starttijd</label>
+              <label style={{ color: 'var(--c-text-3)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Starttijd</label>
               <input type="time" className="glass-input" value={newTime}
                 onChange={e => setNewTime(e.target.value)} style={{ fontSize: '12px', colorScheme: 'dark' }} />
             </div>
             <div>
-              <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Eindtijd</label>
+              <label style={{ color: 'var(--c-text-3)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Eindtijd</label>
               <input type="time" className="glass-input" value={newEndTime}
                 onChange={e => setNewEndTime(e.target.value)} style={{ fontSize: '12px', colorScheme: 'dark' }} />
             </div>
@@ -331,7 +331,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
 
       {/* Lege staat */}
       {incomplete.length === 0 && !adding && (
-        <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>
+        <p style={{ color: 'var(--c-text-3)', fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>
           Geen taken — klik op Nieuw om te beginnen
         </p>
       )}
@@ -357,7 +357,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                   clearDrag()
                 }}
                 style={{
-                  fontSize: 10, color: dropGroup === null ? 'var(--accent)' : 'rgba(255,255,255,0.25)',
+                  fontSize: 10, color: dropGroup === null ? 'var(--accent)' : 'var(--c-text-3)',
                   fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase',
                   padding: '4px 4px 2px', display: 'flex', alignItems: 'center', gap: 5,
                   borderRadius: 6, background: dropGroup === null ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'transparent',
@@ -397,12 +397,12 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                   onDragOver={e => overGroup(e, section.name)}
                   onDragLeave={() => { setDropGroup(undefined); setDropGroupTarget(null) }}
                   onDrop={e => dropOnGroup(e, section.name)}
-                  style={{ fontSize: 11, color: isTaskDropTarget ? 'var(--accent)' : 'rgba(255,255,255,0.35)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', padding: '8px 4px 4px', display: 'flex', alignItems: 'center', gap: 5, cursor: 'grab', userSelect: 'none', borderRadius: 8, background: isTaskDropTarget ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'transparent', transition: 'background 0.15s, color 0.15s, opacity 0.15s', opacity: isDraggingThis ? 0.3 : 1 }}
+                  style={{ fontSize: 11, color: isTaskDropTarget ? 'var(--accent)' : 'var(--c-text-3)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', padding: '8px 4px 4px', display: 'flex', alignItems: 'center', gap: 5, cursor: 'grab', userSelect: 'none', borderRadius: 8, background: isTaskDropTarget ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'transparent', transition: 'background 0.15s, color 0.15s, opacity 0.15s', opacity: isDraggingThis ? 0.3 : 1 }}
                 >
                   <GripVertical size={11} style={{ flexShrink: 0, color: 'rgba(255,255,255,0.2)' }} />
                   {isCollapsed
-                    ? <ChevronRight size={11} style={{ flexShrink: 0, color: 'rgba(255,255,255,0.25)' }} />
-                    : <ChevronDown size={11} style={{ flexShrink: 0, color: 'rgba(255,255,255,0.25)' }} />}
+                    ? <ChevronRight size={11} style={{ flexShrink: 0, color: 'var(--c-text-3)' }} />
+                    : <ChevronDown size={11} style={{ flexShrink: 0, color: 'var(--c-text-3)' }} />}
                   <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block', flexShrink: 0 }} />
                   {section.name}
                   {durLabel && (
@@ -496,7 +496,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                   </button>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: isUrgent || dateInfo?.overdue ? 3 : 2 }}>
-                      <p style={{ fontSize: '14px', color: isUrgent ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.85)', fontWeight: isUrgent ? 600 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0, flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: '14px', color: isUrgent ? 'rgba(255,255,255,0.95)' : 'var(--c-text)', fontWeight: isUrgent ? 600 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0, flex: 1, minWidth: 0 }}>
                         {task.title}
                       </p>
                       {isUrgent && (
@@ -510,7 +510,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                         </span>
                       )}
                       {task.recurrence && (
-                        <span style={{ fontSize: 10, fontWeight: 700, color: (task.streak > 0) ? '#FB923C' : 'rgba(255,255,255,0.4)', background: (task.streak > 0) ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.05)', border: `1px solid ${(task.streak > 0) ? 'rgba(249,115,22,0.3)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 5, padding: '1px 6px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: (task.streak > 0) ? '#FB923C' : 'var(--c-text-3)', background: (task.streak > 0) ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.05)', border: `1px solid ${(task.streak > 0) ? 'rgba(249,115,22,0.3)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 5, padding: '1px 6px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 2 }}>
                           🔁 {task.streak > 0 ? `🔥${task.streak}` : ''}
                         </span>
                       )}
@@ -526,7 +526,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
                       </span>
                     </p>
                     {task.description ? (
-                      <p style={{ fontSize: 11, margin: '2px 0 0', color: 'rgba(255,255,255,0.35)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <p style={{ fontSize: 11, margin: '2px 0 0', color: 'var(--c-text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {task.description}
                       </p>
                     ) : null}
@@ -551,7 +551,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
 
       {/* Afgeronde taken — inklapbaar */}
       {complete.length > 0 && (
-        <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--c-border)' }}>
           <button
             onClick={() => setShowCompleted(v => !v)}
             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 6px', display: 'flex', alignItems: 'center', gap: 5, width: '100%' }}
@@ -569,7 +569,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
               <button onClick={() => onToggle(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
                 <CheckCircle2 size={15} style={{ color: 'var(--accent)' }} />
               </button>
-              <p style={{ flex: 1, fontSize: '12px', color: 'rgba(255,255,255,0.4)', textDecoration: 'line-through', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <p style={{ flex: 1, fontSize: '12px', color: 'var(--c-text-3)', textDecoration: 'line-through', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {task.title}
               </p>
               <button onClick={() => onDelete(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,80,80,0.3)', padding: '2px', flexShrink: 0 }}>

@@ -43,10 +43,10 @@ function TrackRow({ track, onPlayNow, onAddToQueue, compact = false, index }) {
         <img src={imgUrl} style={{ width: compact ? 22 : 32, height: compact ? 22 : 32, borderRadius: 4, flexShrink: 0 }} alt="" />
       )}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: compact ? 11 : 12, color: 'rgba(255,255,255,0.75)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>
+        <p style={{ fontSize: compact ? 11 : 12, color: 'var(--c-text-2)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>
           {track.name}
         </p>
-        <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <p style={{ fontSize: 10, color: 'var(--c-text-3)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {track.artists?.map(a => a.name).join(', ')}
         </p>
       </div>
@@ -56,7 +56,7 @@ function TrackRow({ track, onPlayNow, onAddToQueue, compact = false, index }) {
           ▶
         </button>
         <button onClick={onAddToQueue} title="Aan queue toevoegen"
-          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: 'rgba(255,255,255,0.45)', cursor: 'pointer', padding: '4px 7px', fontSize: 10, fontWeight: 600 }}>
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--c-border-strong)', borderRadius: 6, color: 'var(--c-text-3)', cursor: 'pointer', padding: '4px 7px', fontSize: 10, fontWeight: 600 }}>
           +
         </button>
       </div>
@@ -365,7 +365,7 @@ export default function SpotifyWidget() {
   if (!token) return (
     <div className="glass-card p-4 text-center">
       <Music size={24} color="#1DB954" style={{ margin: '0 auto 8px' }} />
-      <p className="text-xs mb-3" style={{ color: 'rgba(255,255,255,0.5)' }}>Koppel je Spotify account</p>
+      <p className="text-xs mb-3" style={{ color: 'var(--c-text-2)' }}>Koppel je Spotify account</p>
       <button onClick={handleLogin} className="btn-neon w-full" style={{ background: 'rgba(29,185,84,0.15)', borderColor: 'rgba(29,185,84,0.4)', color: '#1DB954' }}>
         Inloggen met Spotify
       </button>
@@ -387,7 +387,7 @@ export default function SpotifyWidget() {
           </div>
           <span style={{ fontSize: 10, color: '#1DB954', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Spotify</span>
         </div>
-        <button onClick={handleLogout} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', fontSize: '11px' }}>
+        <button onClick={handleLogout} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', fontSize: '11px' }}>
           Uitloggen
         </button>
       </div>
@@ -400,7 +400,7 @@ export default function SpotifyWidget() {
             border: '1px solid',
             borderColor: tab === t ? 'color-mix(in srgb, var(--accent) 40%, transparent)' : 'rgba(255,255,255,0.08)',
             background:  tab === t ? 'color-mix(in srgb, var(--accent) 10%, transparent)' : 'transparent',
-            color:       tab === t ? 'var(--accent)' : 'rgba(255,255,255,0.4)',
+            color:       tab === t ? 'var(--accent)' : 'var(--c-text-3)',
           }}>
             {t === 'nu' ? 'Nu' : t === 'queue' ? 'Queue' : 'Recent'}
           </button>
@@ -418,7 +418,7 @@ export default function SpotifyWidget() {
               )}
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium truncate text-white">{track.name}</p>
-                <p className="text-xs truncate" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                <p className="text-xs truncate" style={{ color: 'var(--c-text-3)' }}>
                   {track.artists?.map(a => a.name).join(', ')}
                 </p>
               </div>
@@ -435,33 +435,33 @@ export default function SpotifyWidget() {
               }} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>{formatMs(progressMs)}</span>
-              <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>{formatMs(durationMs)}</span>
+              <span style={{ fontSize: 9, color: 'var(--c-text-3)' }}>{formatMs(progressMs)}</span>
+              <span style={{ fontSize: 9, color: 'var(--c-text-3)' }}>{formatMs(durationMs)}</span>
             </div>
 
             {/* Controls: shuffle | prev | play/pause | next | repeat */}
             <div className="flex items-center justify-center gap-3">
-              <button onClick={() => control('shuffle')} style={{ ...btnBase, color: shuffleState ? '#1DB954' : 'rgba(255,255,255,0.3)' }}>
+              <button onClick={() => control('shuffle')} style={{ ...btnBase, color: shuffleState ? '#1DB954' : 'var(--c-text-3)' }}>
                 <Shuffle size={14} />
               </button>
-              <button onClick={() => control('prev')} style={{ ...btnBase, color: 'rgba(255,255,255,0.6)' }}>
+              <button onClick={() => control('prev')} style={{ ...btnBase, color: 'var(--c-text-2)' }}>
                 <SkipBack size={18} />
               </button>
               <button onClick={() => control(isPlaying ? 'pause' : 'play')}
                 style={{ background: 'rgba(29,185,84,0.2)', border: '1px solid rgba(29,185,84,0.4)', borderRadius: '50%', width: 36, height: 36, cursor: 'pointer', color: '#1DB954', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {isPlaying ? <Pause size={16} /> : <Play size={16} />}
               </button>
-              <button onClick={() => control('next')} style={{ ...btnBase, color: 'rgba(255,255,255,0.6)' }}>
+              <button onClick={() => control('next')} style={{ ...btnBase, color: 'var(--c-text-2)' }}>
                 <SkipForward size={18} />
               </button>
-              <button onClick={() => control('repeat')} style={{ ...btnBase, color: repeatState !== 'off' ? '#1DB954' : 'rgba(255,255,255,0.3)' }}>
+              <button onClick={() => control('repeat')} style={{ ...btnBase, color: repeatState !== 'off' ? '#1DB954' : 'var(--c-text-3)' }}>
                 {repeatState === 'track' ? <Repeat1 size={14} /> : <Repeat size={14} />}
               </button>
             </div>
 
             {/* Wachtrij inline */}
             {queueTracks.length > 0 && (
-              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--c-border)' }}>
                 <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.22)', letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>Wachtrij</span>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   {(isDesktop ? queueTracks : queueTracks.slice(0, 3)).map((t, i) => (
@@ -476,7 +476,7 @@ export default function SpotifyWidget() {
             <p style={{ fontSize: 12, color: 'rgba(255,100,100,0.85)', marginBottom: 6, lineHeight: 1.5 }}>
               Spotify account niet geautoriseerd.
             </p>
-            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 12, lineHeight: 1.4 }}>
+            <p style={{ fontSize: 11, color: 'var(--c-text-3)', marginBottom: 12, lineHeight: 1.4 }}>
               Vraag de beheerder om je account toe te voegen, of koppel opnieuw.
             </p>
             <button onClick={handleLogout}
@@ -485,7 +485,7 @@ export default function SpotifyWidget() {
             </button>
           </div>
         ) : (
-          <p className="text-xs text-center py-2" style={{ color: 'rgba(255,255,255,0.3)' }}>
+          <p className="text-xs text-center py-2" style={{ color: 'var(--c-text-3)' }}>
             Niets aan het afspelen...
           </p>
         )
@@ -495,7 +495,7 @@ export default function SpotifyWidget() {
       {tab === 'queue' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {queueTracks.length === 0 ? (
-            <p className="text-xs text-center py-4" style={{ color: 'rgba(255,255,255,0.3)' }}>Wachtrij is leeg</p>
+            <p className="text-xs text-center py-4" style={{ color: 'var(--c-text-3)' }}>Wachtrij is leeg</p>
           ) : queueTracks.map((t, i) => (
             <TrackRow key={i} track={t} onPlayNow={() => playFromQueue(i)} onAddToQueue={() => addToQueue(t.uri)} index={i + 1} />
           ))}
@@ -507,15 +507,15 @@ export default function SpotifyWidget() {
         <div>
           {(recentError || needsReconnect) ? (
             <div className="text-center py-3">
-              <p className="text-xs mb-3" style={{ color: 'rgba(255,255,255,0.4)' }}>Herverbind om recent afgespeeld te zien</p>
+              <p className="text-xs mb-3" style={{ color: 'var(--c-text-3)' }}>Herverbind om recent afgespeeld te zien</p>
               <button onClick={handleLogin} style={{ background: 'rgba(29,185,84,0.15)', border: '1px solid rgba(29,185,84,0.4)', borderRadius: 6, color: '#1DB954', fontSize: 11, cursor: 'pointer', padding: '6px 12px' }}>
                 Herverbind
               </button>
             </div>
           ) : recentTracks === null ? (
-            <p className="text-xs text-center py-4" style={{ color: 'rgba(255,255,255,0.3)' }}>Laden...</p>
+            <p className="text-xs text-center py-4" style={{ color: 'var(--c-text-3)' }}>Laden...</p>
           ) : recentTracks.length === 0 ? (
-            <p className="text-xs text-center py-4" style={{ color: 'rgba(255,255,255,0.3)' }}>Geen recent afgespeeld</p>
+            <p className="text-xs text-center py-4" style={{ color: 'var(--c-text-3)' }}>Geen recent afgespeeld</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {recentTracks.map((item, i) => (

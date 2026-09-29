@@ -18,7 +18,7 @@ export function TransactionRow({ exp, allCategories, onEdit, onDelete }: {
       isInc ? 'bg-emerald-400/[0.06] border-emerald-400/15' : 'bg-white/[0.04] border-white/[0.07]'
     }`}>
       <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0"
-        style={{ background: `${color}15` }}>{cat.emoji}</div>
+        style={{ background: `color-mix(in srgb, ${color} 8%, transparent)` }}>{cat.emoji}</div>
       <div className="flex-1 min-w-0">
         <p className="text-[13px] font-semibold text-white/85 m-0 truncate">{exp.description || cat.label}</p>
         <p className="text-[11px] text-white/30 m-0">{exp.date}{isInc ? ' · inkomsten' : ''}</p>

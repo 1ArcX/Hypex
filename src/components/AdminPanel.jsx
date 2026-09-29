@@ -42,28 +42,28 @@ export default function AdminPanel({ onClose, profiles = [], onProfilesChange })
             </div>
             <div>
               <h2 style={{ color: 'white', fontWeight: 700, margin: 0 }}>Admin Paneel</h2>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, margin: 0 }}>Gebruikersbeheer</p>
+              <p style={{ color: 'var(--c-text-3)', fontSize: 12, margin: 0 }}>Gebruikersbeheer</p>
             </div>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)' }}>
             <X size={20} />
           </button>
         </div>
 
         {/* Push test */}
-        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '12px 16px', marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--c-border)', borderRadius: 12, padding: '12px 16px', marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: 600, margin: 0 }}>Push melding testen</p>
-            <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, margin: '2px 0 0' }}>Stuurt een test naar dit account</p>
+            <p style={{ color: 'var(--c-text-2)', fontSize: 13, fontWeight: 600, margin: 0 }}>Push melding testen</p>
+            <p style={{ color: 'var(--c-text-3)', fontSize: 11, margin: '2px 0 0' }}>Stuurt een test naar dit account</p>
           </div>
           <button onClick={sendTestPush} disabled={testStatus === 'sending'}
             style={{
               display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10,
               border: '1px solid', cursor: testStatus === 'sending' ? 'default' : 'pointer',
               fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
-              background: testStatus === 'ok' ? 'rgba(0,255,136,0.12)' : testStatus === 'err' ? 'rgba(255,80,80,0.12)' : 'rgba(0,255,209,0.1)',
-              borderColor: testStatus === 'ok' ? 'rgba(0,255,136,0.4)' : testStatus === 'err' ? 'rgba(255,80,80,0.4)' : 'rgba(0,255,209,0.3)',
-              color: testStatus === 'ok' ? '#00ff88' : testStatus === 'err' ? '#ff5050' : '#00FFD1',
+              background: testStatus === 'ok' ? 'rgba(0,255,136,0.12)' : testStatus === 'err' ? 'rgba(255,80,80,0.12)' : 'color-mix(in srgb, var(--accent) 10%, transparent)',
+              borderColor: testStatus === 'ok' ? 'rgba(0,255,136,0.4)' : testStatus === 'err' ? 'rgba(255,80,80,0.4)' : 'color-mix(in srgb, var(--accent) 30%, transparent)',
+              color: testStatus === 'ok' ? '#00ff88' : testStatus === 'err' ? '#ff5050' : 'var(--accent)',
             }}>
             <Bell size={12} />
             {testStatus === 'sending' ? 'Versturen...' : testStatus === 'ok' ? 'Verstuurd!' : testStatus === 'err' ? 'Mislukt' : 'Verstuur test'}
@@ -71,18 +71,18 @@ export default function AdminPanel({ onClose, profiles = [], onProfilesChange })
         </div>
 
         {/* Users */}
-        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, marginBottom: 10 }}>
+        <p style={{ fontSize: 11, color: 'var(--c-text-3)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, marginBottom: 10 }}>
           Gebruikers ({profiles.length})
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {profiles.length === 0 && (
-            <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: 13, textAlign: 'center', padding: '16px 0' }}>Geen gebruikers gevonden</p>
+            <p style={{ color: 'var(--c-text-3)', fontSize: 13, textAlign: 'center', padding: '16px 0' }}>Geen gebruikers gevonden</p>
           )}
           {profiles.map(profile => {
             const isToggling = toggling === profile.id
             const werkAan = !!profile.werk_tab
             return (
-              <div key={profile.id} style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '12px 16px' }}>
+              <div key={profile.id} style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--c-border)', borderRadius: 12, padding: '12px 16px' }}>
                 {/* Avatar */}
                 <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14, fontWeight: 700, color: 'var(--accent)' }}>
                   {(profile.full_name || profile.email || '?').charAt(0).toUpperCase()}
@@ -92,7 +92,7 @@ export default function AdminPanel({ onClose, profiles = [], onProfilesChange })
                   <p style={{ color: 'white', fontSize: 13, fontWeight: 600, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {profile.full_name || 'Naamloos'}
                   </p>
-                  <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, margin: '1px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <p style={{ color: 'var(--c-text-3)', fontSize: 11, margin: '1px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {profile.email || 'Geen e-mail'}
                   </p>
                 </div>
@@ -100,7 +100,7 @@ export default function AdminPanel({ onClose, profiles = [], onProfilesChange })
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <Briefcase size={11} style={{ color: werkAan ? '#FF8C42' : 'rgba(255,255,255,0.2)' }} />
-                    <span style={{ fontSize: 10, color: werkAan ? '#FF8C42' : 'rgba(255,255,255,0.25)', fontWeight: 600 }}>Werk</span>
+                    <span style={{ fontSize: 10, color: werkAan ? '#FF8C42' : 'var(--c-text-3)', fontWeight: 600 }}>Werk</span>
                   </div>
                   <button
                     onClick={() => toggleWerkTab(profile)}

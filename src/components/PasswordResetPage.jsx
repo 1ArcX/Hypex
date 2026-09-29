@@ -29,29 +29,29 @@ export default function PasswordResetPage({ onDone }) {
         {/* Logo */}
         <div className="flex items-center justify-center gap-3 mb-8">
           <div className="w-10 h-10 rounded-2xl flex items-center justify-center"
-            style={{ background: 'rgba(0,255,209,0.15)', border: '1px solid rgba(0,255,209,0.3)' }}>
-            <BookOpen size={20} color="#00FFD1" />
+            style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)' }}>
+            <BookOpen size={20} style={{ color: 'var(--accent)' }} />
           </div>
           <h1 className="text-xl font-semibold text-white">Student Dashboard</h1>
         </div>
 
         {success ? (
           <div className="text-center py-6">
-            <CheckCircle size={48} color="#00FFD1" style={{ margin: '0 auto 16px' }} />
+            <CheckCircle size={48} style={{ color: 'var(--accent)',  margin: '0 auto 16px' }} />
             <h2 className="text-xl font-bold text-white mb-2">Wachtwoord gewijzigd!</h2>
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>Je wordt zo doorgestuurd...</p>
+            <p style={{ color: 'var(--c-text-3)', fontSize: '14px' }}>Je wordt zo doorgestuurd...</p>
           </div>
         ) : (
           <>
             <h2 className="text-2xl font-bold text-white mb-1">Nieuw wachtwoord</h2>
-            <p className="text-sm mb-6" style={{ color: 'rgba(255,255,255,0.4)' }}>
+            <p className="text-sm mb-6" style={{ color: 'var(--c-text-3)' }}>
               Kies een nieuw wachtwoord voor je account
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium flex items-center gap-1.5"
-                  style={{ color: 'rgba(0,255,209,0.8)' }}>
+                  style={{ color: 'color-mix(in srgb, var(--accent) 80%, transparent)' }}>
                   <Lock size={13} /> Nieuw wachtwoord
                 </label>
                 <div className="relative">
@@ -61,7 +61,7 @@ export default function PasswordResetPage({ onDone }) {
                     value={password} onChange={e => setPassword(e.target.value)}
                     className="glass-input pr-10" required autoFocus />
                   <button type="button" onClick={() => setShowPass(!showPass)}
-                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}>
+                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)' }}>
                     {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
@@ -69,7 +69,7 @@ export default function PasswordResetPage({ onDone }) {
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium flex items-center gap-1.5"
-                  style={{ color: 'rgba(0,255,209,0.8)' }}>
+                  style={{ color: 'color-mix(in srgb, var(--accent) 80%, transparent)' }}>
                   <Lock size={13} /> Bevestig wachtwoord
                 </label>
                 <input

@@ -82,7 +82,7 @@ export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onE
               </div>
             )}
           </div>
-          <button onClick={handleClose} style={{ background:'none',border:'none',cursor:'pointer',color:'rgba(255,255,255,0.4)',flexShrink:0 }}>
+          <button onClick={handleClose} style={{ background:'none',border:'none',cursor:'pointer',color:'var(--c-text-3)',flexShrink:0 }}>
             <X size={18} />
           </button>
         </div>
@@ -91,14 +91,14 @@ export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onE
         <div style={{ display:'flex',flexDirection:'column',gap:8,marginBottom:16 }}>
           {task.date && (
             <div style={{ display:'flex',alignItems:'center',gap:8 }}>
-              <Calendar size={13} style={{ color:'rgba(255,255,255,0.35)',flexShrink:0 }} />
-              <span style={{ fontSize:13,color:'rgba(255,255,255,0.7)' }}>{fmtDate(task.date)}</span>
+              <Calendar size={13} style={{ color:'var(--c-text-3)',flexShrink:0 }} />
+              <span style={{ fontSize:13,color:'var(--c-text-2)' }}>{fmtDate(task.date)}</span>
             </div>
           )}
           {!isAllDay && (task.start_time || task.time) && (
             <div style={{ display:'flex',alignItems:'center',gap:8 }}>
-              <Clock size={13} style={{ color:'rgba(255,255,255,0.35)',flexShrink:0 }} />
-              <span style={{ fontSize:13,color:'rgba(255,255,255,0.7)' }}>
+              <Clock size={13} style={{ color:'var(--c-text-3)',flexShrink:0 }} />
+              <span style={{ fontSize:13,color:'var(--c-text-2)' }}>
                 {task.start_time || task.time}
                 {task.end_time ? ` – ${task.end_time}` : ''}
               </span>
@@ -106,8 +106,8 @@ export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onE
           )}
           {isAllDay && task.date && (
             <div style={{ display:'flex',alignItems:'center',gap:8 }}>
-              <Clock size={13} style={{ color:'rgba(255,255,255,0.35)',flexShrink:0 }} />
-              <span style={{ fontSize:13,color:'rgba(255,255,255,0.5)' }}>Hele dag</span>
+              <Clock size={13} style={{ color:'var(--c-text-3)',flexShrink:0 }} />
+              <span style={{ fontSize:13,color:'var(--c-text-2)' }}>Hele dag</span>
             </div>
           )}
         </div>
@@ -115,8 +115,8 @@ export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onE
         {/* Duration */}
         {task.duration_minutes > 0 && (
           <div style={{ display:'flex',alignItems:'center',gap:8,marginBottom:12 }}>
-            <Clock size={13} style={{ color:'rgba(255,255,255,0.35)',flexShrink:0 }} />
-            <span style={{ fontSize:13,color:'rgba(255,255,255,0.7)' }}>
+            <Clock size={13} style={{ color:'var(--c-text-3)',flexShrink:0 }} />
+            <span style={{ fontSize:13,color:'var(--c-text-2)' }}>
               {task.duration_minutes >= 60
                 ? `${Math.floor(task.duration_minutes/60)}u${task.duration_minutes%60>0?' '+task.duration_minutes%60+'min':''}`
                 : `${task.duration_minutes} min`}
@@ -125,10 +125,10 @@ export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onE
         )}
 
         {/* Description — editable */}
-        <div style={{ marginBottom:16,padding:'10px 12px',background:'rgba(255,255,255,0.04)',borderRadius:10,border:'1px solid rgba(255,255,255,0.07)' }}>
+        <div style={{ marginBottom:16,padding:'10px 12px',background:'rgba(255,255,255,0.04)',borderRadius:10,border:'1px solid var(--c-border)' }}>
           <div style={{ display:'flex',alignItems:'center',gap:6,marginBottom:6 }}>
-            <FileText size={11} style={{ color:'rgba(255,255,255,0.3)' }} />
-            <span style={{ fontSize:10,color:'rgba(255,255,255,0.3)',letterSpacing:'0.06em',textTransform:'uppercase' }}>Beschrijving</span>
+            <FileText size={11} style={{ color:'var(--c-text-3)' }} />
+            <span style={{ fontSize:10,color:'var(--c-text-3)',letterSpacing:'0.06em',textTransform:'uppercase' }}>Beschrijving</span>
             {descDirty && <span style={{ marginLeft:'auto',fontSize:10,color:'var(--accent)' }}>opgeslagen</span>}
           </div>
           <textarea
@@ -140,7 +140,7 @@ export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onE
             placeholder="Voeg een beschrijving toe..."
             style={{
               width:'100%', background:'transparent', border:'none', outline:'none',
-              color:'rgba(255,255,255,0.7)', fontSize:13, lineHeight:1.5,
+              color:'var(--c-text-2)', fontSize:13, lineHeight:1.5,
               fontFamily:'inherit', resize:'none', overflow:'hidden', minHeight:'48px', boxSizing:'border-box',
             }}
           />
@@ -163,7 +163,7 @@ export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onE
                 <button onClick={saveBookUrl} style={{ padding:'6px 12px',borderRadius:8,border:'none',background:'var(--accent)',color:'#000',cursor:'pointer',fontSize:12,fontWeight:600 }}>
                   Opslaan
                 </button>
-                <button onClick={() => setEditingBook(false)} style={{ padding:'6px 10px',borderRadius:8,border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'rgba(255,255,255,0.4)',cursor:'pointer',fontSize:12 }}>
+                <button onClick={() => setEditingBook(false)} style={{ padding:'6px 10px',borderRadius:8,border:'1px solid var(--c-border-strong)',background:'transparent',color:'var(--c-text-3)',cursor:'pointer',fontSize:12 }}>
                   <X size={13} />
                 </button>
               </div>
@@ -182,7 +182,7 @@ export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onE
                 </button>
               </div>
             ) : (
-              <button onClick={startEditBook} style={{ width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:6,padding:'9px',borderRadius:10,border:'1px dashed rgba(255,255,255,0.15)',background:'transparent',color:'rgba(255,255,255,0.3)',cursor:'pointer',fontSize:12 }}>
+              <button onClick={startEditBook} style={{ width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:6,padding:'9px',borderRadius:10,border:'1px dashed rgba(255,255,255,0.15)',background:'transparent',color:'var(--c-text-3)',cursor:'pointer',fontSize:12 }}>
                 <Link size={13} /> Voeg boeklink toe
               </button>
             )}
@@ -216,7 +216,7 @@ export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onE
             </button>
             <button
               onClick={handleClose}
-              style={{ flex:1,padding:'10px',borderRadius:10,border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'rgba(255,255,255,0.45)',cursor:'pointer',fontSize:13 }}
+              style={{ flex:1,padding:'10px',borderRadius:10,border:'1px solid var(--c-border-strong)',background:'transparent',color:'var(--c-text-3)',cursor:'pointer',fontSize:13 }}
             >
               Sluiten
             </button>

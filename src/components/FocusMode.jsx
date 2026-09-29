@@ -3,9 +3,9 @@ import { createPortal } from 'react-dom'
 import { X, Play, Pause, RotateCcw, SkipForward, Volume2, VolumeX } from 'lucide-react'
 
 const MODES = {
-  work:      { label: 'FOCUS',       color: '#00FFD1', rgb: '0,255,209'   },
-  break:     { label: 'PAUZE',       color: '#FF8C42', rgb: '255,140,66'  },
-  longBreak: { label: 'LANGE PAUZE', color: '#A78BFA', rgb: '167,139,250' },
+  work:      { label: 'FOCUS',       color: 'var(--accent)'   },
+  break:     { label: 'PAUZE',       color: '#FF8C42'  },
+  longBreak: { label: 'LANGE PAUZE', color: '#A78BFA' },
 }
 
 const SOUND_TYPES = [
@@ -22,7 +22,7 @@ export default function FocusMode({
   onToggleRunning, onReset, onSkip, onClose,
   soundType, onSoundType, volume, onVolume,
 }) {
-  const { color, rgb, label } = MODES[mode] || MODES.work
+  const { color, label } = MODES[mode] || MODES.work
   const progress    = totalSecs > 0 ? seconds / totalSecs : 0
   const radius      = 120
   const circ        = 2 * Math.PI * radius
@@ -33,9 +33,9 @@ export default function FocusMode({
   const content = (
     <div className="focus-overlay">
       {/* Animated blobs */}
-      <div className="focus-blob focus-blob--1" style={{ background: `radial-gradient(circle, rgba(${rgb},0.18) 0%, transparent 70%)` }} />
-      <div className="focus-blob focus-blob--2" style={{ background: `radial-gradient(circle, rgba(${rgb},0.12) 0%, transparent 70%)` }} />
-      <div className="focus-blob focus-blob--3" style={{ background: `radial-gradient(circle, rgba(${rgb},0.08) 0%, transparent 70%)` }} />
+      <div className="focus-blob focus-blob--1" style={{ background: `radial-gradient(circle, color-mix(in srgb, ${color} 18%, transparent) 0%, transparent 70%)` }} />
+      <div className="focus-blob focus-blob--2" style={{ background: `radial-gradient(circle, color-mix(in srgb, ${color} 12%, transparent) 0%, transparent 70%)` }} />
+      <div className="focus-blob focus-blob--3" style={{ background: `radial-gradient(circle, color-mix(in srgb, ${color} 8%, transparent) 0%, transparent 70%)` }} />
 
       {/* Close button — does NOT stop timer */}
       <button className="focus-close-btn" onClick={onClose} title="Sluit focusmodus (timer loopt door)">
@@ -47,7 +47,7 @@ export default function FocusMode({
 
         {/* Task name */}
         {task && (
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', margin: '0 0 6px', textAlign: 'center', letterSpacing: '0.02em' }}>
+          <p style={{ fontSize: 13, color: 'var(--c-text-3)', margin: '0 0 6px', textAlign: 'center', letterSpacing: '0.02em' }}>
             {task}
           </p>
         )}
@@ -55,7 +55,7 @@ export default function FocusMode({
         {/* Mode label */}
         <p style={{
           fontSize: 11, fontWeight: 700, letterSpacing: '0.18em',
-          color: `rgba(${rgb},0.7)`, margin: '0 0 28px', textTransform: 'uppercase',
+          color: `color-mix(in srgb, ${color} 70%, transparent)`, margin: '0 0 28px', textTransform: 'uppercase',
         }}>
           {label}
         </p>
@@ -70,14 +70,14 @@ export default function FocusMode({
               strokeDasharray={circ}
               strokeDashoffset={dashOffset}
               style={{
-                filter: `drop-shadow(0 0 16px ${color}80)`,
+                filter: `drop-shadow(0 0 16px color-mix(in srgb, ${color} 50%, transparent))`,
                 transition: 'stroke-dashoffset 0.5s ease, stroke 0.6s ease',
               }}
             />
           </svg>
 
           <div className="focus-time">
-            <span className="focus-time-digits" style={{ color, textShadow: `0 0 40px ${color}60` }}>
+            <span className="focus-time-digits" style={{ color, textShadow: `0 0 40px color-mix(in srgb, ${color} 38%, transparent)` }}>
               {mm}:{ss}
             </span>
           </div>
@@ -88,10 +88,10 @@ export default function FocusMode({
           className="focus-play-btn"
           onClick={onToggleRunning}
           style={{
-            border: `2px solid rgba(${rgb},0.5)`,
-            background: `rgba(${rgb},0.12)`,
+            border: `2px solid color-mix(in srgb, ${color} 50%, transparent)`,
+            background: `color-mix(in srgb, ${color} 12%, transparent)`,
             color,
-            boxShadow: running ? `0 0 30px rgba(${rgb},0.3)` : 'none',
+            boxShadow: running ? `0 0 30px color-mix(in srgb, ${color} 30%, transparent)` : 'none',
           }}
         >
           {running ? <Pause size={30} /> : <Play size={30} style={{ marginLeft: 3 }} />}
@@ -100,15 +100,15 @@ export default function FocusMode({
         {/* Reset + skip */}
         <div style={{ display: 'flex', gap: 16, marginTop: 16 }}>
           <button onClick={onReset} style={{
-            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 12, padding: '8px 16px', color: 'rgba(255,255,255,0.4)',
+            background: 'rgba(255,255,255,0.05)', border: '1px solid var(--c-border-strong)',
+            borderRadius: 12, padding: '8px 16px', color: 'var(--c-text-3)',
             cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12,
           }}>
             <RotateCcw size={13} /> Reset
           </button>
           <button onClick={onSkip} style={{
-            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 12, padding: '8px 16px', color: 'rgba(255,255,255,0.4)',
+            background: 'rgba(255,255,255,0.05)', border: '1px solid var(--c-border-strong)',
+            borderRadius: 12, padding: '8px 16px', color: 'var(--c-text-3)',
             cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12,
           }}>
             <SkipForward size={13} /> Sla over
@@ -121,7 +121,7 @@ export default function FocusMode({
             <div
               key={i}
               className={`focus-dot${i < sessionsInCycle ? ' focus-dot--done' : ''}`}
-              style={i < sessionsInCycle ? { background: color, boxShadow: `0 0 8px ${color}80` } : {}}
+              style={i < sessionsInCycle ? { background: color, boxShadow: `0 0 8px color-mix(in srgb, ${color} 50%, transparent)` } : {}}
             />
           ))}
         </div>
@@ -134,8 +134,8 @@ export default function FocusMode({
               className={`focus-pill${soundType === id ? ' focus-pill--active' : ''}`}
               onClick={() => onSoundType(id)}
               style={soundType === id ? {
-                background: `rgba(${rgb},0.2)`,
-                border: `1px solid rgba(${rgb},0.5)`,
+                background: `color-mix(in srgb, ${color} 20%, transparent)`,
+                border: `1px solid color-mix(in srgb, ${color} 50%, transparent)`,
                 color,
               } : {}}
             >
@@ -147,13 +147,13 @@ export default function FocusMode({
         {/* Volume slider */}
         {soundType !== 'off' && (
           <div className="focus-volume">
-            <VolumeX size={14} style={{ color: 'rgba(255,255,255,0.35)', flexShrink: 0 }} />
+            <VolumeX size={14} style={{ color: 'var(--c-text-3)', flexShrink: 0 }} />
             <input
               type="range" min="0" max="100" value={volume}
               onChange={e => onVolume(+e.target.value)}
               style={{ flex: 1, accentColor: color }}
             />
-            <Volume2 size={14} style={{ color: 'rgba(255,255,255,0.35)', flexShrink: 0 }} />
+            <Volume2 size={14} style={{ color: 'var(--c-text-3)', flexShrink: 0 }} />
           </div>
         )}
 

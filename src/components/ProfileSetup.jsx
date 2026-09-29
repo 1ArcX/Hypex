@@ -59,24 +59,24 @@ const handleSave = async () => {
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)' }}>
       <div className="glass-card p-8" style={{ width: '100%', maxWidth: '520px', maxHeight: '85vh', overflowY: 'auto', margin: '0 16px' }}>
         <div className="flex items-center gap-3 mb-6">
-          <div style={{ background: 'rgba(0,255,209,0.15)', border: '1px solid rgba(0,255,209,0.3)', borderRadius: '12px', padding: '10px' }}>
-            <GraduationCap size={20} color="#00FFD1" />
+          <div style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', borderRadius: '12px', padding: '10px' }}>
+            <GraduationCap size={20} style={{ color: 'var(--accent)' }} />
           </div>
           <div>
             <h2 className="text-white font-bold text-lg">Welkom! 👋</h2>
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>Stel je profiel in om te beginnen</p>
+            <p style={{ color: 'var(--c-text-3)', fontSize: '13px' }}>Stel je profiel in om te beginnen</p>
           </div>
         </div>
 
         {/* Naam */}
         <div className="mb-4">
-          <label style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>Jouw naam *</label>
+          <label style={{ color: 'var(--c-text-2)', fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>Jouw naam *</label>
           <input className="glass-input" placeholder="Bijv. Ahmed" value={naam} onChange={e => setNaam(e.target.value)} />
         </div>
 
         {/* Klas */}
         <div className="mb-4">
-          <label style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>Klas *</label>
+          <label style={{ color: 'var(--c-text-2)', fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>Klas *</label>
           <select className="glass-input" value={klas} onChange={e => setKlas(e.target.value)} style={{ colorScheme: 'dark' }}>
             <option value="">Selecteer je klas...</option>
             {KLASSEN.map(k => <option key={k} value={k}>{k}</option>)}
@@ -85,7 +85,7 @@ const handleSave = async () => {
 
         {/* Vakken */}
         <div className="mb-6">
-          <label style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '8px' }}>
+          <label style={{ color: 'var(--c-text-2)', fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '8px' }}>
             <BookOpen size={12} style={{ display: 'inline', marginRight: '4px' }} />
             Selecteer je vakken * ({selectedVakken.length} geselecteerd)
           </label>
@@ -95,9 +95,9 @@ const handleSave = async () => {
               return (
                 <button key={vak} onClick={() => toggleVak(vak)} style={{
                   padding: '6px 12px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
-                  border: `1px solid ${selected ? 'rgba(0,255,209,0.6)' : 'rgba(255,255,255,0.12)'}`,
-                  background: selected ? 'rgba(0,255,209,0.15)' : 'rgba(255,255,255,0.04)',
-                  color: selected ? '#00FFD1' : 'rgba(255,255,255,0.5)',
+                  border: `1px solid ${selected ? 'color-mix(in srgb, var(--accent) 60%, transparent)' : 'rgba(255,255,255,0.12)'}`,
+                  background: selected ? 'color-mix(in srgb, var(--accent) 15%, transparent)' : 'rgba(255,255,255,0.04)',
+                  color: selected ? 'var(--accent)' : 'var(--c-text-2)',
                   transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: '4px'
                 }}>
                   {selected && <Check size={10} />}

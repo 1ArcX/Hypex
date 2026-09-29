@@ -99,7 +99,7 @@ export function ExpenseModal({ onClose, onSave, editing, categories, defaultDate
         className={`w-full py-3.5 rounded-2xl border-none text-[15px] font-bold cursor-pointer ${
           isPlanned
             ? desc.trim() ? 'bg-amber-400 text-black' : 'bg-amber-400/20 text-black/50 cursor-default'
-            : 'bg-teal-300 text-black shadow-[0_0_20px_rgba(94,234,212,0.3)]'
+            : 'bg-accent text-black shadow-[0_0_20px_color-mix(in_srgb,var(--accent)_30%,transparent)]'
         }`}>
         {editing?.is_planned ? '✓ Bevestig als echte uitgave' : isPlanned ? '📌 Vastpinnen' : editing ? 'Opslaan' : '+ Toevoegen'}
       </button>

@@ -48,7 +48,7 @@ export function EnveloppenView({ stats, onOpenBudget }: {
           const over = overAmt > 0
           const regPct = budget > 0 ? Math.min(100, (spent / budget) * 100) : 0
           const savPct = budget > 0 ? Math.min(100 - Math.min(100, regPct), (fromSav / budget) * 100) : 0
-          const barColor = over ? '#F87171' : regPct > 75 ? '#FBBF24' : (cat.color || '#5EEAD4')
+          const barColor = over ? '#F87171' : regPct > 75 ? '#FBBF24' : (cat.color || 'var(--accent)')
           if (budget === 0 && total === 0) return null
           return (
             <div key={cat.id}

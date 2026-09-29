@@ -78,10 +78,10 @@ export function BudgetModal({ config, year, month, onClose, onSave }: {
         <p className="text-[11px] text-white/30 mt-1.5">Wordt gebruikt als je geen terugkerend inkomen hebt ingesteld.</p>
       </div>
 
-      <div className="mb-4 p-4 rounded-2xl bg-teal-300/[0.05] border border-teal-300/20">
-        <label className={`${label} text-teal-300`}>➕ Extra budget — {monthLabel}</label>
-        {euroInput(extra, setExtra, 'text-teal-300')}
-        <p className="text-[11px] text-teal-300/60 mt-1.5">
+      <div className="mb-4 p-4 rounded-2xl bg-accent/[0.05] border border-accent/20">
+        <label className={`${label} text-accent`}>➕ Extra budget — {monthLabel}</label>
+        {euroInput(extra, setExtra, 'text-accent')}
+        <p className="text-[11px] text-accent/60 mt-1.5">
           Geldt <b>alleen deze maand</b>. Positief = meer te besteden, negatief = minder. Werkt door in je dag-, week- en envelopbudgetten en telt niet als overschrijding.
         </p>
       </div>
@@ -182,7 +182,7 @@ export function BudgetModal({ config, year, month, onClose, onSave }: {
           <div className="flex flex-wrap gap-1 mb-2.5">
             {CAT_EMOJIS.map(e => (
               <button key={e} onClick={() => setNewEmoji(e)}
-                className={`text-lg w-8 h-8 rounded-lg cursor-pointer border ${newEmoji === e ? 'border-teal-300 border-2 bg-teal-300/[0.08]' : 'border-white/10 bg-white/[0.04]'}`}>{e}</button>
+                className={`text-lg w-8 h-8 rounded-lg cursor-pointer border ${newEmoji === e ? 'border-accent border-2 bg-accent/[0.08]' : 'border-white/10 bg-white/[0.04]'}`}>{e}</button>
             ))}
           </div>
           <p className="text-[11px] text-white/35 font-semibold mb-1.5">Kleur</p>
@@ -206,7 +206,7 @@ export function BudgetModal({ config, year, month, onClose, onSave }: {
             <button onClick={() => { setAddingCat(false); resetCatForm() }}
               className="flex-1 py-2 rounded-xl bg-transparent border border-white/10 text-white/35 cursor-pointer text-[13px]">Annuleer</button>
             <button onClick={addCustomCat} disabled={!newName.trim()}
-              className={`flex-[2] py-2 rounded-xl border-none font-bold text-[13px] ${newName.trim() ? 'bg-teal-300 text-black cursor-pointer' : 'bg-white/[0.06] text-white/25 cursor-default'}`}>
+              className={`flex-[2] py-2 rounded-xl border-none font-bold text-[13px] ${newName.trim() ? 'bg-accent text-black cursor-pointer' : 'bg-white/[0.06] text-white/25 cursor-default'}`}>
               Aanmaken
             </button>
           </div>
@@ -218,8 +218,8 @@ export function BudgetModal({ config, year, month, onClose, onSave }: {
         </button>
       )}
 
-      <div className={`px-3.5 py-2.5 rounded-2xl mb-4 border ${total > monthly ? 'bg-red-400/[0.07] border-red-400/30' : 'bg-teal-300/[0.05] border-teal-300/20'}`}>
-        <span className={`text-[13px] ${total > monthly ? 'text-red-400' : 'text-teal-300'}`}>
+      <div className={`px-3.5 py-2.5 rounded-2xl mb-4 border ${total > monthly ? 'bg-red-400/[0.07] border-red-400/30' : 'bg-accent/[0.05] border-accent/20'}`}>
+        <span className={`text-[13px] ${total > monthly ? 'text-red-400' : 'text-accent'}`}>
           {total > monthly ? `⚠️ Categorieën (${fmtShort(total)}) overschrijden maandbudget` : `✓ Categorieën: ${fmtShort(total)} van ${fmtShort(monthly)}`}
         </span>
       </div>
@@ -238,7 +238,7 @@ export function BudgetModal({ config, year, month, onClose, onSave }: {
             ...((Object.keys(adjustments).length || hadAdj) ? { month_adjustments: adjustments } : {}),
           })
         }}
-        className="w-full py-3.5 rounded-2xl bg-teal-300 border-none text-black text-[15px] font-bold cursor-pointer shadow-[0_0_20px_rgba(94,234,212,0.3)]">
+        className="w-full py-3.5 rounded-2xl bg-accent border-none text-black text-[15px] font-bold cursor-pointer shadow-[0_0_20px_color-mix(in_srgb,var(--accent)_30%,transparent)]">
         Opslaan
       </button>
     </CenterModal>

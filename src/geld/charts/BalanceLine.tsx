@@ -29,9 +29,9 @@ export function BalanceLine({ balanceByDay, dayOfMonth, daysInMonth, adjustedBas
           <ReferenceLine y={0} stroke="rgba(255,255,255,0.08)" />
           <ReferenceLine y={adjustedBase} stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
           <ReferenceLine x={dayOfMonth} stroke="rgba(255,255,255,0.15)" strokeDasharray="2 2" />
-          <Line type="monotone" dataKey="proj" stroke="#5EEAD4" strokeWidth={1.5} strokeOpacity={0.35}
+          <Line type="monotone" dataKey="proj" stroke="var(--accent)" strokeWidth={1.5} strokeOpacity={0.35}
             strokeDasharray="4 3" dot={false} isAnimationActive={false} />
-          <Line type="monotone" dataKey="actual" stroke="#5EEAD4" strokeWidth={2} dot={false}
+          <Line type="monotone" dataKey="actual" stroke="var(--accent)" strokeWidth={2} dot={false}
             isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>

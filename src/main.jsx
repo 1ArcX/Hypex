@@ -14,7 +14,7 @@ class ErrorBoundary extends React.Component {
           <pre style={{ whiteSpace: 'pre-wrap', fontSize: 13, color: '#FCA5A5' }}>
             {this.state.error?.message}
           </pre>
-          <pre style={{ whiteSpace: 'pre-wrap', fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 12 }}>
+          <pre style={{ whiteSpace: 'pre-wrap', fontSize: 11, color: 'var(--c-text-3)', marginTop: 12 }}>
             {this.state.error?.stack}
           </pre>
           <button onClick={() => window.location.reload()} style={{ marginTop: 20, padding: '10px 20px', background: '#EF4444', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>

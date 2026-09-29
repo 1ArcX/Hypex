@@ -157,7 +157,7 @@ export default function TakenPage({
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Filter chips */}
-      <div style={{ flexShrink: 0, position: 'relative', borderTop: '2px solid rgba(0,255,209,0.2)' }}>
+      <div style={{ flexShrink: 0, position: 'relative', borderTop: '2px solid color-mix(in srgb, var(--accent) 20%, transparent)' }}>
       <div style={{
         padding: '16px 16px 0',
         overflowX: 'auto',

@@ -265,8 +265,8 @@ function CalisthenicsTab({ userId }) {
       {/* ── Hero card ── */}
       <div style={{
         padding: '18px', borderRadius: 18,
-        background: 'linear-gradient(135deg, color-mix(in srgb, #00FFD1 10%, transparent), color-mix(in srgb, #3B82F6 8%, transparent))',
-        border: '1px solid color-mix(in srgb, #00FFD1 20%, transparent)',
+        background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent) 10%, transparent), color-mix(in srgb, #3B82F6 8%, transparent))',
+        border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
           <span style={{ fontSize: 32 }}>🤸</span>
@@ -293,8 +293,8 @@ function CalisthenicsTab({ userId }) {
               <div key={day} style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
                 padding: '7px 2px', borderRadius: 10,
-                background: isToday ? (isTraining ? 'rgba(0,255,209,0.12)' : 'rgba(255,255,255,0.04)') : 'transparent',
-                border: isToday ? `1px solid ${isTraining ? 'rgba(0,255,209,0.35)' : 'var(--border)'}` : '1px solid transparent',
+                background: isToday ? (isTraining ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'rgba(255,255,255,0.04)') : 'transparent',
+                border: isToday ? `1px solid ${isTraining ? 'color-mix(in srgb, var(--accent) 35%, transparent)' : 'var(--border)'}` : '1px solid transparent',
               }}>
                 <span style={{ fontSize: 9, fontWeight: isToday ? 800 : 500, color: isToday ? 'var(--accent)' : 'var(--text-3)' }}>{day}</span>
                 <span style={{ fontSize: 15 }}>{isTraining ? '💪' : '😴'}</span>

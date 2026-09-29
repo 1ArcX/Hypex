@@ -15,12 +15,12 @@ export function WeekBars({ weekTotals, weekBudget, maxWeekVal, currentWeekIdx, d
         const weekStart = [1, 8, 15, 22, 29][i]
         if (weekStart > dayOfMonth && weekTotals[i] === 0) return null
         const pct = (weekTotals[i] / maxWeekVal) * 100
-        const barColor = weekTotals[i] > weekBudget * 1.2 ? '#F87171' : weekTotals[i] > weekBudget * 0.8 ? '#FBBF24' : '#5EEAD4'
+        const barColor = weekTotals[i] > weekBudget * 1.2 ? '#F87171' : weekTotals[i] > weekBudget * 0.8 ? '#FBBF24' : 'var(--accent)'
         const cur = i === currentWeekIdx
         return (
           <div key={i}>
             <div className="flex justify-between mb-1">
-              <span className={`text-[11px] ${cur ? 'text-teal-300 font-bold' : 'text-white/35'}`}>
+              <span className={`text-[11px] ${cur ? 'text-accent font-bold' : 'text-white/35'}`}>
                 Week {i + 1}{cur ? ' ●' : ''}
               </span>
               <span className="text-[11px] font-semibold text-white/60 tabular-nums">{fmtShort(weekTotals[i])}</span>

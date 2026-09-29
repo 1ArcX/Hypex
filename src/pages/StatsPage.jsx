@@ -32,7 +32,7 @@ function fmtMins(mins) {
 
 const BAR_MAX_H = 72
 
-function BarChart({ days, values, todayStr, formatLabel, color = 'var(--accent)', dimColor = 'rgba(0,255,209,0.4)' }) {
+function BarChart({ days, values, todayStr, formatLabel, color = 'var(--accent)', dimColor = 'color-mix(in srgb, var(--accent) 40%, transparent)' }) {
   const maxVal = Math.max(...values, 1)
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5 }}>
@@ -49,7 +49,7 @@ function BarChart({ days, values, todayStr, formatLabel, color = 'var(--accent)'
                 background: isFuture ? 'rgba(255,255,255,0.06)'
                   : val === 0 ? 'rgba(255,255,255,0.08)'
                   : isToday ? color : dimColor,
-                boxShadow: isToday && val > 0 ? `0 0 8px ${color}55` : 'none',
+                boxShadow: isToday && val > 0 ? `0 0 8px color-mix(in srgb, ${color} 33%, transparent)` : 'none',
                 transition: 'height 0.35s ease',
               }} />
             </div>
@@ -396,14 +396,14 @@ function WeekNav({ weekOffset, onChange }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <button onClick={() => onChange(weekOffset - 1)}
-        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '5px 8px', cursor: 'pointer', color: 'var(--text-2)', display: 'flex', alignItems: 'center' }}>
+        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--c-border-strong)', borderRadius: 8, padding: '5px 8px', cursor: 'pointer', color: 'var(--text-2)', display: 'flex', alignItems: 'center' }}>
         <ChevronLeft size={14} />
       </button>
       <span style={{ fontSize: 12, color: isCurrentWeek ? 'var(--accent)' : 'var(--text-2)', fontWeight: isCurrentWeek ? 700 : 400, flex: 1, textAlign: 'center', minWidth: 160 }}>
         {isCurrentWeek ? 'Deze week' : weekLabel(days)}
       </span>
       <button onClick={() => onChange(Math.min(0, weekOffset + 1))} disabled={isCurrentWeek}
-        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '5px 8px', cursor: isCurrentWeek ? 'not-allowed' : 'pointer', color: isCurrentWeek ? 'rgba(255,255,255,0.2)' : 'var(--text-2)', display: 'flex', alignItems: 'center' }}>
+        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--c-border-strong)', borderRadius: 8, padding: '5px 8px', cursor: isCurrentWeek ? 'not-allowed' : 'pointer', color: isCurrentWeek ? 'rgba(255,255,255,0.2)' : 'var(--text-2)', display: 'flex', alignItems: 'center' }}>
         <ChevronRight size={14} />
       </button>
     </div>
@@ -471,7 +471,7 @@ function LeaderboardCard({ userId, profiles }) {
                     <span style={{ fontSize: 10, color: 'var(--text-3)', flexShrink: 0 }}>{getLevelName(e.xp)}</span>
                   </div>
                   <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${xpIn}%`, borderRadius: 2, background: isMe ? 'linear-gradient(90deg,var(--accent),rgba(0,255,209,0.6))' : 'linear-gradient(90deg,#FACC15,#F59E0B)', transition: 'width 0.5s ease' }} />
+                    <div style={{ height: '100%', width: `${xpIn}%`, borderRadius: 2, background: isMe ? 'linear-gradient(90deg,var(--accent),color-mix(in srgb, var(--accent) 60%, transparent))' : 'linear-gradient(90deg,#FACC15,#F59E0B)', transition: 'width 0.5s ease' }} />
                   </div>
                 </div>
                 <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>{e.xp} XP</span>
@@ -541,7 +541,7 @@ function LevelUpPopup({ newLevel, onClose }) {
         }}>
           Level {newLevel}
         </h2>
-        <p style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.75)', margin: '0 0 24px' }}>{title}</p>
+        <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--c-text-2)', margin: '0 0 24px' }}>{title}</p>
 
         <button
           onClick={onClose}
@@ -585,7 +585,7 @@ export default function StatsPage({ tasks, userId, profiles = [], onLevelUpSeen 
     <div style={{ height: '100%', overflowY: 'auto', padding: '20px 16px 100px' }}>
       <div style={{ maxWidth: 600, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: '#00FFD1', margin: 0, borderLeft: '3px solid rgba(0,255,209,0.5)', paddingLeft: 12 }}>Statistieken</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--accent)', margin: 0, borderLeft: '3px solid color-mix(in srgb, var(--accent) 50%, transparent)', paddingLeft: 12 }}>Statistieken</h1>
         </div>
 
         {levelUpData && <LevelUpPopup newLevel={levelUpData.newLevel} onClose={handleLevelUpClose} />}

@@ -99,7 +99,7 @@ export default function OnboardingModal({ user, onClose }) {
 
   const inputStyle = {
     width: '100%', background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8,
+    border: '1px solid var(--c-border-strong)', borderRadius: 8,
     padding: '10px 12px', color: 'white', fontSize: 14, outline: 'none',
     boxSizing: 'border-box', fontFamily: 'inherit',
   }
@@ -116,8 +116,8 @@ export default function OnboardingModal({ user, onClose }) {
 
   const secondaryBtn = {
     flex: 1, padding: '11px', background: 'none',
-    border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10,
-    color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 13,
+    border: '1px solid var(--c-border-strong)', borderRadius: 10,
+    color: 'var(--c-text-3)', cursor: 'pointer', fontSize: 13,
   }
 
   return (
@@ -138,7 +138,7 @@ export default function OnboardingModal({ user, onClose }) {
         {step !== 'done' && (
           <button onClick={finish} style={{
             position: 'absolute', top: 18, right: 18, background: 'none',
-            border: 'none', color: 'rgba(255,255,255,0.25)', cursor: 'pointer', fontSize: 11,
+            border: 'none', color: 'var(--c-text-3)', cursor: 'pointer', fontSize: 11,
           }}>
             Overslaan
           </button>
@@ -149,7 +149,7 @@ export default function OnboardingModal({ user, onClose }) {
           <div>
             <div style={{ fontSize: 40, marginBottom: 10 }}>👋</div>
             <h2 style={{ color: 'white', fontSize: 21, fontWeight: 700, margin: '0 0 8px' }}>Welkom bij Dash</h2>
-            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, lineHeight: 1.65, margin: '0 0 24px' }}>
+            <p style={{ color: 'var(--c-text-3)', fontSize: 14, lineHeight: 1.65, margin: '0 0 24px' }}>
               Laten we je dashboard even snel instellen. Dit duurt minder dan een minuut.
             </p>
             <button onClick={next} style={{ ...primaryBtn(false), width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
@@ -163,7 +163,7 @@ export default function OnboardingModal({ user, onClose }) {
           <div>
             <MapPin size={26} style={{ color: 'var(--accent)', marginBottom: 10 }} />
             <h2 style={{ color: 'white', fontSize: 18, fontWeight: 700, margin: '0 0 6px' }}>Jouw locatie</h2>
-            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, margin: '0 0 16px' }}>
+            <p style={{ color: 'var(--c-text-3)', fontSize: 13, margin: '0 0 16px' }}>
               Zoek je stad voor het weerbericht.
             </p>
             <input
@@ -176,7 +176,7 @@ export default function OnboardingModal({ user, onClose }) {
 
             {/* Zoekresultaten */}
             {cityResults.length > 0 && (
-              <div style={{ marginTop: 6, background: 'rgba(15,15,30,0.97)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, overflow: 'hidden' }}>
+              <div style={{ marginTop: 6, background: 'rgba(15,15,30,0.97)', border: '1px solid var(--c-border-strong)', borderRadius: 10, overflow: 'hidden' }}>
                 {cityResults.map((city, i) => (
                   <button
                     key={i}
@@ -189,7 +189,7 @@ export default function OnboardingModal({ user, onClose }) {
                     }}
                   >
                     {city.name}
-                    <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginLeft: 6 }}>
+                    <span style={{ color: 'var(--c-text-3)', fontSize: 11, marginLeft: 6 }}>
                       {city.admin1}{city.country_code ? `, ${city.country_code}` : ''}
                     </span>
                   </button>
@@ -219,7 +219,7 @@ export default function OnboardingModal({ user, onClose }) {
           <div>
             <GraduationCap size={26} style={{ color: 'var(--accent)', marginBottom: 10 }} />
             <h2 style={{ color: 'white', fontSize: 18, fontWeight: 700, margin: '0 0 6px' }}>Magister koppelen</h2>
-            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, margin: '0 0 16px' }}>
+            <p style={{ color: 'var(--c-text-3)', fontSize: 13, margin: '0 0 16px' }}>
               Optioneel — je kunt dit ook later instellen via de Magister widget.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -269,7 +269,7 @@ export default function OnboardingModal({ user, onClose }) {
           <div>
             <Bell size={26} style={{ color: 'var(--accent)', marginBottom: 10 }} />
             <h2 style={{ color: 'white', fontSize: 18, fontWeight: 700, margin: '0 0 6px' }}>Meldingen</h2>
-            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, margin: '0 0 18px', lineHeight: 1.6 }}>
+            <p style={{ color: 'var(--c-text-3)', fontSize: 13, margin: '0 0 18px', lineHeight: 1.6 }}>
               Ontvang meldingen voor je Pomodoro timer, gewoontes en meer — ook als de app op de achtergrond staat.
             </p>
 
@@ -311,7 +311,7 @@ export default function OnboardingModal({ user, onClose }) {
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 44, marginBottom: 12 }}>🎉</div>
             <h2 style={{ color: 'white', fontSize: 21, fontWeight: 700, margin: '0 0 8px' }}>Alles ingesteld!</h2>
-            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, margin: '0 0 24px' }}>
+            <p style={{ color: 'var(--c-text-3)', fontSize: 14, margin: '0 0 24px' }}>
               Je dashboard is klaar voor gebruik. Veel succes vandaag!
             </p>
             <button

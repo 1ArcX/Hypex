@@ -75,14 +75,14 @@ export function JaarView({ stats, yearExpenses, config }: {
           return (
             <button key={m} onClick={() => openMonth(m)}
               className={`px-3.5 py-3 rounded-2xl cursor-pointer text-left backdrop-blur-lg border ${
-                isSelMonth ? 'bg-teal-300/[0.06] border-teal-300/60'
+                isSelMonth ? 'bg-accent/[0.06] border-accent/60'
                   : hasDat ? 'bg-white/[0.04] border-white/[0.08]' : 'bg-white/[0.02] border-white/[0.05]'
               }`}>
               <div className={`flex items-center gap-2.5 ${hasDat && vacOvY && vacSpent > 0 ? 'mb-1.5' : ''}`}>
-                <span className={`text-[12px] font-bold w-7 shrink-0 ${isSelMonth ? 'text-teal-300' : 'text-white/60'}`}>{MONTHS_NL[m]}</span>
+                <span className={`text-[12px] font-bold w-7 shrink-0 ${isSelMonth ? 'text-accent' : 'text-white/60'}`}>{MONTHS_NL[m]}</span>
                 <div className="flex-1">
                   {hasDat ? (
-                    <ProgressBar pct={barW} color={spent > (income || stats.base) ? '#F87171' : '#5EEAD4'} />
+                    <ProgressBar pct={barW} color={spent > (income || stats.base) ? '#F87171' : 'var(--accent)'} />
                   ) : (
                     <span className="text-[11px] text-white/25">Geen data</span>
                   )}

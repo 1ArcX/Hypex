@@ -1,12 +1,13 @@
 import type { ReactNode, CSSProperties } from 'react'
 
-// Frosted-glass basisstijlen, gedeeld door alle geld-componenten
+// Basisstijlen, gedeeld door alle geld-componenten — gebaseerd op de app-brede
+// design tokens (src/index.css) zodat Geld dezelfde kaarten/radii/accent gebruikt.
 export const glassCard =
-  'bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-3xl shadow-[0_8px_32px_rgba(0,0,0,0.35)]'
+  'bg-surface border border-line rounded-r-lg'
 export const glassCardSm =
-  'bg-white/[0.04] backdrop-blur-lg border border-white/[0.07] rounded-2xl'
+  'bg-surface border border-line rounded-r-md'
 export const glassInput =
-  'w-full rounded-2xl bg-white/[0.06] border border-white/10 text-white/90 placeholder-white/25 outline-none focus:border-teal-300/40 focus:bg-white/[0.08] transition-colors [color-scheme:dark]'
+  'w-full rounded-r-md bg-surface-2 border border-line-strong text-white/90 placeholder-white/25 outline-none focus:border-accent/40 focus:bg-surface-3 transition-colors [color-scheme:dark]'
 
 export function GlassCard({ children, className = '', onClick, style }: {
   children: ReactNode
@@ -62,7 +63,7 @@ export function EmptyState({ emoji, title, sub }: { emoji: string; title: string
 export function Spinner() {
   return (
     <div className="flex items-center justify-center py-8">
-      <div className="w-5 h-5 rounded-full border-2 border-white/10 border-t-teal-300 animate-spin" />
+      <div className="w-5 h-5 rounded-full border-2 border-white/10 border-t-accent animate-spin" />
     </div>
   )
 }

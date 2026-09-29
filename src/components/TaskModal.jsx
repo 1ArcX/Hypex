@@ -25,8 +25,8 @@ function isoDowOf(dateStr) {
 
 const PRIORITY_CFG = {
   1: { label: 'Urgent',  color: '#FF6B6B',               bg: 'rgba(255,107,107,0.12)', border: 'rgba(255,107,107,0.35)' },
-  2: { label: 'Normaal', color: 'rgba(255,255,255,0.7)', bg: 'rgba(255,255,255,0.06)', border: 'rgba(255,255,255,0.18)' },
-  3: { label: 'Later',   color: 'rgba(255,255,255,0.3)', bg: 'rgba(255,255,255,0.02)', border: 'rgba(255,255,255,0.08)' },
+  2: { label: 'Normaal', color: 'var(--c-text-2)', bg: 'rgba(255,255,255,0.06)', border: 'rgba(255,255,255,0.18)' },
+  3: { label: 'Later',   color: 'var(--c-text-3)', bg: 'rgba(255,255,255,0.02)', border: 'rgba(255,255,255,0.08)' },
 }
 
 function pad(n) { return String(n).padStart(2, '0') }
@@ -380,7 +380,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
           <h2 style={{ color: 'white', fontWeight: 700, fontSize: '16px', margin: 0 }}>
             {task ? '✏️ Taak bewerken' : '📝 Nieuwe taak'}
           </h2>
-          <button onClick={handleClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}><X size={18} /></button>
+          <button onClick={handleClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)' }}><X size={18} /></button>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -391,7 +391,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
 
           {/* Wanneer — snelle datumkeuze */}
           <div>
-            <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', display: 'block', marginBottom: '6px' }}>Wanneer</label>
+            <label style={{ color: 'var(--c-text-3)', fontSize: '11px', display: 'block', marginBottom: '6px' }}>Wanneer</label>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               <button type="button" onClick={() => { setNoDate(false); setDate(quickToday) }}
                 style={chipStyle(!noDate && date === quickToday)}>Vandaag</button>
@@ -446,7 +446,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input type="time" className="glass-input" value={startTime} style={{ colorScheme: 'dark', flex: 1 }}
                     onChange={e => { setStartTime(e.target.value); setEndTime(minsToTimeStr(timeStrToMins(e.target.value) + durationMinutes)) }} />
-                  <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>–</span>
+                  <span style={{ color: 'var(--c-text-3)', fontSize: 13 }}>–</span>
                   <input type="time" className="glass-input" value={endTime} style={{ colorScheme: 'dark', flex: 1 }}
                     onChange={e => setEndTime(e.target.value)} />
                 </div>
@@ -456,7 +456,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
                     const active = durationMinutes === d
                     return (
                       <button key={d} type="button" onClick={() => setDurationMinutes(d)}
-                        style={{ padding: '4px 9px', borderRadius: '8px', border: `1px solid ${active ? 'color-mix(in srgb, var(--accent) 50%, transparent)' : 'rgba(255,255,255,0.1)'}`, background: active ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'transparent', color: active ? 'var(--accent)' : 'rgba(255,255,255,0.35)', fontSize: '11px', cursor: 'pointer' }}>
+                        style={{ padding: '4px 9px', borderRadius: '8px', border: `1px solid ${active ? 'color-mix(in srgb, var(--accent) 50%, transparent)' : 'rgba(255,255,255,0.1)'}`, background: active ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'transparent', color: active ? 'var(--accent)' : 'var(--c-text-3)', fontSize: '11px', cursor: 'pointer' }}>
                         {d < 60 ? `${d}m` : `${d / 60}u`}
                       </button>
                     )
@@ -472,7 +472,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
                   </div>
                 )}
                 <button type="button" onClick={() => setAllDay(true)}
-                  style={{ alignSelf: 'flex-start', fontSize: 11, color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0' }}>
+                  style={{ alignSelf: 'flex-start', fontSize: 11, color: 'var(--c-text-3)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0' }}>
                   × Tijdslot verwijderen (hele dag)
                 </button>
               </div>
@@ -481,14 +481,14 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
 
           {/* Prioriteit */}
           <div>
-            <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', display: 'block', marginBottom: '6px' }}>Prioriteit</label>
+            <label style={{ color: 'var(--c-text-3)', fontSize: '11px', display: 'block', marginBottom: '6px' }}>Prioriteit</label>
             <div style={{ display: 'flex', gap: '6px' }}>
               {[1, 2, 3].map(p => {
                 const cfg = PRIORITY_CFG[p]
                 const active = priority === p
                 return (
                   <button key={p} type="button" onClick={() => setPriority(p)}
-                    style={{ flex: 1, padding: '7px 8px', borderRadius: '8px', border: `1px solid ${active ? cfg.border : 'rgba(255,255,255,0.08)'}`, background: active ? cfg.bg : 'transparent', color: active ? cfg.color : 'rgba(255,255,255,0.25)', fontSize: '12px', cursor: 'pointer', fontWeight: active ? 600 : 400, transition: 'all 0.15s' }}>
+                    style={{ flex: 1, padding: '7px 8px', borderRadius: '8px', border: `1px solid ${active ? cfg.border : 'rgba(255,255,255,0.08)'}`, background: active ? cfg.bg : 'transparent', color: active ? cfg.color : 'var(--c-text-3)', fontSize: '12px', cursor: 'pointer', fontWeight: active ? 600 : 400, transition: 'all 0.15s' }}>
                     {cfg.label}
                   </button>
                 )
@@ -498,7 +498,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
 
           {/* Herhaling */}
           <div>
-            <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: 5, marginBottom: '6px' }}>
+            <label style={{ color: 'var(--c-text-3)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: 5, marginBottom: '6px' }}>
               <Repeat size={11} /> Herhaling
             </label>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -506,7 +506,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
                 const active = recurrence === opt.value
                 return (
                   <button key={opt.label} type="button" onClick={() => setRecurrence(opt.value)}
-                    style={{ padding: '6px 11px', borderRadius: '9px', border: `1px solid ${active ? 'color-mix(in srgb, var(--accent) 50%, transparent)' : 'rgba(255,255,255,0.1)'}`, background: active ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'transparent', color: active ? 'var(--accent)' : 'rgba(255,255,255,0.35)', fontSize: '12px', cursor: 'pointer', fontWeight: active ? 600 : 400, transition: 'all 0.15s' }}>
+                    style={{ padding: '6px 11px', borderRadius: '9px', border: `1px solid ${active ? 'color-mix(in srgb, var(--accent) 50%, transparent)' : 'rgba(255,255,255,0.1)'}`, background: active ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'transparent', color: active ? 'var(--accent)' : 'var(--c-text-3)', fontSize: '12px', cursor: 'pointer', fontWeight: active ? 600 : 400, transition: 'all 0.15s' }}>
                     {opt.label}
                   </button>
                 )
@@ -519,7 +519,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
                   const active = recurrenceDays.includes(d.iso)
                   return (
                     <button key={d.iso} type="button" onClick={() => toggleRecDay(d.iso)}
-                      style={{ flex: 1, padding: '7px 0', borderRadius: '8px', border: `1px solid ${active ? 'color-mix(in srgb, var(--accent) 50%, transparent)' : 'rgba(255,255,255,0.1)'}`, background: active ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : 'transparent', color: active ? 'var(--accent)' : 'rgba(255,255,255,0.3)', fontSize: '11px', cursor: 'pointer', fontWeight: active ? 700 : 400, transition: 'all 0.15s' }}>
+                      style={{ flex: 1, padding: '7px 0', borderRadius: '8px', border: `1px solid ${active ? 'color-mix(in srgb, var(--accent) 50%, transparent)' : 'rgba(255,255,255,0.1)'}`, background: active ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : 'transparent', color: active ? 'var(--accent)' : 'var(--c-text-3)', fontSize: '11px', cursor: 'pointer', fontWeight: active ? 700 : 400, transition: 'all 0.15s' }}>
                       {d.label}
                     </button>
                   )
@@ -535,7 +535,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
 
           {/* Meer opties — uitklapbaar zodat snel-toevoegen kort blijft */}
           <button type="button" onClick={() => setShowMore(v => !v)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.45)', fontSize: 13, padding: '2px 0', width: 'fit-content' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', fontSize: 13, padding: '2px 0', width: 'fit-content' }}>
             <span style={{ fontSize: 12, transition: 'transform 0.2s', transform: showMore ? 'rotate(90deg)' : 'none' }}>▸</span>
             {showMore ? 'Minder opties' : 'Meer opties'}
           </button>
@@ -551,7 +551,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
             const existingGroups = [...new Set((allTasks || tasks || []).map(t => t.group_name).filter(Boolean))]
             return (
               <div>
-                <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Groep (optioneel)</label>
+                <label style={{ color: 'var(--c-text-3)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Groep (optioneel)</label>
                 <input
                   className="glass-input"
                   list="task-groups-list"
@@ -567,7 +567,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
                 )}
                 {groupName && (
                   <button type="button" onClick={() => setGroupName('')}
-                    style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0', marginTop: 2 }}>
+                    style={{ fontSize: 10, color: 'var(--c-text-3)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0', marginTop: 2 }}>
                     × Groep verwijderen
                   </button>
                 )}
@@ -578,7 +578,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
           {/* Dagvoorstellen bij "nog in te plannen" */}
           {!isRecurring && noDate && daySuggestions.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px' }}>📅 Beschikbare momenten</label>
+              <label style={{ color: 'var(--c-text-3)', fontSize: '11px' }}>📅 Beschikbare momenten</label>
               {daySuggestions.slice(0, showSuggestCount).map((s, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, background: 'rgba(250,204,21,0.06)', border: '1px solid rgba(250,204,21,0.18)' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -612,14 +612,14 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
 
           {/* Deadline */}
           <div>
-            <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Deadline (optioneel)</label>
+            <label style={{ color: 'var(--c-text-3)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Deadline (optioneel)</label>
             <input type="date" className="glass-input" value={dueDate} style={{ colorScheme: 'dark' }}
               onChange={e => setDueDate(e.target.value)} />
           </div>
 
           {/* Vak */}
           <div>
-            <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Vak</label>
+            <label style={{ color: 'var(--c-text-3)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Vak</label>
             <select className="glass-input" value={subjectId} style={{ colorScheme: 'dark' }}
               onChange={e => setSubjectId(e.target.value)}>
               <option value="">Geen vak</option>
@@ -629,7 +629,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
 
           {/* Kleur */}
           <div>
-            <label style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', display: 'block', marginBottom: '6px' }}>Kleur</label>
+            <label style={{ color: 'var(--c-text-3)', fontSize: '11px', display: 'block', marginBottom: '6px' }}>Kleur</label>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {EVENT_COLORS.map(c => (
                 <button key={c} type="button" onClick={() => setColor(c)}
@@ -643,8 +643,8 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
           {/* Afgerond */}
           {task && (
             <button onClick={() => setCompleted(!completed)}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', cursor: 'pointer', color: completed ? '#00FFD1' : 'rgba(255,255,255,0.4)', fontSize: '13px', padding: 0 }}>
-              <div style={{ width: '20px', height: '20px', borderRadius: '6px', background: completed ? 'rgba(0,255,209,0.2)' : 'rgba(255,255,255,0.05)', border: `1px solid ${completed ? 'rgba(0,255,209,0.5)' : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', cursor: 'pointer', color: completed ? 'var(--accent)' : 'var(--c-text-3)', fontSize: '13px', padding: 0 }}>
+              <div style={{ width: '20px', height: '20px', borderRadius: '6px', background: completed ? 'color-mix(in srgb, var(--accent) 20%, transparent)' : 'rgba(255,255,255,0.05)', border: `1px solid ${completed ? 'color-mix(in srgb, var(--accent) 50%, transparent)' : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
                 {completed && <span style={{ fontSize: '12px' }}>✓</span>}
               </div>
               Afgerond
@@ -661,11 +661,11 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
             </button>
           )}
           <button onClick={handleClose}
-            style={{ flex: 1, padding: '9px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.35)', cursor: 'pointer', fontSize: '12px' }}>
+            style={{ flex: 1, padding: '9px', borderRadius: '10px', border: '1px solid var(--c-border-strong)', background: 'transparent', color: 'var(--c-text-3)', cursor: 'pointer', fontSize: '12px' }}>
             Annuleer
           </button>
           <button onClick={handleSave} disabled={!title.trim()}
-            style={{ flex: 2, padding: '9px', borderRadius: '10px', border: '1px solid rgba(0,255,209,0.4)', background: 'rgba(0,255,209,0.12)', color: '#00FFD1', cursor: 'pointer', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+            style={{ flex: 2, padding: '9px', borderRadius: '10px', border: '1px solid color-mix(in srgb, var(--accent) 40%, transparent)', background: 'color-mix(in srgb, var(--accent) 12%, transparent)', color: 'var(--accent)', cursor: 'pointer', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
             <Save size={13} /> Opslaan
           </button>
         </div>

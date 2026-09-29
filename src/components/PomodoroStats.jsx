@@ -72,12 +72,12 @@ export default function PomodoroStats({ refreshKey, userId }) {
   return (
     <div className="card" style={{
       padding: '14px 16px',
-      borderLeft: '3px solid rgba(0,255,209,0.4)',
-      background: 'linear-gradient(135deg, rgba(0,255,209,0.04) 0%, transparent 60%)',
+      borderLeft: '3px solid color-mix(in srgb, var(--accent) 40%, transparent)',
+      background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent) 4%, transparent) 0%, transparent 60%)',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <div style={{ width: 22, height: 22, borderRadius: 7, background: 'rgba(0,255,209,0.12)', border: '1px solid rgba(0,255,209,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <div style={{ width: 22, height: 22, borderRadius: 7, background: 'color-mix(in srgb, var(--accent) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <BarChart2 size={11} style={{ color: 'var(--accent)' }} />
           </div>
           <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase' }}>
@@ -106,7 +106,7 @@ export default function PomodoroStats({ refreshKey, userId }) {
                   background: isFuture ? 'rgba(255,255,255,0.06)'
                              : mins === 0 ? 'rgba(255,255,255,0.08)'
                              : isToday ? 'var(--accent)'
-                             : 'rgba(0,255,209,0.45)',
+                             : 'color-mix(in srgb, var(--accent) 45%, transparent)',
                   boxShadow: isToday && mins > 0 ? '0 0 8px var(--accent-dim)' : 'none',
                   transition: 'height 0.4s ease',
                 }} />

@@ -7,63 +7,101 @@
   50% { opacity: 0.6; }
 }
 
-/* ===== CSS VARIABELEN — DARK MODE (standaard) ===== */
-/* Frosted Glass design system (juni 2026) — zelfde stijl als src/geld/:
-   donkere gradient-basis met accent-glows, doorschijnende blur-kaarten. */
+/* ===== DESIGN TOKENS — Hypex v2 (sept 2026) =====
+   Eén bron voor kleur, radius, typografie en spacing. Alles wat accent-afhankelijk is
+   leidt af van --accent (gezet door App.jsx vanuit het gekozen thema) via color-mix,
+   zodat Neon Cyan / Purple Dream / Sunset / … overal doorwerken.
+   Zie docs/redesign/phase1-analysis.md §4. */
 :root {
-  --bg-base:    radial-gradient(1100px 500px at 80% -10%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 60%),
-                radial-gradient(900px 500px at -10% 100%, color-mix(in srgb, var(--accent) 5%, transparent), transparent 55%),
-                #0b0b0f;
-  --bg-card:    rgba(255, 255, 255, 0.055);
-  --bg-card-2:  rgba(255, 255, 255, 0.09);
-  --bg-sidebar: rgba(255, 255, 255, 0.03);
-  --border:     rgba(255, 255, 255, 0.10);
-  --accent:     #00FFD1;
-  --accent-dim: rgba(0,255,209,0.10);
-  --text-1:     rgba(255, 255, 255, 0.92);
-  --text-2:     rgba(255, 255, 255, 0.45);
-  --text-3:     rgba(255, 255, 255, 0.30);
-  --radius:     18px;
+  /* — Oppervlakken — */
+  --c-bg:            #08090c;
+  --c-surface:       rgba(255, 255, 255, 0.035);
+  --c-surface-2:     rgba(255, 255, 255, 0.06);
+  --c-surface-3:     rgba(255, 255, 255, 0.09);
+  --c-surface-solid: #121419;
+  --c-border:        rgba(255, 255, 255, 0.07);
+  --c-border-strong: rgba(255, 255, 255, 0.12);
 
-  /* Legacy vars (backwards compat) */
-  --bg1: #0b0b0f;
+  /* — Tekst — */
+  --c-text:   rgba(255, 255, 255, 0.92);
+  --c-text-2: rgba(255, 255, 255, 0.60);
+  --c-text-3: rgba(255, 255, 255, 0.40);
+
+  /* — Accent (thema) — */
+  --accent:        #00FFD1;
+  --accent-soft:   color-mix(in srgb, var(--accent) 12%, transparent);
+  --accent-border: color-mix(in srgb, var(--accent) 40%, transparent);
+  --accent-glow:   0 0 16px color-mix(in srgb, var(--accent) 35%, transparent);
+  --on-accent:     #000;
+
+  /* — Semantisch — */
+  --c-success: #34D399;
+  --c-warning: #FF9F43;
+  --c-danger:  #FF5A64;
+  --c-info:    #60A5FA;
+
+  /* — Categorieën (consistent over alle modules) — */
+  --cat-school:      #FACC15;
+  --cat-werk:        #F43F5E;
+  --cat-persoonlijk: #A78BFA;
+  --cat-routine:     #34D399;
+  --cat-overig:      #60A5FA;
+
+  /* — Radius — */
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+  --r-full: 999px;
+
+  /* — Spacing (4pt) — */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 20px; --s-6: 24px; --s-8: 32px;
+
+  /* — Typografie — */
+  --fs-display: 44px;
+  --fs-kpi:     24px;
+  --fs-page:    20px;
+  --fs-section: 15px;
+  --fs-card:    13px;
+  --fs-body:    13px;
+  --fs-meta:    11px;
+  --fs-badge:   11px;
+  --fs-overline: 10px;
+
+  /* — Beweging — */
+  --t-fast: 150ms;
+  --t-base: 220ms;
+  --ease:   cubic-bezier(0.25, 0.46, 0.45, 0.94);
+
+  --shadow-float: 0 24px 64px rgba(0, 0, 0, 0.5);
+
+  /* — Afgeleide / legacy aliassen (bestaande code blijft werken) — */
+  --bg-base:    radial-gradient(1100px 500px at 80% -10%, color-mix(in srgb, var(--accent) 4%, transparent), transparent 60%),
+                radial-gradient(900px 500px at -10% 100%, color-mix(in srgb, var(--accent) 3%, transparent), transparent 55%),
+                var(--c-bg);
+  --bg-card:    var(--c-surface);
+  --bg-card-2:  var(--c-surface-2);
+  --bg-sidebar: rgba(255, 255, 255, 0.02);
+  --border:     var(--c-border);
+  --accent-dim: var(--accent-soft);
+  --text-1:     var(--c-text);
+  --text-2:     var(--c-text-2);
+  --text-3:     var(--c-text-3);
+  --radius:     var(--r-lg);
+
+  --bg1: var(--c-bg);
   --bg2: #101015;
-  --glass-bg: rgba(255, 255, 255, 0.055);
-  --glass-border: rgba(255, 255, 255, 0.10);
-  --text-primary: rgba(255, 255, 255, 0.92);
-  --text-secondary: rgba(255, 255, 255, 0.45);
-  --text-muted: rgba(255, 255, 255, 0.30);
-  --input-bg: rgba(255, 255, 255, 0.06);
-  --input-border: rgba(255, 255, 255, 0.10);
+  --glass-bg: var(--c-surface);
+  --glass-border: var(--c-border);
+  --text-primary: var(--c-text);
+  --text-secondary: var(--c-text-2);
+  --text-muted: var(--c-text-3);
+  --input-bg: var(--c-surface-2);
+  --input-border: var(--c-border-strong);
   --hover-bg: rgba(255, 255, 255, 0.05);
-  --card-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-}
-
-/* ===== LIGHT MODE ===== */
-:root.light-mode {
-  --bg-base:    #f0f2f5;
-  --bg-card:    #ffffff;
-  --bg-card-2:  #f5f5f5;
-  --bg-sidebar: #fafafa;
-  --border:     #e0e0e0;
-  --text-1:     #1a1a1a;
-  --text-2:     #666;
-  --text-3:     #aaa;
-  --accent-dim: rgba(0,200,160,0.10);
-
-  --bg1: #f0f2f5;
-  --bg2: #e8eaf0;
-  --glass-bg: #ffffff;
-  --glass-border: #e0e0e0;
-  --text-primary: rgba(15, 20, 40, 0.9);
-  --text-secondary: rgba(15, 20, 40, 0.5);
-  --text-muted: rgba(15, 20, 40, 0.3);
-  --input-bg: rgba(0, 0, 0, 0.05);
-  --input-border: rgba(0, 0, 0, 0.12);
-  --hover-bg: rgba(0, 0, 0, 0.04);
-  --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-  --timeline-line: rgba(0, 180, 150, 0.3);
-  --dot-bg: rgba(0, 180, 150, 0.3);
+  --card-shadow: none;
 }
 
 /* ===== BODY ===== */
@@ -71,7 +109,7 @@
    app omhoog duwt en de body eronder zichtbaar wordt, sluit dit naadloos aan
    i.p.v. een zichtbare gradient-"balk". De gradient zelf zit op de app-root. */
 html, body, #root {
-  background-color: #0b0b0f;
+  background-color: var(--c-bg);
 }
 
 html, body {
@@ -112,34 +150,43 @@ button:not([style*="translate"]):active {
 }
 
 /* ===== FROSTED GLASS CARDS ===== */
-.card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: var(--card-shadow);
-  transition: background 0.4s ease, border-color 0.4s ease;
-  animation: fadeSlideIn 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+/* Rustende kaart: oppervlak + hairline, geen schaduw/glow (v2 glow-regels).
+   Blur alleen nog op zwevende lagen (nav, modals, sheets). */
+.card,
+.glass-card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  transition: background var(--t-base) ease, border-color var(--t-base) ease, box-shadow var(--t-base) ease;
+  animation: fadeSlideIn var(--t-base) var(--ease) both;
 }
 
-/* glass-card alias (backwards compat) */
-.glass-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: var(--card-shadow);
-  transition: background 0.4s ease, border-color 0.4s ease;
-  animation: fadeSlideIn 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+/* Interactieve kaart/rij: hover = lichte verhoging + vleugje accent */
+.card-interactive {
+  cursor: pointer;
+}
+.card-interactive:hover {
+  background: var(--c-surface-2);
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--c-border-strong));
+}
+
+/* Tint-variant: zet --tone op het element (KPI's, categorie-kaarten) */
+.card-tone {
+  background: color-mix(in srgb, var(--tone) 7%, var(--c-surface));
+  border-color: color-mix(in srgb, var(--tone) 28%, transparent);
+}
+/* Urgent: rode tint + subtiele statische rode gloed */
+.card-urgent {
+  background: color-mix(in srgb, var(--c-danger) 7%, var(--c-surface));
+  border-color: color-mix(in srgb, var(--c-danger) 30%, transparent);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--c-danger) 10%, transparent);
 }
 
 /* ===== INPUTS ===== */
 .glass-input {
   background: var(--input-bg);
   border: 1px solid var(--input-border);
-  border-radius: 12px;
+  border-radius: var(--r-md);
   color: var(--text-primary);
   padding: 8px 12px;
   font-size: 13px;
@@ -160,21 +207,64 @@ button:not([style*="translate"]):active {
 
 /* ===== BUTTONS ===== */
 .btn-neon {
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
   color: var(--accent);
-  border-radius: 14px;
+  border-radius: var(--r-md);
   padding: 8px 16px;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--fs-body);
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background var(--t-fast) ease, box-shadow var(--t-fast) ease;
 }
 
 .btn-neon:hover {
   background: color-mix(in srgb, var(--accent) 20%, transparent);
-  box-shadow: 0 0 15px color-mix(in srgb, var(--accent) 30%, transparent);
+  box-shadow: var(--accent-glow);
 }
+
+/* Primaire knop: gevuld accent (+ Nieuw, + Taak, Start) */
+.btn-primary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  background: var(--accent);
+  color: var(--on-accent);
+  border: none;
+  border-radius: var(--r-sm);
+  padding: 7px 14px;
+  font-size: var(--fs-body);
+  font-weight: 700;
+  cursor: pointer;
+  transition: box-shadow var(--t-fast) ease, filter var(--t-fast) ease;
+}
+.btn-primary:hover { box-shadow: var(--accent-glow); filter: brightness(1.05); }
+.btn-primary:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
+
+/* Secundaire / ghost knop */
+.btn-ghost {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  background: var(--c-surface-2);
+  color: var(--c-text);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-sm);
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--t-fast) ease, border-color var(--t-fast) ease;
+}
+.btn-ghost:hover { background: var(--c-surface-3); border-color: var(--c-border-strong); }
+
+/* ===== TYPOGRAFIE-ROLLEN ===== */
+.t-display  { font-size: var(--fs-display); font-weight: 700; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.t-kpi      { font-size: var(--fs-kpi); font-weight: 700; line-height: 1.1; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.t-page     { font-size: var(--fs-page); font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; color: var(--c-text); }
+.t-section  { font-size: var(--fs-section); font-weight: 600; line-height: 1.3; color: var(--c-text); }
+.t-card     { font-size: var(--fs-card); font-weight: 600; line-height: 1.3; color: var(--c-text); }
+.t-body     { font-size: var(--fs-body); font-weight: 400; line-height: 1.5; }
+.t-meta     { font-size: var(--fs-meta); font-weight: 500; line-height: 1.4; color: var(--c-text-3); }
+.t-badge    { font-size: var(--fs-badge); font-weight: 600; line-height: 1; }
+.t-overline { font-size: var(--fs-overline); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.tnum       { font-variant-numeric: tabular-nums; }
 
 /* ===== TEKST HELPERS — gebruik var() ipv hardcoded kleuren ===== */
 .text-primary { color: var(--text-primary) !important; }
@@ -256,11 +346,10 @@ html, body, #root {
 /* Modal-panelen iets dekkender dan gewone glass-kaarten voor leesbaarheid */
 .modal-overlay .card,
 .modal-overlay .glass-card {
-  background: rgba(24, 24, 30, 0.88);
-}
-:root.light-mode .modal-overlay .card,
-:root.light-mode .modal-overlay .glass-card {
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--c-surface-solid);
+  border-color: var(--c-border-strong);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-float);
 }
 
 .modal-overlay.modal-closing { animation: fadeOut 0.2s ease forwards; }
@@ -341,10 +430,7 @@ html, body, #root {
 
 /* ===== NEON CLOCK ===== */
 .neon-clock {
-  text-shadow:
-    0 0 10px color-mix(in srgb, var(--accent) 90%, transparent),
-    0 0 30px color-mix(in srgb, var(--accent) 50%, transparent),
-    0 0 60px color-mix(in srgb, var(--accent) 20%, transparent);
+  text-shadow: 0 0 24px color-mix(in srgb, var(--accent) 45%, transparent);
   color: var(--accent);
 }
 
@@ -408,7 +494,7 @@ html, body, #root {
 /* Specifieke styling voor alle select elementen — solide kleur,
    want option-lijsten kunnen geen doorschijnende glass-achtergrond aan */
 select, option {
-  background-color: #16161c !important;
+  background-color: var(--c-surface-solid) !important;
   color: white !important;
   border: 1px solid var(--border);
 }
@@ -584,19 +670,46 @@ select {
 
 /* ===== TASK HIGHLIGHT FLASH ===== */
 @keyframes task-flash {
-  0%   { box-shadow: 0 0 0 0px rgba(0,255,209,0.0); }
-  20%  { box-shadow: 0 0 0 3px rgba(0,255,209,0.7); }
-  100% { box-shadow: 0 0 0 0px rgba(0,255,209,0.0); }
+  0%   { box-shadow: 0 0 0 0px transparent; }
+  20%  { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 70%, transparent); }
+  100% { box-shadow: 0 0 0 0px transparent; }
 }
 .task-flash {
   animation: task-flash 1s ease-out forwards;
 }
 
 /* ===== URGENT TASK PULSE ===== */
-@keyframes urgentPulse {
-  0%, 100% { box-shadow: 0 2px 16px rgba(255,50,50,0.12); }
-  50%       { box-shadow: 0 2px 22px rgba(255,50,50,0.28); }
-}
+/* Urgent = subtiele, statische rode gloed (geen oneindige puls meer) */
 .urgent-task {
-  animation: urgentPulse 2.5s ease-in-out infinite;
+  box-shadow: 0 0 20px color-mix(in srgb, var(--c-danger) 14%, transparent);
 }
+
+/* ===== FOCUS ZICHTBAAR (toetsenbord) ===== */
+:where(button, a, input, select, textarea, [role="button"], [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.glass-input:focus-visible { outline: none; }
+
+/* ===== REDUCED MOTION ===== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  button:not([style*="translate"]):active { transform: none; }
+}
+/* ===== GEDEELDE UI-PRIMITIEVEN (src/components/ui) ===== */
+.ui-row { transition: background var(--t-fast) ease; }
+.ui-row--interactive { cursor: pointer; }
+.ui-row--interactive:hover { background: var(--c-surface-3) !important; }
+.ui-row[data-active="true"] {
+  background: var(--accent-soft) !important;
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.ui-icon-btn { transition: background var(--t-fast) ease, color var(--t-fast) ease, box-shadow var(--t-fast) ease; }
+.ui-icon-btn--ghost:hover:not(:disabled) { background: var(--c-surface-2) !important; color: var(--c-text) !important; }
+.ui-icon-btn--soft:hover:not(:disabled)  { background: var(--c-surface-3) !important; }
+.ui-icon-btn--solid:hover:not(:disabled) { box-shadow: var(--accent-glow); }

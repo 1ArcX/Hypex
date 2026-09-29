@@ -62,14 +62,14 @@ export default function ThemeSettings({ onClose, theme, setTheme, onLogout, user
             <h2 className="text-base font-semibold text-white">Instellingen</h2>
           </div>
           <button onClick={onClose}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}>
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)' }}>
             <X size={18} />
           </button>
         </div>
 
         {/* Kleur presets */}
         <div className="mb-5">
-          <p className="text-xs font-medium mb-2" style={{ color: 'rgba(255,255,255,0.5)' }}>Accentkleur</p>
+          <p className="text-xs font-medium mb-2" style={{ color: 'var(--c-text-2)' }}>Accentkleur</p>
           <div className="grid grid-cols-3 gap-2">
             {PRESETS.map(preset => (
               <button key={preset.name} onClick={() => applyPreset(preset)}
@@ -89,24 +89,24 @@ export default function ThemeSettings({ onClose, theme, setTheme, onLogout, user
 
         {/* Custom kleur picker */}
         <div className="mb-5">
-          <p className="text-xs font-medium mb-2" style={{ color: 'rgba(255,255,255,0.5)' }}>Eigen kleur</p>
+          <p className="text-xs font-medium mb-2" style={{ color: 'var(--c-text-2)' }}>Eigen kleur</p>
           <div className="flex items-center gap-3">
             <input type="color" value={customAccent} onChange={e => applyCustomAccent(e.target.value)}
               style={{ width: '40px', height: '40px', borderRadius: '10px', border: 'none', cursor: 'pointer', background: 'none' }} />
-            <span className="text-sm font-mono" style={{ color: 'rgba(255,255,255,0.6)' }}>{customAccent}</span>
+            <span className="text-sm font-mono" style={{ color: 'var(--c-text-2)' }}>{customAccent}</span>
           </div>
         </div>
 
         {/* SOMtoday leskleur — alleen voor het SOMtoday-account */}
         {userEmail === SOMTODAY_EMAIL && (
           <div className="mb-5">
-            <p className="text-xs font-medium mb-2" style={{ color: 'rgba(255,255,255,0.5)' }}>SOMtoday leskleur</p>
+            <p className="text-xs font-medium mb-2" style={{ color: 'var(--c-text-2)' }}>SOMtoday leskleur</p>
             <div className="flex items-center gap-3">
               <input type="color" value={somtodayColor} onChange={e => applySomtodayColor(e.target.value)}
                 style={{ width: '40px', height: '40px', borderRadius: '10px', border: 'none', cursor: 'pointer', background: 'none' }} />
-              <span className="text-sm font-mono" style={{ color: 'rgba(255,255,255,0.6)' }}>{somtodayColor}</span>
+              <span className="text-sm font-mono" style={{ color: 'var(--c-text-2)' }}>{somtodayColor}</span>
               <button onClick={() => applySomtodayColor('#FACC15')}
-                style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}>
+                style={{ fontSize: 11, color: 'var(--c-text-3)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}>
                 reset
               </button>
             </div>
@@ -115,9 +115,9 @@ export default function ThemeSettings({ onClose, theme, setTheme, onLogout, user
 
         {/* Meldingen */}
         <div className="mb-5">
-          <p className="text-xs font-medium mb-2" style={{ color: 'rgba(255,255,255,0.5)' }}>Meldingen</p>
+          <p className="text-xs font-medium mb-2" style={{ color: 'var(--c-text-2)' }}>Meldingen</p>
           {notifState === 'unsupported' && (
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', padding: '8px 0' }}>
+            <div style={{ fontSize: 12, color: 'var(--c-text-3)', padding: '8px 0' }}>
               Niet ondersteund op dit apparaat / browser.
             </div>
           )}
@@ -134,7 +134,7 @@ export default function ThemeSettings({ onClose, theme, setTheme, onLogout, user
                 const result = await requestAndSubscribe(userId)
                 setNotifState(result === 'granted' ? 'granted' : result === 'denied' ? 'denied' : 'default')
               }}
-              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '9px', borderRadius: 12, background: 'rgba(0,255,209,0.08)', border: '1px solid rgba(0,255,209,0.25)', color: 'var(--accent)', cursor: notifState === 'loading' ? 'default' : 'pointer', fontSize: 13, fontWeight: 600 }}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '9px', borderRadius: 12, background: 'color-mix(in srgb, var(--accent) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 25%, transparent)', color: 'var(--accent)', cursor: notifState === 'loading' ? 'default' : 'pointer', fontSize: 13, fontWeight: 600 }}
             >
               <Bell size={14} /> {notifState === 'loading' ? 'Even wachten...' : 'Meldingen aanzetten'}
             </button>
@@ -147,7 +147,7 @@ export default function ThemeSettings({ onClose, theme, setTheme, onLogout, user
         </div>
 
         <div className="mb-5">
-          <p className="text-xs font-medium mb-2" style={{ color: 'rgba(255,255,255,0.5)' }}>Externe agenda's</p>
+          <p className="text-xs font-medium mb-2" style={{ color: 'var(--c-text-2)' }}>Externe agenda's</p>
           <button onClick={() => setShowCalendarConnections(true)}
             className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-sm"
             style={{ background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.25)', color: '#7DD3FC', cursor: 'pointer' }}>
@@ -157,7 +157,7 @@ export default function ThemeSettings({ onClose, theme, setTheme, onLogout, user
 
         <button onClick={resetTheme}
           className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-sm"
-          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', marginBottom: 8 }}>
+          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--c-border)', color: 'var(--c-text-3)', cursor: 'pointer', marginBottom: 8 }}>
           <RotateCcw size={13} /> Standaard herstellen
         </button>
 

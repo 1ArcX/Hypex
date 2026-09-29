@@ -144,22 +144,22 @@ function WeekRow({ day, isToday }) {
       padding: '5px 0',
       borderBottom: '1px solid rgba(255,255,255,0.04)',
     }}>
-      <span style={{ fontSize: 11, color: isToday ? 'var(--accent)' : 'rgba(255,255,255,0.55)', fontWeight: isToday ? 600 : 400 }}>
+      <span style={{ fontSize: 11, color: isToday ? 'var(--accent)' : 'var(--c-text-2)', fontWeight: isToday ? 600 : 400 }}>
         {dayName}
       </span>
-      <Icon size={14} style={{ color: isToday ? 'var(--accent)' : 'rgba(255,255,255,0.5)' }} />
+      <Icon size={14} style={{ color: isToday ? 'var(--accent)' : 'var(--c-text-2)' }} />
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', overflow: 'hidden' }}>
         {day.precipitation_sum > 0 && (
           <span style={{ fontSize: 9, color: 'rgba(0,200,255,0.7)', display: 'flex', alignItems: 'center', gap: 2 }}>
             <Droplets size={9} /> {day.precipitation_sum.toFixed(1)}mm
           </span>
         )}
-        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: 2 }}>
+        <span style={{ fontSize: 9, color: 'var(--c-text-3)', display: 'flex', alignItems: 'center', gap: 2 }}>
           <Wind size={9} /> {Math.round(day.windspeed_10m_max)} km/u
         </span>
       </div>
       <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>{Math.round(day.temperature_2m_min)}°</span>
+        <span style={{ fontSize: 11, color: 'var(--c-text-3)' }}>{Math.round(day.temperature_2m_min)}°</span>
         <span style={{ fontSize: 11, color: 'white', fontWeight: 600 }}>{Math.round(day.temperature_2m_max)}°</span>
       </div>
     </div>
@@ -378,7 +378,7 @@ export default function WeatherWidget({ stacked = false, userId, onRequestPwaIns
     border: 'none',
     cursor: 'pointer',
     background: tab === t ? 'var(--accent)' : 'rgba(255,255,255,0.07)',
-    color: tab === t ? '#000' : 'rgba(255,255,255,0.5)',
+    color: tab === t ? '#000' : 'var(--c-text-2)',
     fontWeight: tab === t ? 600 : 400,
     transition: 'all 0.15s',
   })
@@ -402,7 +402,7 @@ export default function WeatherWidget({ stacked = false, userId, onRequestPwaIns
             🌧️
           </button>
           <button onClick={() => { fetchWeather(); if (tab === 'buien') { setRain(null) } }}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}>
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)' }}>
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
         </div>
@@ -434,32 +434,32 @@ export default function WeatherWidget({ stacked = false, userId, onRequestPwaIns
       {/* ─── Huidig ─── */}
       {(stacked || tab === 'huidig') && weather && !error && (
         <div style={stacked ? { marginBottom: 20 } : {}}>
-          {stacked && <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'rgba(255,255,255,0.3)', marginBottom: 10, textTransform: 'uppercase' }}>Huidig</p>}
+          {stacked && <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--c-text-3)', marginBottom: 10, textTransform: 'uppercase' }}>Huidig</p>}
           <div className="flex items-center gap-3 mb-2">
             <WeatherIcon size={stacked ? 40 : 32} style={{ color: 'var(--accent)' }} />
             <div>
               <div style={{ fontSize: stacked ? 36 : 28, fontWeight: 700, color: 'white' }}>{Math.round(weather.temperature_2m)}°C</div>
-              <div className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>{label}</div>
+              <div className="text-xs" style={{ color: 'var(--c-text-3)' }}>{label}</div>
             </div>
           </div>
           <div className="flex items-center gap-1 mb-1">
-            <MapPin size={11} style={{ color: 'rgba(255,255,255,0.3)' }} />
-            <span className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>{weather.city}</span>
+            <MapPin size={11} style={{ color: 'var(--c-text-3)' }} />
+            <span className="text-xs" style={{ color: 'var(--c-text-3)' }}>{weather.city}</span>
           </div>
           <div className="flex gap-3 mt-2">
             <div className="flex items-center gap-1">
-              <Wind size={12} style={{ color: 'rgba(0,255,209,0.6)' }} />
-              <span className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>{Math.round(weather.windspeed_10m)} km/u</span>
+              <Wind size={12} style={{ color: 'color-mix(in srgb, var(--accent) 60%, transparent)' }} />
+              <span className="text-xs" style={{ color: 'var(--c-text-2)' }}>{Math.round(weather.windspeed_10m)} km/u</span>
             </div>
             <div className="flex items-center gap-1">
-              <Droplets size={12} style={{ color: 'rgba(0,255,209,0.6)' }} />
-              <span className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>{weather.relativehumidity_2m}%</span>
+              <Droplets size={12} style={{ color: 'color-mix(in srgb, var(--accent) 60%, transparent)' }} />
+              <span className="text-xs" style={{ color: 'var(--c-text-2)' }}>{weather.relativehumidity_2m}%</span>
             </div>
           </div>
           {lastUpdated && (
             <div className="flex items-center gap-1 mt-2">
               <Clock size={10} style={{ color: 'rgba(255,255,255,0.2)' }} />
-              <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)' }}>
+              <span style={{ fontSize: '10px', color: 'var(--c-text-3)' }}>
                 Bijgewerkt {timeSince} · volgende update over {Math.max(0, 10 - Math.floor((new Date() - lastUpdated) / 60000))} min
               </span>
             </div>
@@ -473,17 +473,17 @@ export default function WeatherWidget({ stacked = false, userId, onRequestPwaIns
       {/* ─── Buienradar ─── */}
       {(stacked || tab === 'buien') && (
         <div style={stacked ? { marginBottom: 20 } : {}}>
-          {stacked && <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'rgba(255,255,255,0.3)', marginBottom: 10, textTransform: 'uppercase' }}>Buienradar</p>}
+          {stacked && <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--c-text-3)', marginBottom: 10, textTransform: 'uppercase' }}>Buienradar</p>}
           {rainLoading && (
-            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: '12px 0' }}>
+            <p style={{ fontSize: 11, color: 'var(--c-text-3)', textAlign: 'center', padding: '12px 0' }}>
               Buienradar laden...
             </p>
           )}
           {!rainLoading && rain?.length > 0 && (
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                <CloudRain size={13} style={{ color: rainMax > 0 ? 'rgba(0,200,255,0.8)' : 'rgba(255,255,255,0.3)' }} />
-                <span style={{ fontSize: 11, color: rainMax > 0 ? 'rgba(0,200,255,0.9)' : 'rgba(255,255,255,0.4)' }}>
+                <CloudRain size={13} style={{ color: rainMax > 0 ? 'rgba(0,200,255,0.8)' : 'var(--c-text-3)' }} />
+                <span style={{ fontSize: 11, color: rainMax > 0 ? 'rgba(0,200,255,0.9)' : 'var(--c-text-3)' }}>
                   {rainLabel}
                 </span>
               </div>
@@ -497,7 +497,7 @@ export default function WeatherWidget({ stacked = false, userId, onRequestPwaIns
           {!rainLoading && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
               <button onClick={() => { setRain(null); loadRain() }}
-                style={{ fontSize: 10, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)' }}>
+                style={{ fontSize: 10, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)' }}>
                 {rain === null && !coords ? 'Zoek eerst een stad' : 'Vernieuwen'}
               </button>
               {userId && 'Notification' in window && (
@@ -510,7 +510,7 @@ export default function WeatherWidget({ stacked = false, userId, onRequestPwaIns
                     fontSize: 10, padding: '4px 8px', borderRadius: 6, cursor: 'pointer',
                     border: notifEnabled ? '1px solid rgba(0,200,255,0.4)' : '1px solid rgba(255,255,255,0.15)',
                     background: notifEnabled ? 'rgba(0,200,255,0.1)' : 'rgba(255,255,255,0.05)',
-                    color: notifEnabled ? 'rgba(0,200,255,0.9)' : 'rgba(255,255,255,0.4)',
+                    color: notifEnabled ? 'rgba(0,200,255,0.9)' : 'var(--c-text-3)',
                     opacity: notifLoading ? 0.5 : 1,
                   }}
                 >
@@ -521,10 +521,10 @@ export default function WeatherWidget({ stacked = false, userId, onRequestPwaIns
             </div>
           )}
           {!rainLoading && rain?.length === 0 && (
-            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>Geen buiendata beschikbaar.</p>
+            <p style={{ fontSize: 11, color: 'var(--c-text-3)' }}>Geen buiendata beschikbaar.</p>
           )}
           {!rainLoading && !rain && !coords && (
-            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>Zoek eerst een stad.</p>
+            <p style={{ fontSize: 11, color: 'var(--c-text-3)' }}>Zoek eerst een stad.</p>
           )}
         </div>
       )}
@@ -535,9 +535,9 @@ export default function WeatherWidget({ stacked = false, userId, onRequestPwaIns
       {/* ─── Week ─── */}
       {(stacked || tab === 'week') && (
         <div>
-          {stacked && <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'rgba(255,255,255,0.3)', marginBottom: 10, textTransform: 'uppercase' }}>7-daagse prognose</p>}
+          {stacked && <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--c-text-3)', marginBottom: 10, textTransform: 'uppercase' }}>7-daagse prognose</p>}
           {!weekly && !error && (
-            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>Laden...</p>
+            <p style={{ fontSize: 11, color: 'var(--c-text-3)' }}>Laden...</p>
           )}
           {weekly && (
             <div>

@@ -38,7 +38,7 @@ export default function Sidebar({
       background: 'rgba(255,255,255,0.025)',
       backdropFilter: 'blur(24px)',
       WebkitBackdropFilter: 'blur(24px)',
-      borderRight: '1px solid rgba(255,255,255,0.08)',
+      borderRight: '1px solid var(--c-border)',
       display: 'flex',
       flexDirection: 'column',
       height: '100vh',
@@ -53,7 +53,7 @@ export default function Sidebar({
           <div style={{
             width: 32, height: 32, borderRadius: 10,
             background: 'var(--accent-dim)',
-            border: '1px solid rgba(0,255,209,0.25)',
+            border: '1px solid color-mix(in srgb, var(--accent) 25%, transparent)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             <span style={{ fontSize: 16, color: 'var(--accent)' }}>⬡</span>
@@ -215,7 +215,7 @@ export default function Sidebar({
           <div style={{
             width: 26, height: 26, borderRadius: 7,
             background: 'var(--accent-dim)',
-            border: '1px solid rgba(0,255,209,0.25)',
+            border: '1px solid color-mix(in srgb, var(--accent) 25%, transparent)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 11, color: 'var(--accent)', fontWeight: 700, flexShrink: 0,
           }}>

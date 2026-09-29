@@ -24,7 +24,7 @@ function CheckCircle({ done, color, onClick }) {
       style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
       <div style={{
         width: 28, height: 28, borderRadius: '50%',
-        border: `2px solid ${done ? color : 'rgba(255,255,255,0.25)'}`,
+        border: `2px solid ${done ? color : 'var(--c-text-3)'}`,
         background: done ? color : 'transparent',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         transition: 'all 0.18s',
@@ -51,16 +51,16 @@ function RoutineRow({ task, today, onToggle, onOpen, preview = false }) {
       }}>
       {preview ? (
         <div style={{ width: 28, height: 28, borderRadius: '50%', border: '2px dashed rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Repeat size={12} style={{ color: 'rgba(255,255,255,0.3)' }} />
+          <Repeat size={12} style={{ color: 'var(--c-text-3)' }} />
         </div>
       ) : (
         <CheckCircle done={done} color={accent} onClick={(e) => { e.stopPropagation(); onToggle(task) }} />
       )}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.9)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: done ? 'line-through' : 'none' }}>
+        <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--c-text)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: done ? 'line-through' : 'none' }}>
           {task.title}
         </p>
-        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.32)', margin: '2px 0 0', display: 'flex', alignItems: 'center', gap: 4 }}>
+        <p style={{ fontSize: 11, color: 'var(--c-text-3)', margin: '2px 0 0', display: 'flex', alignItems: 'center', gap: 4 }}>
           <Repeat size={10} /> {recurrenceLabel(task.recurrence, task.recurrence_days)}
           {(task.start_time || task.time) ? <> · <Clock size={10} /> {task.start_time || task.time}</> : null}
         </p>
@@ -72,8 +72,8 @@ function RoutineRow({ task, today, onToggle, onOpen, preview = false }) {
           background: active ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.04)',
           border: `1px solid ${active ? 'rgba(249,115,22,0.3)' : 'rgba(255,255,255,0.08)'}`,
         }}>
-          <Flame size={13} style={{ color: active ? '#FB923C' : 'rgba(255,255,255,0.25)' }} />
-          <span style={{ fontSize: 13, fontWeight: 700, color: active ? '#FB923C' : 'rgba(255,255,255,0.3)' }}>{streak}</span>
+          <Flame size={13} style={{ color: active ? '#FB923C' : 'var(--c-text-3)' }} />
+          <span style={{ fontSize: 13, fontWeight: 700, color: active ? '#FB923C' : 'var(--c-text-3)' }}>{streak}</span>
         </div>
       )}
     </div>
@@ -99,11 +99,11 @@ function TaskRow({ task, subjects, today, onToggle, onOpen }) {
       }}>
       <CheckCircle done={false} color={accent} onClick={(e) => { e.stopPropagation(); onToggle(task) }} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: 14, fontWeight: reddish ? 600 : 500, color: 'rgba(255,255,255,0.88)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <p style={{ fontSize: 14, fontWeight: reddish ? 600 : 500, color: 'var(--c-text)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {task.title}
         </p>
         {(overdue || meta) && (
-          <p style={{ fontSize: 11, margin: '2px 0 0', color: overdue ? '#ff8080' : 'rgba(255,255,255,0.3)' }}>
+          <p style={{ fontSize: 11, margin: '2px 0 0', color: overdue ? '#ff8080' : 'var(--c-text-3)' }}>
             {overdue ? `⚠️ ${lateLabel(daysLate(task.date, today))}` : ''}
             {overdue && meta ? ' · ' : ''}
             {meta}
@@ -126,8 +126,8 @@ function TaskRow({ task, subjects, today, onToggle, onOpen }) {
 function SectionLabel({ children, count }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '0 2px 8px' }}>
-      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>{children}</span>
-      {count != null && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>{count}</span>}
+      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--c-text-3)' }}>{children}</span>
+      {count != null && <span style={{ fontSize: 11, color: 'var(--c-text-3)' }}>{count}</span>}
     </div>
   )
 }
@@ -184,7 +184,7 @@ export default function TodayView({ tasks, subjects = [], dateOffset = 0, onTogg
       {/* Datumkop */}
       <div>
         <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-1)', margin: 0, letterSpacing: '-0.02em' }}>{heading}</h1>
-        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', margin: '3px 0 0', textTransform: 'capitalize' }}>
+        <p style={{ fontSize: 13, color: 'var(--c-text-3)', margin: '3px 0 0', textTransform: 'capitalize' }}>
           {dateLabel}
           {isToday && routines.length > 0 ? ` · ${routinesDone}/${routines.length} routines` : ''}
         </p>
@@ -230,7 +230,7 @@ export default function TodayView({ tasks, subjects = [], dateOffset = 0, onTogg
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 50, gap: 10, textAlign: 'center' }}>
           <span style={{ fontSize: 44 }}>🌤️</span>
           <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>{isToday ? 'Niets voor vandaag' : 'Niets gepland'}</p>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', margin: 0, maxWidth: 240 }}>
+          <p style={{ fontSize: 13, color: 'var(--c-text-3)', margin: 0, maxWidth: 240 }}>
             Geen routines of taken gepland. Voeg er een toe of geniet van je vrije dag.
           </p>
           <button onClick={onNew}

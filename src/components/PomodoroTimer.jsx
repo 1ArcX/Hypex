@@ -156,9 +156,9 @@ function sendNotif(title, body) {
 
 // ── Modes ─────────────────────────────────────────────────────────────────────
 const MODES = {
-  work:      { label: 'Focus',       color: '#00FFD1', rgb: '0,255,209',   maxMins: 60 },
-  break:     { label: 'Pauze',       color: '#FF8C42', rgb: '255,140,66',  maxMins: 30 },
-  longBreak: { label: 'Lang',        color: '#A78BFA', rgb: '167,139,250', maxMins: 60 },
+  work:      { label: 'Focus',       color: 'var(--accent)',   maxMins: 60 },
+  break:     { label: 'Pauze',       color: '#FF8C42',  maxMins: 30 },
+  longBreak: { label: 'Lang',        color: '#A78BFA', maxMins: 60 },
 }
 
 function calcNextMode(mode, sessionsInCycle, sessionsPerLong) {
@@ -233,16 +233,15 @@ function reducer(state, action) {
 const iconBtn = {
   display: 'flex', alignItems: 'center', justifyContent: 'center',
   width: '36px', height: '36px', borderRadius: '10px',
-  border: '1px solid rgba(255,255,255,0.08)',
+  border: '1px solid var(--c-border)',
   background: 'rgba(255,255,255,0.04)',
-  color: 'rgba(255,255,255,0.4)', cursor: 'pointer',
+  color: 'var(--c-text-3)', cursor: 'pointer',
 }
 
 // ── Completion Popup ──────────────────────────────────────────────────────────
 function CompletionPopup({ prevMode, nextMode, onStart, onSkip }) {
   const isWorkDone = prevMode === 'work'
   const modeColor  = MODES[nextMode].color
-  const modeRgb    = MODES[nextMode].rgb
 
   return (
     <div style={{
@@ -253,16 +252,16 @@ function CompletionPopup({ prevMode, nextMode, onStart, onSkip }) {
       <div style={{
         textAlign: 'center', maxWidth: 340, width: '100%',
         padding: 40, borderRadius: 24,
-        background: `rgba(${modeRgb}, 0.06)`,
-        border: `1px solid rgba(${modeRgb}, 0.25)`,
-        boxShadow: `0 0 80px rgba(${modeRgb}, 0.2)`,
+        background: `color-mix(in srgb, ${modeColor} 6%, transparent)`,
+        border: `1px solid color-mix(in srgb, ${modeColor} 25%, transparent)`,
+        boxShadow: `0 0 80px color-mix(in srgb, ${modeColor} 20%, transparent)`,
       }}>
         <div style={{
           width: 80, height: 80, borderRadius: '50%', margin: '0 auto 20px',
-          background: `rgba(${modeRgb}, 0.15)`,
-          border: `2px solid rgba(${modeRgb}, 0.4)`,
+          background: `color-mix(in srgb, ${modeColor} 15%, transparent)`,
+          border: `2px solid color-mix(in srgb, ${modeColor} 40%, transparent)`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: `0 0 40px rgba(${modeRgb}, 0.3)`,
+          boxShadow: `0 0 40px color-mix(in srgb, ${modeColor} 30%, transparent)`,
         }}>
           {isWorkDone ? <Coffee size={36} color={modeColor} /> : <Zap size={36} color={modeColor} />}
         </div>
@@ -270,7 +269,7 @@ function CompletionPopup({ prevMode, nextMode, onStart, onSkip }) {
         <h2 style={{ fontSize: 22, fontWeight: 700, color: 'white', margin: '0 0 8px' }}>
           {isWorkDone ? 'Focus sessie klaar! 🎯' : 'Pauze voorbij!'}
         </h2>
-        <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', margin: '0 0 28px', lineHeight: 1.5 }}>
+        <p style={{ fontSize: 14, color: 'var(--c-text-2)', margin: '0 0 28px', lineHeight: 1.5 }}>
           {nextMode === 'longBreak'
             ? 'Je hebt het verdiend — neem een lange pauze.'
             : nextMode === 'break'
@@ -281,11 +280,11 @@ function CompletionPopup({ prevMode, nextMode, onStart, onSkip }) {
         {/* Start button — dismisses AND starts timer */}
         <button onClick={onStart} style={{
           width: '100%', padding: '14px', borderRadius: 14,
-          background: `rgba(${modeRgb}, 0.2)`,
-          border: `1px solid rgba(${modeRgb}, 0.4)`,
+          background: `color-mix(in srgb, ${modeColor} 20%, transparent)`,
+          border: `1px solid color-mix(in srgb, ${modeColor} 40%, transparent)`,
           color: modeColor, cursor: 'pointer',
           fontSize: 15, fontWeight: 700,
-          boxShadow: `0 0 20px rgba(${modeRgb}, 0.15)`,
+          boxShadow: `0 0 20px color-mix(in srgb, ${modeColor} 15%, transparent)`,
           transition: 'all 0.2s',
         }}>
           {nextMode === 'work' ? '▶ Start Focus' : nextMode === 'break' ? '☕ Start Pauze' : '🌙 Start Lange Pauze'}
@@ -294,7 +293,7 @@ function CompletionPopup({ prevMode, nextMode, onStart, onSkip }) {
         {/* Skip — just dismisses, timer stays paused */}
         <button onClick={onSkip} style={{
           marginTop: 10, background: 'none', border: 'none', cursor: 'pointer',
-          color: 'rgba(255,255,255,0.3)', fontSize: 13, padding: '6px',
+          color: 'var(--c-text-3)', fontSize: 13, padding: '6px',
         }}>
           Sla over
         </button>
@@ -712,7 +711,6 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
   const totalSecs     = currentMins * 60
   const progress      = seconds / totalSecs
   const modeColor     = MODES[mode].color
-  const modeRgb       = MODES[mode].rgb
   const radius        = 68
   const circ          = 2 * Math.PI * radius
   const dashOffset    = circ * (1 - progress)
@@ -757,20 +755,20 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
 
           {/* Mode selector — hidden when running, label shown instead */}
           {!running ? (
-            <div style={{ display: 'flex', gap: 3, background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 4, border: '1px solid rgba(255,255,255,0.07)' }}>
-              {Object.entries(MODES).map(([key, { label, color, rgb }]) => (
+            <div style={{ display: 'flex', gap: 3, background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 4, border: '1px solid var(--c-border)' }}>
+              {Object.entries(MODES).map(([key, { label, color }]) => (
                 <button key={key} onClick={() => switchMode(key)} style={{
                   padding: '8px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
                   fontSize: 13, fontWeight: 600, transition: 'all 0.2s',
-                  background: mode === key ? `rgba(${rgb},0.15)` : 'transparent',
-                  color: mode === key ? color : 'rgba(255,255,255,0.3)',
+                  background: mode === key ? `color-mix(in srgb, ${color} 15%, transparent)` : 'transparent',
+                  color: mode === key ? color : 'var(--c-text-3)',
                 }}>
                   {label}
                 </button>
               ))}
             </div>
           ) : (
-            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)' }}>
+            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--c-text-3)' }}>
               {MODES[mode].label}
             </span>
           )}
@@ -781,11 +779,11 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
               <circle cx="120" cy="120" r={bigR} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="10" />
               <circle cx="120" cy="120" r={bigR} fill="none" stroke={modeColor} strokeWidth="10"
                 strokeLinecap="round" strokeDasharray={bigCirc} strokeDashoffset={bigDash}
-                style={{ filter: `drop-shadow(0 0 14px ${modeColor}60)`, transition: 'stroke-dashoffset 0.5s ease, stroke 0.6s ease' }}
+                style={{ filter: `drop-shadow(0 0 14px color-mix(in srgb, ${modeColor} 38%, transparent))`, transition: 'stroke-dashoffset 0.5s ease, stroke 0.6s ease' }}
               />
             </svg>
             <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-              <span style={{ fontSize: 54, fontWeight: 700, fontFamily: 'monospace', color: modeColor, lineHeight: 1, letterSpacing: -2, textShadow: `0 0 30px ${modeColor}50`, transition: 'color 0.6s' }}>
+              <span style={{ fontSize: 54, fontWeight: 700, fontFamily: 'monospace', color: modeColor, lineHeight: 1, letterSpacing: -2, textShadow: `0 0 30px color-mix(in srgb, ${modeColor} 31%, transparent)`, transition: 'color 0.6s' }}>
                 {mm}:{ss}
               </span>
             </div>
@@ -800,7 +798,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
                   width: done ? 10 : 7, height: done ? 10 : 7,
                   borderRadius: '50%', marginTop: done ? 0 : 1.5,
                   background: done ? 'var(--accent)' : 'rgba(255,255,255,0.1)',
-                  boxShadow: done ? '0 0 8px rgba(0,255,209,0.5)' : 'none',
+                  boxShadow: done ? '0 0 8px color-mix(in srgb, var(--accent) 50%, transparent)' : 'none',
                   transition: 'all 0.3s',
                 }} />
               )
@@ -815,12 +813,12 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
             onChange={e => dispatch({ type: 'SET_TASK', v: e.target.value })}
             style={{
               width: '100%', maxWidth: 380, boxSizing: 'border-box',
-              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+              background: 'rgba(255,255,255,0.04)', border: '1px solid var(--c-border)',
               borderRadius: 12, padding: '11px 16px',
-              color: 'rgba(255,255,255,0.8)', fontSize: 14, outline: 'none', textAlign: 'center',
+              color: 'var(--c-text-2)', fontSize: 14, outline: 'none', textAlign: 'center',
               transition: 'border-color 0.2s',
             }}
-            onFocus={e => { e.target.style.borderColor = `rgba(${modeRgb},0.35)` }}
+            onFocus={e => { e.target.style.borderColor = `color-mix(in srgb, ${modeColor} 35%, transparent)` }}
             onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.08)' }}
           />
 
@@ -828,37 +826,37 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
           {!running && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 380 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', width: 46, textAlign: 'right', flexShrink: 0 }}>Focus</span>
+                <span style={{ fontSize: 11, color: 'var(--c-text-3)', width: 46, textAlign: 'right', flexShrink: 0 }}>Focus</span>
                 <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
                   {[15, 20, 25, 30, 45, 60].map(n => (
                     <button key={n} onClick={() => dispatch({ type: 'SET_WORK_MINS', v: n })} style={{
                       padding: '5px 11px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, transition: 'all 0.15s',
-                      background: workMins === n ? 'rgba(0,255,209,0.15)' : 'rgba(255,255,255,0.06)',
-                      color: workMins === n ? '#00FFD1' : 'rgba(255,255,255,0.4)',
+                      background: workMins === n ? 'color-mix(in srgb, var(--accent) 15%, transparent)' : 'rgba(255,255,255,0.06)',
+                      color: workMins === n ? 'var(--accent)' : 'var(--c-text-3)',
                     }}>{n}m</button>
                   ))}
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', width: 46, textAlign: 'right', flexShrink: 0 }}>Pauze</span>
+                <span style={{ fontSize: 11, color: 'var(--c-text-3)', width: 46, textAlign: 'right', flexShrink: 0 }}>Pauze</span>
                 <div style={{ display: 'flex', gap: 5 }}>
                   {[5, 10, 15, 20].map(n => (
                     <button key={n} onClick={() => dispatch({ type: 'SET_BREAK_MINS', v: n })} style={{
                       padding: '5px 11px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, transition: 'all 0.15s',
                       background: breakMins === n ? 'rgba(255,140,66,0.15)' : 'rgba(255,255,255,0.06)',
-                      color: breakMins === n ? '#FF8C42' : 'rgba(255,255,255,0.4)',
+                      color: breakMins === n ? '#FF8C42' : 'var(--c-text-3)',
                     }}>{n}m</button>
                   ))}
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', width: 46, textAlign: 'right', flexShrink: 0 }}>Lang</span>
+                <span style={{ fontSize: 11, color: 'var(--c-text-3)', width: 46, textAlign: 'right', flexShrink: 0 }}>Lang</span>
                 <div style={{ display: 'flex', gap: 5 }}>
                   {[10, 15, 20, 30].map(n => (
                     <button key={n} onClick={() => dispatch({ type: 'SET_LBRK_MINS', v: n })} style={{
                       padding: '5px 11px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, transition: 'all 0.15s',
                       background: longBreakMins === n ? 'rgba(167,139,250,0.15)' : 'rgba(255,255,255,0.06)',
-                      color: longBreakMins === n ? '#A78BFA' : 'rgba(255,255,255,0.4)',
+                      color: longBreakMins === n ? '#A78BFA' : 'var(--c-text-3)',
                     }}>{n}m</button>
                   ))}
                 </div>
@@ -872,18 +870,18 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
               {SOUND_TYPES.map(({ id, emoji, label: lbl }) => (
                 <button key={id} onClick={() => setSoundType(id)} style={{
                   padding: '5px 11px', borderRadius: 8, border: '1px solid', cursor: 'pointer', fontSize: 12, fontWeight: 600, transition: 'all 0.15s',
-                  background: soundType === id ? `rgba(${modeRgb},0.15)` : 'rgba(255,255,255,0.06)',
+                  background: soundType === id ? `color-mix(in srgb, ${modeColor} 15%, transparent)` : 'rgba(255,255,255,0.06)',
                   color: soundType === id ? modeColor : 'rgba(255,255,255,0.4)',
-                  borderColor: soundType === id ? `rgba(${modeRgb},0.4)` : 'rgba(255,255,255,0.08)',
+                  borderColor: soundType === id ? `color-mix(in srgb, ${modeColor} 40%, transparent)` : 'rgba(255,255,255,0.08)',
                 }}>{emoji} {lbl}</button>
               ))}
             </div>
             {soundType !== 'off' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <VolumeX size={13} style={{ color: 'rgba(255,255,255,0.3)', flexShrink: 0 }} />
+                <VolumeX size={13} style={{ color: 'var(--c-text-3)', flexShrink: 0 }} />
                 <input type="range" min="0" max="100" value={volume} onChange={e => setVolume(+e.target.value)}
                   style={{ flex: 1, accentColor: modeColor }} />
-                <Volume2 size={13} style={{ color: 'rgba(255,255,255,0.3)', flexShrink: 0 }} />
+                <Volume2 size={13} style={{ color: 'var(--c-text-3)', flexShrink: 0 }} />
               </div>
             )}
           </div>
@@ -891,23 +889,23 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
           {/* Controls */}
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             {!running && (
-              <button onClick={reset} title="Reset" style={{ width: 46, height: 46, borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <button onClick={reset} title="Reset" style={{ width: 46, height: 46, borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--c-border)', color: 'var(--c-text-3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <RotateCcw size={16} />
               </button>
             )}
             <button onClick={toggleRunning} style={{
               height: 52, padding: '0 44px', borderRadius: 16,
-              border: `1px solid rgba(${modeRgb},0.45)`,
-              background: `rgba(${modeRgb},0.12)`,
+              border: `1px solid color-mix(in srgb, ${modeColor} 45%, transparent)`,
+              background: `color-mix(in srgb, ${modeColor} 12%, transparent)`,
               color: modeColor, cursor: 'pointer', fontSize: 16, fontWeight: 700,
               display: 'flex', alignItems: 'center', gap: 10,
-              boxShadow: running ? `0 0 40px rgba(${modeRgb},0.2)` : 'none',
+              boxShadow: running ? `0 0 40px color-mix(in srgb, ${modeColor} 20%, transparent)` : 'none',
               transition: 'all 0.2s',
             }}>
               {running ? <><Pause size={18} /> Pauzeer</> : <><Play size={18} /> {seconds === totalSecs ? 'Start' : 'Hervat'}</>}
             </button>
             {running && (
-              <button onClick={skip} title="Sla over" style={{ width: 46, height: 46, borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <button onClick={skip} title="Sla over" style={{ width: 46, height: 46, borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--c-border)', color: 'var(--c-text-3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <SkipForward size={16} />
               </button>
             )}
@@ -963,19 +961,19 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
         className="glass-card transition-all duration-700"
         style={{
           padding: '18px',
-          borderLeft: `3px solid rgba(${modeRgb},0.45)`,
-          background: `linear-gradient(135deg, rgba(${modeRgb},0.06) 0%, transparent 60%)`,
+          borderLeft: `3px solid color-mix(in srgb, ${modeColor} 45%, transparent)`,
+          background: `linear-gradient(135deg, color-mix(in srgb, ${modeColor} 6%, transparent) 0%, transparent 60%)`,
           boxShadow: running
-            ? `0 0 40px rgba(${modeRgb},0.18), inset 0 0 30px rgba(${modeRgb},0.04)`
+            ? `0 0 40px color-mix(in srgb, ${modeColor} 18%, transparent), inset 0 0 30px color-mix(in srgb, ${modeColor} 4%, transparent)`
             : undefined,
-          borderColor: running ? `rgba(${modeRgb},0.3)` : undefined,
+          borderColor: running ? `color-mix(in srgb, ${modeColor} 30%, transparent)` : undefined,
           transition: 'border-color 0.6s, background 0.6s, box-shadow 0.6s',
         }}
       >
         {/* ── Header ── */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 22, height: 22, borderRadius: 6, background: `rgba(${modeRgb},0.15)`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.6s' }}>
+            <div style={{ width: 22, height: 22, borderRadius: 6, background: `color-mix(in srgb, ${modeColor} 15%, transparent)`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.6s' }}>
               <Timer size={12} style={{ color: modeColor }} />
             </div>
             <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: modeColor, transition: 'color 0.6s' }}>
@@ -986,7 +984,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
               <span style={{
                 fontSize: 13, fontWeight: 700, fontFamily: 'monospace',
                 color: modeColor, letterSpacing: 1,
-                textShadow: `0 0 12px ${modeColor}60`,
+                textShadow: `0 0 12px color-mix(in srgb, ${modeColor} 38%, transparent)`,
               }}>
                 {mm}:{ss}
               </span>
@@ -1017,7 +1015,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
         {showSettings && (
           <div style={{
             marginBottom: '14px', padding: '14px', borderRadius: '14px',
-            background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+            background: 'rgba(255,255,255,0.03)', border: '1px solid var(--c-border)',
           }}>
             {[
               { label: 'Focus',       color: MODES.work.color,      val: workMins,      max: 60, action: v => dispatch({ type: 'SET_WORK_MINS',  v }) },
@@ -1026,7 +1024,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
             ].map(({ label, color, val, max, action }) => (
               <div key={label} style={{ marginBottom: '10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>{label}</span>
+                  <span style={{ fontSize: '11px', color: 'var(--c-text-3)' }}>{label}</span>
                   <span style={{ fontSize: '11px', fontWeight: 600, color }}>{val} min</span>
                 </div>
                 <input type="range" min="1" max={max} value={val}
@@ -1034,16 +1032,16 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
                   style={{ width: '100%', accentColor: color }} />
               </div>
             ))}
-            <div style={{ paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>Sessies per cyclus</span>
+            <div style={{ paddingTop: '10px', borderTop: '1px solid var(--c-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '11px', color: 'var(--c-text-3)' }}>Sessies per cyclus</span>
               <div style={{ display: 'flex', gap: '4px' }}>
                 {[2, 3, 4, 5, 6].map(n => (
                   <button key={n} onClick={() => dispatch({ type: 'SET_SPL', v: n })}
                     style={{
                       width: '26px', height: '26px', borderRadius: '7px', border: 'none',
                       cursor: 'pointer', fontSize: '11px', fontWeight: 600,
-                      background: sessionsPerLong === n ? 'rgba(0,255,209,0.18)' : 'rgba(255,255,255,0.05)',
-                      color: sessionsPerLong === n ? '#00FFD1' : 'rgba(255,255,255,0.35)',
+                      background: sessionsPerLong === n ? 'color-mix(in srgb, var(--accent) 18%, transparent)' : 'rgba(255,255,255,0.05)',
+                      color: sessionsPerLong === n ? 'var(--accent)' : 'var(--c-text-3)',
                     }}>
                     {n}
                   </button>
@@ -1058,14 +1056,14 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
           display: 'flex', gap: '3px', marginBottom: '14px',
           padding: '3px', borderRadius: '12px', background: 'rgba(255,255,255,0.04)',
         }}>
-          {Object.entries(MODES).map(([key, { label, color, rgb }]) => (
+          {Object.entries(MODES).map(([key, { label, color }]) => (
             <button key={key} onClick={() => switchMode(key)}
               style={{
                 flex: 1, padding: '6px 2px', borderRadius: '9px', border: 'none',
                 cursor: 'pointer', fontSize: '10px', fontWeight: 600,
                 letterSpacing: '0.02em', transition: 'all 0.2s',
-                background: mode === key ? `rgba(${rgb},0.15)` : 'transparent',
-                color: mode === key ? color : 'rgba(255,255,255,0.3)',
+                background: mode === key ? `color-mix(in srgb, ${color} 15%, transparent)` : 'transparent',
+                color: mode === key ? color : 'var(--c-text-3)',
               }}>
               {label}
             </button>
@@ -1082,7 +1080,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
                 height: done ? '8px' : '6px',
                 borderRadius: '50%',
                 background: done ? 'var(--accent)' : 'rgba(255,255,255,0.1)',
-                boxShadow: done ? '0 0 6px rgba(0,255,209,0.5)' : 'none',
+                boxShadow: done ? '0 0 6px color-mix(in srgb, var(--accent) 50%, transparent)' : 'none',
                 transition: 'all 0.3s',
               }} />
             )
@@ -1100,7 +1098,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
                 strokeDasharray={circ}
                 strokeDashoffset={dashOffset}
                 style={{
-                  filter: `drop-shadow(0 0 8px ${modeColor}70)`,
+                  filter: `drop-shadow(0 0 8px color-mix(in srgb, ${modeColor} 44%, transparent))`,
                   transition: 'stroke-dashoffset 0.5s ease, stroke 0.6s ease',
                 }}
               />
@@ -1114,14 +1112,14 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
               <span style={{
                 fontSize: '34px', fontWeight: 700, fontFamily: 'monospace',
                 color: modeColor, lineHeight: 1, letterSpacing: '-1px',
-                textShadow: `0 0 20px ${modeColor}50`,
+                textShadow: `0 0 20px color-mix(in srgb, ${modeColor} 31%, transparent)`,
                 transition: 'color 0.6s ease',
               }}>
                 {mm}:{ss}
               </span>
               <span style={{
                 fontSize: '10px', fontWeight: 500, letterSpacing: '0.08em',
-                color: 'rgba(255,255,255,0.3)', marginTop: '5px',
+                color: 'var(--c-text-3)', marginTop: '5px',
                 textTransform: 'uppercase',
               }}>
                 {MODES[mode].label}
@@ -1137,14 +1135,14 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
             placeholder="Waar werk je aan?"
             value={task}
             onChange={e => dispatch({ type: 'SET_TASK', v: e.target.value })}
-            onFocus={e => { e.target.style.borderColor = `rgba(${modeRgb},0.35)` }}
+            onFocus={e => { e.target.style.borderColor = `color-mix(in srgb, ${modeColor} 35%, transparent)` }}
             onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.07)' }}
             style={{
               width: '100%', boxSizing: 'border-box',
               background: 'rgba(255,255,255,0.03)',
-              border: '1px solid rgba(255,255,255,0.07)',
+              border: '1px solid var(--c-border)',
               borderRadius: '10px', padding: '9px 12px',
-              color: 'rgba(255,255,255,0.65)', fontSize: '12px',
+              color: 'var(--c-text-2)', fontSize: '12px',
               outline: 'none', transition: 'border-color 0.2s',
             }}
           />
@@ -1159,8 +1157,8 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
           <button onClick={toggleRunning}
             style={{
               flex: 1, height: '40px', borderRadius: '12px',
-              border: `1px solid rgba(${modeRgb},0.4)`,
-              background: `rgba(${modeRgb},0.1)`,
+              border: `1px solid color-mix(in srgb, ${modeColor} 40%, transparent)`,
+              background: `color-mix(in srgb, ${modeColor} 10%, transparent)`,
               color: modeColor, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
               fontSize: '13px', fontWeight: 600, transition: 'all 0.2s',
@@ -1183,7 +1181,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
                 ...iconBtn,
                 display: 'flex', alignItems: 'center', gap: 4,
                 width: 'auto', padding: '0 10px', fontSize: 11, fontWeight: 600,
-                color: 'rgba(255,255,255,0.5)',
+                color: 'var(--c-text-2)',
               }}
             >
               <Maximize2 size={13} /> Focus
@@ -1193,16 +1191,16 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
 
         {/* ── Daily stats ── */}
         <div style={{
-          paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.06)',
+          paddingTop: '12px', borderTop: '1px solid var(--c-border)',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
-          <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.28)' }}>
+          <span style={{ fontSize: '11px', color: 'var(--c-text-3)' }}>
             Vandaag gefocust
           </span>
-          <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>
+          <span style={{ fontSize: '11px', color: 'var(--c-text-2)', fontWeight: 600 }}>
             {todayMins > 0 ? todayStr : '—'}
             {totalSessions > 0 && (
-              <span style={{ marginLeft: '8px', color: 'rgba(255,255,255,0.28)', fontWeight: 400 }}>
+              <span style={{ marginLeft: '8px', color: 'var(--c-text-3)', fontWeight: 400 }}>
                 · {totalSessions} sessie{totalSessions !== 1 ? 's' : ''}
               </span>
             )}

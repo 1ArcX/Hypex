@@ -141,7 +141,7 @@ export default function SubjectsWidget({ userId, onSyncComplete }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ color: 'white', fontWeight: 600, fontSize: '13px' }}>Mijn Vakken</span>
           {klas && (
-            <span style={{ background: 'rgba(0,255,209,0.1)', border: '1px solid rgba(0,255,209,0.25)', borderRadius: '20px', padding: '1px 8px', fontSize: '10px', color: '#00FFD1' }}>
+            <span style={{ background: 'color-mix(in srgb, var(--accent) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 25%, transparent)', borderRadius: '20px', padding: '1px 8px', fontSize: '10px', color: 'var(--accent)' }}>
               {klas}
             </span>
           )}
@@ -152,7 +152,7 @@ export default function SubjectsWidget({ userId, onSyncComplete }) {
             <RefreshCw size={11} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} /> Magister
           </button>
           <button onClick={() => setExpanded(!expanded)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '2px' }}>
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', padding: '2px' }}>
             {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
         </div>
@@ -167,21 +167,21 @@ export default function SubjectsWidget({ userId, onSyncComplete }) {
       {expanded && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {vakken.length === 0 ? (
-            <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>
+            <p style={{ color: 'var(--c-text-3)', fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>
               Klik op "Magister" om je vakken te laden
             </p>
           ) : vakken.map(vak => {
             const link = subjectLinks[vak]
             return (
               <div key={vak}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--c-border)' }}
                 onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
                 onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}>
-                <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.75)', fontWeight: 500 }}>{vak}</span>
+                <span style={{ fontSize: '12px', color: 'var(--c-text-2)', fontWeight: 500 }}>{vak}</span>
                 {link ? (
                   <button
                     onClick={e => { e.stopPropagation(); openBook(link, getCreds(userId)) }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#00FFD1', background: 'rgba(0,255,209,0.08)', border: '1px solid rgba(0,255,209,0.2)', borderRadius: '6px', padding: '2px 7px', cursor: 'pointer' }}>
+                    style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--accent)', background: 'color-mix(in srgb, var(--accent) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)', borderRadius: '6px', padding: '2px 7px', cursor: 'pointer' }}>
                     <ExternalLink size={10} /> Boek
                   </button>
                 ) : (

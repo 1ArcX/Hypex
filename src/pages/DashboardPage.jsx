@@ -195,11 +195,11 @@ function useFocusCard({ todayItems, tasks, subjects, today }) {
 }
 
 const FOCUS_CFG = {
-  now:     { color: '#00FFD1', bg: 'rgba(0,255,209,0.08)',   border: 'rgba(0,255,209,0.25)' },
+  now:     { color: 'var(--accent)', bg: 'color-mix(in srgb, var(--accent) 8%, transparent)',   border: 'color-mix(in srgb, var(--accent) 25%, transparent)' },
   soon:    { color: '#818CF8', bg: 'rgba(129,140,248,0.08)', border: 'rgba(129,140,248,0.25)' },
   urgent:  { color: '#FF6B6B', bg: 'rgba(255,107,107,0.08)', border: 'rgba(255,107,107,0.3)' },
   overdue: { color: '#FF8C42', bg: 'rgba(255,140,66,0.08)',  border: 'rgba(255,140,66,0.3)' },
-  today:   { color: '#00FFD1', bg: 'rgba(0,255,209,0.06)',   border: 'rgba(0,255,209,0.2)' },
+  today:   { color: 'var(--accent)', bg: 'color-mix(in srgb, var(--accent) 6%, transparent)',   border: 'color-mix(in srgb, var(--accent) 20%, transparent)' },
   evening: { color: '#A78BFA', bg: 'rgba(167,139,250,0.08)', border: 'rgba(167,139,250,0.25)' },
 }
 
@@ -218,7 +218,7 @@ function FocusCard({ card, onToggleTask, setDetailTask }) {
           <p style={{ fontSize: 10, color: cfg.color, margin: '0 0 2px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{label}</p>
           <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.item.label}</p>
         </div>
-        <span style={{ fontSize: 12, color: cfg.color, fontWeight: 700, background: `${cfg.color}20`, borderRadius: 8, padding: '4px 10px', flexShrink: 0 }}>{badge}</span>
+        <span style={{ fontSize: 12, color: cfg.color, fontWeight: 700, background: `color-mix(in srgb, ${cfg.color} 13%, transparent)`, borderRadius: 8, padding: '4px 10px', flexShrink: 0 }}>{badge}</span>
       </div>
     )
   }
@@ -237,7 +237,7 @@ function FocusCard({ card, onToggleTask, setDetailTask }) {
         </div>
         <button
           onClick={e => { e.stopPropagation(); onToggleTask?.(card.task) }}
-          style={{ flexShrink: 0, width: 34, height: 34, borderRadius: '50%', background: `${cfg.color}18`, border: `2px solid ${cfg.color}50`, color: cfg.color, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 700, transition: 'background 0.15s' }}
+          style={{ flexShrink: 0, width: 34, height: 34, borderRadius: '50%', background: `color-mix(in srgb, ${cfg.color} 9%, transparent)`, border: `2px solid color-mix(in srgb, ${cfg.color} 31%, transparent)`, color: cfg.color, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 700, transition: 'background 0.15s' }}
           title="Markeer als gedaan"
         >✓</button>
       </div>
@@ -358,7 +358,7 @@ export default function DashboardPage({
                   ? 'linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #fff))'
                   : 'linear-gradient(90deg, color-mix(in srgb, var(--accent) 70%, transparent), var(--accent))',
                 transition: 'width 0.6s ease',
-                boxShadow: progressPct > 0 ? '0 0 10px rgba(0,255,209,0.35)' : 'none',
+                boxShadow: progressPct > 0 ? '0 0 10px color-mix(in srgb, var(--accent) 35%, transparent)' : 'none',
               }} />
             </div>
           </div>
@@ -392,18 +392,18 @@ export default function DashboardPage({
             <span style={{ fontSize: 11, color: overdueCount > 0 ? 'rgba(255,140,66,0.65)' : 'var(--text-3)', fontWeight: 600 }}>Te laat</span>
           </div>
           <div onClick={() => onNavigateToTasks?.('alles')} style={{
-            background: 'rgba(0,255,209,0.05)',
-            border: '1px solid rgba(0,255,209,0.12)',
+            background: 'color-mix(in srgb, var(--accent) 5%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--accent) 12%, transparent)',
             borderRadius: 12, padding: '10px 12px',
             display: 'flex', alignItems: 'center', gap: 8,
             cursor: 'pointer',
           }}>
             <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}>{openCount}</span>
-            <span style={{ fontSize: 11, color: 'rgba(0,255,209,0.55)', fontWeight: 600 }}>Open</span>
+            <span style={{ fontSize: 11, color: 'color-mix(in srgb, var(--accent) 55%, transparent)', fontWeight: 600 }}>Open</span>
           </div>
         </div>
       ) : (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 14, background: 'rgba(0,255,209,0.05)', border: '1px solid rgba(0,255,209,0.15)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 14, background: 'color-mix(in srgb, var(--accent) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 15%, transparent)' }}>
           <span style={{ fontSize: 20 }}>🎉</span>
           <div>
             <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', margin: 0 }}>Alles gedaan!</p>
@@ -532,7 +532,7 @@ export default function DashboardPage({
                   fontSize: 10, padding: '2px 7px', borderRadius: 10, cursor: 'pointer', border: '1px solid',
                   borderColor: active ? 'rgba(129,140,248,0.5)' : 'rgba(255,255,255,0.1)',
                   background: active ? 'rgba(129,140,248,0.15)' : 'transparent',
-                  color: active ? 'rgba(129,140,248,1)' : 'rgba(255,255,255,0.35)',
+                  color: active ? 'rgba(129,140,248,1)' : 'var(--c-text-3)',
                   fontWeight: active ? 600 : 400,
                 }}>
                   {f.label}
@@ -609,7 +609,7 @@ export default function DashboardPage({
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
               <span style={{ fontSize: 14 }}>🌧️</span>
               <span style={{ fontSize: 12, color: 'rgba(0,200,255,0.9)', fontWeight: 600 }}>{maxLabel} {timeLabel}</span>
-              <button onClick={dismissRain} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '2px', lineHeight: 1, fontSize: 16 }} title="Verbergen">×</button>
+              <button onClick={dismissRain} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', padding: '2px', lineHeight: 1, fontSize: 16 }} title="Verbergen">×</button>
             </div>
             <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }}>
               <defs>
@@ -672,7 +672,7 @@ export default function DashboardPage({
         style={{
           padding: '14px', fontSize: 14, display: 'flex', alignItems: 'center',
           justifyContent: 'center', gap: 8, width: '100%',
-          boxShadow: '0 0 20px rgba(0,255,209,0.1)',
+          boxShadow: '0 0 20px color-mix(in srgb, var(--accent) 10%, transparent)',
         }}>
         + Taak toevoegen
       </button>

@@ -693,7 +693,7 @@ export default function App() {
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-base)' }}>
       <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin"
-        style={{ borderColor: '#00FFD1', borderTopColor: 'transparent' }} />
+        style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
     </div>
   )
 

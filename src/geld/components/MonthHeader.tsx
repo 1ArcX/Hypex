@@ -15,11 +15,11 @@ export function MonthHeader({ showSearch = false }: { showSearch?: boolean }) {
         <ChevronLeft size={16} />
       </button>
       <div className="flex-1 text-center">
-        <p className={`text-[15px] font-bold m-0 capitalize ${isCurrentMonth ? 'text-white/90' : 'text-teal-300'}`}>
+        <p className={`text-[15px] font-bold m-0 capitalize ${isCurrentMonth ? 'text-white/90' : 'text-accent'}`}>
           {monthLabel}
         </p>
         {!isCurrentMonth && (
-          <p className="text-[9px] font-bold text-teal-300/70 m-0 tracking-[0.08em]">VORIGE MAAND — BEWERKBAAR</p>
+          <p className="text-[9px] font-bold text-accent/70 m-0 tracking-[0.08em]">VORIGE MAAND — BEWERKBAAR</p>
         )}
       </div>
       <button onClick={goToNextMonth} disabled={isCurrentMonth}

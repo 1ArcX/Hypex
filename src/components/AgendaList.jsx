@@ -157,7 +157,7 @@ function Row({ color, timeLabel, title, sub, cancelled, onClick, check }) {
       style={{
         display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', marginBottom: 6,
         borderRadius: 12, cursor: 'pointer',
-        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+        background: 'rgba(255,255,255,0.03)', border: '1px solid var(--c-border)',
       }}>
       <div style={{ width: 50, flexShrink: 0, fontSize: 11, fontWeight: 600, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>
         {timeLabel}

@@ -49,8 +49,8 @@ export default function AuthPage() {
         {/* Logo */}
         <div className="flex items-center justify-center gap-3 mb-8">
           <div className="w-10 h-10 rounded-2xl flex items-center justify-center"
-            style={{ background: 'rgba(0,255,209,0.15)', border: '1px solid rgba(0,255,209,0.3)' }}>
-            <BookOpen size={20} color="#00FFD1" />
+            style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)' }}>
+            <BookOpen size={20} style={{ color: 'var(--accent)' }} />
           </div>
           <h1 className="text-xl font-semibold text-white">Student Dashboard</h1>
         </div>
@@ -58,7 +58,7 @@ export default function AuthPage() {
         <h2 className="text-2xl font-bold text-white mb-1">
           {mode === 'login' ? 'Welkom terug' : mode === 'register' ? 'Account aanmaken' : 'Wachtwoord vergeten'}
         </h2>
-        <p className="text-sm mb-6" style={{ color: 'rgba(255,255,255,0.4)' }}>
+        <p className="text-sm mb-6" style={{ color: 'var(--c-text-3)' }}>
           {mode === 'login' ? 'Log in om je dashboard te openen'
             : mode === 'register' ? 'Maak een gratis account aan'
             : 'We sturen je een resetlink per e-mail'}
@@ -69,7 +69,7 @@ export default function AuthPage() {
           {mode === 'register' && (
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium flex items-center gap-1.5"
-                style={{ color: 'rgba(0,255,209,0.8)' }}>
+                style={{ color: 'color-mix(in srgb, var(--accent) 80%, transparent)' }}>
                 <User size={13} /> Volledige naam
               </label>
               <input type="text" placeholder="Jan de Vries"
@@ -81,7 +81,7 @@ export default function AuthPage() {
           {/* E-mail */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium flex items-center gap-1.5"
-              style={{ color: 'rgba(0,255,209,0.8)' }}>
+              style={{ color: 'color-mix(in srgb, var(--accent) 80%, transparent)' }}>
               <Mail size={13} /> E-mailadres
             </label>
             <input type="email" placeholder="jouw@email.nl"
@@ -93,7 +93,7 @@ export default function AuthPage() {
           {mode !== 'forgot' && (
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium flex items-center gap-1.5"
-                style={{ color: 'rgba(0,255,209,0.8)' }}>
+                style={{ color: 'color-mix(in srgb, var(--accent) 80%, transparent)' }}>
                 <Lock size={13} /> Wachtwoord
               </label>
               <div className="relative">
@@ -103,15 +103,15 @@ export default function AuthPage() {
                   value={password} onChange={e => setPassword(e.target.value)}
                   className="glass-input pr-10" required />
                 <button type="button" onClick={() => setShowPass(!showPass)}
-                  style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}>
+                  style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)' }}>
                   {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
               {/* Wachtwoord vergeten link */}
               {mode === 'login' && (
                 <button type="button" onClick={() => reset('forgot')}
-                  style={{ alignSelf: 'flex-end', fontSize: '12px', color: 'rgba(255,255,255,0.35)', background: 'none', border: 'none', cursor: 'pointer', marginTop: '2px' }}
-                  onMouseEnter={e => e.currentTarget.style.color = '#00FFD1'}
+                  style={{ alignSelf: 'flex-end', fontSize: '12px', color: 'var(--c-text-3)', background: 'none', border: 'none', cursor: 'pointer', marginTop: '2px' }}
+                  onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
                   onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.35)'}>
                   Wachtwoord vergeten?
                 </button>
@@ -128,7 +128,7 @@ export default function AuthPage() {
           )}
           {message && (
             <p className="text-sm px-3 py-2 rounded-xl"
-              style={{ background: 'rgba(0,255,209,0.1)', border: '1px solid rgba(0,255,209,0.3)', color: '#00FFD1' }}>
+              style={{ background: 'color-mix(in srgb, var(--accent) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', color: 'var(--accent)' }}>
               {message}
             </p>
           )}
@@ -144,17 +144,17 @@ export default function AuthPage() {
         </form>
 
         {/* Onderaan navigatie */}
-        <div className="text-center mt-6 text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>
+        <div className="text-center mt-6 text-sm" style={{ color: 'var(--c-text-3)' }}>
           {mode === 'forgot' ? (
             <button onClick={() => reset('login')}
-              style={{ color: '#00FFD1', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '500' }}>
+              style={{ color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '500' }}>
               ← Terug naar inloggen
             </button>
           ) : (
             <>
               {mode === 'login' ? 'Nog geen account?' : 'Al een account?'}{' '}
               <button onClick={() => reset(mode === 'login' ? 'register' : 'login')}
-                style={{ color: '#00FFD1', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '500' }}>
+                style={{ color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '500' }}>
                 {mode === 'login' ? 'Registreer hier' : 'Log in'}
               </button>
             </>

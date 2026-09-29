@@ -512,18 +512,18 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
         <div style={{ display: 'flex', gap: '4px' }}>
           {creds && (
             <button onClick={refresh} disabled={loading}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '3px', borderRadius: '6px' }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', padding: '3px', borderRadius: '6px' }}
               onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
               onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.3)'}>
               <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
             </button>
           )}
           <button onClick={() => setShowSettings(!showSettings)}
-            style={{ background: showSettings ? accentBg(15) : 'rgba(255,255,255,0.05)', border: showSettings ? accentBorder(40) : '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '3px 7px', cursor: 'pointer', color: showSettings ? 'var(--accent)' : 'rgba(255,255,255,0.4)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            style={{ background: showSettings ? accentBg(15) : 'rgba(255,255,255,0.05)', border: showSettings ? accentBorder(40) : '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '3px 7px', cursor: 'pointer', color: showSettings ? 'var(--accent)' : 'var(--c-text-3)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
             <Settings size={11} /> {(creds || somtodayCreds) ? (showSettings ? 'Sluiten' : 'Instelling') : 'Inloggen'}
           </button>
           <button onClick={() => setExpanded(!expanded)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '2px' }}>
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', padding: '2px' }}>
             {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
         </div>
@@ -533,9 +533,9 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
         <>
           {/* Login/instellingen form */}
           {showSettings && (
-            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '14px', marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--c-border)', borderRadius: '12px', padding: '14px', marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {/* Provider selector — SOMtoday only for specific account */}
-              <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 3, border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 3, border: '1px solid var(--c-border)' }}>
                 {(somtodayEnabled ? ['somtoday'] : ['magister']).map(p => (
                   <button key={p} onClick={() => setStProvider(p)}
                     style={{ flex: 1, padding: '5px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: stProvider === p ? 700 : 400,
@@ -550,7 +550,7 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
 
               {/* Magister form */}
               {stProvider === 'magister' && (<>
-                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', margin: 0 }}>
+                <p style={{ color: 'var(--c-text-2)', fontSize: '11px', margin: 0 }}>
                   Log in met je Magister-account. Vakken en lesmateriaal worden automatisch gesynchroniseerd.
                 </p>
                 <input className="glass-input" placeholder="Leerlingnummer" value={formCreds.username}
@@ -587,12 +587,12 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
                   </>
                 ) : (
                   <>
-                    <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
+                    <p style={{ margin: 0, fontSize: 11, color: 'var(--c-text-2)' }}>
                       Eenmalige koppeling via je browser. Volg de 3 stappen:
                     </p>
                     {/* Step 1 */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>① Open leerling.somtoday.nl en log in</span>
+                      <span style={{ fontSize: 11, color: 'var(--c-text-2)', fontWeight: 600 }}>① Open leerling.somtoday.nl en log in</span>
                       <a href="https://leerling.somtoday.nl" target="_blank" rel="noopener noreferrer"
                         style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(251,191,36,0.35)', background: 'rgba(251,191,36,0.08)', color: '#FBBF24', textDecoration: 'none', fontSize: 12, fontWeight: 600, width: 'fit-content' }}>
                         <ExternalLink size={12} /> leerling.somtoday.nl
@@ -600,28 +600,28 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
                     </div>
                     {/* Step 2 */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>② Open de console (F12 → Console) en plak dit commando:</span>
+                      <span style={{ fontSize: 11, color: 'var(--c-text-2)', fontWeight: 600 }}>② Open de console (F12 → Console) en plak dit commando:</span>
                       <div style={{ position: 'relative' }}>
-                        <code style={{ display: 'block', padding: '7px 32px 7px 8px', borderRadius: 7, background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.1)', fontSize: 10, color: '#A5F3FC', wordBreak: 'break-all', lineHeight: 1.4 }}>
+                        <code style={{ display: 'block', padding: '7px 32px 7px 8px', borderRadius: 7, background: 'rgba(0,0,0,0.35)', border: '1px solid var(--c-border-strong)', fontSize: 10, color: '#A5F3FC', wordBreak: 'break-all', lineHeight: 1.4 }}>
                           {`copy(JSON.stringify(Object.fromEntries(Object.entries(localStorage).filter(([k])=>/oidc|token|somtoday/i.test(k)))))`}
                         </code>
                         <button onClick={() => {
                           navigator.clipboard.writeText(`copy(JSON.stringify(Object.fromEntries(Object.entries(localStorage).filter(([k])=>/oidc|token|somtoday/i.test(k)))))`)
-                        }} style={{ position: 'absolute', top: 5, right: 5, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 5, padding: '2px 6px', cursor: 'pointer', color: 'rgba(255,255,255,0.5)', fontSize: 9 }}>
+                        }} style={{ position: 'absolute', top: 5, right: 5, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 5, padding: '2px 6px', cursor: 'pointer', color: 'var(--c-text-2)', fontSize: 9 }}>
                           Kopieer
                         </button>
                       </div>
-                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>Druk Enter — het commando kopieert het resultaat automatisch.</span>
+                      <span style={{ fontSize: 10, color: 'var(--c-text-3)' }}>Druk Enter — het commando kopieert het resultaat automatisch.</span>
                     </div>
                     {/* Step 3 */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>③ Plak het resultaat hier:</span>
+                      <span style={{ fontSize: 11, color: 'var(--c-text-2)', fontWeight: 600 }}>③ Plak het resultaat hier:</span>
                       <textarea
                         value={stTokenPaste}
                         onChange={e => setStTokenPaste(e.target.value)}
                         placeholder='{"oidc.user:...": "..."}'
                         rows={3}
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '7px 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.8)', fontSize: 11, fontFamily: 'monospace', resize: 'vertical', outline: 'none' }}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '7px 8px', borderRadius: 8, border: '1px solid var(--c-border-strong)', background: 'rgba(255,255,255,0.04)', color: 'var(--c-text-2)', fontSize: 11, fontFamily: 'monospace', resize: 'vertical', outline: 'none' }}
                       />
                     </div>
                     {stError && (
@@ -680,7 +680,7 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
                     ] : [])
                   ].map(t => (
                     <button key={t.id} onClick={() => setTab(t.id)}
-                      style={{ flexShrink: 0, minWidth: 'fit-content', padding: '5px 10px', borderRadius: '8px', fontSize: '10px', cursor: 'pointer', border: '1px solid', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', whiteSpace: 'nowrap', borderColor: tab === t.id ? accentBg(50) : 'rgba(255,255,255,0.08)', background: tab === t.id ? accentBg(12) : 'transparent', color: tab === t.id ? 'var(--accent)' : 'rgba(255,255,255,0.4)', position: 'relative' }}>
+                      style={{ flexShrink: 0, minWidth: 'fit-content', padding: '5px 10px', borderRadius: '8px', fontSize: '10px', cursor: 'pointer', border: '1px solid', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', whiteSpace: 'nowrap', borderColor: tab === t.id ? accentBg(50) : 'rgba(255,255,255,0.08)', background: tab === t.id ? accentBg(12) : 'transparent', color: tab === t.id ? 'var(--accent)' : 'var(--c-text-3)', position: 'relative' }}>
                       {t.icon} {t.label}
                       {t.badge && <span style={{ position: 'absolute', top: 2, right: 2, width: 6, height: 6, borderRadius: '50%', background: '#FACC15' }} />}
                     </button>
@@ -732,7 +732,7 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
                     )}
                     <div className={tabless ? 'card' : ''} style={tabless ? { padding: '14px 16px', ...(gridLayout ? { flex: 1, overflowY: 'auto' } : {}) } : {}}>
                       {vakken.length === 0 ? (
-                        <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '12px 0', margin: 0 }}>
+                        <p style={{ color: 'var(--c-text-3)', fontSize: '12px', textAlign: 'center', padding: '12px 0', margin: 0 }}>
                           {somtodayEnabled ? (stDataLoading ? 'Laden…' : somtodayCreds ? 'Vakken worden geladen…' : 'Verbind SOMtoday') : creds ? 'Klik op "Sync" om vakken te laden' : 'Log in bij Magister om vakken te laden'}
                         </p>
                       ) : (
@@ -745,7 +745,7 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
                                 {vak} <ExternalLink size={10} />
                               </button>
                             ) : (
-                              <span key={vak} style={{ padding: '4px 12px', borderRadius: 20, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-2)', fontSize: 12 }}>
+                              <span key={vak} style={{ padding: '4px 12px', borderRadius: 20, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--c-border-strong)', color: 'var(--text-2)', fontSize: 12 }}>
                                 {vak}
                               </span>
                             )
@@ -782,14 +782,14 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
                     )}
                     <div className={tabless ? 'card' : ''} style={tabless ? { padding: '0', ...(gridLayout ? { flex: 1, overflowY: 'auto' } : {}) } : { display: 'flex', flexDirection: 'column', gap: 4 }}>
                       {data.grades.length === 0 && (
-                        <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '20px 0', margin: 0 }}>Geen cijfers gevonden</p>
+                        <p style={{ color: 'var(--c-text-3)', fontSize: '12px', textAlign: 'center', padding: '20px 0', margin: 0 }}>Geen cijfers gevonden</p>
                       )}
                       {data.grades.map((g, i) => {
                         const cijfer = parseFloat(g.cijfer)
                         const color = isNaN(cijfer) ? '#818CF8' : cijfer >= 5.5 ? '#4ADE80' : '#FF6B6B'
                         return (
                           <div key={i} className="stagger-item" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: i < data.grades.length - 1 ? '1px solid var(--border)' : 'none', animationDelay: `${i * 35}ms` }}>
-                            <div style={{ width: 38, height: 38, borderRadius: 10, background: color + '18', border: `1px solid ${color}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <div style={{ width: 38, height: 38, borderRadius: 10, background: `color-mix(in srgb, ${color} 9%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 27%, transparent)`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                               <span style={{ fontSize: 14, fontWeight: 700, color }}>{g.cijfer ?? '–'}</span>
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
@@ -824,14 +824,14 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
                     )}
                     <div className={tabless ? 'card' : ''} style={tabless ? { padding: '0', ...(gridLayout ? { flex: 1, overflowY: 'auto' } : {}) } : { display: 'flex', flexDirection: 'column', gap: 4 }}>
                       {stGrades.length === 0 && (
-                        <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '20px 0', margin: 0 }}>Geen cijfers gevonden</p>
+                        <p style={{ color: 'var(--c-text-3)', fontSize: '12px', textAlign: 'center', padding: '20px 0', margin: 0 }}>Geen cijfers gevonden</p>
                       )}
                       {stGrades.map((g, i) => {
                         const cijfer = parseFloat(g.cijfer)
                         const color = isNaN(cijfer) ? '#818CF8' : g.isVoldoende !== false ? '#4ADE80' : '#FF6B6B'
                         return (
                           <div key={i} className="stagger-item" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: i < stGrades.length - 1 ? '1px solid var(--border)' : 'none', animationDelay: `${i * 35}ms` }}>
-                            <div style={{ width: 38, height: 38, borderRadius: 10, background: color + '18', border: `1px solid ${color}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <div style={{ width: 38, height: 38, borderRadius: 10, background: `color-mix(in srgb, ${color} 9%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 27%, transparent)`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                               <span style={{ fontSize: 14, fontWeight: 700, color }}>{g.cijfer ?? '–'}</span>
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
@@ -876,7 +876,7 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
                     )}
                     <div className={tabless ? 'card' : ''} style={tabless ? { padding: 0, ...(gridLayout ? { flex: 1, overflowY: 'auto' } : {}) } : { display: 'flex', flexDirection: 'column', gap: 4 }}>
                       {data.homework.length === 0 && (
-                        <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '20px 0', margin: 0 }}>Geen huiswerk gevonden</p>
+                        <p style={{ color: 'var(--c-text-3)', fontSize: '12px', textAlign: 'center', padding: '20px 0', margin: 0 }}>Geen huiswerk gevonden</p>
                       )}
                       {data.homework.map((hw, i) => (
                         <div key={i} className="stagger-item" style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 16px', borderBottom: i < data.homework.length - 1 ? '1px solid var(--border)' : 'none', animationDelay: `${i * 35}ms` }}>
@@ -922,11 +922,11 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
                       {/* Detail view */}
                       {swDetail && (
                         <div style={{ display:'flex', flexDirection:'column' }}>
-                          <button onClick={() => setSwDetail(null)} style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, padding:'6px 12px', cursor:'pointer', color:'var(--text-1)', fontSize:12, fontWeight:600, margin:'10px 16px 8px', textAlign:'left' }}>
+                          <button onClick={() => setSwDetail(null)} style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(255,255,255,0.05)', border:'1px solid var(--c-border-strong)', borderRadius:8, padding:'6px 12px', cursor:'pointer', color:'var(--text-1)', fontSize:12, fontWeight:600, margin:'10px 16px 8px', textAlign:'left' }}>
                             <ChevronDown size={13} style={{ transform:'rotate(90deg)' }} /> {swDetail.sw.naam}
                           </button>
                           {swDetail.loading && (
-                            <div style={{ textAlign:'center', padding:'16px', color:'rgba(255,255,255,0.3)', fontSize:'12px' }}>
+                            <div style={{ textAlign:'center', padding:'16px', color:'var(--c-text-3)', fontSize:'12px' }}>
                               <RefreshCw size={14} style={{ animation:'spin 1s linear infinite', display:'block', margin:'0 auto 4px' }} /> Laden...
                             </div>
                           )}
@@ -936,7 +936,7 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
                             </div>
                           )}
                           {!swDetail.loading && swDetail.topics.length === 0 && !swDetail.error && (
-                            <p style={{ color:'rgba(255,255,255,0.25)', fontSize:'12px', textAlign:'center', padding:'20px 0', margin:0 }}>
+                            <p style={{ color:'var(--c-text-3)', fontSize:'12px', textAlign:'center', padding:'20px 0', margin:0 }}>
                               Geen onderdelen gevonden (check console voor API-structuur)
                             </p>
                           )}
@@ -983,7 +983,7 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
                       {!swDetail && (
                         <>
                           {data.studiewijzer.length === 0 && (
-                            <p style={{ color:'rgba(255,255,255,0.25)', fontSize:'12px', textAlign:'center', padding:'20px 0', margin:0 }}>Geen studiewijzer gevonden</p>
+                            <p style={{ color:'var(--c-text-3)', fontSize:'12px', textAlign:'center', padding:'20px 0', margin:0 }}>Geen studiewijzer gevonden</p>
                           )}
                           {data.studiewijzer.map((sw, i) => (
                             <div key={i} className="stagger-item" onClick={() => openStudiewijzer(sw)} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 16px', borderBottom: i < data.studiewijzer.length-1 ? '1px solid var(--border)' : 'none', cursor:'pointer', animationDelay: `${i * 35}ms` }}
@@ -1032,11 +1032,11 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
                       {/* Detail view */}
                       {stSwDetail && (
                         <div style={{ display:'flex', flexDirection:'column' }}>
-                          <button onClick={() => setStSwDetail(null)} style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, padding:'6px 12px', cursor:'pointer', color:'var(--text-1)', fontSize:12, fontWeight:600, margin:'10px 16px 8px', textAlign:'left' }}>
+                          <button onClick={() => setStSwDetail(null)} style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(255,255,255,0.05)', border:'1px solid var(--c-border-strong)', borderRadius:8, padding:'6px 12px', cursor:'pointer', color:'var(--text-1)', fontSize:12, fontWeight:600, margin:'10px 16px 8px', textAlign:'left' }}>
                             <ChevronDown size={13} style={{ transform:'rotate(90deg)' }} /> {stSwDetail.vakNaam}
                           </button>
                           {stSwDetail.loading && (
-                            <div style={{ textAlign:'center', padding:'16px', color:'rgba(255,255,255,0.3)', fontSize:'12px' }}>
+                            <div style={{ textAlign:'center', padding:'16px', color:'var(--c-text-3)', fontSize:'12px' }}>
                               <RefreshCw size={14} style={{ animation:'spin 1s linear infinite', display:'block', margin:'0 auto 4px' }} /> Laden...
                             </div>
                           )}
@@ -1046,7 +1046,7 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
                             </div>
                           )}
                           {!stSwDetail.loading && !stSwDetail.error && !(stSwDetail.mappen?.length) && !(stSwDetail.lossebestanden?.length) && (
-                            <p style={{ color:'rgba(255,255,255,0.25)', fontSize:'12px', textAlign:'center', padding:'20px 0', margin:0 }}>Geen materiaal gevonden</p>
+                            <p style={{ color:'var(--c-text-3)', fontSize:'12px', textAlign:'center', padding:'20px 0', margin:0 }}>Geen materiaal gevonden</p>
                           )}
                           {(stSwDetail.mappen || []).map((map, i) => {
                             const mapKey = `stmap-${i}`
@@ -1097,7 +1097,7 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
                       {!stSwDetail && (
                         <>
                           {stVakken.length === 0 && (
-                            <p style={{ color:'rgba(255,255,255,0.25)', fontSize:'12px', textAlign:'center', padding:'20px 0', margin:0 }}>Geen vakken gevonden</p>
+                            <p style={{ color:'var(--c-text-3)', fontSize:'12px', textAlign:'center', padding:'20px 0', margin:0 }}>Geen vakken gevonden</p>
                           )}
                           {stVakken.map((vak, i) => (
                             <div key={i} className="stagger-item"
@@ -1143,7 +1143,7 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
                     )}
                     <div className={tabless ? 'card' : ''} style={tabless ? { padding: 0, ...(gridLayout ? { flex: 1, overflowY: 'auto' } : {}) } : { display: 'flex', flexDirection: 'column', gap: 4 }}>
                       {data.assignments.length === 0 && (
-                        <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '20px 0', margin: 0 }}>Geen opdrachten gevonden</p>
+                        <p style={{ color: 'var(--c-text-3)', fontSize: '12px', textAlign: 'center', padding: '20px 0', margin: 0 }}>Geen opdrachten gevonden</p>
                       )}
                       {tabless && data.assignments.length > 0 && (
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr auto', gap: '0 12px', padding: '6px 16px', borderBottom: '1px solid var(--border)' }}>
@@ -1169,14 +1169,14 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
                           <div key={i} className="stagger-item" style={{ padding: '8px 10px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${overdue ? 'rgba(255,80,80,0.2)' : 'rgba(255,255,255,0.06)'}`, animationDelay: `${i * 35}ms` }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                               <div style={{ flex: 1, minWidth: 0 }}>
-                                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', fontWeight: 500, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.naam || 'Onbekend'}</p>
-                                {a.vak && <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', margin: '2px 0 0' }}>{a.vak}</p>}
+                                <p style={{ fontSize: 12, color: 'var(--c-text)', fontWeight: 500, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.naam || 'Onbekend'}</p>
+                                {a.vak && <p style={{ fontSize: 11, color: 'var(--c-text-3)', margin: '2px 0 0' }}>{a.vak}</p>}
                               </div>
                               <span style={{ fontSize: 10, color: statusColor, background: statusColor + '18', border: `1px solid ${statusColor}44`, borderRadius: 6, padding: '1px 6px', flexShrink: 0, whiteSpace: 'nowrap' }}>
                                 {statusLabel}
                               </span>
                             </div>
-                            {a.deadline && <p style={{ fontSize: 10, color: overdue ? '#FF6B6B' : 'rgba(255,255,255,0.25)', margin: '4px 0 0' }}>Inleveren: {formatDate(a.deadline)}</p>}
+                            {a.deadline && <p style={{ fontSize: 10, color: overdue ? '#FF6B6B' : 'var(--c-text-3)', margin: '4px 0 0' }}>Inleveren: {formatDate(a.deadline)}</p>}
                           </div>
                         )
                       })}
@@ -1185,7 +1185,7 @@ export default function MagisterWidget({ userId, userEmail, onSubjectsSync, tabl
                 )}
 
                 {!creds && !somtodayEnabled && tab !== 'vakken' && (
-                  <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>
+                  <p style={{ color: 'var(--c-text-3)', fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>
                     Klik op "Inloggen" om te beginnen
                   </p>
                 )}
