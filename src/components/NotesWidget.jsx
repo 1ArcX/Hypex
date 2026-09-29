@@ -48,7 +48,7 @@ function formatRelTime(iso) {
   return `${d.getDate()} ${months[d.getMonth()]}`
 }
 
-export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 0, seamless = false }) {
+export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 0, seamless = false, openNoteId = null }) {
   const [folders, setFolders]       = useState([])
   const [notes, setNotes]           = useState([])
   const [activeNote, setActiveNote] = useState(null)
@@ -146,6 +146,14 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
     setActiveNote(note)
     activeNoteIdRef.current = note.id
   }
+
+  // Direct een notitie openen (bv. vanuit de zoekpalette)
+  const openedFromJumpRef = useRef(null)
+  useEffect(() => {
+    if (!openNoteId || openedFromJumpRef.current === openNoteId) return
+    const note = notes.find(n => n.id === openNoteId)
+    if (note) { openedFromJumpRef.current = openNoteId; openNote(note) }
+  }, [openNoteId, notes])
 
   const goBack = () => {
     setActiveNote(null)

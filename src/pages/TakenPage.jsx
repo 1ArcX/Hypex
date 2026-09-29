@@ -137,12 +137,13 @@ export default function TakenPage({
   useEffect(() => {
     if (!highlightFilter) return
     // Navigeer naar de juiste filter
-    const filterMap = { urgent: 'urgent', telaat: 'telaat', open: 'alles' }
+    const filterMap = { urgent: 'urgent', telaat: 'telaat', open: 'alles', vandaag: 'vandaag' }
     setFilter(filterMap[highlightFilter] ?? 'alles')
     // Bepaal welke taken gehighlight worden
     const matchFn = {
       urgent: t => !t.completed && (t.priority ?? 2) === 1,
-      telaat: t => !t.completed && t.date && t.date < ts,
+      telaat: t => !t.completed && !t.recurrence && t.date && t.date < ts,
+      vandaag: t => !t.completed && t.date === ts,
       open:   t => !t.completed,
     }[highlightFilter]
     if (matchFn) {

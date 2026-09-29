@@ -43,7 +43,7 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 
 - **Sidebar** — [components/Sidebar.jsx](../src/components/Sidebar.jsx)
   - Aliases: "de sidebar", "left menu", "linker menu", "navigatie" (desktop), "zijbalk"
-  - Where: desktop only (`hidden md:block` in App.jsx). Contains logo "Hypex", nav items, Instellingen/Admin/Uitloggen, VersionChecker, avatar.
+  - Where: desktop only (`hidden md:block` in App.jsx). Contains logo "Hypex", "Zoeken" (Ctrl K), nav items (`.hx-nav-item`, red overdue badge on Taken), Instellingen/Admin/Uitloggen, VersionChecker, avatar.
   - Related: BottomNav (mobile equivalent), VersionChecker.
 
 - **BottomNav** — [components/BottomNav.jsx](../src/components/BottomNav.jsx)
@@ -57,15 +57,23 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 
 ## Feature components
 
-### Dashboard
+### Dashboard (v2 command center, 4 rows — CSS grid classes `.dash-*` in index.css)
 - **DashboardPage internals** — [pages/DashboardPage.jsx](../src/pages/DashboardPage.jsx)
-  - `Clock` hero, `FocusCard` ("Nu bezig"/"Urgent"/"Vandaag" focus kaart), the 3-tile stats row
-    ("Urgent" / "Te laat" / "Open"), "Schema vandaag" strip, "Volgende" + "Deadlines" cards, rain graph, "Nog in te plannen".
-  - Aliases for the tiles/cards: "focus kaart", "stats-kaart", "urgent tile", "te laat tile", "open tile",
-    "schema vandaag", "volgende gebeurtenis", "deadlines kaart", "regen grafiek". These are **inline in DashboardPage.jsx**, not separate files.
-- **Clock** — [components/Clock.jsx](../src/components/Clock.jsx) — big dashboard clock; `isBreak` tints it. Aliases: "klok", "de tijd".
-- **WeatherWidget** — [components/WeatherWidget.jsx](../src/components/WeatherWidget.jsx) — weather + PWA-install prompt trigger. Aliases: "weer", "weerwidget". Data: open-meteo/buienalarm, `weather_coords` in localStorage.
-- **SpotifyWidget** — [components/SpotifyWidget.jsx](../src/components/SpotifyWidget.jsx) — Spotify now-playing/queue/recent. Aliases: "spotify", "muziek", "now playing". Data: Spotify OAuth via netlify function.
+  - Row 1 header: greeting + date, search button ("Zoek in Hypex…", opens CommandPalette), inline `Clock`, compact `WeatherWidget`.
+  - Row 2 KPI row (`KpiTile`): "Urgent" / "Te laat" / "Open" / "Vandaag".
+  - Row 3 workspace: "Te laat & urgent" card (compact rows + complete) and "Volgende afspraak" card (countdown, "Nu bezig", filter Alle/Agenda/Werk/Taken, ‹ ›, "Bekijk agenda").
+  - Row 4 widgets: TodayWidget, PomodoroMiniWidget, GeldMiniWidget (admin), `SpotifyWidget compact`.
+  - Row 5 extras: "Schema vandaag", "Deadlines", "Nog in te plannen", `RainCard` (regen grafiek).
+  - Aliases: "stats-kaart", "KPI's", "urgent/te laat/open/vandaag tile", "te laat kaart", "volgende afspraak",
+    "schema vandaag", "deadlines kaart", "regen grafiek". **Inline in DashboardPage.jsx.** (The old FocusCard was folded into these.)
+- **Dashboard widgets** — `src/components/dashboard/`:
+  [TodayWidget](../src/components/dashboard/TodayWidget.jsx) ("Vandaag"-widget, progress ring),
+  [PomodoroMiniWidget](../src/components/dashboard/PomodoroMiniWidget.jsx) (reads `pomodoro_v3`, opens Pomodoro page),
+  [GeldMiniWidget](../src/components/dashboard/GeldMiniWidget.jsx) (reuses Geld hooks `useBudgetStats`, read-only).
+- **Clock** — [components/Clock.jsx](../src/components/Clock.jsx) — clock; `variant="inline"` for the dashboard header, `isBreak` tints it. Aliases: "klok", "de tijd".
+- **CommandPalette** — [components/CommandPalette.jsx](../src/components/CommandPalette.jsx) — "Zoek in Hypex" (Ctrl/⌘K, sidebar "Zoeken", dashboard search field): tasks, agenda items, notes, pages, "Nieuwe taak". Aliases: "zoeken", "search", "command palette", "cmd k".
+- **WeatherWidget** — [components/WeatherWidget.jsx](../src/components/WeatherWidget.jsx) — weather + PWA-install prompt trigger; `compact` = header chip that opens the full widget in a popup. Aliases: "weer", "weerwidget". Data: open-meteo/buienalarm, `weather_coords` in localStorage.
+- **SpotifyWidget** — [components/SpotifyWidget.jsx](../src/components/SpotifyWidget.jsx) — Spotify now-playing/queue/recent; `compact` = dashboard card (track + prev/play/next). Aliases: "spotify", "muziek", "now playing". Data: Spotify OAuth via netlify function.
 
 ### Tasks / taken
 - **TasksWidget** — [components/TasksWidget.jsx](../src/components/TasksWidget.jsx) — main task list with groups, drag-reorder, complete. Aliases: "takenlijst", "taken widget", "de takenlijst".
@@ -148,6 +156,7 @@ Self-contained money/budget app, mounted via [pages/GeldPage.jsx](../src/pages/G
   - `FilterTabs` — [FilterTabs.jsx](../src/components/ui/FilterTabs.jsx) (pills or segmented). Aliases: "filter tabs", "Dag/Week/Maand".
   - `IconButton` — [IconButton.jsx](../src/components/ui/IconButton.jsx) (requires `label`). `EmptyState` — [EmptyState.jsx](../src/components/ui/EmptyState.jsx).
   - `toneColor` / `tint` — [tone.js](../src/components/ui/tone.js): tone name → token color.
+- **Task status** — [utils/taskStatus.js](../src/utils/taskStatus.js): `isOverdue` (excl. routines), `isUrgent`, `daysLate`, `shortDate` — one definition for Dashboard, Sidebar badge, Taken.
 - **Category colors** — [utils/category.js](../src/utils/category.js): `taskCategory`, `eventCategory`, `CATEGORIES`
   (School/Werk/Persoonlijk/Routine/Overig, derived from the item's source).
 - `src/geld/components/ui/` — [Glass.tsx](../src/geld/components/ui/Glass.tsx) (glass card + `Spinner`),

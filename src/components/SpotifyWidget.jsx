@@ -65,7 +65,7 @@ function TrackRow({ track, onPlayNow, onAddToQueue, compact = false, index }) {
   )
 }
 
-export default function SpotifyWidget() {
+export default function SpotifyWidget({ compact = false }) {
   const [token, setToken] = useState(localStorage.getItem('spotify_token') || null)
   const [track, setTrack] = useState(null)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -359,6 +359,59 @@ export default function SpotifyWidget() {
     localStorage.removeItem('spotify_refresh')
     localStorage.removeItem('spotify_scopes')
     setToken(null); setTrack(null)
+  }
+
+  // --- UI: compacte dashboard-variant (Level 3) — zelfde data & bediening ---
+  if (compact) {
+    const ctrl = { background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 6, borderRadius: 8, color: 'var(--c-text-2)' }
+    return (
+      <div className="card" style={{ padding: 14, height: '100%', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <Music size={15} style={{ color: '#1DB954' }} aria-hidden="true" />
+          <h3 className="t-card" style={{ margin: 0, flex: 1 }}>Spotify</h3>
+        </div>
+        {!token ? (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 10 }}>
+            <p className="t-meta" style={{ margin: 0 }}>Koppel je Spotify account</p>
+            <button onClick={handleLogin} className="btn-ghost" style={{ color: '#1DB954', borderColor: 'rgba(29,185,84,0.35)' }}>Inloggen met Spotify</button>
+          </div>
+        ) : track ? (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+              {track.album?.images?.[1] || track.album?.images?.[0]
+                ? <img src={(track.album.images[1] || track.album.images[0]).url} alt="" style={{ width: 40, height: 40, borderRadius: 'var(--r-sm)', flexShrink: 0 }} />
+                : <div style={{ width: 40, height: 40, borderRadius: 'var(--r-sm)', background: 'var(--c-surface-2)', flexShrink: 0 }} />}
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--c-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{track.name}</p>
+                <p className="t-meta" style={{ margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{track.artists?.map(a => a.name).join(', ')}</p>
+              </div>
+            </div>
+            <div style={{ height: 3, borderRadius: 2, background: 'var(--c-surface-3)', margin: '12px 0 8px' }}>
+              <div style={{ height: '100%', borderRadius: 2, background: 'var(--c-text-2)', width: `${durationMs > 0 ? (progressMs / durationMs) * 100 : 0}%`, transition: 'width 0.5s linear' }} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginTop: 'auto' }}>
+              <button onClick={() => control('prev')} style={ctrl} aria-label="Vorige" title="Vorige"><SkipBack size={16} /></button>
+              <button onClick={() => control(isPlaying ? 'pause' : 'play')} aria-label={isPlaying ? 'Pauzeren' : 'Afspelen'} title={isPlaying ? 'Pauzeren' : 'Afspelen'}
+                className="btn-primary" style={{ width: 36, height: 36, padding: 0, borderRadius: '50%' }}>
+                {isPlaying ? <Pause size={16} /> : <Play size={16} style={{ marginLeft: 2 }} />}
+              </button>
+              <button onClick={() => control('next')} style={ctrl} aria-label="Volgende" title="Volgende"><SkipForward size={16} /></button>
+            </div>
+          </>
+        ) : (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 8 }}>
+            {authError ? (
+              <>
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--c-danger)' }}>Spotify account niet geautoriseerd.</p>
+                <button onClick={handleLogout} className="btn-ghost">Ontkoppelen</button>
+              </>
+            ) : (
+              <p className="t-meta" style={{ margin: 0 }}>Niets aan het afspelen...</p>
+            )}
+          </div>
+        )}
+      </div>
+    )
   }
 
   // --- UI: niet ingelogd ---

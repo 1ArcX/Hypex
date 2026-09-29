@@ -166,7 +166,8 @@ function WeekRow({ day, isToday }) {
   )
 }
 
-export default function WeatherWidget({ stacked = false, userId, onRequestPwaInstall }) {
+export default function WeatherWidget({ stacked = false, compact = false, userId, onRequestPwaInstall }) {
+  const [expanded, setExpanded]     = useState(false) // compact: volledige widget in popup
   const [weather, setWeather]       = useState(null)
   const [weekly, setWeekly]         = useState(null)
   const [rain, setRain]             = useState(null)
@@ -382,6 +383,40 @@ export default function WeatherWidget({ stacked = false, userId, onRequestPwaIns
     fontWeight: tab === t ? 600 : 400,
     transition: 'all 0.15s',
   })
+
+  // Compacte header-chip (Level 3): icoon, temperatuur, plaats, conditie.
+  // Klik opent de volledige widget (stad zoeken, buien, week, meldingen) in een popup.
+  if (compact) return (
+    <>
+      <button type="button" onClick={() => setExpanded(true)} className="card card-interactive"
+        aria-label={weather ? `Weer: ${Math.round(weather.temperature_2m)} graden, ${label}, ${weather.city}. Open details` : 'Weer openen'}
+        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', font: 'inherit', color: 'inherit', textAlign: 'left', minWidth: 0 }}>
+        {weather && !error ? (
+          <>
+            <WeatherIcon size={26} style={{ color: 'var(--c-text-2)', flexShrink: 0 }} aria-hidden="true" />
+            <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+              <span className="tnum" style={{ fontSize: 16, fontWeight: 700, color: 'var(--c-text)', lineHeight: 1.1 }}>{Math.round(weather.temperature_2m)}°C</span>
+              <span className="t-meta" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{weather.city}</span>
+              <span className="t-meta" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+            </span>
+          </>
+        ) : (
+          <>
+            <Cloud size={22} style={{ color: 'var(--c-text-3)' }} aria-hidden="true" />
+            <span className="t-meta">{loading ? 'Weer laden…' : error ? 'Weer niet beschikbaar' : 'Weer'}</span>
+          </>
+        )}
+      </button>
+      {expanded && (
+        <div className="modal-overlay" onClick={() => setExpanded(false)} role="dialog" aria-modal="true" aria-label="Weer">
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ width: 'min(420px, calc(100vw - 32px))', maxHeight: '85vh', overflowY: 'auto' }}>
+            <WeatherWidget stacked userId={userId} onRequestPwaInstall={onRequestPwaInstall} />
+            <button type="button" onClick={() => setExpanded(false)} className="btn-ghost" style={{ width: '100%', marginTop: 8 }}>Sluiten</button>
+          </div>
+        </div>
+      )}
+    </>
+  )
 
   return (
     <div className="glass-card p-4" style={{

@@ -1,7 +1,17 @@
 import React, { useState, useMemo, useEffect } from 'react'
+import {
+  Search, Flame, Clock3, CheckCircle2, CalendarDays, AlertTriangle, CalendarClock,
+  ChevronLeft, ChevronRight, ArrowRight, MapPin, Plus, CloudRain, ListTodo, Inbox, X,
+} from 'lucide-react'
 import Clock from '../components/Clock'
 import WeatherWidget from '../components/WeatherWidget'
 import SpotifyWidget from '../components/SpotifyWidget'
+import GeldMiniWidget from '../components/dashboard/GeldMiniWidget'
+import PomodoroMiniWidget from '../components/dashboard/PomodoroMiniWidget'
+import TodayWidget from '../components/dashboard/TodayWidget'
+import { Card, CardHeader, CardLink, KpiTile, ListRow, CheckButton, Pill, IconButton, FilterTabs, EmptyState } from '../components/ui'
+import { taskCategory, eventCategory, categoryColor } from '../utils/category'
+import { isOverdue, isUrgent, daysLate, shortDate } from '../utils/taskStatus'
 
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -16,12 +26,22 @@ function getGreeting() {
   return h < 12 ? 'Goedemorgen' : h < 18 ? 'Goedemiddag' : 'Goedenavond'
 }
 
-function fmtDeadline(d, todayS) {
-  if (d === todayS) return 'Vandaag'
-  const tom = new Date(); tom.setDate(tom.getDate() + 1)
-  if (d === tom.toISOString().slice(0, 10)) return 'Morgen'
-  const dt = new Date(d + 'T00:00:00')
-  return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+function longDate(d = new Date()) {
+  const s = d.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+const hhmm = d => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+
+// "Over 14 min" / "Over 2u 10m" / "Morgen 09:00" / "do 1 okt 19:00"
+function countdownLabel(ts, now = new Date()) {
+  const mins = Math.round((ts - now) / 60000)
+  const sameDay = ts.toDateString() === now.toDateString()
+  if (sameDay && mins < 60) return mins <= 0 ? 'Nu' : `Over ${mins} min`
+  if (sameDay) return `Over ${Math.floor(mins / 60)}u${mins % 60 ? ` ${mins % 60}m` : ''}`
+  const tom = new Date(now); tom.setDate(now.getDate() + 1)
+  if (ts.toDateString() === tom.toDateString()) return `Morgen ${hhmm(ts)}`
+  return `${ts.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })} ${hhmm(ts)}`
 }
 
 // ── Vandaag-strip: haal alle geplande items van vandaag op ─────────────────────
@@ -31,7 +51,6 @@ function useTodayItems(tasks, magisterLessons, calendarEvents) {
     const items = []
 
     // Magister lessen
-    const fmt = d => { const x = new Date(d); return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}` }
     const now = new Date()
     const weekStart = (() => { const d = new Date(now); const day = d.getDay(); d.setDate(d.getDate() - (day === 0 ? 6 : day - 1)); d.setHours(0,0,0,0); return d })()
     const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6)
@@ -45,11 +64,12 @@ function useTodayItems(tasks, magisterLessons, calendarEvents) {
       const e = l.einde ? new Date(l.einde) : null
       items.push({
         sortMins: s.getHours()*60 + s.getMinutes(),
-        time: `${pad2(s.getHours())}:${pad2(s.getMinutes())}`,
+        time: hhmm(s),
         label: l.vak || 'Les',
-        color: '#818CF8',
+        color: categoryColor('school'),
         type: 'lesson',
-        end: e ? `${pad2(e.getHours())}:${pad2(e.getMinutes())}` : null,
+        end: e ? hhmm(e) : null,
+        highlightKey: `lesson:${l.start}`,
       })
     }
 
@@ -63,7 +83,7 @@ function useTodayItems(tasks, magisterLessons, calendarEvents) {
         sortMins: h*60 + m,
         time: ts.slice(0,5),
         label: t.title,
-        color: t.color || 'var(--accent)',
+        color: categoryColor(taskCategory(t)),
         type: 'task',
         raw: t,
         end: t.end_time?.slice(0,5) || null,
@@ -81,9 +101,10 @@ function useTodayItems(tasks, magisterLessons, calendarEvents) {
           sortMins: h*60 + m,
           time: s.start_time.slice(0,5),
           label: 'Werk',
-          color: '#F59E0B',
+          color: categoryColor('werk'),
           type: 'work',
           end: s.end_time?.slice(0,5) || null,
+          highlightKey: `work:${today}:${s.start_time}`,
         })
       }
     } catch {}
@@ -97,13 +118,6 @@ function useNextEvent({ tasks, calendarEvents, magisterLessons, skip, typeFilter
   return useMemo(() => {
     const now = new Date()
     const fmt = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`
-    const todayStr = fmt(now)
-    const DAYS_NL = ['zondag','maandag','dinsdag','woensdag','donderdag','vrijdag','zaterdag']
-    const MONTHS_NL = ['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december']
-    const fmtLabel = d => {
-      if (fmt(d) === todayStr) return `vandaag ${pad2(d.getHours())}:${pad2(d.getMinutes())}`
-      return `${DAYS_NL[d.getDay()]} ${d.getDate()} ${MONTHS_NL[d.getMonth()]} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`
-    }
     const weekStart = (() => { const d = new Date(now); const day = d.getDay(); d.setDate(d.getDate() - (day === 0 ? 6 : day - 1)); d.setHours(0,0,0,0); return d })()
     const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6)
     const cacheKey = `magister_sched_${fmt(weekStart)}_${fmt(weekEnd)}`
@@ -114,20 +128,24 @@ function useNextEvent({ tasks, calendarEvents, magisterLessons, skip, typeFilter
     const nextWeekLessons = (() => { try { return JSON.parse(sessionStorage.getItem(nextCacheKey)) || [] } catch { return [] } })()
     const allLessons = [...(cachedLessons.length ? cachedLessons : magisterLessons), ...nextWeekLessons]
     const shifts = (() => { try { return JSON.parse(localStorage.getItem('pmt_work_shifts')) || [] } catch { return [] } })()
+    const at = (date, time) => time ? new Date(date + 'T' + time.slice(0, 5)) : null
 
     let items = [
       ...tasks.filter(t => t.date && (t.time || t.start_time) && !t.completed)
-        .map(t => { const ts = (t.start_time || t.time || '').slice(0, 5); const d = new Date(t.date + 'T' + ts); return { label: t.title, ts: d, type: 'task', raw: t, highlightKey: `task:${t.id}` } })
+        .map(t => {
+          const ts = (t.start_time || t.time || '').slice(0, 5)
+          return { label: t.title, ts: new Date(t.date + 'T' + ts), end: at(t.date, t.end_time), type: 'task', raw: t, cat: taskCategory(t), highlightKey: `task:${t.id}` }
+        })
         .filter(t => t.ts >= now),
       ...allLessons.filter(l => l.start && !l.uitgevallen && new Date(l.start) >= now)
-        .map(l => ({ label: l.vak || 'Les', ts: new Date(l.start), type: 'lesson', highlightKey: `lesson:${l.start}` })),
+        .map(l => ({ label: l.vak || 'Les', ts: new Date(l.start), end: l.einde ? new Date(l.einde) : null, location: l.lokaal || l.location, type: 'lesson', cat: 'school', highlightKey: `lesson:${l.start}` })),
       ...calendarEvents.filter(ev => ev.start_time && new Date(ev.start_time) >= now)
-        .map(ev => ({ label: ev.title, ts: new Date(ev.start_time), type: 'event', raw: ev, highlightKey: `event:${ev.id}` })),
+        .map(ev => ({ label: ev.title, ts: new Date(ev.start_time), end: ev.end_time ? new Date(ev.end_time) : null, location: ev.location, type: 'event', raw: ev, cat: eventCategory(ev), highlightKey: `event:${ev.id}` })),
       ...shifts.filter(s => s.date && (s.start_time || s.start))
         .map(s => {
           const timeStr = s.start_time || s.start || '09:00'
-          const d = new Date(s.date.slice(0, 10) + 'T' + timeStr)
-          return { label: 'Werk', ts: d, type: 'work', highlightKey: `work:${s.date?.slice(0,10)}:${timeStr}` }
+          const day = s.date.slice(0, 10)
+          return { label: 'Werk', ts: new Date(day + 'T' + timeStr), end: at(day, s.end_time || s.end), type: 'work', cat: 'werk', highlightKey: `work:${day}:${timeStr}` }
         })
         .filter(s => s.ts >= now),
     ].sort((a, b) => a.ts - b.ts)
@@ -140,148 +158,59 @@ function useNextEvent({ tasks, calendarEvents, magisterLessons, skip, typeFilter
     const idx = Math.min(skip, items.length - 1)
     const next = items[Math.max(0, idx)] || null
     if (!next) return { item: null, hasMore: false }
-    return { item: { ...next, timeStr: fmtLabel(next.ts) }, hasMore: idx < items.length - 1 }
+    return { item: next, hasMore: idx < items.length - 1 }
   }, [tasks, calendarEvents, magisterLessons, skip, typeFilter])
 }
 
-// ── Focus card: wat is nu het meest relevant? ────────────────────────────────
-function useFocusCard({ todayItems, tasks, subjects, today }) {
+// ── Nu bezig: loopt er op dit moment iets (les, taak met tijd, dienst)? ─────────
+function useCurrentItem(todayItems) {
   return useMemo(() => {
     const now = new Date()
     const nowMins = now.getHours() * 60 + now.getMinutes()
-    const hour = now.getHours()
-
-    // 1. Iets gaande nu?
     const current = todayItems.find(item => {
       if (!item.end) return false
       const [eh, em] = item.end.split(':').map(Number)
       return item.sortMins <= nowMins && (eh * 60 + em) >= nowMins
     })
-    if (current) {
-      const [eh, em] = current.end.split(':').map(Number)
-      return { type: 'now', item: current, minsLeft: Math.max(1, (eh * 60 + em) - nowMins) }
-    }
-
-    // 2. Iets start binnen 45 minuten?
-    const soon = todayItems.find(item => item.sortMins > nowMins && item.sortMins - nowMins <= 45)
-    if (soon) return { type: 'soon', item: soon, minsUntil: soon.sortMins - nowMins }
-
-    // 3. Urgente taak
-    const urgent = tasks.find(t => !t.completed && (t.priority ?? 2) === 1)
-    if (urgent) return { type: 'urgent', task: urgent, subject: subjects?.find(s => s.id === urgent.subject_id) }
-
-    // 4. Achterstallige taak
-    const overdue = tasks.filter(t => !t.completed && t.date && t.date < today)
-      .sort((a, b) => a.date.localeCompare(b.date))[0]
-    if (overdue) return { type: 'overdue', task: overdue }
-
-    // 5. Taak voor vandaag
-    const todayTask = tasks
-      .filter(t => !t.completed && t.date === today)
-      .sort((a, b) => {
-        if ((a.priority ?? 2) !== (b.priority ?? 2)) return (a.priority ?? 2) - (b.priority ?? 2)
-        return (a.start_time || a.time || '23:59').localeCompare(b.start_time || b.time || '23:59')
-      })[0]
-    if (todayTask) return { type: 'today', task: todayTask, subject: subjects?.find(s => s.id === todayTask.subject_id) }
-
-    // 6. Avond-samenvatting
-    if (hour >= 17) {
-      const done = tasks.filter(t => t.completed && t.date === today).length
-      if (done > 0) return { type: 'evening', done, total: tasks.filter(t => t.date === today).length }
-    }
-
-    return null
-  }, [todayItems, tasks, subjects, today])
+    if (!current) return null
+    const [eh, em] = current.end.split(':').map(Number)
+    return { ...current, minsLeft: Math.max(1, (eh * 60 + em) - nowMins) }
+  }, [todayItems])
 }
 
-const FOCUS_CFG = {
-  now:     { color: 'var(--accent)', bg: 'color-mix(in srgb, var(--accent) 8%, transparent)',   border: 'color-mix(in srgb, var(--accent) 25%, transparent)' },
-  soon:    { color: '#818CF8', bg: 'rgba(129,140,248,0.08)', border: 'rgba(129,140,248,0.25)' },
-  urgent:  { color: '#FF6B6B', bg: 'rgba(255,107,107,0.08)', border: 'rgba(255,107,107,0.3)' },
-  overdue: { color: '#FF8C42', bg: 'rgba(255,140,66,0.08)',  border: 'rgba(255,140,66,0.3)' },
-  today:   { color: 'var(--accent)', bg: 'color-mix(in srgb, var(--accent) 6%, transparent)',   border: 'color-mix(in srgb, var(--accent) 20%, transparent)' },
-  evening: { color: '#A78BFA', bg: 'rgba(167,139,250,0.08)', border: 'rgba(167,139,250,0.25)' },
+// Minuutticker zodat countdowns ("Over 14 min") actueel blijven
+function useMinuteTick() {
+  const [, setT] = useState(0)
+  useEffect(() => {
+    const iv = setInterval(() => setT(t => t + 1), 30000)
+    return () => clearInterval(iv)
+  }, [])
 }
 
-function FocusCard({ card, onToggleTask, setDetailTask }) {
-  if (!card) return null
-  const cfg = FOCUS_CFG[card.type]
-
-  if (card.type === 'now' || card.type === 'soon') {
-    const typeIcon = card.item.type === 'lesson' ? '📚' : card.item.type === 'work' ? '💼' : '✅'
-    const label = card.type === 'now' ? 'Nu bezig' : `Over ${card.minsUntil}m`
-    const badge = card.type === 'now' ? `nog ${card.minsLeft}m` : card.item.time
-    return (
-      <div style={{ padding: '12px 15px', borderRadius: 16, background: cfg.bg, border: `1px solid ${cfg.border}`, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <span style={{ fontSize: 22, lineHeight: 1 }}>{typeIcon}</span>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontSize: 10, color: cfg.color, margin: '0 0 2px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{label}</p>
-          <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.item.label}</p>
-        </div>
-        <span style={{ fontSize: 12, color: cfg.color, fontWeight: 700, background: `color-mix(in srgb, ${cfg.color} 13%, transparent)`, borderRadius: 8, padding: '4px 10px', flexShrink: 0 }}>{badge}</span>
-      </div>
-    )
-  }
-
-  if (card.type === 'urgent' || card.type === 'overdue' || card.type === 'today') {
-    const labelMap = { urgent: '🔥 Urgent', overdue: '⏰ Te laat', today: '📌 Vandaag' }
-    const sub = card.type === 'overdue'
-      ? new Date(card.task.date + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
-      : card.subject?.name
-    return (
-      <div onClick={() => setDetailTask?.(card.task)} style={{ padding: '12px 15px', borderRadius: 16, background: cfg.bg, border: `1px solid ${cfg.border}`, display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontSize: 10, color: cfg.color, margin: '0 0 2px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{labelMap[card.type]}</p>
-          <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.task.title}</p>
-          {sub && <p style={{ fontSize: 11, color: cfg.color, margin: '2px 0 0', opacity: 0.8 }}>{sub}</p>}
-        </div>
-        <button
-          onClick={e => { e.stopPropagation(); onToggleTask?.(card.task) }}
-          style={{ flexShrink: 0, width: 34, height: 34, borderRadius: '50%', background: `color-mix(in srgb, ${cfg.color} 9%, transparent)`, border: `2px solid color-mix(in srgb, ${cfg.color} 31%, transparent)`, color: cfg.color, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 700, transition: 'background 0.15s' }}
-          title="Markeer als gedaan"
-        >✓</button>
-      </div>
-    )
-  }
-
-  if (card.type === 'evening') {
-    return (
-      <div style={{ padding: '12px 15px', borderRadius: 16, background: cfg.bg, border: `1px solid ${cfg.border}`, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <span style={{ fontSize: 22 }}>✨</span>
-        <div>
-          <p style={{ fontSize: 10, color: cfg.color, margin: '0 0 2px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Goed gedaan</p>
-          <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>
-            {card.done}{card.total > 0 ? ` van ${card.total}` : ''} taken afgerond
-          </p>
-        </div>
-      </div>
-    )
-  }
-
-  return null
-}
+const NEXT_FILTERS = [
+  { value: 'alle',  label: 'Alle' },
+  { value: 'event', label: 'Agenda' },
+  { value: 'werk',  label: 'Werk' },
+  { value: 'taak',  label: 'Taken' },
+]
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 export default function DashboardPage({
   isBreak, tasks, subjects, calendarEvents, magisterLessons,
-  magisterError, displayName, homeRain, onNavigate, onNavigateToTasks,
-  setDetailTask, openNewTask, onRequestPwaInstall, profiles, userId,
-  onNavigateToAgenda, onToggleTask,
+  displayName, homeRain, onNavigate, onNavigateToTasks,
+  setDetailTask, openNewTask, onRequestPwaInstall, userId,
+  onNavigateToAgenda, onToggleTask, isAdmin, onOpenSearch,
 }) {
+  useMinuteTick()
   const [skip, setSkip] = useState(0)
   const [nextEventFilter, setNextEventFilter] = useState(() => localStorage.getItem('nextEventFilter') || 'alle')
   const setFilter = (f) => { setNextEventFilter(f); setSkip(0); localStorage.setItem('nextEventFilter', f) }
   const { item: ev, hasMore } = useNextEvent({ tasks, calendarEvents, magisterLessons, skip, typeFilter: nextEventFilter })
   const todayItems = useTodayItems(tasks, magisterLessons, calendarEvents)
+  const current = useCurrentItem(todayItems)
 
   const today = todayDateStr()
-  const focusCard = useFocusCard({ todayItems, tasks, subjects, today })
-  const todayTasks = tasks.filter(t => t.date === today)
-  const completedToday = todayTasks.filter(t => t.completed).length
-  const totalToday = todayTasks.length
-  const progressPct = totalToday > 0 ? (completedToday / totalToday) * 100 : 0
-
-  const hasMagisterCreds = !!localStorage.getItem(`magister_credentials_${userId}`)
+  const subjectName = id => subjects?.find(s => s.id === id)?.name
 
   const checkRainHidden = () => {
     const t = localStorage.getItem('rain_hidden')
@@ -294,391 +223,279 @@ export default function DashboardPage({
     window.addEventListener('rainHiddenChanged', handler)
     return () => window.removeEventListener('rainHiddenChanged', handler)
   }, [])
-  const showMagisterBanner = !hasMagisterCreds || !!magisterError
 
-  const urgentCount  = tasks.filter(t => !t.completed && (t.priority ?? 2) === 1).length
-  const overdueTasks = tasks.filter(t => !t.completed && t.date && t.date < today).sort((a, b) => a.date.localeCompare(b.date))
-  const overdueCount = overdueTasks.length
+  // ── KPI's (één definitie: utils/taskStatus) ──
+  const overdueTasks = tasks.filter(t => isOverdue(t, today)).sort((a, b) => a.date.localeCompare(b.date))
+  const urgentTasks  = tasks.filter(isUrgent)
   const openCount    = tasks.filter(t => !t.completed).length
+  const todayOpen    = tasks.filter(t => !t.completed && t.date === today).length
 
-  // Naderende deadlines (max 3 pills)
-  const now = new Date()
-  const in3 = new Date(now); in3.setDate(now.getDate() + 3)
+  // Werkruimte: eerst te laat, daarna urgent (zonder dubbelingen)
+  const overdueIds = new Set(overdueTasks.map(t => t.id))
+  const attention = [...overdueTasks, ...urgentTasks.filter(t => !overdueIds.has(t.id))]
+  const attentionTitle = overdueTasks.length && attention.length > overdueTasks.length ? 'Te laat & urgent'
+    : overdueTasks.length ? 'Te laat' : 'Urgent'
+
+  // Naderende deadlines (vandaag t/m +3 dagen)
+  const in3 = new Date(); in3.setDate(in3.getDate() + 3)
+  const in3Str = `${in3.getFullYear()}-${pad2(in3.getMonth()+1)}-${pad2(in3.getDate())}`
   const deadlines = tasks
-    .filter(t => !t.completed && t.due_date && t.due_date >= today && t.due_date <= in3.toISOString().slice(0, 10))
+    .filter(t => !t.completed && t.due_date && t.due_date >= today && t.due_date <= in3Str)
     .sort((a, b) => a.due_date.localeCompare(b.due_date))
-    .slice(0, 3)
+    .slice(0, 4)
+  const unplanned = tasks.filter(t => !t.completed && !t.date)
+
+  const showRain = homeRain && !rainHidden && Math.max(...homeRain.map(d => d.precip)) > 0.1
+  const widgetCount = isAdmin ? 4 : 3
 
   return (
-    <div style={{ height: '100%', overflowY: 'auto', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div style={{ height: '100%', overflowY: 'auto' }}>
+      <div className="dash">
 
-      {/* ── HERO: Greeting + Clock + Progress ── */}
-      <div className="card" style={{ padding: '20px 22px 18px' }}>
-        {/* Greeting row */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-          <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0, letterSpacing: '0.03em' }}>
-            {getGreeting()}{displayName ? `, ${displayName}` : ''}
-          </p>
-          {false && showMagisterBanner && (  // INACTIVE: school hidden
-            <button
-              onClick={() => onNavigate('school')}
-              title={magisterError || 'Koppel Magister'}
-              style={{
-                background: magisterError ? 'rgba(255,80,80,0.08)' : 'rgba(250,204,21,0.08)',
-                border: magisterError ? '1px solid rgba(255,80,80,0.3)' : '1px solid rgba(250,204,21,0.3)',
-                borderRadius: 8, padding: '5px 10px', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0,
-              }}
-            >
-              <span style={{ fontSize: 13 }}>{magisterError ? '⚠️' : '🎓'}</span>
-              <span style={{ fontSize: 11, color: magisterError ? 'rgba(255,107,107,0.9)' : 'rgba(250,204,21,0.9)', fontWeight: 600 }}>
-                {magisterError ? 'Fout' : 'Koppel'}
-              </span>
-            </button>
-          )}
-        </div>
+        {/* ── RIJ 1: header — begroeting, zoeken, tijd, weer ── */}
+        <header className="dash-header">
+          <div style={{ minWidth: 0 }}>
+            <h1 className="t-page" style={{ margin: 0, fontSize: 18, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {getGreeting()}{displayName ? `, ${displayName}` : ''}
+            </h1>
+            <p className="t-meta" style={{ margin: '2px 0 0', fontSize: 12 }}>{longDate()}</p>
+          </div>
+          <button type="button" onClick={onOpenSearch} className="dash-search" aria-label="Zoek in Hypex (Ctrl K)">
+            <Search size={14} aria-hidden="true" />
+            <span style={{ flex: 1, textAlign: 'left' }}>Zoek in Hypex…</span>
+            <kbd>Ctrl K</kbd>
+          </button>
+          <div className="dash-clock"><Clock isBreak={isBreak} variant="inline" /></div>
+          <div className="dash-weather">
+            <WeatherWidget compact userId={userId} onRequestPwaInstall={onRequestPwaInstall} />
+          </div>
+        </header>
 
-        {/* Klok gecenterd */}
-        <div style={{ textAlign: 'center', marginBottom: totalToday > 0 ? 14 : 0 }}>
-          <Clock isBreak={isBreak} />
-        </div>
+        {/* ── RIJ 2: KPI's ── */}
+        <section className="dash-kpis" aria-label="Overzicht taken">
+          <KpiTile icon={Flame} value={urgentTasks.length} label="Urgent" tone="danger" onClick={() => onNavigateToTasks?.('urgent')} />
+          <KpiTile icon={Clock3} value={overdueTasks.length} label="Te laat" tone="warning" onClick={() => onNavigateToTasks?.('telaat')} />
+          <KpiTile icon={CheckCircle2} value={openCount} label="Open" tone="success" onClick={() => onNavigateToTasks?.('open')} />
+          <KpiTile icon={CalendarDays} value={todayOpen} label="Vandaag" tone="persoonlijk" onClick={() => onNavigateToTasks?.('vandaag')} />
+        </section>
 
-        {totalToday > 0 && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7 }}>
-              <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 500 }}>Voortgang vandaag</span>
-              <span style={{ fontSize: 11, color: progressPct === 100 ? 'var(--accent)' : 'var(--text-2)', fontWeight: 700 }}>
-                {completedToday}/{totalToday} · {Math.round(progressPct)}%{progressPct === 100 ? ' ✓' : ''}
-              </span>
-            </div>
-            <div style={{ height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 6 }}>
-              <div style={{
-                height: '100%', width: `${progressPct}%`, borderRadius: 6,
-                background: progressPct === 100
-                  ? 'linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #fff))'
-                  : 'linear-gradient(90deg, color-mix(in srgb, var(--accent) 70%, transparent), var(--accent))',
-                transition: 'width 0.6s ease',
-                boxShadow: progressPct > 0 ? '0 0 10px color-mix(in srgb, var(--accent) 35%, transparent)' : 'none',
-              }} />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ── FOCUS KAART ── */}
-      <FocusCard card={focusCard} onToggleTask={onToggleTask} setDetailTask={setDetailTask} />
-
-      {/* ── STATS ROW ── */}
-      {openCount > 0 ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-          <div onClick={() => onNavigateToTasks?.('urgent')} style={{
-            background: urgentCount > 0 ? 'rgba(255,60,60,0.08)' : 'rgba(255,255,255,0.03)',
-            border: `1px solid ${urgentCount > 0 ? 'rgba(255,60,60,0.25)' : 'rgba(255,255,255,0.07)'}`,
-            borderRadius: 12, padding: '10px 12px',
-            display: 'flex', alignItems: 'center', gap: 8,
-            cursor: 'pointer',
-          }}>
-            <span style={{ fontSize: 18, fontWeight: 800, color: urgentCount > 0 ? '#ff6b6b' : 'var(--text-2)', lineHeight: 1 }}>{urgentCount}</span>
-            <span style={{ fontSize: 11, color: urgentCount > 0 ? 'rgba(255,107,107,0.65)' : 'var(--text-3)', fontWeight: 600 }}>Urgent</span>
-          </div>
-          <div onClick={() => onNavigateToTasks?.('telaat')} style={{
-            background: overdueCount > 0 ? 'rgba(255,120,50,0.07)' : 'rgba(255,255,255,0.03)',
-            border: `1px solid ${overdueCount > 0 ? 'rgba(255,120,50,0.2)' : 'rgba(255,255,255,0.07)'}`,
-            borderRadius: 12, padding: '10px 12px',
-            display: 'flex', alignItems: 'center', gap: 8,
-            cursor: 'pointer',
-          }}>
-            <span style={{ fontSize: 18, fontWeight: 800, color: overdueCount > 0 ? '#FF8C42' : 'var(--text-2)', lineHeight: 1 }}>{overdueCount}</span>
-            <span style={{ fontSize: 11, color: overdueCount > 0 ? 'rgba(255,140,66,0.65)' : 'var(--text-3)', fontWeight: 600 }}>Te laat</span>
-          </div>
-          <div onClick={() => onNavigateToTasks?.('alles')} style={{
-            background: 'color-mix(in srgb, var(--accent) 5%, transparent)',
-            border: '1px solid color-mix(in srgb, var(--accent) 12%, transparent)',
-            borderRadius: 12, padding: '10px 12px',
-            display: 'flex', alignItems: 'center', gap: 8,
-            cursor: 'pointer',
-          }}>
-            <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}>{openCount}</span>
-            <span style={{ fontSize: 11, color: 'color-mix(in srgb, var(--accent) 55%, transparent)', fontWeight: 600 }}>Open</span>
-          </div>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 14, background: 'color-mix(in srgb, var(--accent) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 15%, transparent)' }}>
-          <span style={{ fontSize: 20 }}>🎉</span>
-          <div>
-            <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', margin: 0 }}>Alles gedaan!</p>
-            <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>Geen openstaande taken.</p>
-          </div>
-        </div>
-      )}
-
-
-      {/* ── ACHTERSTALLIGE TAKEN ── */}
-      {overdueCount > 0 && (
-        <div className="card" style={{
-          padding: '14px 15px',
-          borderLeft: '3px solid rgba(255,120,50,0.6)',
-          background: 'linear-gradient(135deg, rgba(255,100,40,0.07) 0%, transparent 70%)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <p style={{ fontSize: 9, color: 'rgba(255,140,66,0.85)', margin: 0, letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700 }}>
-              ⏰ Te laat · {overdueCount}
-            </p>
-            <button onClick={() => onNavigateToTasks?.('telaat')} style={{ background: 'rgba(255,120,50,0.1)', border: '1px solid rgba(255,120,50,0.25)', borderRadius: 8, cursor: 'pointer', color: 'rgba(255,140,66,0.9)', padding: '2px 9px', fontSize: 11, fontWeight: 600 }}>
-              Alles
-            </button>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            {overdueTasks.slice(0, 3).map(t => (
-              <div key={t.id} onClick={() => setDetailTask(t)}
-                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.025)', cursor: 'pointer', border: '1px solid transparent', transition: 'background 0.15s' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,100,40,0.06)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.025)'}
-              >
-                <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'rgba(255,140,66,0.7)', flexShrink: 0 }} />
-                <span style={{ fontSize: 13, color: 'var(--text-1)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>{t.title}</span>
-                <span style={{ fontSize: 10, color: 'rgba(255,140,66,0.75)', flexShrink: 0, fontWeight: 600 }}>
-                  {new Date(t.date + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
-                </span>
-              </div>
-            ))}
-            {overdueCount > 3 && (
-              <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '2px 0 0 8px' }}>+{overdueCount - 3} meer</p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── VANDAAG-STRIP ── */}
-      {todayItems.length > 0 && (
-        <div>
-          <p style={{ fontSize: 10, color: 'var(--text-3)', margin: '0 0 8px', letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 600, paddingLeft: 2 }}>
-            Schema vandaag
-          </p>
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
-            {todayItems.map((item, i) => {
-              const icon = item.type === 'lesson' ? '📚' : item.type === 'work' ? '💼' : '✅'
-              const nowMins = new Date().getHours()*60 + new Date().getMinutes()
-              const endMins = item.end ? (() => { const [eh, em] = item.end.split(':').map(Number); return eh*60+em })() : 0
-              const isNow = item.sortMins <= nowMins && item.end && endMins >= nowMins
-              return (
-                <button
-                  key={i}
-                  onClick={() => {
-                    if (item.type === 'task' && item.raw) setDetailTask(item.raw)
-                    else if (item.type === 'lesson' || item.type === 'event' || item.type === 'work') onNavigateToAgenda?.(new Date(), item.highlightKey)
-                  }}
-                  style={{
-                    flexShrink: 0, padding: '9px 13px', borderRadius: 14,
-                    background: isNow ? `${item.color}22` : `${item.color}11`,
-                    border: `1px solid ${item.color}${isNow ? '60' : '30'}`,
-                    color: item.color,
-                    cursor: 'pointer',
-                    display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
-                    gap: 3, maxWidth: 140,
-                    boxShadow: isNow ? `0 0 12px ${item.color}20` : 'none',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, width: '100%' }}>
-                    <span style={{ fontSize: 11 }}>{icon}</span>
-                    <span style={{ fontSize: 10, opacity: 0.7, fontWeight: 500, flex: 1, whiteSpace: 'nowrap' }}>
-                      {item.time}{item.end ? `–${item.end}` : ''}
-                    </span>
-                    {isNow && <span style={{ fontSize: 9, fontWeight: 700, background: `${item.color}25`, borderRadius: 4, padding: '1px 4px' }}>Nu</span>}
-                  </div>
-                  <span style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 120 }}>
-                    {item.label}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ── VOLGENDE + DEADLINES (2 kolommen) ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: deadlines.length ? '1fr 1fr' : '1fr', gap: 10 }}>
-        {/* Volgende gebeurtenis */}
-        <div className="card" style={{
-          padding: '14px 15px',
-          borderLeft: '3px solid rgba(129,140,248,0.5)',
-          background: 'linear-gradient(135deg, rgba(129,140,248,0.05) 0%, transparent 70%)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-            <p style={{ fontSize: 9, color: 'rgba(129,140,248,0.7)', margin: 0, letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700 }}>Volgende</p>
-            <div style={{ display: 'flex', gap: 4 }}>
-              {skip > 0 && (
-                <button onClick={() => setSkip(s => s - 1)}
-                  style={{ background: 'rgba(129,140,248,0.1)', border: '1px solid rgba(129,140,248,0.2)', borderRadius: 6, cursor: 'pointer', color: 'rgba(129,140,248,0.8)', padding: '2px 7px', fontSize: 13, lineHeight: 1 }}>‹</button>
-              )}
-              {ev && hasMore && (
-                <button onClick={() => setSkip(s => s + 1)}
-                  style={{ background: 'rgba(129,140,248,0.1)', border: '1px solid rgba(129,140,248,0.2)', borderRadius: 6, cursor: 'pointer', color: 'rgba(129,140,248,0.8)', padding: '2px 7px', fontSize: 13, lineHeight: 1 }}>›</button>
-              )}
-            </div>
-          </div>
-          {/* Type filter pills */}
-          <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
-            {[
-              { key: 'alle',  label: 'Alle' },
-              // { key: 'school', label: '📚' },  // INACTIVE
-              { key: 'event',  label: '📅' },
-              { key: 'werk',   label: '💼' },
-              { key: 'taak',   label: '✅' },
-            ].map(f => {
-              const active = nextEventFilter === f.key
-              return (
-                <button key={f.key} onClick={() => setFilter(f.key)} style={{
-                  fontSize: 10, padding: '2px 7px', borderRadius: 10, cursor: 'pointer', border: '1px solid',
-                  borderColor: active ? 'rgba(129,140,248,0.5)' : 'rgba(255,255,255,0.1)',
-                  background: active ? 'rgba(129,140,248,0.15)' : 'transparent',
-                  color: active ? 'rgba(129,140,248,1)' : 'var(--c-text-3)',
-                  fontWeight: active ? 600 : 400,
-                }}>
-                  {f.label}
-                </button>
-              )
-            })}
-          </div>
-          {ev ? (
-            <div
-              onClick={() => {
-                if (ev.type === 'task' && ev.raw) { setDetailTask(ev.raw); return }
-                onNavigateToAgenda?.(ev.ts, ev.highlightKey)
-              }}
-              style={{ cursor: 'pointer' }}
-            >
-              <p style={{ fontSize: 13, color: 'var(--text-1)', fontWeight: 600, margin: '0 0 4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {ev.type === 'lesson' ? '📚 ' : ev.type === 'event' ? '📅 ' : ev.type === 'work' ? '💼 ' : '✅ '}{ev.label}
-              </p>
-              <p style={{ fontSize: 11, color: 'rgba(129,140,248,0.8)', margin: 0, fontWeight: 500 }}>{ev.timeStr}</p>
-            </div>
-          ) : (
-            <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>Niets meer gepland</p>
-          )}
-        </div>
-
-        {/* Deadline pills */}
-        {deadlines.length > 0 && (
-          <div className="card" style={{
-            padding: '14px 15px',
-            borderLeft: '3px solid rgba(255,80,80,0.5)',
-            background: 'linear-gradient(135deg, rgba(255,60,60,0.06) 0%, transparent 70%)',
-          }}>
-            <p style={{ fontSize: 9, color: 'rgba(255,107,107,0.75)', margin: '0 0 8px', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700 }}>🔥 Deadlines</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              {deadlines.map(t => (
-                <div key={t.id} onClick={() => setDetailTask(t)}
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', gap: 4 }}>
-                  <span style={{ fontSize: 11, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, fontWeight: 500 }}>{t.title}</span>
-                  <span style={{
-                    fontSize: 10, borderRadius: 8, padding: '2px 7px', flexShrink: 0, fontWeight: 700,
-                    background: t.due_date === today ? 'rgba(255,60,60,0.2)' : 'rgba(255,107,107,0.1)',
-                    color: t.due_date === today ? '#ff5555' : 'rgba(255,107,107,0.85)',
-                    border: `1px solid ${t.due_date === today ? 'rgba(255,60,60,0.45)' : 'rgba(255,107,107,0.25)'}`,
-                  }}>
-                    {fmtDeadline(t.due_date, today)}
-                  </span>
+        {/* ── RIJ 3: werkruimte — aandacht nodig + volgende afspraak ── */}
+        <section className="dash-work">
+          <Card urgent={overdueTasks.length > 0} tone={!overdueTasks.length && attention.length ? 'danger' : undefined} style={{ minWidth: 0 }}>
+            {attention.length > 0 ? (
+              <>
+                <CardHeader icon={AlertTriangle} title={attentionTitle} count={attention.length} tone="danger"
+                  action={<CardLink onClick={() => onNavigateToTasks?.(overdueTasks.length ? 'telaat' : 'urgent')}>Bekijk alles <ArrowRight size={13} /></CardLink>} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {attention.slice(0, 4).map(t => {
+                    const late = overdueIds.has(t.id)
+                    const n = late ? daysLate(t, today) : 0
+                    const subj = subjectName(t.subject_id)
+                    return (
+                      <ListRow key={t.id}
+                        dot={categoryColor(taskCategory(t))}
+                        title={t.title}
+                        subtitle={[late ? `${n} ${n === 1 ? 'dag' : 'dagen'} te laat` : 'Urgent', subj].filter(Boolean).join(' · ')}
+                        trailing={late
+                          ? <Pill tone="danger">{shortDate(t.date, today)}</Pill>
+                          : <Pill tone="danger">{t.date ? shortDate(t.date, today) : 'Urgent'}</Pill>}
+                        action={<CheckButton checked={false} onChange={() => onToggleTask?.(t)} label={`Markeer "${t.title}" als gedaan`} tone="success" />}
+                        onClick={() => setDetailTask(t)}
+                      />
+                    )
+                  })}
+                  {attention.length > 4 && (
+                    <button type="button" onClick={() => onNavigateToTasks?.('telaat')} className="t-meta"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: '2px 10px' }}>
+                      +{attention.length - 4} meer
+                    </button>
+                  )}
                 </div>
-              ))}
+              </>
+            ) : (
+              <>
+                <CardHeader icon={CheckCircle2} title="Niets te laat" tone="success"
+                  action={<CardLink onClick={() => onNavigateToTasks?.('open')}>Naar taken <ArrowRight size={13} /></CardLink>} />
+                <EmptyState compact title={openCount ? 'Geen achterstallige of urgente taken.' : 'Alles gedaan!'}
+                  text={openCount ? `${openCount} open ${openCount === 1 ? 'taak' : 'taken'} op schema.` : 'Geen openstaande taken.'} />
+              </>
+            )}
+          </Card>
+
+          {/* Volgende afspraak */}
+          <Card style={{ minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+            <CardHeader icon={CalendarClock} title="Volgende afspraak"
+              action={
+                <div style={{ display: 'flex', gap: 2 }}>
+                  <IconButton icon={ChevronLeft} label="Vorige afspraak" size={26} disabled={skip === 0} onClick={() => setSkip(s => Math.max(0, s - 1))} />
+                  <IconButton icon={ChevronRight} label="Volgende afspraak" size={26} disabled={!ev || !hasMore} onClick={() => setSkip(s => s + 1)} />
+                </div>
+              } />
+            <FilterTabs variant="segmented" items={NEXT_FILTERS} value={nextEventFilter} onChange={setFilter} label="Soort afspraak" style={{ marginBottom: 12, alignSelf: 'flex-start' }} />
+
+            {current && skip === 0 && nextEventFilter === 'alle' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, padding: '6px 10px', borderRadius: 'var(--r-sm)', background: 'var(--accent-soft)' }}>
+                <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 6px var(--accent)' }} />
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>Nu bezig</span>
+                <span style={{ fontSize: 12, color: 'var(--c-text)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{current.label}</span>
+                <span className="t-meta tnum">nog {current.minsLeft} min</span>
+              </div>
+            )}
+
+            {ev ? (
+              <>
+                {(() => {
+                  const cd = countdownLabel(ev.ts)
+                  const soon = ev.ts - new Date() < 3600000
+                  return (
+                    <p style={{ margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: soon ? 'var(--c-warning)' : 'var(--accent)' }}>
+                      <Clock3 size={14} aria-hidden="true" /> {cd}
+                    </p>
+                  )
+                })()}
+                <button type="button"
+                  onClick={() => { if (ev.type === 'task' && ev.raw) setDetailTask(ev.raw); else onNavigateToAgenda?.(ev.ts, ev.highlightKey) }}
+                  style={{ display: 'flex', gap: 10, background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', color: 'inherit', minWidth: 0 }}>
+                  <span aria-hidden="true" style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, background: categoryColor(ev.cat), flexShrink: 0 }} />
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: 15, fontWeight: 700, color: 'var(--c-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.label}</span>
+                    <span className="t-meta tnum" style={{ display: 'block', fontSize: 12, marginTop: 2 }}>
+                      {ev.ts.toDateString() !== new Date().toDateString() && `${ev.ts.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })} · `}
+                      {hhmm(ev.ts)}{ev.end ? ` – ${hhmm(ev.end)}` : ''}
+                    </span>
+                    {ev.location && (
+                      <span className="t-meta" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, marginTop: 2 }}>
+                        <MapPin size={11} aria-hidden="true" /> {ev.location}
+                      </span>
+                    )}
+                  </span>
+                </button>
+              </>
+            ) : (
+              <EmptyState compact text="Niets meer gepland." />
+            )}
+            <div style={{ marginTop: 'auto', paddingTop: 14 }}>
+              <button type="button" className="btn-ghost"
+                onClick={() => onNavigateToAgenda?.(ev?.ts || new Date(), ev?.highlightKey)}>
+                Bekijk agenda <ArrowRight size={13} aria-hidden="true" />
+              </button>
             </div>
-          </div>
+          </Card>
+        </section>
+
+        {/* ── RIJ 4: compacte widgets ── */}
+        <section className="dash-widgets" style={{ '--cols': widgetCount }} aria-label="Widgets">
+          <TodayWidget tasks={tasks} today={today} onToggleTask={t => onToggleTask?.(t)} onOpenTask={setDetailTask}
+            onNewTask={() => openNewTask()} onOpenList={() => onNavigateToTasks?.('vandaag')} />
+          <PomodoroMiniWidget onOpen={() => onNavigate('pomodoro')} />
+          {isAdmin && <GeldMiniWidget userId={userId} onOpen={() => onNavigate('geld')} />}
+          <SpotifyWidget compact />
+        </section>
+
+        {/* ── RIJ 5 (Level 2/3): schema, deadlines, ongepland, regen ── */}
+        {(todayItems.length > 0 || deadlines.length > 0 || unplanned.length > 0 || showRain) && (
+          <section className="dash-extra">
+            {todayItems.length > 0 && (
+              <Card pad={14} style={{ minWidth: 0 }}>
+                <CardHeader icon={ListTodo} title="Schema vandaag" count={todayItems.length} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {todayItems.slice(0, 5).map((item, i) => {
+                    const nowMins = new Date().getHours() * 60 + new Date().getMinutes()
+                    const endMins = item.end ? (() => { const [eh, em] = item.end.split(':').map(Number); return eh * 60 + em })() : 0
+                    const isNow = item.sortMins <= nowMins && item.end && endMins >= nowMins
+                    const past = item.end ? endMins < nowMins : item.sortMins < nowMins
+                    return (
+                      <ListRow key={i} dot={item.color} title={item.label} done={past && !isNow}
+                        trailing={<>
+                          {isNow && <Pill tone="accent">Nu</Pill>}
+                          <span className="t-meta tnum">{item.time}{item.end ? `–${item.end}` : ''}</span>
+                        </>}
+                        onClick={() => {
+                          if (item.type === 'task' && item.raw) setDetailTask(item.raw)
+                          else onNavigateToAgenda?.(new Date(), item.highlightKey)
+                        }} />
+                    )
+                  })}
+                  {todayItems.length > 5 && <p className="t-meta" style={{ margin: '2px 10px 0' }}>+{todayItems.length - 5} meer</p>}
+                </div>
+              </Card>
+            )}
+
+            {deadlines.length > 0 && (
+              <Card pad={14} style={{ minWidth: 0 }}>
+                <CardHeader icon={Flame} title="Deadlines" count={deadlines.length} tone="danger" />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {deadlines.map(t => (
+                    <ListRow key={t.id} dot={categoryColor(taskCategory(t))} title={t.title}
+                      subtitle={subjectName(t.subject_id)}
+                      trailing={<Pill tone={t.due_date === today ? 'danger' : 'warning'}>{shortDate(t.due_date, today)}</Pill>}
+                      onClick={() => setDetailTask(t)} />
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            {unplanned.length > 0 && (
+              <Card pad={14} style={{ minWidth: 0 }}>
+                <CardHeader icon={Inbox} title="Nog in te plannen" count={unplanned.length}
+                  action={<CardLink onClick={() => onNavigateToTasks?.('open')}>Alle <ArrowRight size={13} /></CardLink>} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {unplanned.slice(0, 4).map(t => (
+                    <ListRow key={t.id} dot={categoryColor(taskCategory(t))} title={t.title}
+                      trailing={subjectName(t.subject_id) && <span className="t-meta">{subjectName(t.subject_id)}</span>}
+                      onClick={() => setDetailTask(t)} />
+                  ))}
+                  {unplanned.length > 4 && <p className="t-meta" style={{ margin: '2px 10px 0' }}>+{unplanned.length - 4} meer</p>}
+                </div>
+              </Card>
+            )}
+
+            {showRain && <RainCard data={homeRain} onDismiss={dismissRain} />}
+          </section>
         )}
+
+        {/* Mobiel: snelle actie onderaan (desktop heeft + in de Vandaag-widget en Ctrl K) */}
+        <button className="btn-primary md:hidden" onClick={() => openNewTask()} style={{ width: '100%', padding: 12 }}>
+          <Plus size={16} aria-hidden="true" /> Taak toevoegen
+        </button>
+
+        {/* Padding voor bottom nav */}
+        <div className="md:hidden" style={{ height: 80 }} />
       </div>
-
-      {/* ── REGEN GRAFIEK ── */}
-      {homeRain && !rainHidden && Math.max(...homeRain.map(d => d.precip)) > 0.1 && (() => {
-        const data = homeRain
-        const maxP = Math.max(...data.map(d => d.precip), 0.5)
-        const W = 260, H = 64, PL = 4, PB = 14, PR = 4, PT = 4
-        const iW = W - PL - PR, iH = H - PT - PB
-        const xOf = i => PL + (i / (data.length - 1 || 1)) * iW
-        const yOf = v => PT + iH - (v / maxP) * iH
-        const pts = data.map((d, i) => [xOf(i), yOf(d.precip)])
-        const lineD = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
-        const areaD = `${lineD} L${pts[pts.length-1][0].toFixed(1)},${(PT+iH).toFixed(1)} L${PL},${(PT+iH).toFixed(1)} Z`
-        const maxLabel = maxP < 0.5 ? 'Lichte regen' : maxP < 2 ? 'Matige regen' : 'Zware regen'
-        const rainIdxs = data.map((d, i) => d.precip > 0.1 ? i : -1).filter(i => i !== -1)
-        const startTime = data[rainIdxs[0]]?.time
-        const endTime = data[rainIdxs[rainIdxs.length - 1]]?.time
-        const timeLabel = startTime === endTime || !endTime ? `vanaf ${startTime}` : `${startTime}–${endTime}`
-        return (
-          <div className="card"
-            style={{ padding: '12px 14px', border: '1px solid rgba(0,180,255,0.25)', background: 'rgba(0,150,255,0.05)' }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-              <span style={{ fontSize: 14 }}>🌧️</span>
-              <span style={{ fontSize: 12, color: 'rgba(0,200,255,0.9)', fontWeight: 600 }}>{maxLabel} {timeLabel}</span>
-              <button onClick={dismissRain} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', padding: '2px', lineHeight: 1, fontSize: 16 }} title="Verbergen">×</button>
-            </div>
-            <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }}>
-              <defs>
-                <linearGradient id="dRainGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="rgba(0,180,255,0.5)" />
-                  <stop offset="100%" stopColor="rgba(0,180,255,0.02)" />
-                </linearGradient>
-              </defs>
-              <path d={areaD} fill="url(#dRainGrad)" />
-              <path d={lineD} fill="none" stroke="rgba(0,200,255,0.8)" strokeWidth="1.5" strokeLinejoin="round" />
-              <line x1={PL} y1={PT+iH} x2={W-PR} y2={PT+iH} stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
-            </svg>
-          </div>
-        )
-      })()}
-
-      {/* ── SPOTIFY + WEATHER ── */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <SpotifyWidget />
-        <WeatherWidget userId={userId} onRequestPwaInstall={onRequestPwaInstall} stacked />
-      </div>
-
-      {/* ── ONGEPLANDE TAKEN ── */}
-      {(() => {
-        const unplanned = tasks.filter(t => !t.completed && !t.date)
-        if (!unplanned.length) return null
-        return (
-          <div className="card" style={{
-            padding: '14px 15px',
-            borderLeft: '3px solid rgba(250,204,21,0.4)',
-            background: 'linear-gradient(135deg, rgba(250,204,21,0.04) 0%, transparent 70%)',
-          }}>
-            <p style={{ fontSize: 9, color: 'rgba(250,204,21,0.7)', margin: '0 0 10px', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700 }}>
-              📋 Nog in te plannen · {unplanned.length}
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {unplanned.slice(0, 5).map(task => {
-                const subject = subjects.find(s => s.id === task.subject_id)
-                return (
-                  <div key={task.id} onClick={() => setDetailTask(task)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.025)', cursor: 'pointer', border: '1px solid transparent', transition: 'background 0.15s' }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(250,204,21,0.05)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.025)'}
-                  >
-                    <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'rgba(250,204,21,0.5)', flexShrink: 0 }} />
-                    <span style={{ fontSize: 13, color: 'var(--text-1)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>{task.title}</span>
-                    {subject && <span style={{ fontSize: 10, color: 'var(--text-3)', flexShrink: 0 }}>{subject.name}</span>}
-                  </div>
-                )
-              })}
-              {unplanned.length > 5 && (
-                <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '2px 0 0 10px' }}>+{unplanned.length - 5} meer</p>
-              )}
-            </div>
-          </div>
-        )
-      })()}
-
-      <button className="btn-neon" onClick={() => openNewTask()}
-        style={{
-          padding: '14px', fontSize: 14, display: 'flex', alignItems: 'center',
-          justifyContent: 'center', gap: 8, width: '100%',
-          boxShadow: '0 0 20px color-mix(in srgb, var(--accent) 10%, transparent)',
-        }}>
-        + Taak toevoegen
-      </button>
-
-      {/* Padding voor bottom nav */}
-      <div style={{ height: 80 }} />
     </div>
+  )
+}
+
+// ── Regen-grafiek (komende 2 uur) ─────────────────────────────────────────────
+function RainCard({ data, onDismiss }) {
+  const maxP = Math.max(...data.map(d => d.precip), 0.5)
+  const W = 260, H = 56, PL = 4, PB = 8, PR = 4, PT = 4
+  const iW = W - PL - PR, iH = H - PT - PB
+  const xOf = i => PL + (i / (data.length - 1 || 1)) * iW
+  const yOf = v => PT + iH - (v / maxP) * iH
+  const pts = data.map((d, i) => [xOf(i), yOf(d.precip)])
+  const lineD = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
+  const areaD = `${lineD} L${pts[pts.length-1][0].toFixed(1)},${(PT+iH).toFixed(1)} L${PL},${(PT+iH).toFixed(1)} Z`
+  const maxLabel = maxP < 0.5 ? 'Lichte regen' : maxP < 2 ? 'Matige regen' : 'Zware regen'
+  const rainIdxs = data.map((d, i) => d.precip > 0.1 ? i : -1).filter(i => i !== -1)
+  const startTime = data[rainIdxs[0]]?.time
+  const endTime = data[rainIdxs[rainIdxs.length - 1]]?.time
+  const timeLabel = startTime === endTime || !endTime ? `vanaf ${startTime}` : `${startTime}–${endTime}`
+  return (
+    <Card pad={14} tone="info" style={{ minWidth: 0 }}>
+      <CardHeader icon={CloudRain} title={`${maxLabel} ${timeLabel}`} tone="info"
+        action={<IconButton icon={X} label="Regengrafiek verbergen" size={24} iconSize={13} onClick={onDismiss} />} />
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }} role="img" aria-label={`${maxLabel} ${timeLabel}`}>
+        <defs>
+          <linearGradient id="dRainGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--c-info)" stopOpacity="0.45" />
+            <stop offset="100%" stopColor="var(--c-info)" stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+        <path d={areaD} fill="url(#dRainGrad)" />
+        <path d={lineD} fill="none" stroke="var(--c-info)" strokeWidth="1.5" strokeLinejoin="round" />
+        <line x1={PL} y1={PT+iH} x2={W-PR} y2={PT+iH} stroke="var(--c-border)" strokeWidth="1" />
+      </svg>
+    </Card>
   )
 }

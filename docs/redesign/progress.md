@@ -36,3 +36,19 @@ Branch `redesign/hypex-v2`, one commit per phase. Analysis & proposal: [phase1-a
 - ~430 inline white-alpha text/border colors mapped to `--c-text*` / `--c-border*`.
 - Cards: no resting shadow/blur; urgent pulse → static glow; single-layer clock glow; focus-visible outlines;
   `prefers-reduced-motion` support.
+
+## Phase 3 — Dashboard
+
+- Command-center grid: header (greeting/date, search, inline clock, weather chip) → 4 KPI tiles →
+  workspace ("Te laat & urgent" + "Volgende afspraak") → widgets (Vandaag, Pomodoro, Geld*, Spotify) → extras
+  (Schema vandaag, Deadlines, Nog in te plannen, regen). *Geld only for admin, same as the Geld page.
+- CommandPalette (D4), sidebar restyle + overdue badge (D11), "Vandaag" KPI (D9), complete/open quick actions (D10).
+- Existing features kept: next-event filter + ‹ ›, "Nu bezig", schema strip, deadlines, unplanned list, rain chart
+  (dismissable), full weather widget (popup from chip), Spotify controls, PWA prompt trigger.
+- **Behavior note:** "Te laat" now uses one definition everywhere (`utils/taskStatus.js`), matching the
+  existing Taken filter: routines are not counted. Before, the Dashboard counted missed routines (3) while
+  Taken showed 1.
+- **Deviation:** the Pomodoro widget's play button opens the Pomodoro page instead of starting the timer
+  there — starting would need a second copy of the timer logic.
+- **Open question:** "Volgende afspraak" doesn't include MyX/Google events (App doesn't load
+  `external_calendar_events`; only the Agenda does). Adding that read query needs approval.

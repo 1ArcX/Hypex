@@ -20,7 +20,7 @@ function getPomodoroDisplay() {
   } catch { return null }
 }
 
-export default function Clock({ isBreak }) {
+export default function Clock({ isBreak, variant = 'hero' }) {
   const [time, setTime] = useState(new Date())
   const [pomodoro, setPomodoro] = useState(getPomodoroDisplay)
 
@@ -43,6 +43,15 @@ export default function Clock({ isBreak }) {
 
   const clockClass = isBreak ? 'neon-clock-orange' : 'neon-clock'
   const pomColor = pomodoro ? MODES[pomodoro.mode]?.color : null
+
+  // Inline (dashboard-header): alleen HH:MM, groot maar zonder eigen kaart
+  if (variant === 'inline') return (
+    <time dateTime={time.toISOString()} className={`t-display select-none ${clockClass}`}
+      aria-label={`Het is ${hours}:${minutes}`} style={{ whiteSpace: 'nowrap', display: 'block' }}>
+      {hours}<span style={{ opacity: 0.6, animation: 'clockBlink 1s step-end infinite' }}>:</span>{minutes}
+      <style>{`@keyframes clockBlink { 0%, 100% { opacity: 0.6; } 50% { opacity: 0.25; } }`}</style>
+    </time>
+  )
 
   return (
     <div className="text-center py-4">

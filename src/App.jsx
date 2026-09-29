@@ -20,6 +20,7 @@ import { callMagister } from './utils/magisterApi'
 import { ensureSomtodayCreds } from './utils/somtodayApi'
 import { awardXP, XP_TASK } from './utils/xp'
 import { advanceOnComplete, revertOnUncomplete, isDoneToday, todayISO } from './utils/recurrence'
+import { isOverdue } from './utils/taskStatus'
 import { VAPID_PUBLIC, urlBase64ToUint8Array } from './utils/push'
 import XPToast from './components/XPToast'
 import BottomNav from './components/BottomNav'
@@ -35,6 +36,7 @@ import JumboPage from './pages/JumboPage'
 import StatsPage from './pages/StatsPage'
 import GeldPage from './pages/GeldPage'
 import HypexAIPage from './pages/HypexAIPage'
+import CommandPalette from './components/CommandPalette'
 
 const ADMIN_EMAIL = 'zhafirfachri@gmail.com'
 
@@ -72,6 +74,8 @@ export default function App() {
   const [activePage, setActivePage] = useState(() => localStorage.getItem('activePage') || 'dashboard')
   const [taskHighlight, setTaskHighlight] = useState(null)
   const [agendaJump, setAgendaJump] = useState(null)
+  const [paletteOpen, setPaletteOpen] = useState(false) // "Zoek in Hypex" (Ctrl/⌘K)
+  const [noteJump, setNoteJump] = useState(null)
   const [magisterLessons, setMagisterLessons] = useState([])
   const [calendarEvents, setCalendarEvents] = useState([])
   const [magisterError, setMagisterError] = useState(null)
@@ -690,6 +694,22 @@ export default function App() {
     localStorage.setItem('activePage', page)
   }
 
+  // Aantal te late (open, datum < vandaag) taken — sidebar-badge
+  const overdueCount = useMemo(() => {
+    const t = todayISO()
+    return tasks.filter(x => isOverdue(x, t)).length
+  }, [tasks])
+
+  // Ctrl/⌘K opent de zoekpalette (alleen ingelogd)
+  useEffect(() => {
+    if (!session) return
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPaletteOpen(o => !o) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [session])
+
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-base)' }}>
       <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin"
@@ -744,6 +764,8 @@ export default function App() {
             onShowSettings={() => setShowThemeSettings(true)}
             onShowAdmin={() => setShowAdmin(true)}
             onLogout={() => supabase.auth.signOut({ scope: 'local' })}
+            onOpenSearch={() => setPaletteOpen(true)}
+            overdueCount={overdueCount}
             syncing={syncing}
             syncFlash={syncFlash}
             updateAvailable={updateAvailable}
@@ -822,6 +844,8 @@ export default function App() {
                 profiles={profiles}
                 userId={user?.id}
                 onToggleTask={handleToggleTask}
+                isAdmin={isAdmin}
+                onOpenSearch={() => setPaletteOpen(true)}
               />
             )}
 
@@ -893,7 +917,7 @@ export default function App() {
             )}
 
             {activePage === 'notities' && (
-              <NotitiesPage userId={user.id} syncTrigger={syncTrigger} />
+              <NotitiesPage userId={user.id} syncTrigger={syncTrigger} openNoteId={noteJump} />
             )}
 
             {activePage === 'statistieken' && (
@@ -931,6 +955,20 @@ export default function App() {
       </div>
 
       {/* Modals / Overlays */}
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        userId={user?.id}
+        tasks={tasks}
+        calendarEvents={calendarEvents}
+        isAdmin={isAdmin}
+        showJumbo={isAdmin || !!userProfile?.werk_tab}
+        onNavigate={handleSetActivePage}
+        onOpenTask={t => setDetailTask(t)}
+        onOpenEvent={ev => { setAgendaJump({ date: new Date(ev.start_time), highlightKey: `event:${ev.id}` }); handleSetActivePage('agenda') }}
+        onOpenNote={n => { setNoteJump(n.id); handleSetActivePage('notities') }}
+        onNewTask={() => openNewTask()}
+      />
       {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} profiles={profiles} onProfilesChange={fetchProfiles} />}
 
       {showThemeSettings && (

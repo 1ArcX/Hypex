@@ -1,6 +1,7 @@
 import React from 'react'
-import { Home, Timer, Calendar, GraduationCap, CheckSquare, Flame, FileText, Briefcase, Settings, Shield, LogOut, RefreshCw, BarChart2, Dumbbell, Wallet, Sparkles } from 'lucide-react'
+import { Home, Timer, Calendar, GraduationCap, CheckSquare, Flame, FileText, Briefcase, Settings, Shield, LogOut, RefreshCw, BarChart2, Dumbbell, Wallet, Sparkles, Search } from 'lucide-react'
 import VersionChecker from './VersionChecker'
+import { CountBadge, Pill } from './ui'
 
 const NAV_ITEMS = [
   { id: 'dashboard',    Icon: Home,           label: 'Dashboard'    },
@@ -17,8 +18,9 @@ const NAV_ITEMS = [
 export default function Sidebar({
   activePage, setActivePage,
   isAdmin, showJumbo, user,
-  onShowSettings, onShowAdmin, onLogout,
+  onShowSettings, onShowAdmin, onLogout, onOpenSearch,
   syncing, syncFlash, updateAvailable, hasLevelUp, hasActiveGymWorkout, hasActivePomo,
+  overdueCount = 0,
 }) {
   const displayName = user?.email?.split('@')[0] || 'Student'
   const initial = displayName.charAt(0).toUpperCase()
@@ -31,13 +33,10 @@ export default function Sidebar({
   ]
 
   return (
-    <>
-    <aside style={{
-      width: 220,
+    <aside className="hx-sidebar" style={{
+      width: 208,
       flexShrink: 0,
-      background: 'rgba(255,255,255,0.025)',
-      backdropFilter: 'blur(24px)',
-      WebkitBackdropFilter: 'blur(24px)',
+      background: 'rgba(255,255,255,0.02)',
       borderRight: '1px solid var(--c-border)',
       display: 'flex',
       flexDirection: 'column',
@@ -48,23 +47,24 @@ export default function Sidebar({
     }}>
 
       {/* Logo */}
-      <div style={{ padding: '18px 16px 14px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+      <div style={{ padding: '16px 14px 12px', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{
-            width: 32, height: 32, borderRadius: 10,
-            background: 'var(--accent-dim)',
-            border: '1px solid color-mix(in srgb, var(--accent) 25%, transparent)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <span style={{ fontSize: 16, color: 'var(--accent)' }}>⬡</span>
+            width: 30, height: 30, borderRadius: '50%',
+            border: '2px solid var(--accent)',
+            boxShadow: '0 0 10px color-mix(in srgb, var(--accent) 30%, transparent)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          }} aria-hidden="true">
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)' }} />
           </div>
-          <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-1)', letterSpacing: '-0.02em' }}>Hypex</span>
+          <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--c-text)', letterSpacing: '-0.02em' }}>Hypex</span>
           {/* Sync indicator */}
           <RefreshCw
-            size={11}
+            size={12}
+            aria-label={syncing ? 'Synchroniseren…' : 'Gesynchroniseerd'}
             style={{
               marginLeft: 'auto',
-              color: syncFlash ? '#1DB954' : 'var(--text-3)',
+              color: syncFlash ? 'var(--c-success)' : 'var(--c-text-3)',
               transition: 'color 0.5s',
               animation: syncing ? 'spin 0.8s linear infinite' : 'none',
               flexShrink: 0,
@@ -73,181 +73,85 @@ export default function Sidebar({
         </div>
       </div>
 
+      {/* Zoeken */}
+      {onOpenSearch && (
+        <div style={{ padding: '0 8px 6px' }}>
+          <button type="button" onClick={onOpenSearch} className="hx-nav-item" style={{ color: 'var(--c-text-3)' }}>
+            <Search size={15} aria-hidden="true" />
+            <span style={{ flex: 1 }}>Zoeken</span>
+            <kbd style={{ fontSize: 10, color: 'var(--c-text-3)', border: '1px solid var(--c-border)', borderRadius: 4, padding: '1px 5px', fontFamily: 'inherit' }}>Ctrl K</kbd>
+          </button>
+        </div>
+      )}
+
       {/* Nav */}
-      <nav style={{ flex: 1, padding: '10px 8px', overflowY: 'auto' }}>
+      <nav aria-label="Hoofdnavigatie" style={{ flex: 1, padding: '4px 8px', overflowY: 'auto' }}>
         {navItems.map(({ id, Icon, label }) => {
           const active = activePage === id
-          const glowingStats = id === 'statistieken' && hasLevelUp && !active
-          const glowingGym   = id === 'gym' && hasActiveGymWorkout && !active
-          const glowingPomo  = id === 'pomodoro' && hasActivePomo && !active
-          const glowing = glowingStats || glowingGym || glowingPomo
-          const glowColor  = glowingGym ? '#F97316' : glowingPomo ? '#EF4444' : '#FACC15'
-          const glowBg     = glowingGym ? 'rgba(249,115,22,0.06)' : glowingPomo ? 'rgba(239,68,68,0.06)' : 'rgba(250,204,21,0.06)'
-          const glowBorder = glowingGym ? 'rgba(249,115,22,0.6)' : glowingPomo ? 'rgba(239,68,68,0.6)' : 'rgba(250,204,21,0.6)'
+          const levelUp   = id === 'statistieken' && hasLevelUp && !active
+          const gymActive = id === 'gym' && hasActiveGymWorkout && !active
+          const pomoActive = id === 'pomodoro' && hasActivePomo && !active
+          const badge = id === 'taken' && overdueCount > 0 && !active
           return (
             <button
               key={id}
+              type="button"
               onClick={() => setActivePage(id)}
-              style={{
-                width: '100%',
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '9px 12px',
-                borderRadius: 12,
-                marginBottom: 3,
-                background: active ? 'color-mix(in srgb, var(--accent) 10%, transparent)' : glowing ? glowBg : 'transparent',
-                border: active ? '1px solid color-mix(in srgb, var(--accent) 30%, transparent)' : glowing ? `1px solid ${glowBorder}` : '1px solid transparent',
-                cursor: 'pointer',
-                color: active ? 'var(--accent)' : glowing ? glowColor : 'var(--text-2)',
-                fontSize: 13,
-                fontWeight: active || glowing ? 600 : 400,
-                textAlign: 'left',
-                transition: 'all 0.12s',
-                animation: glowingGym ? 'gymGlow 2s ease-in-out infinite' : glowingPomo ? 'pomoGlow 2s ease-in-out infinite' : glowing ? 'statsGlow 2s ease-in-out infinite' : 'none',
-                position: 'relative',
-              }}
-              onMouseEnter={e => {
-                if (!active && !glowing) {
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
-                  e.currentTarget.style.color = 'var(--text-1)'
-                }
-              }}
-              onMouseLeave={e => {
-                if (!active && !glowing) {
-                  e.currentTarget.style.background = 'transparent'
-                  e.currentTarget.style.color = 'var(--text-2)'
-                }
-              }}
+              aria-current={active ? 'page' : undefined}
+              className={`hx-nav-item${active ? ' is-active' : ''}${pomoActive ? ' is-running' : ''}`}
             >
-              <Icon size={15} />
-              {label}
-              {glowingStats && (
-                <span style={{
-                  marginLeft: 'auto', fontSize: 10, fontWeight: 700,
-                  background: 'linear-gradient(90deg, #FACC15, #F97316, #FACC15)',
-                  backgroundSize: '200% 100%',
-                  WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                  animation: 'gradientShift 1.5s linear infinite',
-                }}>LEVEL UP</span>
-              )}
-              {glowingGym && (
-                <span style={{
-                  marginLeft: 'auto', fontSize: 10, fontWeight: 700,
-                  background: 'linear-gradient(90deg, #F97316, #EF4444, #F97316)',
-                  backgroundSize: '200% 100%',
-                  WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                  animation: 'gradientShift 1.5s linear infinite',
-                }}>ACTIEF</span>
-              )}
-              {glowingPomo && (
-                <span style={{
-                  marginLeft: 'auto', fontSize: 10, fontWeight: 700,
-                  background: 'linear-gradient(90deg, #EF4444, #EC4899, #EF4444)',
-                  backgroundSize: '200% 100%',
-                  WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                  animation: 'gradientShift 1.5s linear infinite',
-                }}>ACTIEF</span>
-              )}
+              <Icon size={15} aria-hidden="true" />
+              <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+              {badge && <CountBadge count={overdueCount} label={`${overdueCount} te laat`} />}
+              {pomoActive && <Pill tone="accent">Actief</Pill>}
+              {gymActive && <Pill tone="warning">Actief</Pill>}
+              {levelUp && <Pill tone="school">Level up</Pill>}
             </button>
           )
         })}
       </nav>
 
       {/* Footer */}
-      <div style={{ borderTop: '1px solid var(--border)', padding: '8px 8px 12px', flexShrink: 0 }}>
-        <button
-          onClick={onShowSettings}
-          style={{
-            width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-            padding: '8px 10px', borderRadius: 8, marginBottom: 2,
-            background: 'transparent', border: 'none', borderLeft: '2px solid transparent',
-            cursor: 'pointer', color: 'var(--text-2)', fontSize: 13, textAlign: 'left',
-            transition: 'all 0.12s',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = 'var(--text-1)' }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-2)' }}
-        >
-          <Settings size={15} /> Instellingen
+      <div style={{ borderTop: '1px solid var(--c-border)', padding: '8px 8px 12px', flexShrink: 0 }}>
+        <button type="button" onClick={onShowSettings} className="hx-nav-item">
+          <Settings size={15} aria-hidden="true" /> Instellingen
         </button>
 
         {isAdmin && (
-          <button
-            onClick={onShowAdmin}
-            style={{
-              width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-              padding: '8px 10px', borderRadius: 8, marginBottom: 2,
-              background: 'transparent', border: 'none', borderLeft: '2px solid transparent',
-              cursor: 'pointer', color: '#FFB400', fontSize: 13, textAlign: 'left',
-              transition: 'all 0.12s',
-            }}
-          >
-            <Shield size={15} /> Admin
+          <button type="button" onClick={onShowAdmin} className="hx-nav-item" style={{ color: 'var(--c-warning)' }}>
+            <Shield size={15} aria-hidden="true" /> Admin
           </button>
         )}
 
-        <button
-          onClick={onLogout}
-          className="hidden md:flex"
-          style={{
-            width: '100%', alignItems: 'center', gap: 10,
-            padding: '8px 10px', borderRadius: 8, marginBottom: 6,
-            background: 'transparent', border: 'none', borderLeft: '2px solid transparent',
-            cursor: 'pointer', color: 'var(--text-3)', fontSize: 13, textAlign: 'left',
-            transition: 'all 0.12s',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.color = 'rgba(255,80,80,0.7)' }}
-          onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-3)' }}
-        >
-          <LogOut size={15} /> Uitloggen
+        <button type="button" onClick={onLogout} className="hx-nav-item hx-nav-item--danger" style={{ color: 'var(--c-text-3)' }}>
+          <LogOut size={15} aria-hidden="true" /> Uitloggen
         </button>
 
-        <div style={{ padding: '0 10px 6px' }}>
+        <div style={{ padding: '4px 10px 6px' }}>
           <VersionChecker />
         </div>
 
         {/* Avatar */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8,
-          padding: '6px 10px',
-          borderRadius: 8,
-          background: 'var(--bg-card-2)',
-          border: '1px solid var(--border)',
+          padding: '6px 8px',
+          borderRadius: 'var(--r-sm)',
+          background: 'var(--c-surface-2)',
+          border: '1px solid var(--c-border)',
         }}>
           <div style={{
-            width: 26, height: 26, borderRadius: 7,
-            background: 'var(--accent-dim)',
-            border: '1px solid color-mix(in srgb, var(--accent) 25%, transparent)',
+            width: 24, height: 24, borderRadius: '50%',
+            background: 'var(--accent)', color: 'var(--on-accent)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 11, color: 'var(--accent)', fontWeight: 700, flexShrink: 0,
-          }}>
+            fontSize: 11, fontWeight: 700, flexShrink: 0,
+          }} aria-hidden="true">
             {initial}
           </div>
-          <span style={{
-            fontSize: 12, color: 'var(--text-2)',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
+          <span style={{ fontSize: 12, color: 'var(--c-text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {displayName}
           </span>
         </div>
       </div>
     </aside>
-    <style>{`
-      @keyframes statsGlow {
-        0%, 100% { box-shadow: none; }
-        50%       { box-shadow: 0 0 12px rgba(250,204,21,0.25); }
-      }
-      @keyframes gymGlow {
-        0%, 100% { box-shadow: none; }
-        50%       { box-shadow: 0 0 12px rgba(249,115,22,0.3); }
-      }
-      @keyframes pomoGlow {
-        0%, 100% { box-shadow: none; }
-        50%       { box-shadow: 0 0 12px rgba(239,68,68,0.3); }
-      }
-      @keyframes gradientShift {
-        0%   { background-position: 0%   50%; }
-        100% { background-position: 200% 50%; }
-      }
-    `}</style>
-  </>
   )
 }
