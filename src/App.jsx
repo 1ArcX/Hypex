@@ -506,7 +506,8 @@ export default function App() {
     return () => window.removeEventListener('refreshCalendarEvents', handler)
   }, [user?.id])
 
-  const allEvents = useMemo(() => [...calendarEvents, ...externalEvents], [calendarEvents, externalEvents])
+  // Timeline zet via onEventsChange ook geïmporteerde items in calendarEvents → ontdubbelen
+  const allEvents = useMemo(() => [...calendarEvents.filter(e => !e.external), ...externalEvents], [calendarEvents, externalEvents])
 
   // Auto-sync elke 30 seconden
   const doSync = useCallback(async () => {

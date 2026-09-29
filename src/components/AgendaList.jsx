@@ -1,6 +1,8 @@
 import React from 'react'
 import { appliesOn } from '../utils/recurrence'
 import { taskDaypart, daypartLabel } from '../utils/daypart'
+import { taskCategory, eventCategory, categoryColor } from '../utils/category'
+import { eventDisplay } from '../utils/eventTitle'
 
 // Chronologische lijst-weergave (iOS "Lijst"): komende dagen met al hun items
 // — events, lessen, werk, taken en routines — gegroepeerd per dag op tijd.
@@ -55,18 +57,18 @@ function buildDayItems(date, { tasks, subjects, calendarEvents, magisterLessons 
     if (!eventMatchesDay(ev, date)) continue
     const s = new Date(ev.start_time), e = new Date(ev.end_time)
     const allDay = s.getHours() === 0 && s.getMinutes() === 0 && e.getHours() === 23 && e.getMinutes() === 59
-    items.push({ kind: 'event', allDay, mins: allDay ? -1 : s.getHours() * 60 + s.getMinutes(), timeLabel: allDay ? 'hele dag' : fmtTime(s), title: ev.title, color: ev.color || '#818CF8' })
+    items.push({ kind: 'event', allDay, mins: allDay ? -1 : s.getHours() * 60 + s.getMinutes(), timeLabel: allDay ? 'hele dag' : fmtTime(s), title: eventDisplay(ev).title, sub: [eventDisplay(ev).code, ev.location].filter(Boolean).join(' · '), color: categoryColor(eventCategory(ev)) })
   }
   // Lessen
   for (const les of (magisterLessons || [])) {
     if (!les.start || !isSameDay(new Date(les.start), date)) continue
     const s = new Date(les.start)
     const cancelled = les.uitgevallen || les.cancelled
-    items.push({ kind: 'lesson', mins: s.getHours() * 60 + s.getMinutes(), timeLabel: fmtTime(s), title: les.vak || les.description || 'Les', color: cancelled ? '#FF6B6B' : '#FACC15', cancelled, sub: les.lokaal || les.location })
+    items.push({ kind: 'lesson', mins: s.getHours() * 60 + s.getMinutes(), timeLabel: fmtTime(s), title: les.vak || les.description || 'Les', color: cancelled ? 'var(--c-danger)' : categoryColor('school'), cancelled, sub: les.lokaal || les.location })
   }
   // Werk
   for (const sh of getWorkShifts(ds)) {
-    items.push({ kind: 'work', mins: timeStrToMins(sh.start), timeLabel: `${sh.start || ''}`, title: '💼 Jumbo', color: '#FF8C42', sub: sh.end ? `tot ${sh.end}` : '' })
+    items.push({ kind: 'work', mins: timeStrToMins(sh.start), timeLabel: `${sh.start || ''}`, title: 'Jumbo', color: categoryColor('werk'), sub: sh.end ? `tot ${sh.end}` : '' })
   }
   // Taken + routines
   for (const t of (tasks || [])) {
@@ -75,8 +77,7 @@ function buildDayItems(date, { tasks, subjects, calendarEvents, magisterLessons 
     if (!t.recurrence && t.completed) continue
     const timed = t.start_time || t.time
     const dp = taskDaypart(t)
-    const subject = subjects?.find(s => s.id === t.subject_id)
-    const color = subject?.color || t.color || (t.recurrence ? '#5EEAD4' : '#818CF8')
+    const color = categoryColor(taskCategory(t))
     items.push({
       kind: 'task', task: t, color,
       mins: timed ? timeStrToMins(timed) : -1,
@@ -127,7 +128,7 @@ export default function AgendaList({ tasks, subjects, calendarEvents, magisterLe
         <div style={{ marginBottom: 18 }}>
           <p style={{ fontSize: 12, fontWeight: 700, color: '#ff8080', letterSpacing: '0.05em', textTransform: 'uppercase', margin: '0 0 8px', padding: '0 2px' }}>⚠️ Te laat</p>
           {overdue.map(t => (
-            <Row key={t.id} color="#FF6B6B" timeLabel="te laat"
+            <Row key={t.id} color="var(--c-danger)" timeLabel="te laat"
               title={t.title} onClick={() => onViewDetail?.(t)}
               check={{ done: false, onToggle: () => onToggleTask?.(t) }} />
           ))}

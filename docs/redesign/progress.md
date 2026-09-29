@@ -56,3 +56,22 @@ Branch `redesign/hypex-v2`, one commit per phase. Analysis & proposal: [phase1-a
   name is parsed by `utils/eventTitle.js` (no mapping needed). Items without a name (e.g. "MATH0") keep the code.
 - Verified in the browser with real data: dashboard rows, next appointment (name + code + location), search
   (Ctrl K, event → Agenda with highlight, "Nieuwe taak"), Geld widget matches the Geld page.
+
+## Phase 4 — Agenda
+
+- Timeline (week/day/month): category colors via `utils/category.js`, light tinted blocks with a clear border
+  and 3px left edge; MyX events show the readable course name, time, and the code small underneath (D3).
+- Calmer grid: day-part color bands removed, lighter hour/half-hour/column lines; today's column and date
+  stronger (accent circle with a soft glow).
+- Now line kept and made clearer: red line + red time pill in the hour column (as in the mockup).
+- Right rail (≥1280px): "Kleuren" legend + mini month calendar (click a day to jump; ‹ › per month).
+- Toolbar on shared components (btn-ghost "Vandaag", labelled icon buttons, segmented Dag/Week/Maand, btn-primary "Nieuw").
+- Mobile list (AgendaList) uses the same categories and readable names.
+- **D1 refinement (from real data):** own agenda items get their category from the palette color the user
+  picked (red/orange = Werk, yellow = School, green = Routine, cyan/blue = Overig, purple/pink = Persoonlijk).
+  The user already uses color as category ("Werk" events are red). Tasks stay source-based.
+- **Bugs fixed on the way (pre-existing):**
+  - Week/day events were positioned as a % of the full width instead of the day-column width, so they drifted
+    right and Sunday's blocks were clipped.
+  - Month grid columns grew with long titles (`1fr` → `minmax(0, 1fr)`), so dates landed under the wrong weekday.
+  - Sticky all-day row was translucent; events showed through when scrolling.

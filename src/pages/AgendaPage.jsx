@@ -313,9 +313,9 @@ export default function AgendaPage({
     <>
       {/* ── Desktop (md+): full Timeline ── */}
       <div className="hidden md:flex" style={{ height: '100%', flexDirection: 'column', padding: '24px 28px' }}>
-        <h2 style={{ margin: '0 0 16px', fontSize: 20, fontWeight: 700, color: 'var(--text-1)', flexShrink: 0 }}>Agenda</h2>
-        <div className="card" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ flex: 1, overflow: 'hidden', padding: '16px' }}>
+        <h1 className="t-page" style={{ margin: '0 0 16px', flexShrink: 0 }}>Agenda</h1>
+        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ flex: 1, overflow: 'hidden' }}>
             {isDesktop && (
               <Timeline
                 userId={userId} userEmail={userEmail} tasks={tasks} subjects={subjects}

@@ -783,3 +783,7 @@ select {
   .dash-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .dash-widgets { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ===== AGENDA (v2) ===== */
+.agenda-rail { width: 220px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+@media (max-width: 1279px) { .agenda-rail { display: none; } }

@@ -4,9 +4,10 @@
 //
 //   School       lessen (Magister/SOMtoday), MyX-rooster (ICS), taken met een vak
 //   Werk         PMT/Jumbo-diensten
-//   Persoonlijk  eigen agenda-items, taken zonder vak/herhaling
+//   Persoonlijk  taken zonder vak/herhaling
 //   Routine      herhalende taken
 //   Overig       Google Agenda en alles wat niet te plaatsen is
+//   Eigen agenda-items: categorie volgt de gekozen paletkleur (zie EVENT_COLOR_CATEGORY).
 
 export const CATEGORIES = {
   school:      { label: 'School',      color: 'var(--cat-school)' },
@@ -24,6 +25,17 @@ export function taskCategory(task) {
   return 'persoonlijk'
 }
 
+// Eigen agenda-items: de gebruiker kiest zelf een kleur uit het vaste palet van het
+// event-formulier en gebruikt die als categorie (bv. "Werk" = rood). Die keuze respecteren
+// we door elke paletkleur op de dichtstbijzijnde categorie te mappen.
+const EVENT_COLOR_CATEGORY = {
+  '#ff6b6b': 'werk', '#ff8c42': 'werk',
+  '#facc15': 'school',
+  '#4ade80': 'routine',
+  '#00ffd1': 'overig', '#38bdf8': 'overig',
+  '#818cf8': 'persoonlijk', '#f472b6': 'persoonlijk',
+}
+
 /** Agenda-event (calendar_events of geïmporteerd external_calendar_events). */
 export function eventCategory(ev) {
   if (!ev) return 'overig'
@@ -33,7 +45,8 @@ export function eventCategory(ev) {
     if (typeof kind === 'string' && kind.startsWith('calendar#')) return 'overig'
     return 'school'
   }
-  return 'persoonlijk'
+  if (ev.description?.startsWith('pmt:')) return 'werk'
+  return EVENT_COLOR_CATEGORY[(ev.color || '').toLowerCase()] || 'persoonlijk'
 }
 
 export const lessonCategory = () => 'school'

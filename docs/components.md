@@ -82,7 +82,7 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 - **TaskDetailModal** — [components/TaskDetailModal.jsx](../src/components/TaskDetailModal.jsx) — read-only task detail + start pomodoro + edit/delete. Aliases: "taak detail", "taakdetail popup".
 
 ### Agenda
-- **Timeline** — [components/Timeline.jsx](../src/components/Timeline.jsx) — full week/day calendar grid (desktop agenda) with Magister/SOMtoday lessons, events, tasks, work shifts. Aliases: "timeline", "agenda grid", "week weergave", "kalender".
+- **Timeline** — [components/Timeline.jsx](../src/components/Timeline.jsx) — full week/day/month calendar grid (desktop agenda) with Magister/SOMtoday lessons, events, tasks, work shifts. Category-colored blocks (`blockStyle`), red now-line with time pill, right rail `SideRail` (legend "Kleuren" + mini month, `.agenda-rail`, ≥1280px). Aliases: "timeline", "agenda grid", "week weergave", "kalender", "legenda", "mini kalender".
 - **AgendaList** — [components/AgendaList.jsx](../src/components/AgendaList.jsx) — mobile agenda list ("Niets gepland de komende weken"). Aliases: "agenda lijst", "agenda mobiel".
 
 ### Pomodoro

@@ -4,6 +4,25 @@ import { Plus, ChevronLeft, ChevronRight, X, Save, Trash2 } from 'lucide-react'
 import { callMagister } from '../utils/magisterApi'
 import { callSomtoday, ensureSomtodayCreds } from '../utils/somtodayApi'
 import { appliesOn } from '../utils/recurrence'
+import { taskCategory, eventCategory, categoryColor, CATEGORIES, CATEGORY_ORDER } from '../utils/category'
+import { eventDisplay } from '../utils/eventTitle'
+import { FilterTabs, IconButton } from './ui'
+
+const WORK = 'var(--cat-werk)' // = categoryColor('werk')
+
+// v2 event-blok: lichte tint van de categoriekleur, duidelijke rand, dikke linkerrand
+function blockStyle(color, extra = {}) {
+  return {
+    position: 'absolute', overflow: 'hidden', boxSizing: 'border-box', marginLeft: '2px', cursor: 'pointer',
+    borderRadius: 6, padding: '3px 7px',
+    background: `color-mix(in srgb, ${color} 13%, var(--c-bg))`,
+    border: `1px solid color-mix(in srgb, ${color} 38%, transparent)`,
+    borderLeft: `3px solid ${color}`,
+    ...extra,
+  }
+}
+const blockTitle = (color, extra = {}) => ({ fontSize: '11px', fontWeight: 700, color: `color-mix(in srgb, ${color} 55%, white)`, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', ...extra })
+const blockMeta = (color) => ({ fontSize: '10px', color: `color-mix(in srgb, ${color} 45%, var(--c-text-2))`, lineHeight: 1.3, marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' })
 
 const HOUR_H = 56
 const TIME_COL = 48
@@ -492,7 +511,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
         {!hideHeader && (
           <div style={{
             display: 'grid',
-            gridTemplateColumns: `${TIME_COL}px repeat(${N}, 1fr)`,
+            gridTemplateColumns: `${TIME_COL}px repeat(${N}, minmax(0, 1fr))`,
             borderBottom: '1px solid var(--c-border)',
             flexShrink: 0,
           }}>
@@ -501,12 +520,12 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
               const isToday = isSameDay(d, now)
               return (
                 <div key={i} style={{ padding: '8px 6px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 500, letterSpacing: '0.06em', color: isToday ? 'var(--accent, #00FFD1)' : 'var(--c-text-3)', marginBottom: '4px', textTransform: 'uppercase' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 500, letterSpacing: '0.06em', color: isToday ? 'var(--accent)' : 'var(--c-text-3)', marginBottom: '4px', textTransform: 'uppercase', fontWeight: isToday ? 700 : 500 }}>
                     {DAYS_SHORT[d.getDay()]}
                   </div>
                   <div
                     onClick={() => { if (!isDay) { setCurrent(d); setView('day') } }}
-                    style={{ width: isDay ? '36px' : '28px', height: isDay ? '36px' : '28px', borderRadius: '50%', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', background: isToday ? 'var(--accent, #00FFD1)' : 'transparent', color: isToday ? '#000' : 'var(--c-text)', fontSize: isDay ? '18px' : '13px', fontWeight: isToday ? 700 : 400, cursor: isDay ? 'default' : 'pointer', transition: 'background 0.15s' }}>
+                    style={{ width: isDay ? '36px' : '28px', height: isDay ? '36px' : '28px', borderRadius: '50%', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', background: isToday ? 'var(--accent)' : 'transparent', color: isToday ? 'var(--on-accent)' : 'var(--c-text)', fontSize: isDay ? '18px' : '14px', fontWeight: isToday ? 700 : 500, cursor: isDay ? 'default' : 'pointer', transition: 'background 0.15s', boxShadow: isToday ? '0 0 12px color-mix(in srgb, var(--accent) 40%, transparent)' : 'none' }}>
                     {d.getDate()}
                   </div>
                 </div>
@@ -524,14 +543,14 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
               const allDayEvs = getEventsForDay(d).filter(ev => {
                 const s = new Date(ev.start_time)
                 return s.getHours() === 0 && s.getMinutes() === 0
-              }).map(ev => ({ kind: 'event', key: ev.id, color: ev.color, title: ev.title, onClick: e => openEditEvent(ev, e) }))
+              }).map(ev => ({ kind: 'event', key: ev.id, color: categoryColor(eventCategory(ev)), title: eventDisplay(ev).title, onClick: e => openEditEvent(ev, e) }))
               const allDayLes = getMagisterLessonsForDay(d).filter(les => {
                 const s = new Date(les.start)
                 return s.getHours() === 0 && s.getMinutes() === 0
               }).map((les, i) => {
                 const isSomtoday = les._source === 'somtoday'
                 const somtodayColor = (() => { try { return localStorage.getItem('somtoday_lesson_color') || '#FACC15' } catch { return '#FACC15' } })()
-                const color = (les.uitgevallen || les.cancelled) ? '#FF6B6B' : isSomtoday ? somtodayColor : '#FACC15'
+                const color = (les.uitgevallen || les.cancelled) ? 'var(--c-danger)' : isSomtoday ? somtodayColor : categoryColor('school')
                 const title = les.vak || les.description || les.title || 'Les'
                 return { kind: 'lesson', key: `les-allday-${i}`, color, title, onClick: e => { e.stopPropagation(); setLessonDetail(les) } }
               })
@@ -540,8 +559,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                 .filter(t => !t.start_time && !t.time)
                 .filter(t => t.recurrence || !t.completed)
                 .map(t => {
-                  const subject = subjects?.find(s => s.id === t.subject_id)
-                  const color = subject?.color || t.color || (t.recurrence ? '#5EEAD4' : '#818CF8')
+                  const color = categoryColor(taskCategory(t))
                   return {
                     kind: 'task', key: `task-allday-${t.id}`, color,
                     title: `${t.recurrence ? '🔁 ' : ''}${t.completed ? '✓ ' : ''}${t.title}`,
@@ -552,15 +570,15 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
             })
             if (allDayByDay.every(arr => arr.length === 0)) return null
             return (
-              <div style={{ display: 'grid', gridTemplateColumns: `${TIME_COL}px repeat(${N}, 1fr)`, borderBottom: '1px solid var(--c-border)', padding: '4px 0', position: 'sticky', top: 0, zIndex: 5, background: 'var(--bg-sidebar, #12121a)', maxHeight: 92, overflowY: 'auto' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: `${TIME_COL}px repeat(${N}, minmax(0, 1fr))`, borderBottom: '1px solid var(--c-border)', padding: '4px 0', position: 'sticky', top: 0, zIndex: 15, background: 'var(--c-surface-solid)', maxHeight: 92, overflowY: 'auto' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 8 }}>
-                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.22)', letterSpacing: '0.06em', textTransform: 'uppercase', userSelect: 'none' }}>dag</span>
+                  <span style={{ fontSize: 9, color: 'var(--c-text-3)', letterSpacing: '0.06em', textTransform: 'uppercase', userSelect: 'none' }}>dag</span>
                 </div>
                 {allDayByDay.map((items, di) => (
                   <div key={di} style={{ padding: '0 2px', display: 'flex', flexDirection: 'column', gap: 2 }}>
                     {items.map(item => (
                       <div key={item.key} onClick={item.onClick}
-                        style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, cursor: 'pointer', background: item.color + '28', borderLeft: `3px solid ${item.color}`, color: item.color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, cursor: 'pointer', background: `color-mix(in srgb, ${item.color} 16%, var(--c-surface-solid))`, borderLeft: `3px solid ${item.color}`, color: `color-mix(in srgb, ${item.color} 60%, white)`, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {item.title}
                       </div>
                     ))}
@@ -572,43 +590,15 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
 
           <div style={{ position: 'relative', height: `${24 * HOUR_H}px` }}>
 
-            {/* Ochtend / Middag / Avond achtergrondzones */}
-            {[
-              { start: 0,  end: 6,  color: 'rgba(30,20,60,0.28)',   label: '' },           // nacht (donkerblauw)
-              { start: 6,  end: 12, color: 'rgba(255,200,80,0.045)', label: 'Ochtend' },    // ochtend (zacht geel)
-              { start: 12, end: 18, color: 'rgba(0,180,255,0.035)',  label: 'Middag' },     // middag (lichtblauw)
-              { start: 18, end: 24, color: 'rgba(120,60,200,0.055)', label: 'Avond' },      // avond (zacht paars)
-            ].map(({ start, end, color, label }) => (
-              <div key={start} style={{
-                position: 'absolute',
-                top: `${start * HOUR_H}px`,
-                left: `${TIME_COL}px`,
-                right: 0,
-                height: `${(end - start) * HOUR_H}px`,
-                background: color,
-                pointerEvents: 'none',
-                zIndex: 0,
-              }}>
-                {label && (
-                  <span style={{
-                    position: 'absolute', top: 6, right: 8,
-                    fontSize: 9, fontWeight: 600, letterSpacing: '0.08em',
-                    color: 'rgba(255,255,255,0.12)', textTransform: 'uppercase',
-                    userSelect: 'none',
-                  }}>{label}</span>
-                )}
-              </div>
-            ))}
-
             {/* Today column highlight */}
             {days.map((d, di) => isSameDay(d, now) && N > 1 && (
               <div key={`today-col-${di}`} style={{
                 position: 'absolute', top: 0, height: '100%',
                 left: `calc(${TIME_COL}px + ${di} * (100% - ${TIME_COL}px) / ${N})`,
                 width: `calc((100% - ${TIME_COL}px) / ${N})`,
-                background: 'color-mix(in srgb, var(--accent) 4%, transparent)',
-                borderLeft: '1px solid color-mix(in srgb, var(--accent) 10%, transparent)',
-                borderRight: '1px solid color-mix(in srgb, var(--accent) 10%, transparent)',
+                background: 'color-mix(in srgb, var(--accent) 5%, transparent)',
+                borderLeft: '1px solid color-mix(in srgb, var(--accent) 14%, transparent)',
+                borderRight: '1px solid color-mix(in srgb, var(--accent) 14%, transparent)',
                 pointerEvents: 'none', zIndex: 0,
               }} />
             ))}
@@ -617,11 +607,11 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
             {Array.from({ length: 24 }, (_, h) => (
               <React.Fragment key={h}>
                 <div style={{ position: 'absolute', top: `${h * HOUR_H}px`, left: 0, width: `${TIME_COL}px`, height: `${HOUR_H}px`, display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end', paddingRight: '10px', boxSizing: 'border-box', pointerEvents: 'none', transform: h === 0 ? 'none' : 'translateY(-8px)' }}>
-                  <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.22)', fontVariantNumeric: 'tabular-nums', lineHeight: 1, userSelect: 'none' }}>
+                  <span style={{ fontSize: '10px', color: 'var(--c-text-3)', fontVariantNumeric: 'tabular-nums', lineHeight: 1, userSelect: 'none' }}>
                     {h === 0 ? '' : `${pad(h)}:00`}
                   </span>
                 </div>
-                <div style={{ position: 'absolute', top: `${h * HOUR_H}px`, left: `${TIME_COL}px`, right: 0, height: `${HOUR_H}px`, borderTop: '1px solid rgba(255,255,255,0.05)', display: 'grid', gridTemplateColumns: `repeat(${N}, 1fr)` }}>
+                <div style={{ position: 'absolute', top: `${h * HOUR_H}px`, left: `${TIME_COL}px`, right: 0, height: `${HOUR_H}px`, borderTop: '1px solid rgba(255,255,255,0.045)', display: 'grid', gridTemplateColumns: `repeat(${N}, minmax(0, 1fr))` }}>
                   {days.map((d, di) => (
                     <div key={di}
                       onClick={() => openNew(d, h)}
@@ -633,7 +623,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                         await supabase.from('tasks').update({ time: `${pad(h)}:00`, date: toDateStr(d) }).eq('id', taskId)
                         window.dispatchEvent(new Event('refreshTasks'))
                       }}
-                      style={{ borderLeft: di > 0 ? '1px solid rgba(255,255,255,0.04)' : 'none', cursor: 'pointer', backgroundImage: 'linear-gradient(to bottom, transparent calc(50% - 0.5px), rgba(255,255,255,0.03) calc(50% - 0.5px), rgba(255,255,255,0.03) calc(50% + 0.5px), transparent calc(50% + 0.5px))' }}
+                      style={{ borderLeft: di > 0 ? '1px solid rgba(255,255,255,0.035)' : 'none', cursor: 'pointer', backgroundImage: 'linear-gradient(to bottom, transparent calc(50% - 0.5px), rgba(255,255,255,0.018) calc(50% - 0.5px), rgba(255,255,255,0.018) calc(50% + 0.5px), transparent calc(50% + 0.5px))' }}
                     />
                   ))}
                 </div>
@@ -691,22 +681,22 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                     // Position within this day column, with sub-column for overlaps
                     const dayFrac = 1 / N
                     const subFrac = dayFrac / item._colTotal
-                    const leftPct = (di + item._col / item._colTotal) * dayFrac * 100
-                    const widthPct = subFrac * 100
-                    const leftStyle = `calc(${TIME_COL}px + ${leftPct}%)`
-                    const widthStyle = `calc(${widthPct}% - 4px)`
+                    // Fracties van de dagkolommen-breedte (100% − tijdkolom), niet van de hele breedte
+                    const leftFrac = (di + item._col / item._colTotal) * dayFrac
+                    const leftStyle = `calc(${TIME_COL}px + (100% - ${TIME_COL}px) * ${leftFrac})`
+                    const widthStyle = `calc((100% - ${TIME_COL}px) * ${subFrac} - 4px)`
                     const isHL = highlightKey && getItemHighlightKey(item) === highlightKey
                     const hlStyle = isHL ? { outline: '2px solid rgba(255,255,255,0.9)', outlineOffset: '1px', boxShadow: '0 0 0 4px rgba(255,255,255,0.18), 0 0 18px rgba(255,255,255,0.25)', zIndex: 20, opacity: 1 } : {}
 
                     if (item.type === 'work') {
                       const sh = item.data
                       return (
-                        <div key={item.key} ref={isHL ? highlightRef : undefined} style={{ position: 'absolute', top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, background: 'rgba(255,140,0,0.15)', borderLeft: '3px solid #FF8C42', borderRadius: '5px', padding: '3px 7px', overflow: 'hidden', zIndex: 1, boxSizing: 'border-box', marginLeft: '2px', ...hlStyle }}>
-                          <div style={{ fontSize: '11px', fontWeight: 600, color: '#FF8C42', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            💼 Jumbo
+                        <div key={item.key} ref={isHL ? highlightRef : undefined} style={blockStyle(WORK, { top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, zIndex: 1, cursor: 'default', ...hlStyle })}>
+                          <div style={blockTitle(WORK)}>
+                            Jumbo
                           </div>
                           {showDetail && (
-                            <div style={{ fontSize: '10px', color: '#FF8C42aa', lineHeight: 1.3, marginTop: '1px' }}>
+                            <div style={blockMeta(WORK)}>
                               {sh.start} – {sh.end}{sh.label ? ` · ${sh.label}` : ''}
                             </div>
                           )}
@@ -719,9 +709,8 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                       const cancelled = les.uitgevallen || les.cancelled
                       const isSomtoday = les._source === 'somtoday'
                       const somtodayColor = (() => { try { return localStorage.getItem('somtoday_lesson_color') || '#FACC15' } catch { return '#FACC15' } })()
-                      const baseColor = isSomtoday ? somtodayColor : '#FACC15'
-                      const color = cancelled ? '#FF6B6B' : baseColor
-                      const borderColor = cancelled ? '#FF6B6B99' : baseColor + '99'
+                      const baseColor = isSomtoday ? somtodayColor : categoryColor('school')
+                      const color = cancelled ? 'var(--c-danger)' : baseColor
                       const lesTitle = les.vak || les.description || les.title || 'Les'
                       const teachers = isSomtoday
                         ? (les.teachers || []).filter(t => t !== les.title)
@@ -734,12 +723,12 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                         <div key={item.key}
                           ref={isHL ? highlightRef : undefined}
                           onClick={e => { e.stopPropagation(); setLessonDetail(les) }}
-                          style={{ position: 'absolute', top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, background: `color-mix(in srgb, ${color} 9%, transparent)`, borderLeft: `3px solid ${borderColor}`, borderRadius: '5px', padding: '3px 7px', overflow: 'hidden', cursor: 'pointer', zIndex: 1, boxSizing: 'border-box', marginLeft: '2px', opacity: cancelled ? 0.5 : 0.85, ...hlStyle }}>
-                          <div style={{ fontSize: '11px', fontWeight: 600, color, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: cancelled ? 'line-through' : 'none' }}>
-                            🎓 {lesTitle}
+                          style={blockStyle(color, { top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, zIndex: 1, opacity: cancelled ? 0.55 : 1, ...hlStyle })}>
+                          <div style={blockTitle(color, { textDecoration: cancelled ? 'line-through' : 'none' })}>
+                            {lesTitle}
                           </div>
                           {showDetail && subLabel && (
-                            <div style={{ fontSize: '10px', color: `color-mix(in srgb, ${color} 67%, transparent)`, lineHeight: 1.3, marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={blockMeta(color)}>
                               {subLabel}
                             </div>
                           )}
@@ -750,18 +739,24 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                     if (item.type === 'event') {
                       const ev = item.data
                       const s = new Date(ev.start_time), en = new Date(ev.end_time)
+                      const color = categoryColor(eventCategory(ev))
+                      const disp = eventDisplay(ev)
                       return (
                         <div key={item.key}
                           ref={isHL ? highlightRef : undefined}
                           onClick={e => openEditEvent(ev, e)}
-                          style={{ position: 'absolute', top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, background: ev.color + '22', borderLeft: `3px solid ${ev.color}`, borderRadius: '5px', padding: '3px 7px', overflow: 'hidden', cursor: 'pointer', zIndex: 2, boxSizing: 'border-box', marginLeft: '2px', ...hlStyle }}>
-                          <div style={{ fontSize: '11px', fontWeight: 600, color: ev.color, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {ev.external ? '↗ ' : ''}{ev.title}
+                          title={[disp.title, disp.code, ev.location].filter(Boolean).join(' · ')}
+                          style={blockStyle(color, { top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, zIndex: 2, ...hlStyle })}>
+                          <div style={blockTitle(color)}>
+                            {disp.title}
                           </div>
                           {showDetail && (
-                            <div style={{ fontSize: '10px', color: ev.color + 'bb', lineHeight: 1.2, marginTop: '1px' }}>
+                            <div style={blockMeta(color)}>
                               {fmtTime(s)} – {fmtTime(en)}
                             </div>
+                          )}
+                          {height >= 58 && disp.code && (
+                            <div style={{ ...blockMeta(color), fontSize: '9px', letterSpacing: '0.02em', opacity: 0.85 }}>{ev.external ? '↗ ' : ''}{disp.code}</div>
                           )}
                         </div>
                       )
@@ -770,19 +765,19 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                     if (item.type === 'task') {
                       const task = item.data
                       const subject = subjects?.find(s => s.id === task.subject_id)
-                      const color = task.completed ? '#4ADE80' : (subject?.color || '#818CF8')
+                      const color = task.completed ? 'var(--c-success)' : categoryColor(taskCategory(task))
                       return (
                         <div key={item.key}
                           ref={isHL ? highlightRef : undefined}
                           draggable
                           onDragStart={e => e.dataTransfer.setData('taskId', task.id)}
                           onClick={e => { e.stopPropagation(); onViewDetail ? onViewDetail(task) : onEditTask?.(task) }}
-                          style={{ position: 'absolute', top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, background: `color-mix(in srgb, ${color} 9%, transparent)`, borderLeft: `3px solid ${color}`, borderRadius: '5px', padding: '3px 7px', overflow: 'hidden', cursor: 'pointer', zIndex: 3, boxSizing: 'border-box', marginLeft: '2px', opacity: task.completed ? 0.55 : 1, ...hlStyle }}>
-                          <div style={{ fontSize: '11px', fontWeight: 600, color, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: task.completed ? 'line-through' : 'none' }}>
+                          style={blockStyle(color, { top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, zIndex: 3, opacity: task.completed ? 0.55 : 1, ...hlStyle })}>
+                          <div style={blockTitle(color, { textDecoration: task.completed ? 'line-through' : 'none' })}>
                             {task.completed ? '✓ ' : ''}{task.title}
                           </div>
                           {showDetail && subject && (
-                            <div style={{ fontSize: '10px', color: `color-mix(in srgb, ${color} 67%, transparent)`, lineHeight: 1.2, marginTop: '1px' }}>
+                            <div style={blockMeta(color)}>
                               {subject.name}
                             </div>
                           )}
@@ -798,8 +793,12 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
 
             {/* Current time line */}
             {showNowLine && (
-              <div style={{ position: 'absolute', top: `${nowTop}px`, left: `${TIME_COL - 6}px`, right: 0, height: '2px', background: '#FF453A', zIndex: 10, pointerEvents: 'none' }}>
-                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#FF453A', position: 'absolute', left: '-1px', top: '-4px' }} />
+              <div aria-hidden="true" style={{ position: 'absolute', top: `${nowTop}px`, left: 0, right: 0, height: 0, zIndex: 10, pointerEvents: 'none' }}>
+                <div style={{ position: 'absolute', left: `${TIME_COL}px`, right: 0, top: -1, height: 2, background: 'var(--c-danger)', boxShadow: '0 0 6px color-mix(in srgb, var(--c-danger) 50%, transparent)' }} />
+                <div style={{ position: 'absolute', left: 2, top: -9, height: 18, padding: '0 5px', borderRadius: 5, background: 'var(--c-danger)', color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', fontVariantNumeric: 'tabular-nums' }}>
+                  {pad(now.getHours())}:{pad(now.getMinutes())}
+                </div>
+                <div style={{ position: 'absolute', left: `${TIME_COL - 4}px`, top: -4, width: 8, height: 8, borderRadius: '50%', background: 'var(--c-danger)' }} />
               </div>
             )}
           </div>
@@ -826,13 +825,13 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
           {MONTHS_FULL[monthDate.getMonth()]} {monthDate.getFullYear()}
         </div>
         {/* Day-of-week header */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
           {['Ma','Di','Wo','Do','Vr','Za','Zo'].map(d => (
             <div key={d} style={{ padding: '4px', textAlign: 'center', fontSize: '10px', fontWeight: 500, color: 'var(--c-text-3)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{d}</div>
           ))}
         </div>
         {/* Day cells */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
           {cells.map((date, i) => {
             if (!date) return <div key={i} style={{ borderRight: '1px solid rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(0,0,0,0.1)', minHeight: '64px' }} />
             const evs = getEventsForDay(date)
@@ -849,14 +848,16 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
               <div key={i} onClick={() => { setCurrent(date); setView('day') }}
                 style={{ padding: '4px 5px', borderRight: '1px solid rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', background: isToday ? 'color-mix(in srgb, var(--accent) 4%, transparent)' : isWeekend ? 'rgba(255,255,255,0.01)' : 'transparent', minHeight: '64px' }}>
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '3px' }}>
-                  <div style={{ width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: isToday ? 'var(--accent, #00FFD1)' : 'transparent', color: isToday ? '#000' : isWeekend ? 'rgba(255,255,255,0.35)' : 'var(--c-text-2)', fontSize: '11px', fontWeight: isToday ? 700 : 400 }}>
+                  <div style={{ width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: isToday ? 'var(--accent)' : 'transparent', color: isToday ? 'var(--on-accent)' : isWeekend ? 'var(--c-text-3)' : 'var(--c-text-2)', fontSize: '11px', fontWeight: isToday ? 700 : 400 }}>
                     {date.getDate()}
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                   {all.slice(0, 2).map((item, idx) => {
-                    const color = item.color || (item.vak ? '#FACC15' : subjects?.find(s => s.id === item.subject_id)?.color || '#818CF8')
-                    const label = item.title || item.vak || '–'
+                    const color = item.vak ? categoryColor('school')
+                      : item.start_time ? (item.description?.startsWith('pmt:') ? categoryColor('werk') : categoryColor(eventCategory(item)))
+                      : categoryColor(taskCategory(item))
+                    const label = item.start_time ? eventDisplay(item).title : (item.title || item.vak || '–')
                     return (
                       <div key={item.id || idx} style={{ background: `color-mix(in srgb, ${color} 16%, transparent)`, borderLeft: `2px solid ${color}`, borderRadius: '3px', padding: '1px 5px', fontSize: '9px', color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>
                         {label}
@@ -890,6 +891,59 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
 
   const weekDays = getWeekDays(current)
 
+  // ─── RECHTER RAIL: legenda + mini-maandkalender (desktop, ≥1280px via CSS) ─────
+  const SideRail = () => {
+    const m = new Date(current.getFullYear(), current.getMonth(), 1)
+    const last = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate()
+    const pad0 = (m.getDay() + 6) % 7
+    const cells = [...Array(pad0).fill(null), ...Array.from({ length: last }, (_, i) => new Date(m.getFullYear(), m.getMonth(), i + 1))]
+    const inView = d => view === 'week' ? weekDays.some(w => isSameDay(w, d)) : isSameDay(d, current)
+    const shiftMonth = dir => { const d = new Date(current); d.setDate(1); d.setMonth(d.getMonth() + dir); setCurrent(d); onDateChange?.(d) }
+    return (
+      <aside className="agenda-rail" aria-label="Legenda en maandoverzicht">
+        <div className="card" style={{ padding: 14 }}>
+          <p className="t-card" style={{ margin: '0 0 10px' }}>Kleuren</p>
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {CATEGORY_ORDER.map(c => (
+              <li key={c} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--c-text-2)' }}>
+                <span aria-hidden="true" style={{ width: 10, height: 10, borderRadius: '50%', background: CATEGORIES[c].color }} />
+                {CATEGORIES[c].label}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="card" style={{ padding: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+            <p className="t-card" style={{ margin: 0, flex: 1 }}>{MONTHS_FULL[m.getMonth()]} {m.getFullYear()}</p>
+            <IconButton icon={ChevronLeft} label="Vorige maand" size={24} iconSize={13} onClick={() => shiftMonth(-1)} />
+            <IconButton icon={ChevronRight} label="Volgende maand" size={24} iconSize={13} onClick={() => shiftMonth(1)} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 2, textAlign: 'center' }}>
+            {['M','D','W','D','V','Z','Z'].map((d, i) => <span key={i} className="t-meta" style={{ fontSize: 10 }}>{d}</span>)}
+            {cells.map((d, i) => {
+              if (!d) return <span key={i} />
+              const today = isSameDay(d, now)
+              const sel = inView(d)
+              return (
+                <button key={i} type="button" onClick={() => { setCurrent(d); onDateChange?.(d) }}
+                  aria-label={`${d.getDate()} ${MONTHS_FULL[d.getMonth()]}`} aria-current={today ? 'date' : undefined}
+                  className="tnum"
+                  style={{
+                    height: 24, borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, padding: 0,
+                    background: today ? 'var(--accent)' : sel ? 'var(--accent-soft)' : 'transparent',
+                    color: today ? 'var(--on-accent)' : sel ? 'var(--accent)' : 'var(--c-text-2)',
+                    fontWeight: today || sel ? 700 : 400,
+                  }}>
+                  {d.getDate()}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </aside>
+    )
+  }
+
   const MobileWeekStrip = () => {
     const wDays = getWeekDays(current)
     return (
@@ -916,21 +970,15 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderRadius: '16px', background: 'rgba(255,255,255,0.015)' }}>
+    <div style={{ display: 'flex', height: '100%', overflow: 'hidden', gap: 12 }}>
+    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderRadius: 'var(--r-lg)', background: 'var(--c-surface)', border: '1px solid var(--c-border)' }}>
       {/* Toolbar */}
-      {!hideToolbar && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid var(--c-border)', flexShrink: 0, gap: '8px', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <button onClick={() => setCurrent(new Date())}
-            style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid var(--c-border-strong)', background: 'rgba(255,255,255,0.06)', color: 'var(--c-text-2)', fontSize: '11px', cursor: 'pointer', fontWeight: 500 }}>
-            Vandaag
-          </button>
-          <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', padding: '4px', display: 'flex', borderRadius: '6px' }}>
-            <ChevronLeft size={16} />
-          </button>
-          <button onClick={() => navigate(1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', padding: '4px', display: 'flex', borderRadius: '6px' }}>
-            <ChevronRight size={16} />
-          </button>
-          <span style={{ color: 'white', fontWeight: 600, fontSize: '13px', whiteSpace: 'nowrap' }}>
+      {!hideToolbar && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderBottom: '1px solid var(--c-border)', flexShrink: 0, gap: '8px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+          <button onClick={() => setCurrent(new Date())} className="btn-ghost">Vandaag</button>
+          <IconButton icon={ChevronLeft} label={view === 'day' ? 'Vorige dag' : view === 'week' ? 'Vorige week' : 'Vorige maand'} onClick={() => navigate(-1)} />
+          <IconButton icon={ChevronRight} label={view === 'day' ? 'Volgende dag' : view === 'week' ? 'Volgende week' : 'Volgende maand'} onClick={() => navigate(1)} />
+          <span className="t-section" style={{ whiteSpace: 'nowrap', marginLeft: 4 }}>
             {headerLabel()}
           </span>
           {magisterSyncing && (
@@ -945,18 +993,11 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
             </div>
           )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '2px', border: '1px solid var(--c-border)' }}>
-            {(isMobile ? [['week','Week'], ['month','Maand']] : [['day','Dag'], ['week','Week'], ['month','Maand']]).map(([v, label]) => (
-              <button key={v} onClick={() => setView(v)}
-                style={{ padding: '3px 10px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', border: 'none', background: view === v ? 'rgba(255,255,255,0.15)' : 'transparent', color: view === v ? 'white' : 'var(--c-text-3)', fontWeight: view === v ? 600 : 400 }}>
-                {label}
-              </button>
-            ))}
-          </div>
-          <button onClick={() => openNew(current)}
-            style={{ background: 'var(--accent, #00FFD1)', border: 'none', borderRadius: '8px', padding: '5px 12px', cursor: 'pointer', color: '#000', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700 }}>
-            <Plus size={13} /> Nieuw
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <FilterTabs variant="segmented" label="Weergave" value={view} onChange={setView}
+            items={(isMobile ? [['week','Week'], ['month','Maand']] : [['day','Dag'], ['week','Week'], ['month','Maand']]).map(([value, label]) => ({ value, label }))} />
+          <button onClick={() => openNew(current)} className="btn-primary">
+            <Plus size={14} aria-hidden="true" /> Nieuw
           </button>
         </div>
       </div>}
@@ -998,7 +1039,10 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
         {view === 'day'   && TimeGrid({ days: [current], hideHeader: isMobile })}
       </div>
 
-      {/* Lesson detail popup */}
+    </div>
+    {!isMobile && !hideToolbar && SideRail()}
+
+      {/* Lesson detail popup (fixed, dus positie in de flex-rij maakt niet uit) */}
       {lessonDetail && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(12px)', padding: '16px' }}
           onClick={() => setLessonDetail(null)}>
