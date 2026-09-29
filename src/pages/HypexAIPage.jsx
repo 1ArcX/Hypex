@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { supabase } from '../supabaseClient'
 import { isDueToday, isDoneToday, appliesOn, advanceOnComplete, todayISO } from '../utils/recurrence'
+import DagbriefingStrip from '../components/ai/DagbriefingStrip'
 
 const ACCENT = 'var(--accent)'
 
@@ -108,7 +109,7 @@ const CARD = {
 }
 const actCard = (icon, title, detail, c) => ({ id: 'act' + Date.now() + Math.random().toString(36).slice(2, 6), isAction: true, icon, title, detail, ...c })
 
-export default function HypexAIPage({ tasks = [], subjects = [], userId, displayName = 'daar' }) {
+export default function HypexAIPage({ tasks = [], subjects = [], userId, displayName = 'daar', calendarEvents = [], magisterLessons = [], onNavigate, onNavigateToTasks, onNavigateToAgenda }) {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -366,39 +367,38 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
 
   return (
     <div ref={pageRef} style={{ height: appH ? `${appH}px` : '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <div style={{ position: 'fixed', top: 0, left: 0, zIndex: 99999, background: 'rgba(0,0,0,0.85)', color: '#5EEAD4', font: '10px monospace', padding: '2px 6px', pointerEvents: 'none' }}>
-        iH:{dbg.iH} top:{dbg.top} pH:{dbg.parentH} appH:{appH}
-      </div>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 52, padding: '0 16px', borderBottom: '1px solid var(--c-border)', background: 'rgba(255,255,255,0.02)', backdropFilter: 'blur(24px)', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 56, padding: '0 16px', borderBottom: '1px solid var(--c-border)', background: 'rgba(255,255,255,0.02)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
           <div style={{ width: 24, height: 24, borderRadius: 8, background: 'linear-gradient(140deg, color-mix(in srgb, var(--accent) 90%, transparent), color-mix(in srgb, var(--accent) 55%, #3b82f6))', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 14px color-mix(in srgb, var(--accent) 40%, transparent)' }}>
             <span style={{ fontSize: 13, lineHeight: 1 }}>✦</span>
           </div>
-          <span style={{ fontWeight: 600, fontSize: 17, color: 'var(--c-text)', letterSpacing: '-0.02em' }}>Hypex AI</span>
+          <h1 className="t-page" style={{ margin: 0, fontSize: 17 }}>Hypex AI</h1>
         </div>
-        <button onClick={() => setMessages([])} title="Nieuw gesprek" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', padding: 8, display: 'flex', alignItems: 'center' }}>
+        <button onClick={() => setMessages([])} title="Nieuw gesprek" aria-label="Nieuw gesprek" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', padding: 8, display: 'flex', alignItems: 'center' }}>
           <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
         </button>
       </div>
 
       {/* Chat */}
-      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '16px 14px 8px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '16px 14px 8px' }}>
+      <div style={{ maxWidth: 760, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
         {/* Briefing */}
         {messages.length === 0 && briefing && (
-          <div style={{ position: 'relative', padding: '16px 16px 15px', borderRadius: 18, background: 'color-mix(in srgb, var(--accent) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 16%, transparent)', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', top: -30, right: -20, width: 120, height: 120, borderRadius: '50%', background: 'radial-gradient(circle, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%)', pointerEvents: 'none' }} />
+          <div className="card" style={{ position: 'relative', padding: '16px 16px 15px', borderColor: 'color-mix(in srgb, var(--accent) 22%, transparent)', background: 'color-mix(in srgb, var(--accent) 4%, var(--c-surface))' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                 <span style={{ fontSize: 12 }}>✦</span>
                 <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: ACCENT }}>Dagbriefing</span>
               </div>
-              <button onClick={regenBriefing} style={{ background: 'color-mix(in srgb, var(--accent) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)', borderRadius: 8, cursor: 'pointer', color: ACCENT, padding: '4px 6px', display: 'flex', alignItems: 'center' }}>
+              <button onClick={regenBriefing} aria-label="AI-briefing vernieuwen" title="AI-briefing vernieuwen" style={{ background: 'var(--accent-soft)', border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)', borderRadius: 8, cursor: 'pointer', color: ACCENT, padding: '4px 6px', display: 'flex', alignItems: 'center' }}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: briefBusy ? 'spin 0.8s linear infinite' : 'none' }}><path d="M21 12a9 9 0 1 1-2.6-6.4M21 3v5h-5" /></svg>
               </button>
             </div>
-            <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--c-text)', margin: '0 0 8px', letterSpacing: '-0.01em' }}>{greeting()}, {displayName}</p>
+            <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--c-text)', margin: '0 0 12px', letterSpacing: '-0.01em' }}>{greeting()}, {displayName}</p>
+            <DagbriefingStrip tasks={tasks} calendarEvents={calendarEvents} magisterLessons={magisterLessons} userId={userId}
+              onNavigate={onNavigate} onNavigateToTasks={onNavigateToTasks} onNavigateToAgenda={onNavigateToAgenda} />
             <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--c-text-2)' }}>
               <Blocks blocks={parseMd(briefing)} boldColor="rgba(255,255,255,0.92)" />
             </div>
@@ -409,7 +409,7 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
         {messages.length === 0 && (
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '2px 0 4px', scrollbarWidth: 'none' }}>
             {CHIPS.map(c => (
-              <button key={c.label} onClick={() => ask(c.prompt)} style={{ flex: 'none', display: 'flex', alignItems: 'center', gap: 7, padding: '9px 13px', borderRadius: 13, background: 'rgba(255,255,255,0.045)', border: '1px solid var(--c-border-strong)', cursor: 'pointer', color: 'var(--c-text)', fontSize: 12.5, fontWeight: 500, whiteSpace: 'nowrap' }}>
+              <button key={c.label} onClick={() => ask(c.prompt)} className="btn-ghost" style={{ flex: 'none', gap: 7, padding: '9px 13px', borderRadius: 'var(--r-md)', fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap' }}>
                 <span style={{ fontSize: 14 }}>{c.icon}</span>{c.label}
               </button>
             ))}
@@ -454,18 +454,20 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
         )}
         <div ref={endRef} style={{ height: 2, flexShrink: 0 }} />
       </div>
+      </div>
 
       {/* Input */}
-      <div style={{ flexShrink: 0, padding: '8px 14px calc(8px + env(safe-area-inset-bottom))', borderTop: '1px solid var(--c-border)', background: 'rgba(255,255,255,0.02)', backdropFilter: 'blur(24px)' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 9, background: 'rgba(255,255,255,0.06)', border: '1px solid var(--c-border-strong)', borderRadius: 22, padding: '5px 5px 5px 16px' }}>
+      <div style={{ flexShrink: 0, padding: '8px 14px calc(8px + env(safe-area-inset-bottom))', borderTop: '1px solid var(--c-border)', background: 'rgba(255,255,255,0.02)' }}>
+        <div style={{ maxWidth: 760, margin: '0 auto', display: 'flex', alignItems: 'flex-end', gap: 9, background: 'var(--c-surface-2)', border: '1px solid var(--c-border-strong)', borderRadius: 22, padding: '5px 5px 5px 16px' }}>
           <input
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(input) } }}
             placeholder="Vraag Hypex AI iets..."
+            aria-label="Vraag Hypex AI iets"
             style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: 'var(--c-text)', fontSize: 14, padding: '8px 0', minWidth: 0 }}
           />
-          <button onClick={() => ask(input)} disabled={!canSend} style={{ flex: 'none', width: 36, height: 36, borderRadius: '50%', border: 'none', cursor: canSend ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', background: canSend ? 'linear-gradient(140deg, var(--accent), color-mix(in srgb, var(--accent) 80%, #000))' : 'rgba(255,255,255,0.08)', boxShadow: canSend ? '0 0 16px color-mix(in srgb, var(--accent) 35%, transparent)' : 'none' }}>
+          <button onClick={() => ask(input)} disabled={!canSend} aria-label="Versturen" style={{ flex: 'none', width: 36, height: 36, borderRadius: '50%', border: 'none', cursor: canSend ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', background: canSend ? 'linear-gradient(140deg, var(--accent), color-mix(in srgb, var(--accent) 80%, #000))' : 'rgba(255,255,255,0.08)', boxShadow: canSend ? '0 0 16px color-mix(in srgb, var(--accent) 35%, transparent)' : 'none' }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ color: canSend ? 'var(--on-accent)' : 'var(--c-text-3)' }}><path d="M12 19V5M5 12l7-7 7 7" /></svg>
           </button>
         </div>

@@ -902,7 +902,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
               boxShadow: running ? `0 0 40px color-mix(in srgb, ${modeColor} 20%, transparent)` : 'none',
               transition: 'all 0.2s',
             }}>
-              {running ? <><Pause size={18} /> Pauzeer</> : <><Play size={18} /> {seconds === totalSecs ? 'Start' : 'Hervat'}</>}
+              {running ? <><Pause size={18} /> Pauzeer</> : <><Play size={18} /> {seconds === totalSecs ? (mode === 'work' ? 'Start focus' : 'Start') : 'Hervat'}</>}
             </button>
             {running && (
               <button onClick={skip} title="Sla over" style={{ width: 46, height: 46, borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--c-border)', color: 'var(--c-text-3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

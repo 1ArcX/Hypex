@@ -947,7 +947,11 @@ export default function App() {
             )}
 
             {activePage === 'hypexai' && isAdmin && (
-              <HypexAIPage userId={user.id} tasks={tasks} subjects={subjects} displayName={displayName} />
+              <HypexAIPage userId={user.id} tasks={tasks} subjects={subjects} displayName={displayName}
+                calendarEvents={allEvents} magisterLessons={magisterLessons}
+                onNavigate={handleSetActivePage}
+                onNavigateToTasks={(filter) => { setTaskHighlight(filter); setActivePage('taken') }}
+                onNavigateToAgenda={(date, highlightKey) => { setAgendaJump({ date, highlightKey }); handleSetActivePage('agenda') }} />
             )}
 
           </div>

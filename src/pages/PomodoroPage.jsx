@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import PomodoroTimer from '../components/PomodoroTimer'
 import StudieBuddiesWidget from '../components/StudieBuddiesWidget'
 import PomodoroStats from '../components/PomodoroStats'
+import { Target, Clock3 } from 'lucide-react'
 
 const SESSION_LOG_KEY = 'pomodoro_session_log'
 const MODE_META = {
@@ -38,25 +39,25 @@ function SessionRow({ session }) {
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0' }}>
-      <div style={{
-        width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+      <div aria-hidden="true" style={{
+        width: 32, height: 32, borderRadius: 'var(--r-sm)', flexShrink: 0,
         background: `color-mix(in srgb, ${m.color} 9%, transparent)`, border: `1px solid color-mix(in srgb, ${m.color} 20%, transparent)`,
         display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
       }}>
         {m.icon}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: 13, color: 'var(--text-1)', margin: 0, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <p style={{ fontSize: 13, color: 'var(--c-text)', margin: 0, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {session.tag || m.label}
         </p>
-        <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>
+        <p className="t-meta tnum" style={{ margin: 0 }}>
           {durStr}{session.completedAt ? ` · klaar ${fmtTime(session.completedAt)}` : ''}
         </p>
       </div>
       <span style={{
         fontSize: 11, color: m.color, fontWeight: 600, flexShrink: 0,
         background: `color-mix(in srgb, ${m.color} 8%, transparent)`, border: `1px solid color-mix(in srgb, ${m.color} 19%, transparent)`,
-        borderRadius: 6, padding: '2px 8px',
+        borderRadius: 'var(--r-xs)', padding: '2px 8px',
       }}>
         {m.label}
       </span>
@@ -72,20 +73,20 @@ function DayLog({ label, sessions }) {
   const totalStr = h > 0 ? `${h}u ${m}m` : `${totalMins}m`
 
   return (
-    <div className="card" style={{ padding: '14px 16px', borderLeft: '3px solid color-mix(in srgb, var(--accent) 25%, transparent)', background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent) 2%, transparent) 0%, transparent 60%)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-        <p style={{ fontSize: 10, color: 'var(--text-3)', margin: 0, letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 600 }}>
+    <div className="card" style={{ padding: '14px 16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+        <p className="t-card" style={{ margin: 0 }}>
           {label}
         </p>
         {totalMins > 0 && (
-          <span style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600 }}>
+          <span className="tnum" style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}>
             {totalStr} focus
           </span>
         )}
       </div>
       {sessions.map((s, i) => (
         <React.Fragment key={i}>
-          {i > 0 && <div style={{ height: 1, background: 'var(--border)', margin: '1px 0' }} />}
+          {i > 0 && <div style={{ height: 1, background: 'var(--c-border)', margin: '1px 0' }} />}
           <SessionRow session={s} />
         </React.Fragment>
       ))}
@@ -111,6 +112,8 @@ export default function PomodoroPage({ onModeChange, onFocusModeChange, onPomodo
     byDate[s.date].push(s)
   }
   const sortedDates = Object.keys(byDate).sort((a, b) => b.localeCompare(a)).slice(0, 14)
+  const todayFocus = (byDate[today] || []).filter(s => s.mode === 'work')
+  const todayFocusMins = todayFocus.reduce((sum, s) => sum + (s.durationMins || 0), 0)
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', background: 'var(--bg-base)' }}>
@@ -129,6 +132,26 @@ export default function PomodoroPage({ onModeChange, onFocusModeChange, onPomodo
         />
       </div>
 
+      {/* Vandaag — sessies en focusminuten (sessielog) */}
+      <div style={{ maxWidth: 480, margin: '0 auto', padding: '0 20px 12px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <div className="card" style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Target size={16} aria-hidden="true" style={{ color: 'var(--accent)' }} />
+            <span>
+              <span className="t-kpi" style={{ fontSize: 18, display: 'block' }}>{todayFocus.length}</span>
+              <span className="t-meta">{todayFocus.length === 1 ? 'focussessie vandaag' : 'focussessies vandaag'}</span>
+            </span>
+          </div>
+          <div className="card" style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Clock3 size={16} aria-hidden="true" style={{ color: 'var(--accent)' }} />
+            <span>
+              <span className="t-kpi" style={{ fontSize: 18, display: 'block' }}>{todayFocusMins}<span style={{ fontSize: 12, color: 'var(--c-text-3)', fontWeight: 600 }}> min</span></span>
+              <span className="t-meta">focus vandaag</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* Week stats */}
       <div style={{ maxWidth: 480, margin: '0 auto', padding: '0 20px' }}>
         <PomodoroStats refreshKey={sessions.length} userId={userId} />
@@ -138,9 +161,9 @@ export default function PomodoroPage({ onModeChange, onFocusModeChange, onPomodo
       {sessions.length > 0 && (
         <div style={{ maxWidth: 480, margin: '0 auto', padding: '0 20px 48px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-            <span style={{ fontSize: 10, color: 'var(--text-3)', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 600 }}>Sessie log</span>
-            <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+            <div style={{ flex: 1, height: 1, background: 'var(--c-border)' }} />
+            <span className="t-overline" style={{ color: 'var(--c-text-3)' }}>Sessie log</span>
+            <div style={{ flex: 1, height: 1, background: 'var(--c-border)' }} />
           </div>
 
           {sortedDates.map(date => (
