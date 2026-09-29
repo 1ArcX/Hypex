@@ -72,15 +72,13 @@ export default function PomodoroStats({ refreshKey, userId }) {
   return (
     <div className="card" style={{
       padding: '14px 16px',
-      borderLeft: '3px solid color-mix(in srgb, var(--accent) 40%, transparent)',
-      background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent) 4%, transparent) 0%, transparent 60%)',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
           <div style={{ width: 22, height: 22, borderRadius: 7, background: 'color-mix(in srgb, var(--accent) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <BarChart2 size={11} style={{ color: 'var(--accent)' }} />
           </div>
-          <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase' }}>
+          <span className="t-card">
             Focus deze week
           </span>
         </div>

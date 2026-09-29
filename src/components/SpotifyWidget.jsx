@@ -429,8 +429,6 @@ export default function SpotifyWidget({ compact = false }) {
 
   return (
     <div className="glass-card p-4" style={{
-      borderLeft: '3px solid rgba(29,185,84,0.4)',
-      background: 'linear-gradient(135deg, rgba(29,185,84,0.05) 0%, transparent 60%)',
     }}>
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
@@ -438,7 +436,7 @@ export default function SpotifyWidget({ compact = false }) {
           <div style={{ width: 24, height: 24, borderRadius: 8, background: 'rgba(29,185,84,0.15)', border: '1px solid rgba(29,185,84,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <Music size={12} color="#1DB954" />
           </div>
-          <span style={{ fontSize: 10, color: '#1DB954', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Spotify</span>
+          <span className="t-card">Spotify</span>
         </div>
         <button onClick={handleLogout} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', fontSize: '11px' }}>
           Uitloggen

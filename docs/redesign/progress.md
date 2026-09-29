@@ -91,3 +91,30 @@ Branch `redesign/hypex-v2`, one commit per phase. Analysis & proposal: [phase1-a
   not the calendar week.
 - Not exercised against the database: completing/deleting tasks (would change real data). The handlers passed
   to the rows are the same functions as before.
+
+## Phase 6 — remaining pages
+
+- **Notities:** desktop split view (list: search, folder filter pills with colored dots, sort; detail: title,
+  "Bewerkt …", folder tag + folder select, delete, monospace content panel); mobile keeps list → detail.
+  Tags = folders with deterministic colors (D5/D6).
+  - Bug fixed: autosave cancelled earlier pending edits (title then content within 0.6 s, or switching
+    notes) — now merged per note and flushed before switching/unmount.
+  - Delete now asks for confirmation (irreversible).
+  - iOS "inputs 16px" rule in index.html scoped to touch devices (it forced 16px inputs on desktop too).
+- **Geld:** hero "Nog over deze maand" (amount, progress, spent / budget, breakdown) → row Vandaag · Deze week ·
+  Inkomsten → row Prognose · Spaarstreak · Analyse; withdrawals warning clickable (opens Inkomsten);
+  "Opnames" tile folded into that warning. Fixed breakdown text "… − = €225" → "… = €225".
+  Label kept as existing copy "Nog over deze maand" (mockup: "Beschikbaar deze maand").
+- **Instellingen:** 3×2 preset grid (radio semantics), eigen kleur, **Live preview** (nav item, KPI card, pill,
+  progress bar, primary/secondary button, bottom nav) — all on `var(--accent)`, updates instantly.
+- **Pomodoro:** "Start focus", today summary (focus sessions + minutes from the session log), token styling,
+  ring glows only while running. Session→task link deferred (D7).
+- **Hypex AI:** structured Dagbriefing strip (Urgent, Te laat, Volgende afspraak, Dagbudget) above the existing
+  AI briefing; AI prompt/backend unchanged. Removed an always-visible debug overlay ("iH:… appH:…").
+  - Known inconsistency (not changed): the AI budget line uses its own rough sum (e.g. €1617 of €1650),
+    unlike the Geld page (carryover/fixed costs). Aligning it would change data sent to the AI → your call.
+- **Statistieken:** XP card first with rank ("Rang #1 van 7", from the same leaderboard data), week grid
+  (Focus/Taken/Gewoontes/Jumbo), leaderboard last. "XP this week" deferred (D8, no history). Routines per-day
+  bars not possible (no per-day completion history) — Gewoontes card kept as is.
+- **Jumbo & other widgets:** v1 "colored left border + gradient" card pattern removed from Work, Vrachttijden,
+  PomodoroStats, StudieBuddies, Weather, Spotify, Magister; uppercase 10px titles → card-title style.

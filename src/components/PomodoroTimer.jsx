@@ -779,11 +779,11 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
               <circle cx="120" cy="120" r={bigR} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="10" />
               <circle cx="120" cy="120" r={bigR} fill="none" stroke={modeColor} strokeWidth="10"
                 strokeLinecap="round" strokeDasharray={bigCirc} strokeDashoffset={bigDash}
-                style={{ filter: `drop-shadow(0 0 14px color-mix(in srgb, ${modeColor} 38%, transparent))`, transition: 'stroke-dashoffset 0.5s ease, stroke 0.6s ease' }}
+                style={{ filter: running ? `drop-shadow(0 0 14px color-mix(in srgb, ${modeColor} 38%, transparent))` : 'none', transition: 'stroke-dashoffset 0.5s ease, stroke 0.6s ease' }}
               />
             </svg>
             <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-              <span style={{ fontSize: 54, fontWeight: 700, fontFamily: 'monospace', color: modeColor, lineHeight: 1, letterSpacing: -2, textShadow: `0 0 30px color-mix(in srgb, ${modeColor} 31%, transparent)`, transition: 'color 0.6s' }}>
+              <span style={{ fontSize: 54, fontWeight: 700, fontFamily: 'monospace', color: modeColor, lineHeight: 1, letterSpacing: -2, textShadow: running ? `0 0 30px color-mix(in srgb, ${modeColor} 31%, transparent)` : 'none', transition: 'color 0.6s' }}>
                 {mm}:{ss}
               </span>
             </div>

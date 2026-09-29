@@ -420,8 +420,6 @@ export default function WeatherWidget({ stacked = false, compact = false, userId
 
   return (
     <div className="glass-card p-4" style={{
-      borderLeft: '3px solid rgba(56,189,248,0.45)',
-      background: 'linear-gradient(135deg, rgba(56,189,248,0.05) 0%, transparent 60%)',
     }}>
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
@@ -429,7 +427,7 @@ export default function WeatherWidget({ stacked = false, compact = false, userId
           <div style={{ width: 24, height: 24, borderRadius: 8, background: 'rgba(56,189,248,0.15)', border: '1px solid rgba(56,189,248,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <Cloud size={12} style={{ color: '#38BDF8' }} />
           </div>
-          <h3 style={{ fontSize: 10, color: '#38BDF8', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', margin: 0 }}>Weer</h3>
+          <h3 className="t-card" style={{ margin: 0 }}>Weer</h3>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <button onClick={toggleRainChart} title={rainHidden ? 'Regenkaart tonen op dashboard' : 'Regenkaart verbergen op dashboard'}

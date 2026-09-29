@@ -263,7 +263,7 @@ export default function TasksWidget({ tasks, subjects, onAdd, onDelete, onToggle
           <div style={{ width: 24, height: 24, borderRadius: 8, background: 'color-mix(in srgb, var(--accent) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <CheckSquare size={12} style={{ color: 'var(--accent)' }} />
           </div>
-          <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Taken</span>
+          <span className="t-card">Taken</span>
         </div>}
         <button
           onClick={() => { if (onNew) { onNew() } else { setAdding(!adding); setNewTitle('') } }}

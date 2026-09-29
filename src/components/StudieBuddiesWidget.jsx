@@ -58,8 +58,6 @@ export default function StudieBuddiesWidget({ profiles = [], onlineUsers = [] })
   return (
     <div className="card" style={{
       padding: '14px 16px',
-      borderLeft: '3px solid rgba(167,139,250,0.45)',
-      background: 'linear-gradient(135deg, rgba(167,139,250,0.05) 0%, transparent 60%)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
         <div style={{ width: 22, height: 22, borderRadius: 7, background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>

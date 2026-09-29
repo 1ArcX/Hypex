@@ -31,7 +31,7 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 | `statistieken` | [pages/StatsPage.jsx](../src/pages/StatsPage.jsx) | Statistieken / Stats | (self-contained SVG bar charts) | all |
 | `jumbo` | [pages/JumboPage.jsx](../src/pages/JumboPage.jsx) | Jumbo ★ | WorkWidget, VrachttijdenWidget | admin or `werk_tab` profile |
 | `geld` | [pages/GeldPage.jsx](../src/pages/GeldPage.jsx) → [geld/GeldPage.tsx](../src/geld/GeldPage.tsx) | Geld | Geld sub-app (see below) | admin only |
-| `hypexai` | [pages/HypexAIPage.jsx](../src/pages/HypexAIPage.jsx) | Hypex AI | (chat/assistant UI) | admin only |
+| `hypexai` | [pages/HypexAIPage.jsx](../src/pages/HypexAIPage.jsx) | Hypex AI | DagbriefingStrip + AI briefing, chips, chat | admin only |
 | `school` | [pages/SchoolPage.jsx](../src/pages/SchoolPage.jsx) | — | MagisterWidget | **INACTIVE** (hidden from nav, June 2026) |
 | `gewoontes` | [pages/GewoontesPage.jsx](../src/pages/GewoontesPage.jsx) | — | HabitsWidget | **INACTIVE** |
 | `gym` | [pages/GymPage.jsx](../src/pages/GymPage.jsx) | — | GymWidget | **INACTIVE** |
@@ -89,11 +89,12 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 ### Pomodoro
 - **PomodoroTimer** — [components/PomodoroTimer.jsx](../src/components/PomodoroTimer.jsx) — the timer (Focus/Pauze/Lange pauze), cycle settings, session complete. Aliases: "pomodoro timer", "de timer", "focus timer". State: `pomodoro_v3` in localStorage.
 - **FocusMode** — [components/FocusMode.jsx](../src/components/FocusMode.jsx) — full-screen focus overlay (used by PomodoroTimer). Aliases: "focus mode", "focus overlay", "focus scherm".
+- **Pomodoro today summary** — inline in [pages/PomodoroPage.jsx](../src/pages/PomodoroPage.jsx): "focussessies vandaag" / "focus vandaag" from the session log.
 - **PomodoroStats** — [components/PomodoroStats.jsx](../src/components/PomodoroStats.jsx) — weekly focus-minutes stats. Aliases: "pomodoro stats", "focus statistieken".
 - **StudieBuddiesWidget** — [components/StudieBuddiesWidget.jsx](../src/components/StudieBuddiesWidget.jsx) — shows who is studying now (Supabase presence). Aliases: "studiebuddies", "wie is online", "study buddies".
 
 ### Notes / habits / gym
-- **NotesWidget** — [components/NotesWidget.jsx](../src/components/NotesWidget.jsx) — notes list + editor ("Opgeslagen"/"Geen notities"). Aliases: "notities", "notes", "kladblok".
+- **NotesWidget** — [components/NotesWidget.jsx](../src/components/NotesWidget.jsx) — notes list + editor; `split` = desktop split view (list with search, folder filters, sort | detail with folder tag, delete). Folder colors via `folderColor(id)`. Styles `.notes-*`. Aliases: "notities", "notes", "kladblok", "split view".
 - **HabitsWidget** — [components/HabitsWidget.jsx](../src/components/HabitsWidget.jsx) — habits/streaks (Gewoontes page, INACTIVE). Aliases: "gewoontes", "habits", "streaks".
 - **GymWidget** — [components/GymWidget.jsx](../src/components/GymWidget.jsx) — workout tracking, awards XP (Gym page, INACTIVE). Aliases: "gym", "workout", "training". State: `gym_active_workout` in localStorage.
 
@@ -105,8 +106,11 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 - **WorkWidget** — [components/WorkWidget.jsx](../src/components/WorkWidget.jsx) — PMT/Jumbo work shifts. Aliases: "werk", "diensten", "rooster werk", "PMT". Data: `/.netlify/functions/pmt`, `pmt_work_shifts` in localStorage.
 - **VrachttijdenWidget** — [components/VrachttijdenWidget.jsx](../src/components/VrachttijdenWidget.jsx) — freight/truck arrival times with a maplibre route map. Aliases: "vrachttijden", "vrachtwagen", "route map", "truck times".
 
+### Hypex AI
+- **DagbriefingStrip** — [components/ai/DagbriefingStrip.jsx](../src/components/ai/DagbriefingStrip.jsx) — structured briefing tiles (Urgent, Te laat, Volgende afspraak, Dagbudget) from real data above the AI text. Aliases: "dagbriefing", "briefing".
+
 ### Settings / admin / onboarding / auth
-- **ThemeSettings** — [components/ThemeSettings.jsx](../src/components/ThemeSettings.jsx) — "Instellingen": accent color, meldingen, external calendars. Aliases: "instellingen", "settings", "thema", "accentkleur".
+- **ThemeSettings** — [components/ThemeSettings.jsx](../src/components/ThemeSettings.jsx) — "Instellingen": accent color presets + eigen kleur, "Live preview" mini-UI, meldingen, external calendars. Aliases: "instellingen", "settings", "thema", "accentkleur".
 - **CalendarConnections** — [components/CalendarConnections.jsx](../src/components/CalendarConnections.jsx) — "Agenda's koppelen" (Google / MyX). Opened from ThemeSettings. Aliases: "agenda koppelen", "calendar connections", "externe agenda's".
 - **AdminPanel** — [components/AdminPanel.jsx](../src/components/AdminPanel.jsx) — "Admin Paneel": user management, push test, `werk_tab` toggle. Aliases: "admin", "admin paneel", "gebruikersbeheer".
 - **OnboardingModal** — [components/OnboardingModal.jsx](../src/components/OnboardingModal.jsx) — first-login flow ("Welkom bij Dash", location, Magister, notifications). Aliases: "onboarding", "welkom scherm", "intro".
@@ -158,6 +162,7 @@ Self-contained money/budget app, mounted via [pages/GeldPage.jsx](../src/pages/G
   - `IconButton` — [IconButton.jsx](../src/components/ui/IconButton.jsx) (requires `label`). `EmptyState` — [EmptyState.jsx](../src/components/ui/EmptyState.jsx).
   - `toneColor` / `tint` — [tone.js](../src/components/ui/tone.js): tone name → token color.
 - **Task status** — [utils/taskStatus.js](../src/utils/taskStatus.js): `isOverdue` (excl. routines), `isUrgent`, `daysLate`, `shortDate` — one definition for Dashboard, Sidebar badge, Taken.
+- **Upcoming items** — [utils/upcoming.js](../src/utils/upcoming.js): `buildUpcoming()` (tasks, lessons, events, PMT shifts) + `countdownLabel()`; used by Dashboard and Hypex AI.
 - **Event names** — [utils/eventTitle.js](../src/utils/eventTitle.js): `eventDisplay(ev)` → readable course name + code for MyX events.
 - **Category colors** — [utils/category.js](../src/utils/category.js): `taskCategory`, `eventCategory`, `CATEGORIES`
   (School/Werk/Persoonlijk/Routine/Overig, derived from the item's source).

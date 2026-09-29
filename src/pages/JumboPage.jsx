@@ -11,11 +11,11 @@ export default function JumboPage({ isAdmin, userId }) {
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '24px 28px' }}>
-      <h2 style={{ margin: '0 0 20px', fontSize: 20, fontWeight: 700, color: 'var(--text-1)' }}>Jumbo ★</h2>
+      <h1 className="t-page" style={{ margin: '0 0 16px' }}>Jumbo ★</h1>
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-        gap: 16,
+        gap: 12,
         alignItems: 'start',
       }}>
         <WorkWidget userId={userId} />

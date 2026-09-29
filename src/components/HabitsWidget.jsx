@@ -1279,7 +1279,7 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
     return (
       <div className={seamless ? '' : 'glass-card'} style={{ padding: '14px 16px', ...(seamless ? {} : { borderLeft: '3px solid rgba(34,197,94,0.45)', background: 'linear-gradient(135deg, rgba(34,197,94,0.05) 0%, transparent 60%)' }) }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-          {!seamless && <span style={{ fontSize: 10, color: '#22C55E', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Gewoontes</span>}
+          {!seamless && <span className="t-card">Gewoontes</span>}
           {todayHabits.length > 0 && <span style={{ fontSize: 11, color: doneToday === todayHabits.length ? 'var(--accent)' : 'var(--c-text-3)', fontWeight: 600 }}>{doneToday}/{todayHabits.length}</span>}
         </div>
         {todayHabits.length > 0 && (
