@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { X, Palette, RotateCcw, LogOut, Bell, BellOff } from 'lucide-react'
+import { X, Palette, RotateCcw, LogOut, Bell, BellOff, Home, Calendar, CheckSquare, Play, CalendarPlus } from 'lucide-react'
+import { IconButton, ProgressBar, Pill } from './ui'
 import { pushSupported, requestAndSubscribe } from '../utils/push'
 import CalendarConnections from './CalendarConnections'
 
@@ -49,64 +50,96 @@ export default function ThemeSettings({ onClose, theme, setTheme, onLogout, user
     applyPreset(def)
   }
 
+  const label = { fontSize: 12, fontWeight: 600, color: 'var(--c-text-2)', margin: '0 0 8px' }
+
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 100,
-      background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px'
-    }}>
-      <div className="glass-card p-6 w-full max-w-sm">
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-2">
-            <Palette size={18} style={{ color: 'var(--accent)' }} />
-            <h2 className="text-base font-semibold text-white">Instellingen</h2>
+    <div className="modal-overlay" style={{ zIndex: 100, padding: 16 }}>
+      <div className="card modal-content" role="dialog" aria-modal="true" aria-labelledby="settings-title"
+        style={{ width: '100%', maxWidth: 460, padding: 22, maxHeight: 'calc(100dvh - 32px)', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Palette size={17} style={{ color: 'var(--accent)' }} aria-hidden="true" />
+            <h2 id="settings-title" className="t-section" style={{ margin: 0, fontSize: 16 }}>Instellingen</h2>
           </div>
-          <button onClick={onClose}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)' }}>
-            <X size={18} />
-          </button>
+          <IconButton icon={X} label="Sluiten" onClick={onClose} />
         </div>
 
         {/* Kleur presets */}
-        <div className="mb-5">
-          <p className="text-xs font-medium mb-2" style={{ color: 'var(--c-text-2)' }}>Accentkleur</p>
-          <div className="grid grid-cols-3 gap-2">
-            {PRESETS.map(preset => (
-              <button key={preset.name} onClick={() => applyPreset(preset)}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs transition-all"
-                style={{
-                  background: theme.accent === preset.accent ? `${preset.accent}20` : 'rgba(255,255,255,0.04)',
-                  border: theme.accent === preset.accent ? `1px solid ${preset.accent}60` : '1px solid rgba(255,255,255,0.08)',
-                  color: theme.accent === preset.accent ? preset.accent : 'rgba(255,255,255,0.5)',
-                  cursor: 'pointer'
-                }}>
-                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: preset.accent, flexShrink: 0 }} />
-                {preset.name}
-              </button>
-            ))}
+        <div style={{ marginBottom: 18 }}>
+          <p style={label}>Accentkleur</p>
+          <div role="radiogroup" aria-label="Accentkleur" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+            {PRESETS.map(preset => {
+              const active = theme.accent?.toLowerCase() === preset.accent.toLowerCase()
+              return (
+                <button key={preset.name} onClick={() => applyPreset(preset)} role="radio" aria-checked={active}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 'var(--r-sm)',
+                    fontSize: 12, fontWeight: active ? 700 : 500, cursor: 'pointer', textAlign: 'left', minWidth: 0,
+                    background: active ? `color-mix(in srgb, ${preset.accent} 14%, transparent)` : 'var(--c-surface-2)',
+                    border: `1px solid ${active ? `color-mix(in srgb, ${preset.accent} 50%, transparent)` : 'var(--c-border)'}`,
+                    color: active ? preset.accent : 'var(--c-text-2)',
+                    boxShadow: active ? `0 0 12px color-mix(in srgb, ${preset.accent} 25%, transparent)` : 'none',
+                  }}>
+                  <span aria-hidden="true" style={{ width: 10, height: 10, borderRadius: '50%', background: preset.accent, flexShrink: 0 }} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{preset.name}</span>
+                </button>
+              )
+            })}
           </div>
         </div>
 
         {/* Custom kleur picker */}
-        <div className="mb-5">
-          <p className="text-xs font-medium mb-2" style={{ color: 'var(--c-text-2)' }}>Eigen kleur</p>
-          <div className="flex items-center gap-3">
-            <input type="color" value={customAccent} onChange={e => applyCustomAccent(e.target.value)}
-              style={{ width: '40px', height: '40px', borderRadius: '10px', border: 'none', cursor: 'pointer', background: 'none' }} />
-            <span className="text-sm font-mono" style={{ color: 'var(--c-text-2)' }}>{customAccent}</span>
+        <div style={{ marginBottom: 18 }}>
+          <p style={label}>Eigen kleur</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <input type="color" value={customAccent} onChange={e => applyCustomAccent(e.target.value)} aria-label="Eigen accentkleur kiezen"
+              style={{ width: 40, height: 40, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'none', padding: 0 }} />
+            <span className="tnum" style={{ fontSize: 13, fontFamily: 'ui-monospace, monospace', color: 'var(--c-text-2)' }}>{customAccent.toUpperCase()}</span>
+          </div>
+        </div>
+
+        {/* Live preview — alles hieronder gebruikt var(--accent), dus verandert direct mee */}
+        <div style={{ marginBottom: 18 }}>
+          <p style={label}>Live preview</p>
+          <div aria-hidden="true" style={{ display: 'grid', gridTemplateColumns: '110px minmax(0, 1fr)', gap: 10, padding: 10, borderRadius: 'var(--r-md)', background: 'var(--c-bg)', border: '1px solid var(--c-border)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <div className="hx-nav-item is-active" style={{ height: 28, fontSize: 11, padding: '0 8px', gap: 6 }}><Home size={12} /> Dashboard</div>
+              <div className="hx-nav-item" style={{ height: 28, fontSize: 11, padding: '0 8px', gap: 6 }}><Calendar size={12} /> Agenda</div>
+              <div className="hx-nav-item" style={{ height: 28, fontSize: 11, padding: '0 8px', gap: 6 }}><CheckSquare size={12} /> Taken</div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
+              <div className="card card-tone" style={{ '--tone': 'var(--accent)', padding: '8px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', animation: 'none' }}>
+                <span style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span className="tnum" style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent)', lineHeight: 1 }}>2/3</span>
+                  <span style={{ fontSize: 10, color: 'var(--c-text-3)' }}>Voltooid</span>
+                </span>
+                <Pill tone="accent">Actief</Pill>
+              </div>
+              <ProgressBar value={66} tone="accent" height={5} />
+              <div style={{ display: 'flex', gap: 6 }}>
+                <span className="btn-primary" style={{ padding: '5px 10px', fontSize: 11 }}><Play size={11} /> Start focus</span>
+                <span className="btn-neon" style={{ padding: '5px 10px', fontSize: 11, display: 'inline-flex', alignItems: 'center' }}>Secundair</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-around', padding: '6px 4px', borderRadius: 'var(--r-sm)', background: 'var(--c-surface-2)' }}>
+                {[['Home', Home, false], ['Agenda', Calendar, true], ['Taken', CheckSquare, false]].map(([t, I, on]) => (
+                  <span key={t} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, fontSize: 9, color: on ? 'var(--accent)' : 'var(--c-text-3)', fontWeight: on ? 700 : 500 }}>
+                    <I size={13} />{t}
+                  </span>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
         {/* SOMtoday leskleur — alleen voor het SOMtoday-account */}
         {userEmail === SOMTODAY_EMAIL && (
-          <div className="mb-5">
-            <p className="text-xs font-medium mb-2" style={{ color: 'var(--c-text-2)' }}>SOMtoday leskleur</p>
-            <div className="flex items-center gap-3">
-              <input type="color" value={somtodayColor} onChange={e => applySomtodayColor(e.target.value)}
-                style={{ width: '40px', height: '40px', borderRadius: '10px', border: 'none', cursor: 'pointer', background: 'none' }} />
-              <span className="text-sm font-mono" style={{ color: 'var(--c-text-2)' }}>{somtodayColor}</span>
-              <button onClick={() => applySomtodayColor('#FACC15')}
-                style={{ fontSize: 11, color: 'var(--c-text-3)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}>
+          <div style={{ marginBottom: 18 }}>
+            <p style={label}>SOMtoday leskleur</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <input type="color" value={somtodayColor} onChange={e => applySomtodayColor(e.target.value)} aria-label="SOMtoday leskleur"
+                style={{ width: 40, height: 40, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'none', padding: 0 }} />
+              <span style={{ fontSize: 13, fontFamily: 'ui-monospace, monospace', color: 'var(--c-text-2)' }}>{somtodayColor}</span>
+              <button onClick={() => applySomtodayColor('#FACC15')} className="btn-ghost" style={{ padding: '4px 10px', fontSize: 11 }}>
                 reset
               </button>
             </div>
@@ -114,15 +147,15 @@ export default function ThemeSettings({ onClose, theme, setTheme, onLogout, user
         )}
 
         {/* Meldingen */}
-        <div className="mb-5">
-          <p className="text-xs font-medium mb-2" style={{ color: 'var(--c-text-2)' }}>Meldingen</p>
+        <div style={{ marginBottom: 18 }}>
+          <p style={label}>Meldingen</p>
           {notifState === 'unsupported' && (
             <div style={{ fontSize: 12, color: 'var(--c-text-3)', padding: '8px 0' }}>
               Niet ondersteund op dit apparaat / browser.
             </div>
           )}
           {notifState === 'denied' && (
-            <div style={{ fontSize: 12, color: 'rgba(239,68,68,0.7)', lineHeight: 1.5 }}>
+            <div style={{ fontSize: 12, color: 'var(--c-danger)', lineHeight: 1.5 }}>
               Geblokkeerd — ga naar je telefoon-instellingen → browser → Hypex om meldingen toe te staan.
             </div>
           )}
@@ -134,40 +167,32 @@ export default function ThemeSettings({ onClose, theme, setTheme, onLogout, user
                 const result = await requestAndSubscribe(userId)
                 setNotifState(result === 'granted' ? 'granted' : result === 'denied' ? 'denied' : 'default')
               }}
-              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '9px', borderRadius: 12, background: 'color-mix(in srgb, var(--accent) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 25%, transparent)', color: 'var(--accent)', cursor: notifState === 'loading' ? 'default' : 'pointer', fontSize: 13, fontWeight: 600 }}
+              className="btn-neon" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: notifState === 'loading' ? 'default' : 'pointer' }}
             >
-              <Bell size={14} /> {notifState === 'loading' ? 'Even wachten...' : 'Meldingen aanzetten'}
+              <Bell size={14} aria-hidden="true" /> {notifState === 'loading' ? 'Even wachten...' : 'Meldingen aanzetten'}
             </button>
           )}
           {notifState === 'granted' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: 12, background: 'rgba(29,185,84,0.08)', border: '1px solid rgba(29,185,84,0.2)', fontSize: 13, color: '#1DB954' }}>
-              <Bell size={14} /> Meldingen staan aan
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: 'var(--r-md)', background: 'color-mix(in srgb, var(--c-success) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--c-success) 25%, transparent)', fontSize: 13, color: 'var(--c-success)' }}>
+              <Bell size={14} aria-hidden="true" /> Meldingen staan aan
             </div>
           )}
         </div>
 
-        <div className="mb-5">
-          <p className="text-xs font-medium mb-2" style={{ color: 'var(--c-text-2)' }}>Externe agenda's</p>
-          <button onClick={() => setShowCalendarConnections(true)}
-            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-sm"
-            style={{ background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.25)', color: '#7DD3FC', cursor: 'pointer' }}>
-            Google Agenda of MijnX koppelen
+        <div style={{ marginBottom: 18 }}>
+          <p style={label}>Externe agenda's</p>
+          <button onClick={() => setShowCalendarConnections(true)} className="btn-ghost" style={{ width: '100%', padding: '9px 12px' }}>
+            <CalendarPlus size={14} aria-hidden="true" /> Google Agenda of MijnX koppelen
           </button>
         </div>
 
-        <button onClick={resetTheme}
-          className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-sm"
-          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--c-border)', color: 'var(--c-text-3)', cursor: 'pointer', marginBottom: 8 }}>
-          <RotateCcw size={13} /> Standaard herstellen
+        <button onClick={resetTheme} className="btn-ghost" style={{ width: '100%', padding: '9px 12px', marginBottom: 8, color: 'var(--c-text-2)' }}>
+          <RotateCcw size={13} aria-hidden="true" /> Standaard herstellen
         </button>
 
         {onLogout && (
-          <button onClick={onLogout}
-            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-sm"
-            style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', color: 'rgba(239,68,68,0.7)', cursor: 'pointer' }}
-            onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
-            onMouseLeave={e => e.currentTarget.style.color = 'rgba(239,68,68,0.7)'}>
-            <LogOut size={13} /> Uitloggen
+          <button onClick={onLogout} className="btn-ghost hx-logout" style={{ width: '100%', padding: '9px 12px', color: 'var(--c-danger)', borderColor: 'color-mix(in srgb, var(--c-danger) 25%, transparent)', background: 'color-mix(in srgb, var(--c-danger) 6%, transparent)' }}>
+            <LogOut size={13} aria-hidden="true" /> Uitloggen
           </button>
         )}
       </div>
