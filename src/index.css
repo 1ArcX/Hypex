@@ -861,3 +861,6 @@ select {
   .stats-page { padding: 14px 16px 100px; }
   .stats-grid { grid-template-columns: minmax(0, 1fr); }
 }
+@media (max-width: 767px) { .dash-search kbd { display: none; } }
+/* Paginatitel: op mobiel toont de globale topbalk de titel al */
+@media (max-width: 767px) { .hide-mobile { display: none !important; } }

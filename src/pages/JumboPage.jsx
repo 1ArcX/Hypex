@@ -11,7 +11,7 @@ export default function JumboPage({ isAdmin, userId }) {
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '24px 28px' }}>
-      <h1 className="t-page" style={{ margin: '0 0 16px' }}>Jumbo ★</h1>
+      <h1 className="t-page hide-mobile" style={{ margin: '0 0 16px' }}>Jumbo ★</h1>
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',

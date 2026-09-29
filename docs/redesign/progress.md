@@ -118,3 +118,19 @@ Branch `redesign/hypex-v2`, one commit per phase. Analysis & proposal: [phase1-a
   bars not possible (no per-day completion history) — Gewoontes card kept as is.
 - **Jumbo & other widgets:** v1 "colored left border + gradient" card pattern removed from Work, Vrachttijden,
   PomodoroStats, StudieBuddies, Weather, Spotify, Magister; uppercase 10px titles → card-title style.
+
+## Phase 7 — Responsive
+
+Checked at 375 (mobile preset), 768 (tablet), 1024, 1440 and 1920 px — no horizontal page scroll on any page
+(automated check over all nav pages; the only horizontal scrollers are the intended chip rows: Hypex AI
+suggestions and, on mobile, the Taken filters).
+
+- Mobile keeps the existing bottom nav + "Meer" sheet (no sidebar). Page titles that duplicated the mobile
+  top bar are hidden on mobile (`.hide-mobile`).
+- Dashboard mobile order = hierarchy: header → KPIs (2×2) → Te laat/Urgent → Volgende afspraak → Vandaag,
+  Pomodoro, Geld → Schema/Deadlines/Nog in te plannen → Spotify (Level 3 last; single instance, no double
+  polling) → "Taak toevoegen". Clock hidden on mobile (top bar + OS clock); Ctrl K hint hidden.
+- Dashboard grid: 4-col KPIs/widgets ≥1280, 2-col widgets and wrapped search 768–1280, workspace stacks <1100.
+- Agenda legend rail only ≥1280; Taken filters wrap on desktop, scroll on mobile; Notities split view on
+  desktop, list → detail on mobile; Statistieken week cards 2-col when ≥ ~760px content width.
+- "Schema vandaag" past items are dimmed instead of struck through (strike-through read as "done").

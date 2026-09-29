@@ -164,6 +164,7 @@ export default function TakenPage({
         )}
         <FilterTabs
           label="Filter taken"
+          wrap={isDesktop}
           value={filter}
           onChange={v => setFilter(v === filter && v.startsWith('group:') ? 'alles' : v)}
           items={[

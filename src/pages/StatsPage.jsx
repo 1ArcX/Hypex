@@ -598,7 +598,7 @@ export default function StatsPage({ tasks, userId, profiles = [], onLevelUpSeen 
   return (
     <div className="stats-page">
       <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <h1 className="t-page" style={{ margin: 0 }}>Statistieken</h1>
+        <h1 className="t-page hide-mobile" style={{ margin: 0 }}>Statistieken</h1>
 
         {levelUpData && <LevelUpPopup newLevel={levelUpData.newLevel} onClose={handleLevelUpClose} />}
         {/* Level 1: persoonlijke voortgang */}

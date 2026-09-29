@@ -5,12 +5,12 @@ import { toneColor, tint } from './tone'
  * items: [{ value, label, count?, tone? }]
  * variant: 'pills' (Taken-filters) | 'segmented' (Dag/Week/Maand)
  */
-export function FilterTabs({ items, value, onChange, variant = 'pills', label, style }) {
+export function FilterTabs({ items, value, onChange, variant = 'pills', label, wrap = false, style }) {
   const segmented = variant === 'segmented'
   return (
     <div role="tablist" aria-label={label} style={{
       display: 'flex', gap: segmented ? 2 : 6, alignItems: 'center', minWidth: 0,
-      overflowX: 'auto', scrollbarWidth: 'none',
+      ...(wrap ? { flexWrap: 'wrap' } : { overflowX: 'auto', scrollbarWidth: 'none' }),
       ...(segmented ? { padding: 2, borderRadius: 'var(--r-sm)', background: 'var(--c-surface-2)', border: '1px solid var(--c-border)' } : null),
       ...style,
     }}>

@@ -14,6 +14,7 @@ import { taskCategory, eventCategory, categoryColor } from '../utils/category'
 import { isOverdue, isUrgent, daysLate, shortDate } from '../utils/taskStatus'
 import { eventDisplay } from '../utils/eventTitle'
 import { buildUpcoming, countdownLabel } from '../utils/upcoming'
+import { useIsDesktop } from '../hooks/useIsDesktop'
 
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -177,6 +178,7 @@ export default function DashboardPage({
   onNavigateToAgenda, onToggleTask, isAdmin, onOpenSearch,
 }) {
   useMinuteTick()
+  const isDesktop = useIsDesktop()
   const [skip, setSkip] = useState(0)
   const [nextEventFilter, setNextEventFilter] = useState(() => localStorage.getItem('nextEventFilter') || 'alle')
   const setFilter = (f) => { setNextEventFilter(f); setSkip(0); localStorage.setItem('nextEventFilter', f) }
@@ -221,7 +223,7 @@ export default function DashboardPage({
   const unplanned = tasks.filter(t => !t.completed && !t.date)
 
   const showRain = homeRain && !rainHidden && Math.max(...homeRain.map(d => d.precip)) > 0.1
-  const widgetCount = isAdmin ? 4 : 3
+  const widgetCount = (isAdmin ? 3 : 2) + (isDesktop ? 1 : 0)
 
   return (
     <div style={{ height: '100%', overflowY: 'auto' }}>
@@ -366,7 +368,8 @@ export default function DashboardPage({
             onNewTask={() => openNewTask()} onOpenList={() => onNavigateToTasks?.('vandaag')} />
           <PomodoroMiniWidget onOpen={() => onNavigate('pomodoro')} />
           {isAdmin && <GeldMiniWidget userId={userId} onOpen={() => onNavigate('geld')} />}
-          <SpotifyWidget compact />
+          {/* Spotify (Level 3): op desktop in de widgetrij, op mobiel onderaan */}
+          {isDesktop && <SpotifyWidget compact />}
         </section>
 
         {/* ── RIJ 5 (Level 2/3): schema, deadlines, ongepland, regen ── */}
@@ -382,7 +385,7 @@ export default function DashboardPage({
                     const isNow = item.sortMins <= nowMins && item.end && endMins >= nowMins
                     const past = item.end ? endMins < nowMins : item.sortMins < nowMins
                     return (
-                      <ListRow key={i} dot={item.color} title={item.label} done={past && !isNow}
+                      <ListRow key={i} dot={item.color} title={item.label} style={past && !isNow ? { opacity: 0.5 } : undefined}
                         trailing={<>
                           {isNow && <Pill tone="accent">Nu</Pill>}
                           <span className="t-meta tnum">{item.time}{item.end ? `–${item.end}` : ''}</span>
@@ -430,6 +433,8 @@ export default function DashboardPage({
             {showRain && <RainCard data={homeRain} onDismiss={dismissRain} />}
           </section>
         )}
+
+        {!isDesktop && <SpotifyWidget compact />}
 
         {/* Mobiel: snelle actie onderaan (desktop heeft + in de Vandaag-widget en Ctrl K) */}
         <button className="btn-primary md:hidden" onClick={() => openNewTask()} style={{ width: '100%', padding: 12 }}>
