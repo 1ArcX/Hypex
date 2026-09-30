@@ -6,19 +6,27 @@ import { TransactionRow } from '../components/TransactionRow'
 import type { BudgetStats } from '../hooks/useBudgetStats'
 import type { Expense } from '../types'
 import { findCategory } from '../lib/categories'
-import { fmt } from '../lib/format'
+import { fmt, fmtDay } from '../lib/format'
 import { isHistVacationExpense, sumAmounts } from '../lib/budget'
 
-// Alle uitgaven van de maand: gepland, regulier en vakantie apart
-export function UitgavenSheet({ stats, onClose, onEdit, onDelete, onPlan }: {
+// Alle uitgaven van de maand: gepland, regulier en vakantie apart.
+// Met dayFilter (vanuit de Analyse-heatmap) alleen die ene dag.
+export function UitgavenSheet({ stats, onClose, onEdit, onDelete, onPlan, dayFilter, onClearFilter }: {
   stats: BudgetStats
   onClose: () => void
   onEdit: (exp: Expense) => void
   onDelete: (id: string) => void
   onPlan: () => void
+  dayFilter?: string | null
+  onClearFilter?: () => void
 }) {
-  const [showAll, setShowAll] = useState(false)
-  const { plannedExpenses, regularExpenses, allCategories, totalSpent, vacHistory } = stats
+  const [showAllState, setShowAll] = useState(false)
+  const onDay = (e: Expense) => !dayFilter || e.date === dayFilter
+  const plannedExpenses = stats.plannedExpenses.filter(onDay)
+  const regularExpenses = stats.regularExpenses.filter(onDay)
+  const { allCategories, vacHistory } = stats
+  const totalSpent = dayFilter ? sumAmounts(stats.budgetExpenses.filter(onDay)) : stats.totalSpent
+  const showAll = showAllState || !!dayFilter
 
   const nonVacExps = regularExpenses.filter(e => !isHistVacationExpense(e, vacHistory))
   const vacExps = regularExpenses.filter(e => isHistVacationExpense(e, vacHistory))
@@ -29,7 +37,21 @@ export function UitgavenSheet({ stats, onClose, onEdit, onDelete, onPlan }: {
   return (
     <Sheet onClose={onClose} title="💸 Uitgaven">
       <div className="flex items-center justify-between mb-4 -mt-1">
-        <span className="text-[13px] text-white/35">{fmt(totalSpent)} totaal deze maand</span>
+        {dayFilter ? (
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-[13px] text-white/35 truncate">
+              <span className="font-semibold text-white/70">{fmtDay(dayFilter)}</span> · {fmt(totalSpent)}
+            </span>
+            {onClearFilter && (
+              <button onClick={onClearFilter}
+                className="shrink-0 px-2 py-1 rounded-lg bg-white/[0.06] border border-white/10 text-white/50 cursor-pointer text-[11px] font-semibold">
+                ✕ Hele maand
+              </button>
+            )}
+          </div>
+        ) : (
+          <span className="text-[13px] text-white/35">{fmt(totalSpent)} totaal deze maand</span>
+        )}
         <button onClick={onPlan}
           className="px-2.5 py-1.5 rounded-lg bg-amber-400/10 border border-amber-400/30 text-amber-400 cursor-pointer text-[12px] font-semibold">
           📌 Plannen
@@ -72,7 +94,7 @@ export function UitgavenSheet({ stats, onClose, onEdit, onDelete, onPlan }: {
               <TransactionRow key={exp.id} exp={exp} allCategories={allCategories} onEdit={onEdit} onDelete={onDelete} />
             ))}
           </div>
-          {nonVacExps.length > 12 && (
+          {!dayFilter && nonVacExps.length > 12 && (
             <button onClick={() => setShowAll(v => !v)}
               className="w-full mb-3 py-2.5 rounded-2xl bg-transparent border border-white/10 text-white/35 cursor-pointer text-[13px] flex items-center justify-center gap-1.5">
               {showAll ? <><ChevronUp size={14} /> Minder tonen</> : <><ChevronDown size={14} /> Alle {nonVacExps.length} tonen</>}
@@ -80,7 +102,9 @@ export function UitgavenSheet({ stats, onClose, onEdit, onDelete, onPlan }: {
           )}
         </>
       ) : plannedExpenses.length === 0 && vacExps.length === 0 ? (
-        <EmptyState emoji="💰" title="Nog geen uitgaves" sub="Voeg je eerste uitgave toe" />
+        dayFilter
+          ? <EmptyState emoji="🌤️" title="Geen uitgaven op deze dag" sub="Niets uitgegeven — lekker bezig" />
+          : <EmptyState emoji="💰" title="Nog geen uitgaves" sub="Voeg je eerste uitgave toe" />
       ) : null}
 
       {/* Vakantie-uitgaven (gearchiveerde vakantie) */}

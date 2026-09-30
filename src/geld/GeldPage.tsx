@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useGeldStore } from './store/geldStore'
 import { useMonthNav } from './hooks/useMonthNav'
@@ -18,6 +18,7 @@ import { SearchSheet } from './sheets/SearchSheet'
 import { AnalyseSheet } from './sheets/AnalyseSheet'
 import { InkomstenSheet } from './sheets/InkomstenSheet'
 import { UitgavenSheet } from './sheets/UitgavenSheet'
+import { EnvelopeSheet } from './sheets/EnvelopeSheet'
 import { ExpenseModal } from './modals/ExpenseModal'
 import { SavingsModal } from './modals/SavingsModal'
 import { BudgetModal } from './modals/BudgetModal'
@@ -36,7 +37,7 @@ export default function GeldPage({ userId }: { userId: string; onClose?: () => v
   // Data
   const { expenses, prevExpenses, loading: expensesLoading, deleteExpense } = useExpenses(userId)
   const { config, loading: configLoading, saveBudget } = useBudgetConfig(userId)
-  const { pendingIncomeSource, saveRecurringIncome, confirmIncomeToday } = useRecurringIncome(userId, config, isCurrentMonth)
+  const { pendingIncomeSource, saveRecurringIncome, confirmIncomeToday } = useRecurringIncome(userId, config, isCurrentMonth, expenses)
   const savings = useSavingsData(userId)
   const { yearExpenses } = useYearExpenses(userId)
   const stats = useBudgetStats({ expenses, prevExpenses, yearExpenses, config })
@@ -52,6 +53,9 @@ export default function GeldPage({ userId }: { userId: string; onClose?: () => v
   const [showAnalyse, setShowAnalyse] = useState(false)
   const [showInkomsten, setShowInkomsten] = useState(false)
   const [showUitgaven, setShowUitgaven] = useState(false)
+  const [uitgavenDay, setUitgavenDay] = useState<string | null>(null)
+  const [envelopeCat, setEnvelopeCat] = useState<string | null>(null)
+  const [addCategory, setAddCategory] = useState<string | undefined>(undefined)
   const [editing, setEditing] = useState<Expense | null>(null)
   const [editingSavings, setEditingSavings] = useState<Expense | null>(null)
   const [showEarlyIncome, setShowEarlyIncome] = useState<RecurringSource | null>(null)
@@ -65,6 +69,22 @@ export default function GeldPage({ userId }: { userId: string; onClose?: () => v
     try { localStorage.setItem(incomeLaterKey, '1') } catch {}
   }
 
+  // Terug naar de app (ander apparaat kan intussen iets hebben ingevuld) → alles opnieuw ophalen
+  useEffect(() => {
+    let last = Date.now()
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible' || Date.now() - last < 5000) return
+      last = Date.now()
+      refresh()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+    }
+  }, [refresh])
+
   const saveExpense = async (data: ExpenseInput) => {
     if (editing) {
       await supabase.from('expenses').update(data).eq('id', editing.id)
@@ -74,6 +94,7 @@ export default function GeldPage({ userId }: { userId: string; onClose?: () => v
     }
     setShowAdd(false)
     setShowPlanned(false)
+    setAddCategory(undefined)
     refresh()
   }
 
@@ -113,7 +134,7 @@ export default function GeldPage({ userId }: { userId: string; onClose?: () => v
               onEdit={openEdit} onDelete={deleteExpense} />
           )}
           {activeTab === 'enveloppen' && (
-            <EnveloppenView stats={stats} onOpenBudget={() => setShowBudget(true)} />
+            <EnveloppenView stats={stats} onOpenBudget={() => setShowBudget(true)} onOpenCategory={setEnvelopeCat} />
           )}
           {activeTab === 'jaar' && (
             <JaarView stats={stats} yearExpenses={yearExpenses} config={config} />
@@ -129,7 +150,10 @@ export default function GeldPage({ userId }: { userId: string; onClose?: () => v
         <SearchSheet userId={userId} allCategories={stats.allCategories}
           onClose={() => setSearchOpen(false)} onEdit={openEdit} onDelete={deleteExpense} />
       )}
-      {showAnalyse && <AnalyseSheet stats={stats} onClose={() => setShowAnalyse(false)} />}
+      {showAnalyse && (
+        <AnalyseSheet stats={stats} onClose={() => setShowAnalyse(false)}
+          onOpenDay={iso => { setUitgavenDay(iso); setShowUitgaven(true) }} />
+      )}
       {showInkomsten && (
         <InkomstenSheet stats={stats} savings={savings} userId={userId} isCurrentMonth={isCurrentMonth}
           onClose={() => setShowInkomsten(false)}
@@ -140,14 +164,22 @@ export default function GeldPage({ userId }: { userId: string; onClose?: () => v
           onDelete={deleteExpense} />
       )}
       {showUitgaven && (
-        <UitgavenSheet stats={stats} onClose={() => setShowUitgaven(false)}
+        <UitgavenSheet stats={stats} onClose={() => { setShowUitgaven(false); setUitgavenDay(null) }}
+          dayFilter={uitgavenDay} onClearFilter={() => setUitgavenDay(null)}
           onEdit={openEdit} onDelete={deleteExpense} onPlan={() => setShowPlanned(true)} />
+      )}
+      {envelopeCat && (
+        <EnvelopeSheet catId={envelopeCat} stats={stats} prevExpenses={prevExpenses}
+          onClose={() => setEnvelopeCat(null)}
+          onEdit={openEdit} onDelete={deleteExpense}
+          onAdd={() => { setEditing(null); setAddCategory(envelopeCat); setShowAdd(true) }}
+          onOpenBudget={() => setShowBudget(true)} />
       )}
 
       {/* Modals */}
       {showAdd && (
-        <ExpenseModal editing={editing} defaultDate={defaultDate} categories={stats.allCategories}
-          onClose={() => { setShowAdd(false); setEditing(null) }} onSave={saveExpense} />
+        <ExpenseModal editing={editing} defaultDate={defaultDate} defaultCategory={addCategory} categories={stats.allCategories}
+          onClose={() => { setShowAdd(false); setEditing(null); setAddCategory(undefined) }} onSave={saveExpense} />
       )}
       {showPlanned && (
         <ExpenseModal plannedMode defaultDate={defaultDate} categories={stats.allCategories}

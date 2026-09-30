@@ -3,12 +3,14 @@ import { MonthHeader } from '../components/MonthHeader'
 import { ProgressBar, EmptyState } from '../components/ui/Glass'
 import type { BudgetStats } from '../hooks/useBudgetStats'
 import { fmt } from '../lib/format'
+import { envelopeProgress } from '../lib/budget'
 
 // Enveloppen: budget vs. besteed per categorie, met carryover-schaling
 // en spaargeld-segment in de balk
-export function EnveloppenView({ stats, onOpenBudget }: {
+export function EnveloppenView({ stats, onOpenBudget, onOpenCategory }: {
   stats: BudgetStats
   onOpenBudget: () => void
+  onOpenCategory: (catId: string) => void
 }) {
   const s = stats
   const allEmpty = s.allCategories.every(c => !(s.catBudgets[c.id] || 0) && !(s.spentByCategory[c.id] || 0))
@@ -44,15 +46,13 @@ export function EnveloppenView({ stats, onOpenBudget }: {
           const spent = s.spentByCategory[cat.id] || 0
           const fromSav = s.savingsByCategory[cat.id] || 0
           const total = spent + fromSav
-          const overAmt = spent > budget && budget > 0 ? spent - budget : 0
-          const over = overAmt > 0
-          const regPct = budget > 0 ? Math.min(100, (spent / budget) * 100) : 0
-          const savPct = budget > 0 ? Math.min(100 - Math.min(100, regPct), (fromSav / budget) * 100) : 0
+          const { overAmt, over, regPct, savPct } = envelopeProgress(budget, spent, fromSav)
           const barColor = over ? '#F87171' : regPct > 75 ? '#FBBF24' : (cat.color || 'var(--accent)')
           if (budget === 0 && total === 0) return null
           return (
-            <div key={cat.id}
-              className={`px-4 py-3 rounded-2xl backdrop-blur-lg border ${
+            <button key={cat.id} type="button" onClick={() => onOpenCategory(cat.id)}
+              aria-label={`${cat.label} details`}
+              className={`w-full text-left px-4 py-3 rounded-2xl backdrop-blur-lg border cursor-pointer transition-colors hover:bg-white/[0.06] ${
                 over ? 'bg-red-400/[0.05] border-red-400/30'
                   : fromSav > 0 ? 'bg-white/[0.04] border-amber-400/20'
                   : 'bg-white/[0.04] border-white/[0.08]'
@@ -96,7 +96,7 @@ export function EnveloppenView({ stats, onOpenBudget }: {
                   </span>
                 )}
               </div>
-            </div>
+            </button>
           )
         })}
         {allEmpty && <EmptyState emoji="📁" title="Geen enveloppen" sub="Stel budgetten in via 'Beheren'" />}

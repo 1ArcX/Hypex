@@ -114,3 +114,11 @@ export function activeMonthlyBudget(config: BudgetConfig | null): number {
     ? config!.vacation_budget!
     : (config?.monthly_budget || 400)
 }
+
+// Voortgang van één envelop (kaart + detailsheet): over-bedrag en balkpercentages
+export function envelopeProgress(budget: number, spent: number, fromSavings: number) {
+  const overAmt = spent > budget && budget > 0 ? spent - budget : 0
+  const regPct = budget > 0 ? Math.min(100, (spent / budget) * 100) : 0
+  const savPct = budget > 0 ? Math.min(100 - regPct, (fromSavings / budget) * 100) : 0
+  return { overAmt, over: overAmt > 0, regPct, savPct }
+}

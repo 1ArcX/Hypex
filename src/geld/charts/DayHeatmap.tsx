@@ -1,13 +1,15 @@
 import type { Expense } from '../types'
-import { monthStartOf, monthEndOf, todayStr, pad2 } from '../lib/format'
+import { monthStartOf, monthEndOf, todayStr, pad2, fmtDay } from '../lib/format'
 
 const DAY_HEADERS = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 
-// Kalender-heatmap: hoeveel je per dag uitgaf, kleur naar verhouding
-export function DayHeatmap({ budgetExpenses, selYear, selMonth }: {
+// Kalender-heatmap: hoeveel je per dag uitgaf, kleur naar verhouding.
+// Met onDayClick zijn verstreken dagen aanklikbaar (→ uitgaven van die dag).
+export function DayHeatmap({ budgetExpenses, selYear, selMonth, onDayClick }: {
   budgetExpenses: Expense[]
   selYear: number
   selMonth: number
+  onDayClick?: (iso: string) => void
 }) {
   const daysInSelMonth = new Date(selYear, selMonth + 1, 0).getDate()
   const todayISO = todayStr()
@@ -51,15 +53,25 @@ export function DayHeatmap({ budgetExpenses, selYear, selMonth }: {
         const iso = isoOf(d)
         const isFuture = iso > todayISO
         const isToday = iso === todayISO
-        return (
-          <div key={d}
-            className={`h-9 rounded-lg flex flex-col items-center justify-center gap-px ${isToday ? 'ring-1 ring-accent' : ''} ${isFuture ? 'opacity-30' : ''}`}
-            style={{ background: cellColor(d) }}>
+        const clickable = !!onDayClick && !isFuture
+        const content = (
+          <>
             <span className={`text-[11px] leading-none ${isToday ? 'font-bold' : ''} ${isFuture ? 'text-white/30' : 'text-white/60'}`}>{d}</span>
             {!isFuture && (spentPerDay[iso] || 0) > 0 && (
               <span className="text-[8px] leading-none text-white/55 tabular-nums">€{Math.round(spentPerDay[iso])}</span>
             )}
-          </div>
+          </>
+        )
+        const cls = `h-9 rounded-lg flex flex-col items-center justify-center gap-px ${isToday ? 'ring-1 ring-accent' : ''} ${isFuture ? 'opacity-30' : ''}`
+        return clickable ? (
+          <button key={d} type="button" onClick={() => onDayClick!(iso)}
+            aria-label={`Uitgaven op ${fmtDay(iso)}`}
+            className={`${cls} border-none p-0 cursor-pointer transition-[filter] hover:brightness-150 active:scale-95`}
+            style={{ background: cellColor(d) }}>
+            {content}
+          </button>
+        ) : (
+          <div key={d} className={cls} style={{ background: cellColor(d) }}>{content}</div>
         )
       })}
     </div>

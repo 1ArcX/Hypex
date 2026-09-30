@@ -1,22 +1,27 @@
 import { useCallback } from 'react'
 import { supabase } from '../../supabaseClient'
-import type { BudgetConfig, RecurringSource } from '../types'
+import type { BudgetConfig, Expense, RecurringSource } from '../types'
 import { calcRecurringThisMonth, getFilledInToday, isPayDayToday, markFilledInToday } from '../lib/recurring'
 import { todayStr } from '../lib/format'
 import { useGeldStore } from '../store/geldStore'
 
 // Terugkerend inkomen: bronnen uit budget_config, verwacht bedrag deze maand,
 // en de betaaldag-prompt (welke bron is vandaag betaaldag en nog niet bevestigd).
-export function useRecurringIncome(userId: string, config: BudgetConfig | null, isCurrentMonth: boolean) {
+export function useRecurringIncome(userId: string, config: BudgetConfig | null, isCurrentMonth: boolean, expenses: Expense[] = []) {
   const refresh = useGeldStore(s => s.refresh)
 
   const sources = config?.recurring_income || []
   const hasRecurring = sources.length > 0
   const recurringExpected = calcRecurringThisMonth(sources)
 
+  // Bevestigd = vlag in budget_config/localStorage óf er staat vandaag al een
+  // inkomstenregel met de bronnaam (werkt ook als het op een ander apparaat is ingevuld)
+  const today = todayStr()
   const filledInToday = isCurrentMonth ? getFilledInToday(config) : []
+  const loggedToday = (src: RecurringSource) =>
+    expenses.some(e => e.is_income && e.date === today && e.description === src.name)
   const pendingIncomeSource: RecurringSource | null = isCurrentMonth
-    ? (sources.find(src => isPayDayToday(src) && !filledInToday.includes(src.id)) || null)
+    ? (sources.find(src => isPayDayToday(src) && !filledInToday.includes(src.id) && !loggedToday(src)) || null)
     : null
 
   const saveRecurringIncome = useCallback(async (next: RecurringSource[]) => {
@@ -37,10 +42,11 @@ export function useRecurringIncome(userId: string, config: BudgetConfig | null, 
       [today]: [...new Set([...(existing[today] || []), sourceId])],
     }
     Object.keys(updated).forEach(d => { if (d < today) delete updated[d] })
-    await supabase.from('budget_config').upsert(
+    const { error } = await supabase.from('budget_config').upsert(
       { income_confirmed_dates: updated, user_id: userId, updated_at: new Date().toISOString() },
       { onConflict: 'user_id' },
     )
+    if (error) console.warn('[geld] betaaldag-bevestiging niet opgeslagen:', error.message)
     refresh()
   }, [userId, config, refresh])
 

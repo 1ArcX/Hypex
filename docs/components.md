@@ -130,10 +130,12 @@ Self-contained money/budget app, mounted via [pages/GeldPage.jsx](../src/pages/G
 
 - **Tabs** (bottom [TabBar](../src/geld/components/TabBar.tsx), center + button opens ActionSheet):
   - `home` → [views/HomeView.tsx](../src/geld/views/HomeView.tsx) — "Home" (balance, this month). Aliases: "geld home", "budget overzicht".
-  - `enveloppen` → [views/EnveloppenView.tsx](../src/geld/views/EnveloppenView.tsx) — "Enveloppen" (envelope budgeting). Aliases: "enveloppen", "envelopjes".
+  - `enveloppen` → [views/EnveloppenView.tsx](../src/geld/views/EnveloppenView.tsx) — "Enveloppen" (envelope budgeting). Aliases: "enveloppen", "envelopjes". Tapping a card opens EnvelopeSheet.
   - `jaar` → [views/JaarView.tsx](../src/geld/views/JaarView.tsx) — "Jaar" (yearly overview). Aliases: "jaar", "jaaroverzicht".
 - **Sheets:** [AnalyseSheet](../src/geld/sheets/AnalyseSheet.tsx), [InkomstenSheet](../src/geld/sheets/InkomstenSheet.tsx),
   [UitgavenSheet](../src/geld/sheets/UitgavenSheet.tsx), [SearchSheet](../src/geld/sheets/SearchSheet.tsx). Aliases: "analyse", "inkomsten", "uitgaven", "zoeken".
+  Tapping a day in the Analyse heatmap opens UitgavenSheet with `dayFilter` (that day only, "Hele maand" clears it).
+- **EnvelopeSheet** — [sheets/EnvelopeSheet.tsx](../src/geld/sheets/EnvelopeSheet.tsx) — envelope/category detail: budget status, KPIs (aantal, gemiddeld, vorige maand), planned + transactions in the category, "+ Uitgave" (prefilled category) and "Budget aanpassen". Aliases: "envelop detail", "categorie detail".
 - **Modals:** [ExpenseModal](../src/geld/modals/ExpenseModal.tsx) ("uitgave toevoegen"),
   [IncomeDayModal](../src/geld/modals/IncomeDayModal.tsx), [RecurringIncomeModal](../src/geld/modals/RecurringIncomeModal.tsx),
   [SavingsModal](../src/geld/modals/SavingsModal.tsx), [BudgetModal](../src/geld/modals/BudgetModal.tsx).

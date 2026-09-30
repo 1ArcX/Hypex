@@ -7,17 +7,18 @@ import { todayStr, parseAmount } from '../lib/format'
 
 // Uitgave loggen/bewerken — ook geplande uitgaven (plannedMode) en het
 // bevestigen van een geplande uitgave als echte uitgave
-export function ExpenseModal({ onClose, onSave, editing, categories, defaultDate, plannedMode }: {
+export function ExpenseModal({ onClose, onSave, editing, categories, defaultDate, defaultCategory, plannedMode }: {
   onClose: () => void
   onSave: (data: ExpenseInput) => void
   editing?: Expense | null
   categories: CategoryConfig[]
   defaultDate?: string
+  defaultCategory?: string
   plannedMode?: boolean
 }) {
   const isPlanned = plannedMode || editing?.is_planned
   const [amount, setAmount] = useState(editing?.amount ? String(editing.amount) : '')
-  const [cat, setCat] = useState(editing?.category || 'eten')
+  const [cat, setCat] = useState(editing?.category || defaultCategory || 'eten')
   const [desc, setDesc] = useState(editing?.description || '')
   const [date, setDate] = useState(editing?.date || defaultDate || todayStr())
   const [paidFromSavings, setPFS] = useState(editing?.paid_from_savings || false)

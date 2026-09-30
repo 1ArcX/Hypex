@@ -8,7 +8,11 @@ import type { BudgetStats } from '../hooks/useBudgetStats'
 import { useGeldStore } from '../store/geldStore'
 
 // Analyse van de maand: weekbalken, dagheatmap, categorie-donut en saldolijn
-export function AnalyseSheet({ stats, onClose }: { stats: BudgetStats; onClose: () => void }) {
+export function AnalyseSheet({ stats, onClose, onOpenDay }: {
+  stats: BudgetStats
+  onClose: () => void
+  onOpenDay: (iso: string) => void
+}) {
   const selYear = useGeldStore(s => s.selYear)
   const selMonth = useGeldStore(s => s.selMonth)
 
@@ -21,8 +25,11 @@ export function AnalyseSheet({ stats, onClose }: { stats: BudgetStats; onClose: 
       </div>
 
       <div className={`${glassCardSm} p-3.5 pb-2.5 mb-2.5`}>
-        <p className="text-[12px] font-semibold text-white/60 mb-2.5">📅 Uitgaven per dag</p>
-        <DayHeatmap budgetExpenses={stats.budgetExpenses} selYear={selYear} selMonth={selMonth} />
+        <div className="flex items-baseline justify-between mb-2.5">
+          <p className="text-[12px] font-semibold text-white/60 m-0">📅 Uitgaven per dag</p>
+          <span className="text-[10px] text-white/30">Tik op een dag</span>
+        </div>
+        <DayHeatmap budgetExpenses={stats.budgetExpenses} selYear={selYear} selMonth={selMonth} onDayClick={onOpenDay} />
       </div>
 
       <div className="grid grid-cols-2 gap-2.5">
