@@ -164,10 +164,12 @@ function sendNotif(title, body) {
 
 // ── Modes ─────────────────────────────────────────────────────────────────────
 const MODES = {
-  work:      { label: 'Focus',       color: 'var(--accent)',   maxMins: 60 },
-  break:     { label: 'Pauze',       color: '#FF8C42',  maxMins: 30 },
-  longBreak: { label: 'Lang',        color: '#A78BFA', maxMins: 60 },
+  work:      { label: 'Focus',       color: 'var(--accent)',   maxMins: 180 },
+  break:     { label: 'Pauze',       color: '#FF8C42',  maxMins: 60 },
+  longBreak: { label: 'Lang',        color: '#A78BFA', maxMins: 90 },
 }
+
+const clampMins = (v, max) => Math.max(1, Math.min(max, Math.round(v) || 1))
 
 function calcNextMode(mode, sessionsInCycle, sessionsPerLong) {
   if (mode !== 'work') return 'work'
@@ -228,10 +230,10 @@ function reducer(state, action) {
         sessionsInCycle: newSIC, totalSessions: newTotal, todayMins,
       }
     }
-    case 'SET_WORK_MINS':  return { ...state, workMins:       action.v, seconds: state.mode === 'work'      && !state.running ? action.v * 60 : state.seconds }
-    case 'SET_BREAK_MINS': return { ...state, breakMins:      action.v, seconds: state.mode === 'break'     && !state.running ? action.v * 60 : state.seconds }
-    case 'SET_LBRK_MINS':  return { ...state, longBreakMins:  action.v, seconds: state.mode === 'longBreak' && !state.running ? action.v * 60 : state.seconds }
-    case 'SET_SPL':        return { ...state, sessionsPerLong: action.v }
+    case 'SET_WORK_MINS':  { const v = clampMins(action.v, MODES.work.maxMins);      return { ...state, workMins: v,      seconds: state.mode === 'work'      && !state.running ? v * 60 : state.seconds } }
+    case 'SET_BREAK_MINS': { const v = clampMins(action.v, MODES.break.maxMins);     return { ...state, breakMins: v,     seconds: state.mode === 'break'     && !state.running ? v * 60 : state.seconds } }
+    case 'SET_LBRK_MINS':  { const v = clampMins(action.v, MODES.longBreak.maxMins); return { ...state, longBreakMins: v, seconds: state.mode === 'longBreak' && !state.running ? v * 60 : state.seconds } }
+    case 'SET_SPL':        return { ...state, sessionsPerLong: Math.max(1, Math.min(12, Math.round(action.v) || 1)) }
     case 'SET_TASK':       return { ...state, task: action.v }
     case 'TOGGLE_SOUND':   return { ...state, soundEnabled: !state.soundEnabled }
     case 'TOGGLE_NOTIF':   return { ...state, notifEnabled: !state.notifEnabled }
@@ -343,13 +345,14 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
   const [focusMode, setFocusMode]   = useState(false)
   const [soundType, setSoundType]   = useState(() => loadAmbient().soundType || 'off')
   const [volume, setVolume]         = useState(() => loadAmbient().volume ?? 60)
+  const [scene, setScene]           = useState(() => loadAmbient().scene || 'auto') // achtergrond: 'auto' = volgt focusgeluid
 
   useAmbientSound(soundType, volume / 100, state.running)
 
   // Ambient keuze is per apparaat
   useEffect(() => {
-    try { localStorage.setItem(LS_AMBIENT, JSON.stringify({ soundType, volume })) } catch {}
-  }, [soundType, volume])
+    try { localStorage.setItem(LS_AMBIENT, JSON.stringify({ soundType, volume, scene })) } catch {}
+  }, [soundType, volume, scene])
 
   useEffect(() => { stateRef.current = state }, [state])
 
@@ -813,6 +816,8 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
           isFresh={seconds === totalSecs}
           soundType={soundType}
           onSoundType={setSoundType}
+          scene={scene}
+          onScene={setScene}
           volume={volume}
           onVolume={setVolume}
           onToggleRunning={toggleRunning}
@@ -924,9 +929,9 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
             background: 'rgba(255,255,255,0.03)', border: '1px solid var(--c-border)',
           }}>
             {[
-              { label: 'Focus',       color: MODES.work.color,      val: workMins,      max: 60, action: v => dispatch({ type: 'SET_WORK_MINS',  v }) },
-              { label: 'Pauze',       color: MODES.break.color,     val: breakMins,     max: 30, action: v => dispatch({ type: 'SET_BREAK_MINS', v }) },
-              { label: 'Lange pauze', color: MODES.longBreak.color, val: longBreakMins, max: 60, action: v => dispatch({ type: 'SET_LBRK_MINS',  v }) },
+              { label: 'Focus',       color: MODES.work.color,      val: workMins,      max: MODES.work.maxMins, action: v => dispatch({ type: 'SET_WORK_MINS',  v }) },
+              { label: 'Pauze',       color: MODES.break.color,     val: breakMins,     max: MODES.break.maxMins, action: v => dispatch({ type: 'SET_BREAK_MINS', v }) },
+              { label: 'Lange pauze', color: MODES.longBreak.color, val: longBreakMins, max: MODES.longBreak.maxMins, action: v => dispatch({ type: 'SET_LBRK_MINS',  v }) },
             ].map(({ label, color, val, max, action }) => (
               <div key={label} style={{ marginBottom: '10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
