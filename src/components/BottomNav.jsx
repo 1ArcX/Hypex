@@ -18,8 +18,9 @@ const SHEET_BASE = [
 
 const PRIMARY_SWIPE_ORDER = ['dashboard', 'agenda', 'taken', 'notities']  // gewoontes INACTIVE
 
-export default function BottomNav({ activePage, setActivePage, isAdmin, showJumbo, hasLevelUp, hasActiveGymWorkout, hasActivePomo }) {
+export default function BottomNav({ activePage, setActivePage, isAdmin, showJumbo, hasLevelUp, hasActiveGymWorkout, hasActivePomo, onSheetChange }) {
   const [showSheet, setShowSheet] = useState(false)
+  useEffect(() => { onSheetChange?.(showSheet) }, [showSheet, onSheetChange])
   const sheetRef = useRef(null)
   const swipeStartX = useRef(null)
 

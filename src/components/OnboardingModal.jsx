@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { MapPin, GraduationCap, ChevronRight, Check, Bell } from 'lucide-react'
+import { MapPin, ChevronRight, Check, Bell } from 'lucide-react'
 import { pushSupported, requestAndSubscribe } from '../utils/push'
 
 export default function OnboardingModal({ user, onClose }) {
@@ -13,7 +13,6 @@ export default function OnboardingModal({ user, onClose }) {
   // Zo valt de locatiestap niet weg zodra je iets opslaat in localStorage.
   const [steps] = useState(() => {
     const s = ['welcome', 'location']
-    if (!localStorage.getItem(`magister_credentials_${user?.id}`)) s.push('magister')
     // Only show notifications step if supported and not yet granted
     if (pushSupported() && Notification.permission !== 'granted') s.push('notifications')
     s.push('done')
@@ -42,10 +41,6 @@ export default function OnboardingModal({ user, onClose }) {
     // Dronten als default
     return { name: 'Dronten', latitude: 52.5217, longitude: 5.7214 }
   })
-
-  const [school, setSchool]                   = useState('ichthus')
-  const [leerlingnummer, setLeerlingnummer]   = useState('')
-  const [wachtwoord, setWachtwoord]           = useState('')
 
   const step     = steps[stepIndex]
   const progress = ((stepIndex + 1) / steps.length) * 100
@@ -83,16 +78,6 @@ export default function OnboardingModal({ user, onClose }) {
       lat: selectedCity.latitude,
       lon: selectedCity.longitude,
       city: selectedCity.name,
-    }))
-    next()
-  }
-
-  const saveMagister = () => {
-    if (!school || !leerlingnummer || !wachtwoord) return
-    localStorage.setItem(`magister_credentials_${user?.id}`, JSON.stringify({
-      school: school.trim(),
-      username: leerlingnummer.trim(),
-      password: wachtwoord,
     }))
     next()
   }
@@ -209,56 +194,6 @@ export default function OnboardingModal({ user, onClose }) {
               <button onClick={next} style={secondaryBtn}>Overslaan</button>
               <button onClick={confirmLocation} style={primaryBtn(false)}>
                 Bevestigen
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ─── Magister ─── */}
-        {step === 'magister' && (
-          <div>
-            <GraduationCap size={26} style={{ color: 'var(--accent)', marginBottom: 10 }} />
-            <h2 style={{ color: 'white', fontSize: 18, fontWeight: 700, margin: '0 0 6px' }}>Magister koppelen</h2>
-            <p style={{ color: 'var(--c-text-3)', fontSize: 13, margin: '0 0 16px' }}>
-              Optioneel — je kunt dit ook later instellen via de Magister widget.
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <input
-                value={school}
-                onChange={e => setSchool(e.target.value)}
-                placeholder="Schoolnaam (bijv. ssgn)"
-                style={inputStyle}
-                autoFocus
-                autoCapitalize="none"
-              />
-              <input
-                value={leerlingnummer}
-                onChange={e => setLeerlingnummer(e.target.value)}
-                placeholder="Leerlingnummer"
-                style={inputStyle}
-                autoCapitalize="none"
-                autoComplete="off"
-              />
-              <input
-                value={wachtwoord}
-                onChange={e => setWachtwoord(e.target.value)}
-                type="password"
-                placeholder="Wachtwoord"
-                style={inputStyle}
-                autoComplete="new-password"
-              />
-            </div>
-            <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', marginTop: 8 }}>
-              Credentials worden alleen lokaal opgeslagen op dit apparaat.
-            </p>
-            <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-              <button onClick={next} style={secondaryBtn}>Overslaan</button>
-              <button
-                onClick={saveMagister}
-                disabled={!school || !leerlingnummer || !wachtwoord}
-                style={primaryBtn(!school || !leerlingnummer || !wachtwoord)}
-              >
-                Koppelen
               </button>
             </div>
           </div>

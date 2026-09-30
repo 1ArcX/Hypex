@@ -53,7 +53,7 @@ const SWIPE_HINT_KEY = 'swipe_hint_seen_v1'
 export default function TakenPage({
   tasks, subjects,
   onAdd, onEdit, onDelete, onToggle, onViewDetail, onNew, onMoveToGroup, onReorder, onReorderGroups, groupOrder,
-  highlightFilter, onClearHighlight,
+  highlightFilter, onClearHighlight, hideFab,
 }) {
   const isDesktop = useIsDesktop()
   const [filter, setFilter] = useState('vandaag')
@@ -229,7 +229,8 @@ export default function TakenPage({
       )}
 
       {/* Nieuwe taak — gecentreerde knop met label onderaan de Taken-tab */}
-      {!isDesktop && ReactDOM.createPortal(
+      {/* Verborgen zolang het Meer-menu open is (anders ligt hij over de sheet heen) */}
+      {!isDesktop && !hideFab && ReactDOM.createPortal(
         <button
           onClick={() => onNew?.()}
           style={{

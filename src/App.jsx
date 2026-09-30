@@ -67,6 +67,7 @@ export default function App() {
     return { accent: '#00FFD1', bg1: '#0f0f0f', bg2: '#171717' }
   })
   const [focusMode, setFocusMode] = useState(false)
+  const [meerOpen, setMeerOpen] = useState(false) // mobiele "Meer"-sheet open → Taken-FAB verbergen
   const [profiles, setProfiles] = useState([])
   const [showAdmin, setShowAdmin] = useState(false)
   const [activePage, setActivePage] = useState(() => localStorage.getItem('activePage') || 'dashboard')
@@ -916,6 +917,7 @@ export default function App() {
                 groupOrder={groupOrder}
                 highlightFilter={taskHighlight}
                 onClearHighlight={() => setTaskHighlight(null)}
+                hideFab={meerOpen}
               />
             )}
 
@@ -966,6 +968,7 @@ export default function App() {
               hasLevelUp={hasLevelUp}
               hasActiveGymWorkout={hasActiveGymWorkout}
               hasActivePomo={hasActivePomo}
+              onSheetChange={setMeerOpen}
             />
           </div>
         </div>
