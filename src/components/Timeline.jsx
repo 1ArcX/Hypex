@@ -7,6 +7,7 @@ import { appliesOn } from '../utils/recurrence'
 import { taskCategory, eventCategory, categoryColor, CATEGORIES, CATEGORY_ORDER } from '../utils/category'
 import { eventDisplay } from '../utils/eventTitle'
 import { FilterTabs, IconButton } from './ui'
+import { useViewport } from '../hooks/useViewport'
 
 const WORK = 'var(--cat-werk)' // = categoryColor('werk')
 
@@ -29,7 +30,18 @@ const kbdClick = (label, fn) => ({
 const blockTitle = (color, extra = {}) => ({ fontSize: '11px', fontWeight: 700, color: `color-mix(in srgb, ${color} 55%, white)`, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', ...extra })
 const blockMeta = (color) => ({ fontSize: '10px', color: `color-mix(in srgb, ${color} 45%, var(--c-text-2))`, lineHeight: 1.3, marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' })
 
-const HOUR_H = 56
+const BASE_HOUR_H = 56 // mobiel; desktop schaalt mee met de vensterhoogte (zie hourHeight)
+
+// Uurhoogte zodat ~15 uur (07–22) in beeld past; hoge schermen krijgen fijnere vakjes
+function hourHeight(viewportH) {
+  return Math.round(Math.min(140, Math.max(48, (viewportH - 210) / 15)))
+}
+// Achtergrond van een uurvak: halfuurlijn, en kwartierlijnen als er ruimte is
+function slotBackground(hourH) {
+  const line = (pct, a) => `linear-gradient(to bottom, transparent calc(${pct}% - 0.5px), rgba(255,255,255,${a}) calc(${pct}% - 0.5px), rgba(255,255,255,${a}) calc(${pct}% + 0.5px), transparent calc(${pct}% + 0.5px))`
+  if (hourH >= 96) return [line(25, 0.014), line(50, 0.03), line(75, 0.014)].join(', ')
+  return line(50, 0.018)
+}
 const TIME_COL = 48
 const magisterKey = (userId) => `magister_credentials_${userId}`
 
@@ -110,13 +122,13 @@ function layoutOverlaps(items) {
   return sorted
 }
 
-const emptyForm = (date, hour) => ({
+const emptyForm = (date, hour, minute = 0) => ({
   title: '', description: '',
   date: toDateStr(date || new Date()),
   endDate: '',
   allDay: false,
-  startTime: hour !== undefined ? `${pad(hour)}:00` : '09:00',
-  endTime: hour !== undefined ? `${pad(Math.min(hour+1,23))}:00` : '10:00',
+  startTime: hour !== undefined ? `${pad(hour)}:${pad(minute)}` : '09:00',
+  endTime: hour !== undefined ? (hour >= 23 ? '23:59' : `${pad(hour + 1)}:${pad(minute)}`) : '10:00',
   color: '#818CF8', recurrence: '', recurrence_days: []
 })
 
@@ -124,6 +136,11 @@ const SOMTODAY_EMAIL = 'jbrugman.prive@gmail.com'
 
 export default function Timeline({ userId, userEmail, tasks, subjects, onEditTask, onViewDetail, defaultView = 'week', initialDate, isMobile = false, hideToolbar = false, onLessonsChange, onEventsChange, onMagisterError, onDateChange, highlightKey }) {
   const [view, setView] = useState(defaultView)
+  const vp = useViewport()
+  // Smal maar hoog venster: legenda + mini-maand als strook onder het rooster (zie .agenda-shell in index.css)
+  const railBelow = !isMobile && vp.w < 1280 && vp.h >= 1100
+  const HOUR_H = isMobile ? BASE_HOUR_H : hourHeight(vp.h - (railBelow ? 250 : 0))
+  const quarterSlots = HOUR_H >= 96
   const [current, setCurrent] = useState(initialDate || new Date())
   const [events, setEvents] = useState([])
   const [modal, setModal] = useState(null)
@@ -423,8 +440,8 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
     })
   }
 
-  const openNew = (date, hour) => {
-    setForm(emptyForm(date || current, hour))
+  const openNew = (date, hour, minute) => {
+    setForm(emptyForm(date || current, hour, minute))
     setModal({ mode: 'new' })
   }
 
@@ -617,11 +634,21 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                     {/* verberg het uurlabel als de rode nu-pill er overheen valt */}
                     {h === 0 || (showNowLine && Math.abs(nowMins - h * 60) < 15) ? '' : `${pad(h)}:00`}
                   </span>
+                  {quarterSlots && !(showNowLine && Math.abs(nowMins - (h * 60 + 30)) < 15) && (
+                    <span style={{ position: 'absolute', top: HOUR_H / 2, right: 10, fontSize: '9px', color: 'var(--c-text-3)', opacity: 0.55, fontVariantNumeric: 'tabular-nums', lineHeight: 1, userSelect: 'none' }}>
+                      :30
+                    </span>
+                  )}
                 </div>
                 <div style={{ position: 'absolute', top: `${h * HOUR_H}px`, left: `${TIME_COL}px`, right: 0, height: `${HOUR_H}px`, borderTop: '1px solid rgba(255,255,255,0.045)', display: 'grid', gridTemplateColumns: `repeat(${N}, minmax(0, 1fr))` }}>
                   {days.map((d, di) => (
                     <div key={di}
-                      onClick={() => openNew(d, h)}
+                      onClick={e => {
+                        // Hoge vakken: klik snapt naar het kwartier
+                        if (!quarterSlots) return openNew(d, h)
+                        const q = Math.min(3, Math.floor((e.nativeEvent.offsetY / HOUR_H) * 4))
+                        openNew(d, h, q * 15)
+                      }}
                       onDragOver={e => e.preventDefault()}
                       onDrop={async e => {
                         e.preventDefault()
@@ -630,7 +657,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                         await supabase.from('tasks').update({ time: `${pad(h)}:00`, date: toDateStr(d) }).eq('id', taskId)
                         window.dispatchEvent(new Event('refreshTasks'))
                       }}
-                      style={{ borderLeft: di > 0 ? '1px solid rgba(255,255,255,0.035)' : 'none', cursor: 'pointer', backgroundImage: 'linear-gradient(to bottom, transparent calc(50% - 0.5px), rgba(255,255,255,0.018) calc(50% - 0.5px), rgba(255,255,255,0.018) calc(50% + 0.5px), transparent calc(50% + 0.5px))' }}
+                      style={{ borderLeft: di > 0 ? '1px solid rgba(255,255,255,0.035)' : 'none', cursor: 'pointer', backgroundImage: slotBackground(HOUR_H) }}
                     />
                   ))}
                 </div>
@@ -980,8 +1007,8 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
   }
 
   return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden', gap: 12 }}>
-    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderRadius: 'var(--r-lg)', background: 'var(--c-surface)', border: '1px solid var(--c-border)' }}>
+    <div className="agenda-shell" style={{ display: 'flex', height: '100%', overflow: 'hidden', gap: 12 }}>
+    <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderRadius: 'var(--r-lg)', background: 'var(--c-surface)', border: '1px solid var(--c-border)' }}>
       {/* Toolbar */}
       {!hideToolbar && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderBottom: '1px solid var(--c-border)', flexShrink: 0, gap: '8px', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>

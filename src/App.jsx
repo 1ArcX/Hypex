@@ -10,6 +10,8 @@ import PasswordResetPage from './components/PasswordResetPage'
 import OnboardingModal from './components/OnboardingModal'
 
 import Sidebar from './components/Sidebar'
+import { useNavLayout } from './hooks/useNavLayout'
+import { useViewport } from './hooks/useViewport'
 import VersionChecker from './components/VersionChecker'
 import { callMagister } from './utils/magisterApi'
 import { ensureSomtodayCreds } from './utils/somtodayApi'
@@ -710,6 +712,21 @@ export default function App() {
     return tasks.filter(x => isOverdue(x, t)).length
   }, [tasks])
 
+  // Desktop-navigatie: positie (links/boven) + automatisch verbergen (per apparaat)
+  const [navLayout] = useNavLayout()
+  const viewport = useViewport()
+  const navTop = navLayout.position === 'top'
+  const [navShown, setNavShown] = useState(false)
+  const navHideTimer = useRef(null)
+  const showNav = useCallback(() => { clearTimeout(navHideTimer.current); setNavShown(true) }, [])
+  const hideNavSoon = useCallback(() => {
+    clearTimeout(navHideTimer.current)
+    navHideTimer.current = setTimeout(() => setNavShown(false), 400)
+  }, [])
+  useEffect(() => () => clearTimeout(navHideTimer.current), [])
+  // Na navigeren via de verborgen balk: direct inklappen
+  useEffect(() => { if (navLayout.autoHide) setNavShown(false) }, [activePage, navLayout.autoHide])
+
   // Ctrl/⌘K opent de zoekpalette (alleen ingelogd)
   useEffect(() => {
     if (!session) return
@@ -757,15 +774,24 @@ export default function App() {
       {/* Blur wrapper voor focus mode */}
       <div style={{
         display: 'flex',
+        flexDirection: navTop ? 'column' : 'row',
         height: '100%',
         filter: focusMode ? 'blur(4px) brightness(0.4)' : 'none',
         transition: 'filter 0.4s ease',
         pointerEvents: focusMode ? 'none' : 'auto',
       }}>
 
-        {/* Desktop Sidebar */}
-        <div className="hidden md:block">
+        {/* Desktop navigatie — zijbalk links of balk boven, optioneel automatisch verbergen */}
+        {navLayout.autoHide && (
+          <div className={`hidden md:block hx-nav-hotzone ${navTop ? 'is-top' : 'is-left'}${overdueCount > 0 ? ' has-alert' : ''}`}
+            onMouseEnter={showNav} aria-hidden="true" />
+        )}
+        <div className={`hidden md:block hx-nav-wrap ${navTop ? 'is-top' : 'is-left'}${navLayout.autoHide ? ' is-auto' : ''}${navShown ? ' is-shown' : ''}`}
+          onMouseEnter={navLayout.autoHide ? showNav : undefined}
+          onMouseLeave={navLayout.autoHide ? hideNavSoon : undefined}>
           <Sidebar
+            orientation={navTop ? 'horizontal' : 'vertical'}
+            rail={!navTop && !navLayout.autoHide && viewport.w < 1200}
             activePage={activePage}
             setActivePage={handleSetActivePage}
             isAdmin={isAdmin}
@@ -787,7 +813,7 @@ export default function App() {
 
         {/* Main area — position:relative zodat de zwevende navbar hieraan ankert
             (zelfde --app-height-referentie als de inhoud, geen verspringende band) */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+        <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
 
           {/* Mobile header — iOS navigation bar: titel gecentreerd */}
           <div className="md:hidden flex items-center justify-between px-4"

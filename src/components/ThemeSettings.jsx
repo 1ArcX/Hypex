@@ -1,6 +1,8 @@
 import React, { useState } from 'react'
 import { X, Palette, RotateCcw, LogOut, Bell, BellOff, Home, Calendar, CheckSquare, Play, CalendarPlus, Download } from 'lucide-react'
-import { IconButton, ProgressBar, Pill } from './ui'
+import { IconButton, ProgressBar, Pill, FilterTabs } from './ui'
+import { useNavLayout } from '../hooks/useNavLayout'
+import { useIsDesktop } from '../hooks/useIsDesktop'
 import { pushSupported, requestAndSubscribe } from '../utils/push'
 import CalendarConnections from './CalendarConnections'
 
@@ -29,6 +31,8 @@ export default function ThemeSettings({ onClose, theme, setTheme, onLogout, user
     try { return localStorage.getItem('somtoday_lesson_color') || '#FACC15' } catch { return '#FACC15' }
   })
   const [showCalendarConnections, setShowCalendarConnections] = useState(false)
+  const [navLayout, setNavLayout] = useNavLayout()
+  const isDesktop = useIsDesktop()
 
   const applySomtodayColor = (color) => {
     setSomtodayColorState(color)
@@ -134,6 +138,24 @@ export default function ThemeSettings({ onClose, theme, setTheme, onLogout, user
             </div>
           </div>
         </div>
+
+        {/* Navigatie (desktop, per apparaat) */}
+        {isDesktop && (
+          <div style={{ marginBottom: 18 }}>
+            <p style={label}>Navigatie <span style={{ fontWeight: 500, color: 'var(--c-text-3)' }}>· dit apparaat</span></p>
+            <FilterTabs variant="segmented" label="Positie navigatie" value={navLayout.position}
+              onChange={v => setNavLayout({ position: v })}
+              items={[{ value: 'left', label: 'Links (verticaal)' }, { value: 'top', label: 'Boven (horizontaal)' }]} />
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, fontSize: 13, color: 'var(--c-text-2)', cursor: 'pointer' }}>
+              <input type="checkbox" checked={navLayout.autoHide} onChange={e => setNavLayout({ autoHide: e.target.checked })}
+                style={{ width: 16, height: 16, accentColor: 'var(--accent)', cursor: 'pointer' }} />
+              Automatisch verbergen
+            </label>
+            {navLayout.autoHide && <div style={{ fontSize: 11, color: 'var(--c-text-3)', marginTop: 4, lineHeight: 1.5 }}>
+              Beweeg je muis naar de {navLayout.position === 'top' ? 'bovenrand' : 'linkerrand'} om de navigatie te tonen.
+            </div>}
+          </div>
+        )}
 
         {/* SOMtoday leskleur — alleen voor het SOMtoday-account */}
         {userEmail === SOMTODAY_EMAIL && (

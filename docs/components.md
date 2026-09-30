@@ -45,6 +45,9 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 - **Sidebar** — [components/Sidebar.jsx](../src/components/Sidebar.jsx)
   - Aliases: "de sidebar", "left menu", "linker menu", "navigatie" (desktop), "zijbalk"
   - Where: desktop only (`hidden md:block` in App.jsx). Contains logo "Hypex", "Zoeken" (Ctrl K), nav items (`.hx-nav-item`, red overdue badge on Taken), Instellingen/Admin/Uitloggen, VersionChecker, avatar.
+  - Layouts (per device, `nav_layout` in localStorage via [hooks/useNavLayout.js](../src/hooks/useNavLayout.js), set in ThemeSettings "Navigatie"):
+    `orientation="vertical"` (left; auto **icon rail** 64px below 1200px viewport, `.hx-sidebar.is-rail`) or `orientation="horizontal"` (52px top bar `.hx-topbar`, labels drop to icons when narrow via container query).
+    **Auto-hide**: wrapper `.hx-nav-wrap.is-auto` slides in from a 6px hot-zone (`.hx-nav-hotzone`) at the left/top edge. Aliases: "taakbalk", "navigatie boven", "icoonbalk", "automatisch verbergen".
   - Related: BottomNav (mobile equivalent), VersionChecker.
 
 - **BottomNav** — [components/BottomNav.jsx](../src/components/BottomNav.jsx)
@@ -64,9 +67,10 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
   - Row 2 KPI row (`KpiTile`): "Urgent" / "Te laat" / "Open" / "Vandaag".
   - Row 3 workspace: "Te laat & urgent" card (compact rows + complete) and "Volgende afspraak" card (countdown, "Nu bezig", filter Alle/Agenda/Werk/Taken, ‹ ›, "Bekijk agenda").
   - Row 4 widgets: TodayWidget, PomodoroMiniWidget, GeldMiniWidget (admin), `SpotifyWidget compact`.
+    On tall windows (≥1100px high, `.dash.is-tall`) Spotify becomes `variant="hero"` in its own row above the widgets lists show more rows, and a "Komende dagen" card (next 6 days, `.dash-week`) fills the remaining height. Grids use container queries on `.dash-scroll` (container `dash`).
   - Row 5 extras: "Schema vandaag", "Deadlines", "Nog in te plannen", `RainCard` (regen grafiek).
   - Aliases: "stats-kaart", "KPI's", "urgent/te laat/open/vandaag tile", "te laat kaart", "volgende afspraak",
-    "schema vandaag", "deadlines kaart", "regen grafiek". **Inline in DashboardPage.jsx.** (The old FocusCard was folded into these.)
+    "schema vandaag", "deadlines kaart", "regen grafiek", "komende dagen". **Inline in DashboardPage.jsx.** (The old FocusCard was folded into these.)
 - **Dashboard widgets** — `src/components/dashboard/`:
   [TodayWidget](../src/components/dashboard/TodayWidget.jsx) ("Vandaag"-widget, progress ring),
   [PomodoroMiniWidget](../src/components/dashboard/PomodoroMiniWidget.jsx) (reads `pomodoro_v3`, opens Pomodoro page),
@@ -74,7 +78,7 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 - **Clock** — [components/Clock.jsx](../src/components/Clock.jsx) — clock; `variant="inline"` for the dashboard header, `isBreak` tints it. Aliases: "klok", "de tijd".
 - **CommandPalette** — [components/CommandPalette.jsx](../src/components/CommandPalette.jsx) — "Zoek in Hypex" (Ctrl/⌘K, sidebar "Zoeken", dashboard search field): tasks, agenda items, notes, pages, "Nieuwe taak". Aliases: "zoeken", "search", "command palette", "cmd k".
 - **WeatherWidget** — [components/WeatherWidget.jsx](../src/components/WeatherWidget.jsx) — weather + PWA-install prompt trigger; `compact` = header chip that opens the full widget in a popup. Aliases: "weer", "weerwidget". Data: open-meteo/buienalarm, `weather_coords` in localStorage.
-- **SpotifyWidget** — [components/SpotifyWidget.jsx](../src/components/SpotifyWidget.jsx) — Spotify now-playing/queue/recent; `compact` = dashboard card (track + prev/play/next). Aliases: "spotify", "muziek", "now playing". Data: Spotify OAuth via netlify function.
+- **SpotifyWidget** — [components/SpotifyWidget.jsx](../src/components/SpotifyWidget.jsx) — Spotify now-playing/queue/recent; `compact` = dashboard card (track + prev/play/next); `variant="hero"` = large dashboard card on tall screens (big cover + blurred backdrop, seek bar, shuffle/repeat, volume, queue, single "Laatst afgespeeld", styles `.sp-hero*`). Aliases: "spotify", "muziek", "now playing". Data: Spotify OAuth via netlify function.
 
 ### Tasks / taken
 - **TasksWidget** — [components/TasksWidget.jsx](../src/components/TasksWidget.jsx) — main task list with groups, drag-reorder, complete. Aliases: "takenlijst", "taken widget", "de takenlijst".
@@ -84,7 +88,7 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 - **TaskDetailModal** — [components/TaskDetailModal.jsx](../src/components/TaskDetailModal.jsx) — read-only task detail + start pomodoro + edit/delete. Aliases: "taak detail", "taakdetail popup".
 
 ### Agenda
-- **Timeline** — [components/Timeline.jsx](../src/components/Timeline.jsx) — full week/day/month calendar grid (desktop agenda) with Magister/SOMtoday lessons, events, tasks, work shifts. Category-colored blocks (`blockStyle`), red now-line with time pill, right rail `SideRail` (legend "Kleuren" + mini month, `.agenda-rail`, ≥1280px). Aliases: "timeline", "agenda grid", "week weergave", "kalender", "legenda", "mini kalender".
+- **Timeline** — [components/Timeline.jsx](../src/components/Timeline.jsx) — full week/day/month calendar grid (desktop agenda) with Magister/SOMtoday lessons, events, tasks, work shifts. Hour height scales with window height (`hourHeight()`, ~15 h in view); ≥96px/h shows 15-min lines + ":30" labels and clicks snap to the quarter. Narrow-but-tall windows show the rail as a strip below the grid (`.agenda-shell`). Category-colored blocks (`blockStyle`), red now-line with time pill, right rail `SideRail` (legend "Kleuren" + mini month, `.agenda-rail`, ≥1280px). Aliases: "timeline", "agenda grid", "week weergave", "kalender", "legenda", "mini kalender".
 - **AgendaList** — [components/AgendaList.jsx](../src/components/AgendaList.jsx) — mobile agenda list ("Niets gepland de komende weken"). Aliases: "agenda lijst", "agenda mobiel".
 
 ### Pomodoro
@@ -92,6 +96,7 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 - **PomodoroHero** — [components/pomodoro/PomodoroHero.jsx](../src/components/pomodoro/PomodoroHero.jsx) — the Pomodoro page hero: animated background (SceneCanvas) + "Achtergrond" picker (top-right; Automatisch = follows focus sound), mode tabs, big ring (click the time to type minutes, scroll/↑↓ ±1, Shift ±5), "Waar werk je aan?", time chips (+ chip for a custom value), focus-sound tiles + volume, reset/Start focus/settings popover (eindsignaal, meldingen, sliders + number fields, sessies-per-cyclus stepper), card row slot. Styles `.pomo-*` in index.css. Aliases: "pomodoro hero", "sfeervolle achtergrond", "achtergrond kiezen", "focus modes", "tijdopties", "startknop".
 - **SceneCanvas / scenes** — [components/pomodoro/SceneCanvas.jsx](../src/components/pomodoro/SceneCanvas.jsx) + [scenes.js](../src/components/pomodoro/scenes.js) — canvas-animated scenes (Nacht, Regen, Oceaan, Haardvuur, Aurora, Rustig), ~30 fps, paused when hidden/off-screen, static under reduced motion; `sceneThumb()` renders cached previews. Aliases: "achtergrond", "animatie", "scène".
 - **SessionGoalCard** — [components/pomodoro/SessionGoalCard.jsx](../src/components/pomodoro/SessionGoalCard.jsx) — "Sessie doel": Doel (preset or a task) | Checklist (tasks + own items). Task items are synced with Taken (ticking completes the task; completed elsewhere = ticked). Aliases: "sessie doel", "intentie", "checklist".
+- **Pomodoro layout** — ring size is `--ring` on `.pomo-page` (container `pomo`); tall windows (≥1300px high) drop the 100vh hero, enlarge the ring and put StudieBuddies + PomodoroStats side by side (`.pomo-below-grid`) so everything fits on one screen; short windows (≤820px) shrink the ring.
 - **Pomodoro cards** — inline in [pages/PomodoroPage.jsx](../src/pages/PomodoroPage.jsx) via `renderCards`: `TodayCard` ("Vandaag": focussessies, focus tijd, cyclus dots), SessionGoalCard, `SpotifyWidget compact title="Focus playlist"`. Aliases: "voortgang vandaag", "focus playlist", "focus muziek".
 - **FocusMode** — [components/FocusMode.jsx](../src/components/FocusMode.jsx) — full-screen focus overlay (used by PomodoroTimer). Aliases: "focus mode", "focus overlay", "focus scherm".
 - **PomodoroStats** — [components/PomodoroStats.jsx](../src/components/PomodoroStats.jsx) — weekly focus-minutes stats. Aliases: "pomodoro stats", "focus statistieken".
@@ -114,7 +119,7 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 - **DagbriefingStrip** — [components/ai/DagbriefingStrip.jsx](../src/components/ai/DagbriefingStrip.jsx) — structured briefing tiles (Urgent, Te laat, Volgende afspraak, Dagbudget) from real data above the AI text. Aliases: "dagbriefing", "briefing".
 
 ### Settings / admin / onboarding / auth
-- **ThemeSettings** — [components/ThemeSettings.jsx](../src/components/ThemeSettings.jsx) — "Instellingen": accent color presets + eigen kleur, "Live preview" mini-UI, meldingen, external calendars, "Desktop-app" download (Windows browsers only, hidden inside the app via `window.__HYPEX_DESKTOP__`). Aliases: "instellingen", "settings", "thema", "accentkleur".
+- **ThemeSettings** — [components/ThemeSettings.jsx](../src/components/ThemeSettings.jsx) — "Instellingen": accent color presets + eigen kleur, "Live preview" mini-UI, "Navigatie" (links/boven + automatisch verbergen, desktop, per device), meldingen, external calendars, "Desktop-app" download (Windows browsers only, hidden inside the app via `window.__HYPEX_DESKTOP__`). Aliases: "instellingen", "settings", "thema", "accentkleur".
 - **CalendarConnections** — [components/CalendarConnections.jsx](../src/components/CalendarConnections.jsx) — "Agenda's koppelen" (Google / MyX). Opened from ThemeSettings. Aliases: "agenda koppelen", "calendar connections", "externe agenda's".
 - **AdminPanel** — [components/AdminPanel.jsx](../src/components/AdminPanel.jsx) — "Admin Paneel": user management, push test, `werk_tab` toggle. Aliases: "admin", "admin paneel", "gebruikersbeheer".
 - **OnboardingModal** — [components/OnboardingModal.jsx](../src/components/OnboardingModal.jsx) — first-login flow ("Welkom bij Dash", location, Magister, notifications). Aliases: "onboarding", "welkom scherm", "intro".
@@ -180,7 +185,7 @@ Self-contained money/budget app, mounted via [pages/GeldPage.jsx](../src/pages/G
 
 ## Hooks & utils (non-visual, for reference)
 
-- App hooks: [hooks/useIsDesktop.js](../src/hooks/useIsDesktop.js), [hooks/useAmbientSound.js](../src/hooks/useAmbientSound.js).
+- App hooks: [hooks/useIsDesktop.js](../src/hooks/useIsDesktop.js), [hooks/useViewport.js](../src/hooks/useViewport.js) (`{ w, h, tall, portrait }`, for JS-driven sizes), [hooks/useNavLayout.js](../src/hooks/useNavLayout.js) (nav position/auto-hide), [hooks/useAmbientSound.js](../src/hooks/useAmbientSound.js).
 - Utils (`src/utils/`): `magisterApi`, `somtodayApi` (school), `push` (web-push), `xp` (XP/level-up events),
   `recurrence` (recurring tasks), `calendarSync`, `daypart`, `alleVakken`, `openBook`, `openExternal`, `supabaseProfiles`.
 

@@ -180,8 +180,10 @@ export default function PomodoroPage({ onModeChange, onFocusModeChange, onPomodo
 
       {/* Onder de hero: wie studeert er, weekstats en sessie-log */}
       <div className="pomo-below">
-        <StudieBuddiesWidget profiles={profiles} onlineUsers={onlineUsers} />
-        <PomodoroStats refreshKey={sessions.length} userId={userId} />
+        <div className="pomo-below-grid">
+          <StudieBuddiesWidget profiles={profiles} onlineUsers={onlineUsers} />
+          <PomodoroStats refreshKey={sessions.length} userId={userId} />
+        </div>
 
         {sessions.length > 0 && (
           <>

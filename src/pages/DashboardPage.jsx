@@ -15,6 +15,7 @@ import { isOverdue, isUrgent, daysLate, shortDate } from '../utils/taskStatus'
 import { eventDisplay } from '../utils/eventTitle'
 import { buildUpcoming, countdownLabel } from '../utils/upcoming'
 import { useIsDesktop } from '../hooks/useIsDesktop'
+import { useViewport } from '../hooks/useViewport'
 import { toISO, isDueToday, isDoneToday } from '../utils/recurrence'
 import { greeting } from '../utils/greeting'
 
@@ -176,6 +177,10 @@ export default function DashboardPage({
 }) {
   useMinuteTick()
   const isDesktop = useIsDesktop()
+  const vp = useViewport()
+  // Hoog scherm (bv. verticale monitor): Spotify groot in een eigen rij, langere lijsten
+  const tall = isDesktop && vp.h >= 1100
+  const lim = tall ? { attention: 8, schedule: 10, deadlines: 6, unplanned: 8 } : { attention: 4, schedule: 5, deadlines: 4, unplanned: 4 }
   const [skip, setSkip] = useState(0)
   const [nextEventFilter, setNextEventFilter] = useState(() => localStorage.getItem('nextEventFilter') || 'alle')
   const setFilter = (f) => { setNextEventFilter(f); setSkip(0); localStorage.setItem('nextEventFilter', f) }
@@ -216,15 +221,27 @@ export default function DashboardPage({
   const deadlines = tasks
     .filter(t => !t.completed && t.due_date && t.due_date >= today && t.due_date <= in3Str)
     .sort((a, b) => a.due_date.localeCompare(b.due_date))
-    .slice(0, 4)
+    .slice(0, lim.deadlines)
   const unplanned = tasks.filter(t => !t.completed && !t.date)
 
+  // Hoog scherm: komende 6 dagen (vanaf morgen), per dag gegroepeerd
+  const weekAhead = useMemo(() => {
+    if (!tall) return []
+    const start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() + 1)
+    const days = Array.from({ length: 6 }, (_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return { date: d, items: [] } })
+    for (const it of buildUpcoming({ tasks, calendarEvents, magisterLessons })) {
+      const idx = Math.floor((new Date(it.ts).setHours(0, 0, 0, 0) - start) / 86400000)
+      if (idx >= 0 && idx < 6) days[idx].items.push(it)
+    }
+    return days
+  }, [tall, tasks, calendarEvents, magisterLessons])
+
   const showRain = homeRain && !rainHidden && Math.max(...homeRain.map(d => d.precip)) > 0.1
-  const widgetCount = (isAdmin ? 3 : 2) + (isDesktop ? 1 : 0)
+  const widgetCount = (isAdmin ? 3 : 2) + (isDesktop && !tall ? 1 : 0)
 
   return (
-    <div style={{ height: '100%', overflowY: 'auto' }}>
-      <div className="dash">
+    <div className="dash-scroll">
+      <div className={`dash${tall ? ' is-tall' : ''}`}>
 
         {/* ── RIJ 1: header — begroeting, zoeken, tijd, weer ── */}
         <header className="dash-header">
@@ -261,7 +278,7 @@ export default function DashboardPage({
                 <CardHeader icon={AlertTriangle} title={attentionTitle} count={attention.length} tone="danger"
                   action={<CardLink onClick={() => onNavigateToTasks?.(overdueTasks.length ? 'telaat' : 'urgent')}>Bekijk alles <ArrowRight size={13} /></CardLink>} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {attention.slice(0, 4).map(t => {
+                  {attention.slice(0, lim.attention).map(t => {
                     const late = overdueIds.has(t.id)
                     const n = late ? daysLate(t, today) : 0
                     const subj = subjectName(t.subject_id)
@@ -279,10 +296,10 @@ export default function DashboardPage({
                       />
                     )
                   })}
-                  {attention.length > 4 && (
+                  {attention.length > lim.attention && (
                     <button type="button" onClick={() => onNavigateToTasks?.('telaat')} className="t-meta"
                       style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: '2px 10px' }}>
-                      +{attention.length - 4} meer
+                      +{attention.length - lim.attention} meer
                     </button>
                   )}
                 </div>
@@ -359,14 +376,17 @@ export default function DashboardPage({
           </Card>
         </section>
 
+        {/* Hoog scherm: Spotify als grote kaart in een eigen rij */}
+        {tall && <SpotifyWidget variant="hero" queueLimit={vp.h >= 1600 ? 8 : 5} />}
+
         {/* ── RIJ 4: compacte widgets ── */}
-        <section className="dash-widgets" style={{ '--cols': widgetCount }} aria-label="Widgets">
+        <section className="dash-widgets" style={{ '--cols': widgetCount, '--cols-md': widgetCount === 3 ? 3 : 2 }} aria-label="Widgets">
           <TodayWidget tasks={tasks} today={today} scheduleCount={todayItems.filter(i => i.type !== 'task').length} onToggleTask={t => onToggleTask?.(t)} onOpenTask={setDetailTask}
             onNewTask={() => openNewTask()} onOpenList={() => onNavigateToTasks?.('vandaag')} />
           <PomodoroMiniWidget onOpen={() => onNavigate('pomodoro')} />
           {isAdmin && <GeldMiniWidget userId={userId} onOpen={() => onNavigate('geld')} />}
           {/* Spotify (Level 3): op desktop in de widgetrij, op mobiel onderaan */}
-          {isDesktop && <SpotifyWidget compact />}
+          {isDesktop && !tall && <SpotifyWidget compact />}
         </section>
 
         {/* ── RIJ 5 (Level 2/3): schema, deadlines, ongepland, regen ── */}
@@ -376,7 +396,7 @@ export default function DashboardPage({
               <Card pad={14} style={{ minWidth: 0 }}>
                 <CardHeader icon={ListTodo} title="Schema vandaag" count={todayItems.length} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {todayItems.slice(0, 5).map((item, i) => {
+                  {todayItems.slice(0, lim.schedule).map((item, i) => {
                     const nowMins = new Date().getHours() * 60 + new Date().getMinutes()
                     const endMins = item.end ? (() => { const [eh, em] = item.end.split(':').map(Number); return eh * 60 + em })() : 0
                     const isNow = item.sortMins <= nowMins && item.end && endMins >= nowMins
@@ -393,7 +413,7 @@ export default function DashboardPage({
                         }} />
                     )
                   })}
-                  {todayItems.length > 5 && <p className="t-meta" style={{ margin: '2px 10px 0' }}>+{todayItems.length - 5} meer</p>}
+                  {todayItems.length > lim.schedule && <p className="t-meta" style={{ margin: '2px 10px 0' }}>+{todayItems.length - lim.schedule} meer</p>}
                 </div>
               </Card>
             )}
@@ -417,18 +437,47 @@ export default function DashboardPage({
                 <CardHeader icon={Inbox} title="Nog in te plannen" count={unplanned.length}
                   action={<CardLink onClick={() => onNavigateToTasks?.('open')}>Alle <ArrowRight size={13} /></CardLink>} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {unplanned.slice(0, 4).map(t => (
+                  {unplanned.slice(0, lim.unplanned).map(t => (
                     <ListRow key={t.id} dot={categoryColor(taskCategory(t))} title={t.title}
                       trailing={subjectName(t.subject_id) && <span className="t-meta">{subjectName(t.subject_id)}</span>}
                       onClick={() => setDetailTask(t)} />
                   ))}
-                  {unplanned.length > 4 && <p className="t-meta" style={{ margin: '2px 10px 0' }}>+{unplanned.length - 4} meer</p>}
+                  {unplanned.length > lim.unplanned && <p className="t-meta" style={{ margin: '2px 10px 0' }}>+{unplanned.length - lim.unplanned} meer</p>}
                 </div>
               </Card>
             )}
 
             {showRain && <RainCard data={homeRain} onDismiss={dismissRain} />}
           </section>
+        )}
+
+        {/* Hoog scherm: vooruitblik op de komende dagen vult de rest van de hoogte */}
+        {tall && (
+          <Card pad={14} className="dash-week" style={{ minWidth: 0 }}>
+            <CardHeader icon={CalendarDays} title="Komende dagen"
+              action={<CardLink onClick={() => onNavigateToAgenda?.(weekAhead[0]?.date || new Date())}>Agenda <ArrowRight size={13} /></CardLink>} />
+            <div className="dash-week-grid">
+              {weekAhead.map(({ date, items }) => (
+                <div key={date.toDateString()} className="dash-week-day">
+                  <p className="t-overline" style={{ margin: '0 0 6px', color: 'var(--c-text-3)' }}>
+                    {date.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })}
+                  </p>
+                  {items.length === 0 ? (
+                    <p className="t-meta" style={{ margin: 0, opacity: 0.6 }}>Niets gepland</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {items.slice(0, 8).map((it, i) => (
+                        <ListRow key={i} dot={categoryColor(it.cat)} title={it.label}
+                          trailing={<span className="t-meta tnum">{hhmm(it.ts)}</span>}
+                          onClick={() => { if (it.type === 'task' && it.raw) setDetailTask(it.raw); else onNavigateToAgenda?.(it.ts, it.highlightKey) }} />
+                      ))}
+                      {items.length > 8 && <p className="t-meta" style={{ margin: '2px 10px 0' }}>+{items.length - 8} meer</p>}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Card>
         )}
 
         {!isDesktop && <SpotifyWidget compact />}
