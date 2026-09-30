@@ -46,7 +46,7 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
   - Aliases: "de sidebar", "left menu", "linker menu", "navigatie" (desktop), "zijbalk"
   - Where: desktop only (`hidden md:block` in App.jsx). Contains logo "Hypex", "Zoeken" (Ctrl K), nav items (`.hx-nav-item`, red overdue badge on Taken), Instellingen/Admin/Uitloggen, VersionChecker, avatar.
   - Layouts (per device, `nav_layout` in localStorage via [hooks/useNavLayout.js](../src/hooks/useNavLayout.js), set in ThemeSettings "Navigatie"):
-    `orientation="vertical"` (left, 208px, always icon + text) or `orientation="horizontal"` (118px top bar `.hx-topbar`; nav buttons always with text, each in a `.hx-tilt-slot` and rotated 45° with the end bottom-right; nav scrolls horizontally when narrow).
+    `orientation="vertical"` (left, 208px, always icon + text) or `orientation="horizontal"` (100px top bar `.hx-topbar`; nav buttons always with text, each in a `.hx-tilt-slot` and rotated 45° with the end bottom-right; only the active page is drawn as a pill, the others are plain slanted text; nav scrolls horizontally when narrow).
     **Auto-hide**: wrapper `.hx-nav-wrap.is-auto` slides in from a 6px hot-zone (`.hx-nav-hotzone`) at the left/top edge. Aliases: "taakbalk", "navigatie boven", "icoonbalk", "automatisch verbergen".
   - Related: BottomNav (mobile equivalent), VersionChecker.
 

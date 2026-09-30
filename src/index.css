@@ -748,31 +748,31 @@ select {
   background: rgba(255, 255, 255, 0.02); border-right: 1px solid var(--c-border);
 }
 
-/* Balk bovenaan — navknoppen 45° schuin, uiteinde rechtsonder.
+/* Balk bovenaan — navknoppen 45° schuin, uiteinde rechtsonder ("licht": alleen de actieve pagina is een pill).
    Elke knop zit in een vaste slot en draait om zijn linkerbovenhoek. */
 .hx-topbar {
-  container: topbar / inline-size; width: 100%; height: 118px; flex-shrink: 0;
+  width: 100%; height: 100px; flex-shrink: 0;
   background: rgba(255, 255, 255, 0.02); border-bottom: 1px solid var(--c-border);
 }
-.hx-topbar-inner { height: 100%; display: flex; align-items: flex-start; gap: 16px; padding: 12px 12px 0 14px; box-sizing: border-box; }
+.hx-topbar-inner { height: 100%; display: flex; align-items: center; gap: 16px; padding: 0 14px; box-sizing: border-box; }
 .hx-topbar-side { display: flex; align-items: center; gap: 8px; flex-shrink: 0; height: 34px; }
 .hx-topbar-nav {
-  flex: 1; min-width: 0; height: 100%; display: flex; align-items: flex-start;
-  overflow-x: auto; overflow-y: hidden; scrollbar-width: none; padding-left: 24px;
+  flex: 1; min-width: 0; height: 100%; display: flex; align-items: stretch;
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: none; padding-left: 22px;
 }
 .hx-topbar-nav::-webkit-scrollbar { display: none; }
-.hx-tilt-slot { position: relative; flex: 0 0 56px; height: 100%; }
-.hx-tilt-slot:last-child { margin-right: 84px; }
+.hx-tilt-slot { position: relative; flex: 0 0 50px; }
+.hx-tilt-slot:last-child { margin-right: 16px; }
 .hx-topbar .hx-nav-item { width: auto; margin: 0; flex-shrink: 0; }
 .hx-topbar .hx-tilt-slot .hx-nav-item {
-  position: absolute; top: 2px; left: 0; width: 112px; height: 30px; padding: 0 10px; gap: 7px;
+  position: absolute; top: 6px; left: 0; width: auto; max-width: 112px; height: 26px;
+  padding: 0 10px 0 8px; gap: 7px; border-radius: var(--r-full); font-size: 12px;
   transform: rotate(45deg); transform-origin: top left;
-  background: var(--c-surface); border-color: var(--c-border);
+  background: transparent; border-color: transparent; color: var(--c-text-3);
 }
-.hx-topbar .hx-tilt-slot .hx-nav-item:hover { background: var(--c-surface-2); }
-.hx-topbar .hx-tilt-slot .hx-nav-item.is-active { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
-@container topbar (max-width: 1000px) {
-  .hx-tilt-slot { flex-basis: 48px; }
+.hx-topbar .hx-tilt-slot .hx-nav-item:hover { background: var(--c-surface-2); color: var(--c-text); }
+.hx-topbar .hx-tilt-slot .hx-nav-item.is-active {
+  background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 35%, transparent); color: var(--accent);
 }
 
 /* Automatisch verbergen: nav schuift over de inhoud, verschijnt via een hot-zone aan de rand */
