@@ -184,6 +184,15 @@ Self-contained money/budget app, mounted via [pages/GeldPage.jsx](../src/pages/G
 - Utils (`src/utils/`): `magisterApi`, `somtodayApi` (school), `push` (web-push), `xp` (XP/level-up events),
   `recurrence` (recurring tasks), `calendarSync`, `daypart`, `alleVakken`, `openBook`, `openExternal`, `supabaseProfiles`.
 
+## Desktop app (`desktop/`, Windows .exe)
+
+- Tauri v2 shell that loads the **live site** `https://hypexdash.netlify.app` — no copy of the frontend,
+  so every Netlify deploy appears in the app automatically. Logic in [desktop/src-tauri/src/lib.rs](../desktop/src-tauri/src/lib.rs):
+  auth/`about:blank`/same-site popups open as in-app windows (keeps `window.opener`/`postMessage` working for
+  Google agenda + Simacan), other `window.open` / `_blank` links go to the default browser; single instance; remembers window size.
+- Build: `cd desktop && npm run build` → `desktop/src-tauri/target/release/bundle/nsis/Hypex_<version>_x64-setup.exe`.
+  Only rebuild when the shell itself changes (icon, window behaviour). Aliases: "desktop app", "exe", "pc app", "tauri".
+
 ## Known unused / naming notes
 
 - **Unused components (verify before relying):** `SubjectsWidget`, `WeekBudgetWidget`

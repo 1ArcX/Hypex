@@ -1,0 +1,15 @@
+{
+  "name": "hypex-desktop",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Windows-app voor Hypex: een venster rond https://hypexdash.netlify.app",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "icons": "tauri icon ../public/icon.png"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.9.0"
+  }
+}
