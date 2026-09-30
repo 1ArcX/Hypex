@@ -27,7 +27,7 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 | `dashboard` | [pages/DashboardPage.jsx](../src/pages/DashboardPage.jsx) | Dashboard / Home | Clock, FocusCard, SpotifyWidget, WeatherWidget | all |
 | `agenda` | [pages/AgendaPage.jsx](../src/pages/AgendaPage.jsx) | Agenda | Timeline (desktop), AgendaList (mobile) | all |
 | `taken` | [pages/TakenPage.jsx](../src/pages/TakenPage.jsx) | Taken | FilterTabs, TodayView (Vandaag/Morgen), TasksWidget (other filters) | all |
-| `pomodoro` | [pages/PomodoroPage.jsx](../src/pages/PomodoroPage.jsx) | Pomodoro / (in "Meer") | PomodoroTimer, StudieBuddiesWidget, PomodoroStats | all |
+| `pomodoro` | [pages/PomodoroPage.jsx](../src/pages/PomodoroPage.jsx) | Pomodoro / (in "Meer") | PomodoroTimer → PomodoroHero (+ Vandaag / SessionGoalCard / Focus playlist cards); below: StudieBuddiesWidget, PomodoroStats, sessie-log | all |
 | `notities` | [pages/NotitiesPage.jsx](../src/pages/NotitiesPage.jsx) | Notities | NotesWidget | all |
 | `statistieken` | [pages/StatsPage.jsx](../src/pages/StatsPage.jsx) | Statistieken / Stats | (self-contained SVG bar charts) | all |
 | `jumbo` | [pages/JumboPage.jsx](../src/pages/JumboPage.jsx) | Jumbo ★ | WorkWidget, VrachttijdenWidget | admin or `werk_tab` profile |
@@ -88,9 +88,11 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 - **AgendaList** — [components/AgendaList.jsx](../src/components/AgendaList.jsx) — mobile agenda list ("Niets gepland de komende weken"). Aliases: "agenda lijst", "agenda mobiel".
 
 ### Pomodoro
-- **PomodoroTimer** — [components/PomodoroTimer.jsx](../src/components/PomodoroTimer.jsx) — the timer (Focus/Pauze/Lange pauze), cycle settings, session complete. Aliases: "pomodoro timer", "de timer", "focus timer". State: `pomodoro_v3` in localStorage.
+- **PomodoroTimer** — [components/PomodoroTimer.jsx](../src/components/PomodoroTimer.jsx) — timer state/logic (Focus/Pauze/Lange pauze), cycle settings, session complete, cross-device sync (incl. sessie doel + checklist via a `goals` broadcast). Compact card variant for widgets; `fullPage` renders PomodoroHero. Aliases: "pomodoro timer", "de timer", "focus timer". State: `pomodoro_v3` (timer, goal, checklist) + `pomodoro_ambient` (focus sound + volume, per device) in localStorage.
+- **PomodoroHero** — [components/pomodoro/PomodoroHero.jsx](../src/components/pomodoro/PomodoroHero.jsx) — the Pomodoro page hero: scenic background per focus sound (`public/pomodoro/{night,brown,rain,ocean}.webp`, gradient fallback), mode tabs, big ring, "Waar werk je aan?", time chips, focus-sound tiles + volume, reset/Start focus/settings popover (eindsignaal, meldingen, sliders, sessies per cyclus), card row slot. Styles `.pomo-*` in index.css. Aliases: "pomodoro hero", "sfeervolle achtergrond", "focus modes", "tijdopties", "startknop".
+- **SessionGoalCard** — [components/pomodoro/SessionGoalCard.jsx](../src/components/pomodoro/SessionGoalCard.jsx) — "Sessie doel": Doel (preset or a task) | Checklist (tasks + own items). Task items are synced with Taken (ticking completes the task; completed elsewhere = ticked). Aliases: "sessie doel", "intentie", "checklist".
+- **Pomodoro cards** — inline in [pages/PomodoroPage.jsx](../src/pages/PomodoroPage.jsx) via `renderCards`: `TodayCard` ("Vandaag": focussessies, focus tijd, cyclus dots), SessionGoalCard, `SpotifyWidget compact title="Focus playlist"`. Aliases: "voortgang vandaag", "focus playlist", "focus muziek".
 - **FocusMode** — [components/FocusMode.jsx](../src/components/FocusMode.jsx) — full-screen focus overlay (used by PomodoroTimer). Aliases: "focus mode", "focus overlay", "focus scherm".
-- **Pomodoro today summary** — inline in [pages/PomodoroPage.jsx](../src/pages/PomodoroPage.jsx): "focussessies vandaag" / "focus vandaag" from the session log.
 - **PomodoroStats** — [components/PomodoroStats.jsx](../src/components/PomodoroStats.jsx) — weekly focus-minutes stats. Aliases: "pomodoro stats", "focus statistieken".
 - **StudieBuddiesWidget** — [components/StudieBuddiesWidget.jsx](../src/components/StudieBuddiesWidget.jsx) — shows who is studying now (Supabase presence). Aliases: "studiebuddies", "wie is online", "study buddies".
 

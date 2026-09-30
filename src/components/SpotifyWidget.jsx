@@ -65,7 +65,7 @@ function TrackRow({ track, onPlayNow, onAddToQueue, compact = false, index }) {
   )
 }
 
-export default function SpotifyWidget({ compact = false }) {
+export default function SpotifyWidget({ compact = false, title = 'Spotify', className = '' }) {
   const [token, setToken] = useState(localStorage.getItem('spotify_token') || null)
   const [track, setTrack] = useState(null)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -365,10 +365,10 @@ export default function SpotifyWidget({ compact = false }) {
   if (compact) {
     const ctrl = { background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 6, borderRadius: 8, color: 'var(--c-text-2)' }
     return (
-      <div className="card" style={{ padding: 14, height: '100%', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div className={`card ${className}`} style={{ padding: 14, height: '100%', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
           <Music size={15} style={{ color: '#1DB954' }} aria-hidden="true" />
-          <h3 className="t-card" style={{ margin: 0, flex: 1 }}>Spotify</h3>
+          <h3 className="t-card" style={{ margin: 0, flex: 1 }}>{title}</h3>
         </div>
         {!token ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 10 }}>

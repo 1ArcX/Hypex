@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Play, Pause, RotateCcw, SkipForward, Settings, X, Bell, BellOff, Volume2, VolumeX, Coffee, Zap, Maximize2, Timer } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import FocusMode from './FocusMode'
+import PomodoroHero from './pomodoro/PomodoroHero'
 import useAmbientSound from '../hooks/useAmbientSound'
 import { awardXP } from '../utils/xp'
 import { toISO } from '../utils/recurrence'
@@ -77,6 +78,11 @@ async function clearTimerSession(userId) {
 // ── Persistence ───────────────────────────────────────────────────────────────
 const LS_KEY   = 'pomodoro_v3'
 const LS_STATS = 'pomodoro_stats'
+const LS_AMBIENT = 'pomodoro_ambient'
+
+function loadAmbient() {
+  try { return JSON.parse(localStorage.getItem(LS_AMBIENT)) || {} } catch { return {} }
+}
 
 function getTodayKey() { return toISO(new Date()) }
 
@@ -114,6 +120,7 @@ function persist(s, endTime) {
     longBreakMins: s.longBreakMins, sessionsPerLong: s.sessionsPerLong,
     sessionsInCycle: s.sessionsInCycle, totalSessions: s.totalSessions,
     task: s.task, soundEnabled: s.soundEnabled, notifEnabled: s.notifEnabled,
+    goal: s.goal, checklist: s.checklist,
     running: s.running, remainingSeconds: s.seconds, endTime,
   }))
 }
@@ -176,6 +183,8 @@ const INIT = {
   mode: 'work', workMins: 25, breakMins: 5, longBreakMins: 15, sessionsPerLong: 4,
   sessionsInCycle: 0, totalSessions: 0, seconds: 25 * 60, running: false,
   task: '', soundEnabled: true, notifEnabled: false, showSettings: false,
+  goal: null,       // { kind: 'preset'|'task', value, taskId? }
+  checklist: [],    // [{ id, label, taskId?, done }]
   todayMins: getTodayMins(),
 }
 
@@ -227,6 +236,15 @@ function reducer(state, action) {
     case 'TOGGLE_SOUND':   return { ...state, soundEnabled: !state.soundEnabled }
     case 'TOGGLE_NOTIF':   return { ...state, notifEnabled: !state.notifEnabled }
     case 'TOGGLE_SETTINGS':return { ...state, showSettings: !state.showSettings }
+    // Sessie doel + checklist
+    case 'SET_GOAL':       return { ...state, goal: action.v }
+    case 'SET_GOALS':      return { ...state, goal: action.goal ?? null, checklist: action.checklist ?? [] }
+    case 'ADD_CHECK':
+      if (action.item.taskId && state.checklist.some(c => c.taskId === action.item.taskId)) return state
+      return { ...state, checklist: [...state.checklist, action.item] }
+    case 'SET_CHECK':      return { ...state, checklist: state.checklist.map(c => c.id === action.id ? { ...c, done: action.done } : c) }
+    case 'REMOVE_CHECK':   return { ...state, checklist: state.checklist.filter(c => c.id !== action.id) }
+    case 'CLEAR_DONE_CHECK': return { ...state, checklist: state.checklist.filter(c => !action.ids.includes(c.id)) }
     default: return state
   }
 }
@@ -304,7 +322,7 @@ function CompletionPopup({ prevMode, nextMode, onStart, onSkip }) {
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusModeChange, userId, noFocusOverlay = false, fullPage = false, onSessionComplete, onXPEarned }) {
+export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusModeChange, userId, noFocusOverlay = false, fullPage = false, onSessionComplete, onXPEarned, renderCards, seedTask, onSeedConsumed }) {
   const [state, dispatch] = useReducer(reducer, INIT)
   const stateRef           = useRef(state)
   const endTimeRef         = useRef(null)
@@ -323,10 +341,15 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
 
   // Focus mode + ambient sound state
   const [focusMode, setFocusMode]   = useState(false)
-  const [soundType, setSoundType]   = useState('off')
-  const [volume, setVolume]         = useState(60)
+  const [soundType, setSoundType]   = useState(() => loadAmbient().soundType || 'off')
+  const [volume, setVolume]         = useState(() => loadAmbient().volume ?? 60)
 
   useAmbientSound(soundType, volume / 100, state.running)
+
+  // Ambient keuze is per apparaat
+  useEffect(() => {
+    try { localStorage.setItem(LS_AMBIENT, JSON.stringify({ soundType, volume })) } catch {}
+  }, [soundType, volume])
 
   useEffect(() => { stateRef.current = state }, [state])
 
@@ -357,7 +380,8 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
     if (!s) return
     const { mode = 'work', workMins = 25, breakMins = 5, longBreakMins = 15,
             sessionsPerLong = 4, sessionsInCycle = 0, totalSessions = 0,
-            task = '', soundEnabled = true, notifEnabled = false } = s
+            task = '', soundEnabled = true, notifEnabled = false,
+            goal = null, checklist = [] } = s
 
     if (s.running && s.endTime) {
       const remaining = Math.ceil((s.endTime - Date.now()) / 1000)
@@ -366,7 +390,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
         dispatch({ type: 'RESTORE', payload: {
           mode, workMins, breakMins, longBreakMins, sessionsPerLong,
           sessionsInCycle, totalSessions, seconds: remaining, running: true,
-          task, soundEnabled, notifEnabled,
+          task, soundEnabled, notifEnabled, goal, checklist,
         }})
       } else {
         let nextMode, newSIC = sessionsInCycle, newTotal = totalSessions
@@ -384,7 +408,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
         dispatch({ type: 'RESTORE', payload: {
           mode: nextMode, workMins, breakMins, longBreakMins, sessionsPerLong,
           sessionsInCycle: newSIC, totalSessions: newTotal,
-          seconds: nextMins * 60, running: false, task, soundEnabled, notifEnabled,
+          seconds: nextMins * 60, running: false, task, soundEnabled, notifEnabled, goal, checklist,
         }})
         setTimeout(() => onModeChange?.(nextMode !== 'work'), 0)
       }
@@ -393,7 +417,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
         mode, workMins, breakMins, longBreakMins, sessionsPerLong,
         sessionsInCycle, totalSessions,
         seconds: s.remainingSeconds ?? workMins * 60,
-        running: false, task, soundEnabled, notifEnabled,
+        running: false, task, soundEnabled, notifEnabled, goal, checklist,
       }})
     }
   }, [])
@@ -415,11 +439,21 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
       const newTotal  = s.mode === 'work' ? s.totalSessions + 1 : s.totalSessions
       // Remove session so the background cron doesn't double-fire a push
       clearTimerSession(userIdRef.current)
+      const checkDone = s.checklist.filter(c => c.done)
       onSessionComplete?.({
         mode: s.mode, durationMins: getMins(s), tag: s.task,
+        goal: s.mode === 'work' ? (s.goal?.value || null) : null,
+        checkDone: s.mode === 'work' ? checkDone.length : 0,
+        checkTotal: s.mode === 'work' ? s.checklist.length : 0,
         startedAt: startTimeRef.current, completedAt: Date.now(),
         date: toISO(new Date()),
       })
+      // Afgeronde checklist-items vallen weg na een focussessie; open items gaan mee
+      if (s.mode === 'work' && checkDone.length) {
+        const ids = checkDone.map(c => c.id)
+        dispatch({ type: 'CLEAR_DONE_CHECK', ids })
+        broadcastGoalsRef.current?.(s.goal, s.checklist.filter(c => !ids.includes(c.id)))
+      }
       if (s.mode === 'work' && userIdRef.current) {
         supabase.from('pomodoro_sessions').insert({
           user_id: userIdRef.current,
@@ -498,7 +532,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
   }, [
     state.running, state.mode, state.seconds, state.workMins, state.breakMins, state.longBreakMins,
     state.sessionsPerLong, state.sessionsInCycle, state.totalSessions,
-    state.task, state.soundEnabled, state.notifEnabled,
+    state.task, state.soundEnabled, state.notifEnabled, state.goal, state.checklist,
   ])
 
   // ── Cross-device sync via Supabase Realtime ───────────────────────────────
@@ -521,6 +555,14 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
 
   // Always keep ref in sync with latest broadcastState
   useEffect(() => { broadcastStateRef.current = broadcastState }, [broadcastState])
+
+  // Sessie doel + checklist: eigen event, altijd toegepast (los van de timer-sync)
+  const broadcastGoalsRef = useRef(null)
+  const broadcastGoals = useCallback((goal, checklist) => {
+    if (!channelRef.current || !userId) return
+    channelRef.current.send({ type: 'broadcast', event: 'goals', payload: { goal, checklist } })
+  }, [userId])
+  useEffect(() => { broadcastGoalsRef.current = broadcastGoals }, [broadcastGoals])
 
   function applyRemoteState(remote) {
     if (!remote) return
@@ -583,10 +625,14 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
       .on('broadcast', { event: 'state' }, ({ payload }) => {
         applyRemoteState(payload)
       })
+      .on('broadcast', { event: 'goals' }, ({ payload }) => {
+        dispatch({ type: 'SET_GOALS', goal: payload?.goal, checklist: payload?.checklist })
+      })
       // Another device just connected and is requesting current state
       .on('broadcast', { event: 'request_state' }, () => {
         const s = stateRef.current
         broadcastState(s, s.running ? endTimeRef.current : null)
+        if (s.goal || s.checklist.length) broadcastGoals(s.goal, s.checklist)
       })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
@@ -597,7 +643,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
 
     channelRef.current = channel
     return () => { supabase.removeChannel(channel) }
-  }, [userId, broadcastState])
+  }, [userId, broadcastState, broadcastGoals])
 
   // Broadcast every second while running so other devices stay frame-accurate
   useEffect(() => {
@@ -701,6 +747,35 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
     if (s.notifEnabled) saveTimerSession(userIdRef.current, endTime, s)
   }
 
+  // ── Sessie doel API (voor de kaart op de Pomodoro-pagina) ─────────────────
+  // Past lokaal toe en broadcast de nieuwe goal/checklist naar andere apparaten.
+  const commitGoals = (goal, checklist) => {
+    dispatch({ type: 'SET_GOALS', goal, checklist })
+    broadcastGoals(goal, checklist)
+  }
+  const goalApi = {
+    setGoal: (goal) => commitGoals(goal, stateRef.current.checklist),
+    addCheck: (item) => {
+      const cur = stateRef.current.checklist
+      if (item.taskId && cur.some(c => c.taskId === item.taskId)) return
+      commitGoals(stateRef.current.goal, [...cur, { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, done: false, ...item }])
+    },
+    setCheck: (id, done) => commitGoals(stateRef.current.goal, stateRef.current.checklist.map(c => c.id === id ? { ...c, done } : c)),
+    removeCheck: (id) => commitGoals(stateRef.current.goal, stateRef.current.checklist.filter(c => c.id !== id)),
+    setTask: (v) => dispatch({ type: 'SET_TASK', v }),
+  }
+
+  // Taak meegegeven via "Start pomodoro" in het taakdetail → wordt het sessiedoel
+  useEffect(() => {
+    if (!seedTask) return
+    const t = setTimeout(() => {
+      commitGoals({ kind: 'task', value: seedTask.title, taskId: seedTask.id }, stateRef.current.checklist)
+      dispatch({ type: 'SET_TASK', v: seedTask.title })
+      onSeedConsumed?.()
+    }, 0)
+    return () => clearTimeout(t)
+  }, [seedTask])
+
   // ── Display ───────────────────────────────────────────────────────────────
   const {
     mode, seconds, running, sessionsInCycle, sessionsPerLong, totalSessions,
@@ -721,205 +796,35 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
   const todayM        = todayMins % 60
   const todayStr      = todayH > 0 ? `${todayH}u ${todayM}m` : `${todayMins}m`
 
-  // ── Full-page render ──────────────────────────────────────────────────────
+  // ── Full-page render (Pomodoro-pagina) ────────────────────────────────────
   if (fullPage) {
-    const bigR    = 100
-    const bigCirc = 2 * Math.PI * bigR
-    const bigDash = bigCirc * (1 - progress)
-
     return (
       <>
         {popup && createPortal(
           <CompletionPopup prevMode={popup.prevMode} nextMode={popup.nextMode} onStart={startAfterPopup} onSkip={skipPopup} />,
           document.body
         )}
-
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '28px 20px 32px', gap: 18, boxSizing: 'border-box' }}>
-
-          {/* Sound + notif row */}
-          <div style={{ display: 'flex', gap: 8, alignSelf: 'stretch', justifyContent: 'flex-end' }}>
-            <button onClick={() => dispatch({ type: 'TOGGLE_SOUND' })} style={iconBtn} title={soundEnabled ? 'Geluid uit' : 'Geluid aan'}>
-              {soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
-            </button>
-            <button onClick={toggleNotif} style={iconBtn} title={notifEnabled ? 'Meldingen uit' : 'Meldingen aan'}>
-              {notifEnabled ? <Bell size={14} /> : <BellOff size={14} />}
-            </button>
-            {notifEnabled && (
-              <button
-                onClick={() => sendPushNotif(userId, 'Test melding 🔔', 'Push meldingen werken correct!')}
-                style={{ fontSize: 11, color: 'var(--text-3)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}
-              >
-                Test
-              </button>
-            )}
-          </div>
-
-          {/* Mode selector — hidden when running, label shown instead */}
-          {!running ? (
-            <div style={{ display: 'flex', gap: 3, background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 4, border: '1px solid var(--c-border)' }}>
-              {Object.entries(MODES).map(([key, { label, color }]) => (
-                <button key={key} onClick={() => switchMode(key)} style={{
-                  padding: '8px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                  fontSize: 13, fontWeight: 600, transition: 'all 0.2s',
-                  background: mode === key ? `color-mix(in srgb, ${color} 15%, transparent)` : 'transparent',
-                  color: mode === key ? color : 'var(--c-text-3)',
-                }}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--c-text-3)' }}>
-              {MODES[mode].label}
-            </span>
-          )}
-
-          {/* Large ring */}
-          <div style={{ position: 'relative', width: 240, height: 240 }}>
-            <svg width="240" height="240" style={{ transform: 'rotate(-90deg)' }}>
-              <circle cx="120" cy="120" r={bigR} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="10" />
-              <circle cx="120" cy="120" r={bigR} fill="none" stroke={modeColor} strokeWidth="10"
-                strokeLinecap="round" strokeDasharray={bigCirc} strokeDashoffset={bigDash}
-                style={{ filter: running ? `drop-shadow(0 0 14px color-mix(in srgb, ${modeColor} 38%, transparent))` : 'none', transition: 'stroke-dashoffset 0.5s ease, stroke 0.6s ease' }}
-              />
-            </svg>
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-              <span style={{ fontSize: 54, fontWeight: 700, fontFamily: 'monospace', color: modeColor, lineHeight: 1, letterSpacing: -2, textShadow: running ? `0 0 30px color-mix(in srgb, ${modeColor} 31%, transparent)` : 'none', transition: 'color 0.6s' }}>
-                {mm}:{ss}
-              </span>
-            </div>
-          </div>
-
-          {/* Cycle dots */}
-          <div style={{ display: 'flex', gap: 8 }}>
-            {Array.from({ length: sessionsPerLong }, (_, i) => {
-              const done = i < sessionsInCycle
-              return (
-                <div key={i} style={{
-                  width: done ? 10 : 7, height: done ? 10 : 7,
-                  borderRadius: '50%', marginTop: done ? 0 : 1.5,
-                  background: done ? 'var(--accent)' : 'rgba(255,255,255,0.1)',
-                  boxShadow: done ? '0 0 8px color-mix(in srgb, var(--accent) 50%, transparent)' : 'none',
-                  transition: 'all 0.3s',
-                }} />
-              )
-            })}
-          </div>
-
-          {/* Tag input */}
-          <input
-            type="text"
-            placeholder="Waar werk je aan? (optioneel)"
-            value={task}
-            onChange={e => dispatch({ type: 'SET_TASK', v: e.target.value })}
-            style={{
-              width: '100%', maxWidth: 380, boxSizing: 'border-box',
-              background: 'rgba(255,255,255,0.04)', border: '1px solid var(--c-border)',
-              borderRadius: 12, padding: '11px 16px',
-              color: 'var(--c-text-2)', fontSize: 14, outline: 'none', textAlign: 'center',
-              transition: 'border-color 0.2s',
-            }}
-            onFocus={e => { e.target.style.borderColor = `color-mix(in srgb, ${modeColor} 35%, transparent)` }}
-            onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.08)' }}
-          />
-
-          {/* Setup pills — visible only when not running */}
-          {!running && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 380 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 11, color: 'var(--c-text-3)', width: 46, textAlign: 'right', flexShrink: 0 }}>Focus</span>
-                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                  {[15, 20, 25, 30, 45, 60].map(n => (
-                    <button key={n} onClick={() => dispatch({ type: 'SET_WORK_MINS', v: n })} style={{
-                      padding: '5px 11px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, transition: 'all 0.15s',
-                      background: workMins === n ? 'color-mix(in srgb, var(--accent) 15%, transparent)' : 'rgba(255,255,255,0.06)',
-                      color: workMins === n ? 'var(--accent)' : 'var(--c-text-3)',
-                    }}>{n}m</button>
-                  ))}
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 11, color: 'var(--c-text-3)', width: 46, textAlign: 'right', flexShrink: 0 }}>Pauze</span>
-                <div style={{ display: 'flex', gap: 5 }}>
-                  {[5, 10, 15, 20].map(n => (
-                    <button key={n} onClick={() => dispatch({ type: 'SET_BREAK_MINS', v: n })} style={{
-                      padding: '5px 11px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, transition: 'all 0.15s',
-                      background: breakMins === n ? 'rgba(255,140,66,0.15)' : 'rgba(255,255,255,0.06)',
-                      color: breakMins === n ? '#FF8C42' : 'var(--c-text-3)',
-                    }}>{n}m</button>
-                  ))}
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 11, color: 'var(--c-text-3)', width: 46, textAlign: 'right', flexShrink: 0 }}>Lang</span>
-                <div style={{ display: 'flex', gap: 5 }}>
-                  {[10, 15, 20, 30].map(n => (
-                    <button key={n} onClick={() => dispatch({ type: 'SET_LBRK_MINS', v: n })} style={{
-                      padding: '5px 11px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, transition: 'all 0.15s',
-                      background: longBreakMins === n ? 'rgba(167,139,250,0.15)' : 'rgba(255,255,255,0.06)',
-                      color: longBreakMins === n ? '#A78BFA' : 'var(--c-text-3)',
-                    }}>{n}m</button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Ambient sound picker */}
-          <div style={{ width: '100%', maxWidth: 380, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-              {SOUND_TYPES.map(({ id, emoji, label: lbl }) => (
-                <button key={id} onClick={() => setSoundType(id)} style={{
-                  padding: '5px 11px', borderRadius: 8, border: '1px solid', cursor: 'pointer', fontSize: 12, fontWeight: 600, transition: 'all 0.15s',
-                  background: soundType === id ? `color-mix(in srgb, ${modeColor} 15%, transparent)` : 'rgba(255,255,255,0.06)',
-                  color: soundType === id ? modeColor : 'rgba(255,255,255,0.4)',
-                  borderColor: soundType === id ? `color-mix(in srgb, ${modeColor} 40%, transparent)` : 'rgba(255,255,255,0.08)',
-                }}>{emoji} {lbl}</button>
-              ))}
-            </div>
-            {soundType !== 'off' && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <VolumeX size={13} style={{ color: 'var(--c-text-3)', flexShrink: 0 }} />
-                <input type="range" min="0" max="100" value={volume} onChange={e => setVolume(+e.target.value)}
-                  style={{ flex: 1, accentColor: modeColor }} />
-                <Volume2 size={13} style={{ color: 'var(--c-text-3)', flexShrink: 0 }} />
-              </div>
-            )}
-          </div>
-
-          {/* Controls */}
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            {!running && (
-              <button onClick={reset} title="Reset" style={{ width: 46, height: 46, borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--c-border)', color: 'var(--c-text-3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <RotateCcw size={16} />
-              </button>
-            )}
-            <button onClick={toggleRunning} style={{
-              height: 52, padding: '0 44px', borderRadius: 16,
-              border: `1px solid color-mix(in srgb, ${modeColor} 45%, transparent)`,
-              background: `color-mix(in srgb, ${modeColor} 12%, transparent)`,
-              color: modeColor, cursor: 'pointer', fontSize: 16, fontWeight: 700,
-              display: 'flex', alignItems: 'center', gap: 10,
-              boxShadow: running ? `0 0 40px color-mix(in srgb, ${modeColor} 20%, transparent)` : 'none',
-              transition: 'all 0.2s',
-            }}>
-              {running ? <><Pause size={18} /> Pauzeer</> : <><Play size={18} /> {seconds === totalSecs ? (mode === 'work' ? 'Start focus' : 'Start') : 'Hervat'}</>}
-            </button>
-            {running && (
-              <button onClick={skip} title="Sla over" style={{ width: 46, height: 46, borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--c-border)', color: 'var(--c-text-3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <SkipForward size={16} />
-              </button>
-            )}
-          </div>
-
-          {/* Today stats */}
-          {(todayMins > 0 || totalSessions > 0) && (
-            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.22)', textAlign: 'center' }}>
-              {todayMins > 0 ? `Vandaag ${todayStr} gefocust` : ''}
-              {totalSessions > 0 ? `${todayMins > 0 ? ' · ' : ''}${totalSessions} sessie${totalSessions !== 1 ? 's' : ''}` : ''}
-            </span>
-          )}
-        </div>
+        <PomodoroHero
+          state={state}
+          modes={MODES}
+          soundTypes={SOUND_TYPES}
+          progress={progress}
+          timeLabel={`${mm}:${ss}`}
+          isFresh={seconds === totalSecs}
+          soundType={soundType}
+          onSoundType={setSoundType}
+          volume={volume}
+          onVolume={setVolume}
+          onToggleRunning={toggleRunning}
+          onReset={reset}
+          onSkip={skip}
+          onSwitchMode={switchMode}
+          onToggleNotif={toggleNotif}
+          onTestNotif={() => sendPushNotif(userId, 'Test melding 🔔', 'Push meldingen werken correct!')}
+          dispatch={dispatch}
+        >
+          {renderCards?.({ ...state, goalApi })}
+        </PomodoroHero>
       </>
     )
   }

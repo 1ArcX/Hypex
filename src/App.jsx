@@ -82,6 +82,7 @@ export default function App() {
   const [externalEvents, setExternalEvents] = useState([])
   const [magisterError, setMagisterError] = useState(null)
   const [detailTask, setDetailTask] = useState(null)
+  const [pomodoroSeedTask, setPomodoroSeedTask] = useState(null)
   const [subjectLinks, setSubjectLinks] = useState({})
   const [showPwaPrompt, setShowPwaPrompt] = useState(false)
   const [homeRain, setHomeRain] = useState(null)
@@ -870,6 +871,10 @@ export default function App() {
                 profiles={profiles}
                 onlineUsers={studieBuddiesOnline}
                 onXPEarned={(xp) => setXpToast({ xp, icon: '🍅' })}
+                tasks={tasks}
+                onToggleTask={handleToggleTask}
+                seedTask={pomodoroSeedTask}
+                onSeedConsumed={() => setPomodoroSeedTask(null)}
               />
             )}
 
@@ -1025,7 +1030,7 @@ export default function App() {
           onEdit={(task) => { setDetailTask(null); openEditTask(task) }}
           onDelete={(id) => { setDetailTask(null); handleDeleteTask(id) }}
           onClose={() => setDetailTask(null)}
-          onStartPomodoro={() => { setDetailTask(null); setActivePage('pomodoro') }}
+          onStartPomodoro={() => { setPomodoroSeedTask(detailTask); setDetailTask(null); setActivePage('pomodoro') }}
           onSaveDescription={async (id, description) => {
             await supabase.from('tasks').update({ description }).eq('id', id)
             fetchTasks()

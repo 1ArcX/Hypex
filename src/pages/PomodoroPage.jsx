@@ -2,7 +2,9 @@ import React, { useState } from 'react'
 import PomodoroTimer from '../components/PomodoroTimer'
 import StudieBuddiesWidget from '../components/StudieBuddiesWidget'
 import PomodoroStats from '../components/PomodoroStats'
-import { Target, Clock3 } from 'lucide-react'
+import SpotifyWidget from '../components/SpotifyWidget'
+import SessionGoalCard from '../components/pomodoro/SessionGoalCard'
+import { Target, Clock3, CalendarCheck } from 'lucide-react'
 import { toISO } from '../utils/recurrence'
 
 const SESSION_LOG_KEY = 'pomodoro_session_log'
@@ -53,6 +55,8 @@ function SessionRow({ session }) {
         </p>
         <p className="t-meta tnum" style={{ margin: 0 }}>
           {durStr}{session.completedAt ? ` · klaar ${fmtTime(session.completedAt)}` : ''}
+          {session.goal && session.goal !== session.tag ? ` · ${session.goal}` : ''}
+          {session.checkTotal > 0 ? ` · ✓ ${session.checkDone}/${session.checkTotal}` : ''}
         </p>
       </div>
       <span style={{
@@ -95,7 +99,43 @@ function DayLog({ label, sessions }) {
   )
 }
 
-export default function PomodoroPage({ onModeChange, onFocusModeChange, onPomodoroActive, userId, profiles, onlineUsers = [], onXPEarned }) {
+function TodayCard({ count, mins, sessionsInCycle, sessionsPerLong }) {
+  return (
+    <div className="card pomo-card">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <CalendarCheck size={15} style={{ color: 'var(--accent)' }} aria-hidden="true" />
+        <h3 className="t-card" style={{ margin: 0 }}>Vandaag</h3>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <div className="pomo-stat">
+          <Target size={16} aria-hidden="true" style={{ color: 'var(--accent)' }} />
+          <span>
+            <span className="t-kpi tnum" style={{ fontSize: 18, display: 'block' }}>{count}</span>
+            <span className="t-meta">{count === 1 ? 'focussessie' : 'focussessies'}</span>
+          </span>
+        </div>
+        <div className="pomo-stat">
+          <Clock3 size={16} aria-hidden="true" style={{ color: 'var(--accent)' }} />
+          <span>
+            <span className="t-kpi tnum" style={{ fontSize: 18, display: 'block' }}>{mins}<span style={{ fontSize: 12, color: 'var(--c-text-3)', fontWeight: 600 }}> min</span></span>
+            <span className="t-meta">focus tijd</span>
+          </span>
+        </div>
+      </div>
+      <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span className="t-meta" style={{ flexShrink: 0 }}>Cyclus</span>
+        <div style={{ display: 'flex', gap: 6, flex: 1 }} aria-label={`${sessionsInCycle} van ${sessionsPerLong} sessies in deze cyclus`}>
+          {Array.from({ length: sessionsPerLong }, (_, i) => (
+            <span key={i} className={`pomo-dot${i < sessionsInCycle ? ' is-done' : ''}`} />
+          ))}
+        </div>
+        <span className="t-meta tnum">{sessionsInCycle}/{sessionsPerLong}</span>
+      </div>
+    </div>
+  )
+}
+
+export default function PomodoroPage({ onModeChange, onFocusModeChange, onPomodoroActive, userId, profiles, onlineUsers = [], onXPEarned, tasks = [], onToggleTask, seedTask, onSeedConsumed }) {
   const [sessions, setSessions] = useState(loadSessions)
 
   const handleSessionComplete = (session) => {
@@ -117,61 +157,47 @@ export default function PomodoroPage({ onModeChange, onFocusModeChange, onPomodo
   const todayFocusMins = todayFocus.reduce((sum, s) => sum + (s.durationMins || 0), 0)
 
   return (
-    <div style={{ height: '100%', overflowY: 'auto', background: 'var(--bg-base)' }}>
-      {/* Full-page timer */}
-      <div style={{ maxWidth: 480, margin: '0 auto' }}>
+    <div className="pomo-page">
+      <PomodoroTimer
+        onModeChange={onModeChange}
+        onFocusModeChange={onFocusModeChange}
+        onPomodoroActive={onPomodoroActive}
+        userId={userId}
+        noFocusOverlay
+        fullPage
+        onSessionComplete={handleSessionComplete}
+        onXPEarned={onXPEarned}
+        seedTask={seedTask}
+        onSeedConsumed={onSeedConsumed}
+        renderCards={(t) => (
+          <>
+            <TodayCard count={todayFocus.length} mins={todayFocusMins} sessionsInCycle={t.sessionsInCycle} sessionsPerLong={t.sessionsPerLong} />
+            <SessionGoalCard goal={t.goal} checklist={t.checklist} goalApi={t.goalApi} tasks={tasks} onToggleTask={onToggleTask} />
+            <SpotifyWidget compact title="Focus playlist" className="pomo-card" />
+          </>
+        )}
+      />
+
+      {/* Onder de hero: wie studeert er, weekstats en sessie-log */}
+      <div className="pomo-below">
         <StudieBuddiesWidget profiles={profiles} onlineUsers={onlineUsers} />
-        <PomodoroTimer
-          onModeChange={onModeChange}
-          onFocusModeChange={onFocusModeChange}
-          onPomodoroActive={onPomodoroActive}
-          userId={userId}
-          noFocusOverlay
-          fullPage
-          onSessionComplete={handleSessionComplete}
-          onXPEarned={onXPEarned}
-        />
-      </div>
-
-      {/* Vandaag — sessies en focusminuten (sessielog) */}
-      <div style={{ maxWidth: 480, margin: '0 auto', padding: '0 20px 12px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          <div className="card" style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Target size={16} aria-hidden="true" style={{ color: 'var(--accent)' }} />
-            <span>
-              <span className="t-kpi" style={{ fontSize: 18, display: 'block' }}>{todayFocus.length}</span>
-              <span className="t-meta">{todayFocus.length === 1 ? 'focussessie vandaag' : 'focussessies vandaag'}</span>
-            </span>
-          </div>
-          <div className="card" style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Clock3 size={16} aria-hidden="true" style={{ color: 'var(--accent)' }} />
-            <span>
-              <span className="t-kpi" style={{ fontSize: 18, display: 'block' }}>{todayFocusMins}<span style={{ fontSize: 12, color: 'var(--c-text-3)', fontWeight: 600 }}> min</span></span>
-              <span className="t-meta">focus vandaag</span>
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Week stats */}
-      <div style={{ maxWidth: 480, margin: '0 auto', padding: '0 20px' }}>
         <PomodoroStats refreshKey={sessions.length} userId={userId} />
+
+        {sessions.length > 0 && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+              <div style={{ flex: 1, height: 1, background: 'var(--c-border)' }} />
+              <span className="t-overline" style={{ color: 'var(--c-text-3)' }}>Sessie log</span>
+              <div style={{ flex: 1, height: 1, background: 'var(--c-border)' }} />
+            </div>
+            <div className="pomo-log">
+              {sortedDates.map(date => (
+                <DayLog key={date} label={fmtDate(date)} sessions={byDate[date]} />
+              ))}
+            </div>
+          </>
+        )}
       </div>
-
-      {/* Session log */}
-      {sessions.length > 0 && (
-        <div style={{ maxWidth: 480, margin: '0 auto', padding: '0 20px 48px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ flex: 1, height: 1, background: 'var(--c-border)' }} />
-            <span className="t-overline" style={{ color: 'var(--c-text-3)' }}>Sessie log</span>
-            <div style={{ flex: 1, height: 1, background: 'var(--c-border)' }} />
-          </div>
-
-          {sortedDates.map(date => (
-            <DayLog key={date} label={fmtDate(date)} sessions={byDate[date]} />
-          ))}
-        </div>
-      )}
     </div>
   )
 }
