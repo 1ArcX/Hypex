@@ -89,6 +89,18 @@ async function exchangeCode(code, verifier, redirectUri) {
   if (!res.ok) throw new Error(data.error_description || data.error || 'Token ophalen mislukt')
   return data
 }
+// Haal code/state uit de geplakte localhost-callback-link (of een losse querystring / code)
+function parseCallback(text) {
+  const raw = (text || '').trim()
+  if (!raw) return null
+  let params
+  try { params = new URL(raw).searchParams }
+  catch { params = new URLSearchParams(raw.includes('=') ? raw.slice(raw.indexOf('?') + 1) : '') }
+  const error = params.get('error')
+  if (error) return { error: params.get('error_description') || error }
+  const code = params.get('code') || (!raw.includes('=') && !raw.includes('/') ? raw : null)
+  return code ? { code, state: params.get('state') } : null
+}
 
 // ─── Polyline decoder (Google encoded polyline format) ────────────────────────
 function decodePolyline(encoded) {
@@ -509,33 +521,78 @@ export default function VrachttijdenWidget() {
   // ─── Login ────────────────────────────────────────────────────────────────
   const REDIRECT_URI = 'http://localhost:3000/simacan-callback.html'
 
-  const handleLogin = useCallback(async () => {
+  // Simacan accepteert alleen localhost:3000 als redirect. Buiten de dev-server laadt die pagina niet,
+  // dus de gebruiker plakt de link uit de adresbalk terug (zie parseCallback / pasteText).
+  const pendingLoginRef = useRef((() => {
+    const verifier = sessionStorage.getItem('simacan_verifier'); const state = sessionStorage.getItem('simacan_state')
+    return verifier && state ? { verifier, state } : null
+  })())
+  const [awaitingPaste, setAwaitingPaste] = useState(() => !!pendingLoginRef.current)
+  const [pasteText,     setPasteText]     = useState('')
+  const loginCleanupRef = useRef(null)
+
+  const clearPendingLogin = useCallback(() => {
+    pendingLoginRef.current = null
+    sessionStorage.removeItem('simacan_verifier'); sessionStorage.removeItem('simacan_state')
+    loginCleanupRef.current?.(); loginCleanupRef.current = null
+    setAwaitingPaste(false); setPasteText('')
+  }, [])
+
+  const completeLogin = useCallback(async (code, returnedState) => {
+    const pending = pendingLoginRef.current
+    if (!pending) throw new Error('Geen actieve login. Klik opnieuw op "Inloggen met Simacan".')
+    if (returnedState && returnedState !== pending.state) throw new Error('Deze link hoort bij een oudere login. Log opnieuw in.')
     setLoginLoading(true); setError(null)
+    try {
+      const td = await exchangeCode(code, pending.verifier, REDIRECT_URI)
+      const t = { accessToken:td.access_token, refreshToken:td.refresh_token }
+      clearPendingLogin(); saveTokens(t); fetchStops(t)
+    } catch (e) {
+      if (/code not valid|invalid_grant|expired/i.test(e.message)) {
+        clearPendingLogin()
+        throw new Error('De inlogcode is verlopen (±1 minuut geldig). Log opnieuw in en plak de link sneller.')
+      }
+      throw e
+    } finally { setLoginLoading(false) }
+  }, [clearPendingLogin, saveTokens, fetchStops])
+
+  const handleLogin = useCallback(async () => {
+    setError(null); clearPendingLogin()
     try {
       const verifier = randomBase64url(32); const challenge = await sha256Base64url(verifier); const state = randomBase64url(16)
       const authUrl = `${KC_BASE}/auth?` + new URLSearchParams({ client_id:KC_CLIENT_ID, response_type:'code', scope:'openid offline_access', redirect_uri:REDIRECT_URI, state, code_challenge:challenge, code_challenge_method:'S256' }).toString()
-      // Sla verifier op voor redirect flow (mobiel herladen pagina)
-      sessionStorage.setItem('simacan_verifier', verifier)
+      pendingLoginRef.current = { verifier, state }
+      sessionStorage.setItem('simacan_verifier', verifier); sessionStorage.setItem('simacan_state', state)
       const popup = window.open(authUrl, 'simacan_login', 'width=520,height=640,left=200,top=100')
-      if (!popup) throw new Error('Popup geblokkeerd. Sta popups toe voor deze site.')
-      await new Promise((resolve, reject) => {
-        const handler = async (event) => {
-          if (event.origin !== 'http://localhost:3000' && event.origin !== window.location.origin) return
-          if (event.data?.type === 'simacan_auth_error') { window.removeEventListener('message', handler); reject(new Error(event.data.description || event.data.error)); return }
-          if (event.data?.type !== 'simacan_auth') return
-          if (event.data.state !== state) { reject(new Error('State mismatch')); return }
-          window.removeEventListener('message', handler)
-          sessionStorage.removeItem('simacan_verifier')
-          try { const td = await exchangeCode(event.data.code, verifier, REDIRECT_URI); const t = { accessToken:td.access_token, refreshToken:td.refresh_token }; saveTokens(t); fetchStops(t); resolve() }
-          catch (e) { reject(e) }
-        }
-        window.addEventListener('message', handler)
-        setTimeout(() => { window.removeEventListener('message', handler); reject(new Error('Login timeout')) }, 5*60*1000)
-        const chk = setInterval(() => { if (popup.closed) { clearInterval(chk); window.removeEventListener('message', handler); reject(new Error('Login geannuleerd')) } }, 500)
-      })
+      if (!popup) { clearPendingLogin(); throw new Error('Popup geblokkeerd. Sta popups toe voor deze site.') }
+      setAwaitingPaste(true)
+      // Automatische route: werkt lokaal op :3000 (callback-pagina stuurt postMessage)
+      const handler = async (event) => {
+        if (event.origin !== 'http://localhost:3000' && event.origin !== window.location.origin) return
+        if (event.data?.type === 'simacan_auth_error') { clearPendingLogin(); setError(event.data.description || event.data.error); return }
+        if (event.data?.type !== 'simacan_auth') return
+        try { await completeLogin(event.data.code, event.data.state) } catch (e) { setError(e.message) }
+      }
+      window.addEventListener('message', handler)
+      loginCleanupRef.current = () => window.removeEventListener('message', handler)
     } catch (e) { setError(e instanceof TypeError ? 'Geen verbinding met de server. Probeer het opnieuw.' : e.message) }
-    setLoginLoading(false)
-  }, [saveTokens, fetchStops])
+  }, [clearPendingLogin, completeLogin])
+
+  useEffect(() => () => loginCleanupRef.current?.(), [])
+
+  const submitPasted = useCallback(async (text) => {
+    const parsed = parseCallback(text)
+    if (!parsed) return
+    setError(null)
+    if (parsed.error) { clearPendingLogin(); setError(parsed.error); return }
+    try { await completeLogin(parsed.code, parsed.state) }
+    catch (e) { setError(e instanceof TypeError ? 'Geen verbinding met de server. Probeer het opnieuw.' : e.message) }
+  }, [completeLogin, clearPendingLogin])
+
+  const pasteFromClipboard = useCallback(async () => {
+    try { const text = await navigator.clipboard.readText(); setPasteText(text); submitPasted(text) }
+    catch { setError('Plakken lukt niet automatisch. Plak de link handmatig in het veld.') }
+  }, [submitPasted])
 
   // ─── Datum helpers ────────────────────────────────────────────────────────
   const today = toISO(new Date())
@@ -584,8 +641,26 @@ export default function VrachttijdenWidget() {
           <p style={{ fontSize:'12px', color:'var(--c-text-3)', margin:0, textAlign:'center' }}>Log eenmalig in — daarna werkt het automatisch op alle apparaten.</p>
           <button onClick={handleLogin} disabled={loginLoading}
             style={{ display:'flex', alignItems:'center', gap:'8px', padding:'9px 20px', borderRadius:'10px', border:accentBorder(40), background:accentBg(12), color:'var(--accent)', cursor:loginLoading?'wait':'pointer', fontSize:'13px', fontWeight:600 }}>
-            {loginLoading ? <><RefreshCw size={14} style={{ animation:'spin 1s linear infinite' }} /> Bezig...</> : <><LogIn size={14} /> Inloggen met Simacan</>}
+            {loginLoading ? <><RefreshCw size={14} style={{ animation:'spin 1s linear infinite' }} /> Bezig...</> : <><LogIn size={14} /> {awaitingPaste ? 'Opnieuw inloggen' : 'Inloggen met Simacan'}</>}
           </button>
+          {awaitingPaste && (
+            <div style={{ width:'100%', display:'flex', flexDirection:'column', gap:'8px', padding:'10px', borderRadius:'10px', background:'rgba(255,255,255,0.04)', border:'1px solid var(--c-border-strong)' }}>
+              <p style={{ fontSize:'11px', color:'var(--c-text-2)', margin:0, lineHeight:1.45 }}>
+                Na het inloggen opent een pagina die niet laadt (<b>localhost</b>). Dat klopt. Kopieer de <b>volledige link uit de adresbalk</b> van die pagina en plak hem hieronder, binnen 1 minuut.
+              </p>
+              <div style={{ display:'flex', gap:'6px' }}>
+                <input value={pasteText} placeholder="http://localhost:3000/simacan-callback.html?code=…" disabled={loginLoading}
+                  onChange={e => setPasteText(e.target.value)}
+                  onPaste={e => { const text = e.clipboardData.getData('text'); e.preventDefault(); setPasteText(text); submitPasted(text) }}
+                  onKeyDown={e => { if (e.key === 'Enter') submitPasted(pasteText) }}
+                  style={{ flex:1, minWidth:0, background:'rgba(255,255,255,0.05)', border:'1px solid var(--c-border-strong)', borderRadius:'8px', padding:'6px 8px', color:'var(--c-text-1)', fontSize:'11px' }} />
+                <button onClick={pasteText.trim() ? () => submitPasted(pasteText) : pasteFromClipboard} disabled={loginLoading}
+                  style={{ padding:'6px 10px', borderRadius:'8px', border:accentBorder(40), background:accentBg(12), color:'var(--accent)', cursor:'pointer', fontSize:'11px', fontWeight:600, whiteSpace:'nowrap' }}>
+                  {pasteText.trim() ? 'Verbinden' : 'Plakken'}
+                </button>
+              </div>
+            </div>
+          )}
           {error && <div style={{ display:'flex', alignItems:'center', gap:'6px', color:'#ff6b6b', fontSize:'11px', textAlign:'center' }}><AlertCircle size={12} style={{ flexShrink:0 }} /> {error}</div>}
         </div>
       )}
