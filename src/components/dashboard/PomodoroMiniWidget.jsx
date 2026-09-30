@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Timer, Play, Pause } from 'lucide-react'
 import { CardHeader } from '../ui'
+import { toISO } from '../../utils/recurrence'
 
 // Dashboard-widget "Pomodoro": leest de timerstatus die PomodoroTimer bewaart
 // (localStorage `pomodoro_v3` / `pomodoro_stats`). Starten/stoppen gebeurt op de
@@ -21,7 +22,7 @@ function readState() {
   if (s?.running && s.endTime) remaining = Math.max(0, Math.ceil((s.endTime - Date.now()) / 1000))
   else if (s && typeof s.remainingSeconds === 'number') remaining = s.remainingSeconds
   let todayMins = 0
-  try { todayMins = (JSON.parse(localStorage.getItem('pomodoro_stats')) || {})[new Date().toISOString().slice(0, 10)] || 0 } catch {}
+  try { todayMins = (JSON.parse(localStorage.getItem('pomodoro_stats')) || {})[toISO(new Date())] || 0 } catch {}
   return { mode, running: !!s?.running && remaining > 0, remaining, total: totalMins * 60, task: s?.task || '', todayMins }
 }
 

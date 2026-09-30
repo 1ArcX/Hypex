@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Truck, RefreshCw, AlertCircle, ChevronDown, ChevronUp, LogIn, Map as MapIcon, Bell, BellOff } from 'lucide-react'
 import { supabase } from '../supabaseClient'
+import { toISO } from '../utils/recurrence'
 
 /*
   Voer dit SQL uit in Supabase → SQL Editor:
@@ -84,7 +85,7 @@ async function exchangeCode(code, verifier, redirectUri) {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ grant_type:'authorization_code', client_id:KC_CLIENT_ID, code, code_verifier:verifier, redirect_uri:redirectUri }).toString()
   })
-  const data = await res.json()
+  const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(data.error_description || data.error || 'Token ophalen mislukt')
   return data
 }
@@ -332,7 +333,7 @@ export default function VrachttijdenWidget() {
   const [error,       setError]       = useState(null)
   const [lastUpdate,  setLastUpdate]  = useState(null)
   const [selectedStop,setSelectedStop]= useState(null)
-  const [selectedDate,setSelectedDate]= useState(() => new Date().toISOString().slice(0,10))
+  const [selectedDate,setSelectedDate]= useState(() => toISO(new Date()))
   const [routeData,    setRouteData]   = useState({})
   const [showMap,      setShowMap]     = useState({})
   const [notifyStops,  setNotifyStops] = useState(() => { try { return new Set(JSON.parse(localStorage.getItem('simacan_notify') || '[]')) } catch { return new Set() } })
@@ -371,11 +372,11 @@ export default function VrachttijdenWidget() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action:'locationStops', token:t.accessToken, refreshToken:t.refreshToken, date: new Date(date+'T12:00:00').toISOString() })
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       if (data._newTokens) saveTokens({ accessToken:data._newTokens.accessToken, refreshToken:data._newTokens.refreshToken || t.refreshToken })
       if (!res.ok) {
         if (res.status === 401) { saveTokens(null); setError('Sessie verlopen. Log opnieuw in.'); setLoading(false); return }
-        throw new Error(data.error || 'Serverfout')
+        throw new Error(data.error || 'Vrachttijden konden niet geladen worden. Probeer het opnieuw.')
       }
       const raw = data.locationStops || data.stops || data.result || (Array.isArray(data) ? data : [])
       const arr = Array.isArray(raw) ? raw : Object.values(raw)
@@ -392,7 +393,7 @@ export default function VrachttijdenWidget() {
       const stateSnapshot = {}
       for (const stop of arr) stateSnapshot[stop.id] = { delay: stop.delay, activity: stop.tripStatus?.activity, eta: stop.actualStartTime || stop.eta || stop.plannedStartTime }
       saveSimacanState(userIdRef.current, stateSnapshot)
-    } catch (e) { setError(e.message) }
+    } catch (e) { setError(e instanceof TypeError ? 'Geen verbinding met de server. Probeer het opnieuw.' : e.message) }
     setLoading(false)
   }, [saveTokens])
 
@@ -418,7 +419,7 @@ export default function VrachttijdenWidget() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action:'tripRoute', token:tokensRef.current.accessToken, refreshToken:tokensRef.current.refreshToken, tripUuid })
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       if (data._newTokens) saveTokens({ accessToken:data._newTokens.accessToken, refreshToken:data._newTokens.refreshToken || tokensRef.current.refreshToken })
       if (!res.ok) throw new Error(data.error || 'Route ophalen mislukt')
       setRouteData(p => ({ ...p, [stopId]: { stops: data.stops || [], vehiclePos, loading: false } }))
@@ -480,7 +481,7 @@ export default function VrachttijdenWidget() {
   }, [])
 
   useEffect(() => {
-    if (!tokens || selectedDate !== new Date().toISOString().slice(0,10)) return
+    if (!tokens || selectedDate !== toISO(new Date())) return
     const t = setInterval(() => fetchStops(), 60000)
     return () => clearInterval(t)
   }, [!!tokens, selectedDate, fetchStops])
@@ -532,12 +533,12 @@ export default function VrachttijdenWidget() {
         setTimeout(() => { window.removeEventListener('message', handler); reject(new Error('Login timeout')) }, 5*60*1000)
         const chk = setInterval(() => { if (popup.closed) { clearInterval(chk); window.removeEventListener('message', handler); reject(new Error('Login geannuleerd')) } }, 500)
       })
-    } catch (e) { setError(e.message) }
+    } catch (e) { setError(e instanceof TypeError ? 'Geen verbinding met de server. Probeer het opnieuw.' : e.message) }
     setLoginLoading(false)
   }, [saveTokens, fetchStops])
 
   // ─── Datum helpers ────────────────────────────────────────────────────────
-  const today = new Date().toISOString().slice(0,10)
+  const today = toISO(new Date())
   const changeDate = (nd) => { setSelectedDate(nd); setStops(null); setSelectedStop(null); setRouteData({}); setShowMap({}); fetchStops(tokensRef.current, nd) }
 
   // ─── Gesorteerde stops ────────────────────────────────────────────────────
@@ -566,11 +567,11 @@ export default function VrachttijdenWidget() {
       {/* Datum navigatie */}
       {tokens && (
         <div style={{ display:'flex', alignItems:'center', gap:'6px', marginBottom:'10px' }}>
-          <button onClick={() => { const d=new Date(selectedDate); d.setDate(d.getDate()-1); changeDate(d.toISOString().slice(0,10)) }}
+          <button onClick={() => { const d=new Date(selectedDate+'T12:00:00'); d.setDate(d.getDate()-1); changeDate(toISO(d)) }}
             style={{ background:'rgba(255,255,255,0.06)', border:'1px solid var(--c-border-strong)', borderRadius:'8px', padding:'4px 8px', cursor:'pointer', color:'var(--c-text-2)', fontSize:'16px', lineHeight:1 }}>‹</button>
           <input type="date" value={selectedDate} onChange={e => { if (e.target.value) changeDate(e.target.value) }}
             style={{ flex:1, background:'rgba(255,255,255,0.05)', border:'1px solid var(--c-border-strong)', borderRadius:'8px', padding:'4px 8px', color:'white', fontSize:'12px', textAlign:'center', cursor:'pointer' }} />
-          <button onClick={() => { const d=new Date(selectedDate); d.setDate(d.getDate()+1); changeDate(d.toISOString().slice(0,10)) }}
+          <button onClick={() => { const d=new Date(selectedDate+'T12:00:00'); d.setDate(d.getDate()+1); changeDate(toISO(d)) }}
             style={{ background:'rgba(255,255,255,0.06)', border:'1px solid var(--c-border-strong)', borderRadius:'8px', padding:'4px 8px', cursor:'pointer', color:'var(--c-text-2)', fontSize:'16px', lineHeight:1 }}>›</button>
           {selectedDate !== today && <button onClick={() => changeDate(today)} style={{ background:'rgba(255,255,255,0.06)', border:'1px solid var(--c-border-strong)', borderRadius:'8px', padding:'4px 7px', cursor:'pointer', color:'var(--c-text-2)', fontSize:'10px', whiteSpace:'nowrap' }}>Vandaag</button>}
         </div>
@@ -599,7 +600,8 @@ export default function VrachttijdenWidget() {
           )}
           {error && !loading && (
             <div style={{ padding:'10px', borderRadius:'10px', background:'rgba(255,80,80,0.06)', border:'1px solid rgba(255,80,80,0.2)', display:'flex', alignItems:'center', gap:'8px' }}>
-              <AlertCircle size={13} style={{ color:'#ff6b6b', flexShrink:0 }} /><span style={{ color:'#ff6b6b', fontSize:'11px' }}>{error}</span>
+              <AlertCircle size={13} style={{ color:'#ff6b6b', flexShrink:0 }} /><span style={{ color:'#ff6b6b', fontSize:'11px', flex:1 }}>{error}</span>
+              <button onClick={() => fetchStops()} className="btn-ghost" style={{ fontSize:'11px', padding:'4px 10px', flexShrink:0 }}>Opnieuw</button>
             </div>
           )}
 

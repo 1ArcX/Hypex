@@ -4,10 +4,11 @@ import { supabase } from '../supabaseClient'
 import { matchVak } from '../utils/alleVakken'
 import { callMagister, clearStoredTokens } from '../utils/magisterApi'
 import { callSomtoday, somtodayKey, ensureSomtodayCreds, loginWithPopup } from '../utils/somtodayApi'
+import { toISO } from '../utils/recurrence'
 
 const storageKey = (userId) => `magister_credentials_${userId}`
 
-function inDays(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10) }
+function inDays(n) { const d = new Date(); d.setDate(d.getDate() + n); return toISO(d) }
 
 function Skeleton({ rows = 4, compact = false }) {
   return (

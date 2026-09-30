@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { BarChart2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
+import { toISO } from '../utils/recurrence'
 
 const LS_STATS = 'pomodoro_stats'
 const DAYS = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo']
@@ -12,7 +13,7 @@ function getWeekDays() {
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(now)
     d.setDate(now.getDate() + mondayOffset + i)
-    return d.toISOString().slice(0, 10)
+    return toISO(d)
   })
 }
 
@@ -29,7 +30,7 @@ function loadLocalStats() {
 
 export default function PomodoroStats({ refreshKey, userId }) {
   const weekDays = getWeekDays()
-  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayStr = toISO(new Date())
   const [statsMap, setStatsMap] = useState(() => loadLocalStats())
 
   useEffect(() => {
@@ -52,7 +53,7 @@ export default function PomodoroStats({ refreshKey, userId }) {
         // Sommeer minuten per dag
         const map = {}
         for (const row of data) {
-          const day = row.completed_at.slice(0, 10)
+          const day = toISO(new Date(row.completed_at))
           map[day] = (map[day] || 0) + (row.duration_minutes || 0)
         }
         // Merge met localStorage (neem max per dag)
@@ -88,6 +89,9 @@ export default function PomodoroStats({ refreshKey, userId }) {
           </span>
         )}
       </div>
+      {total === 0 && (
+        <p style={{ fontSize: 11, color: 'var(--c-text-3)', margin: '-6px 0 10px' }}>Nog geen focussessies deze week — start er een hierboven.</p>
+      )}
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6 }}>
         {weekDays.map((dateStr, i) => {
           const mins = values[i]

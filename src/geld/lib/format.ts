@@ -19,6 +19,20 @@ export function toISODate(d: Date): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
 }
 
+// 'YYYY-MM-DD' → 'Vandaag' / 'Gisteren' / 'di 29 sep'
+export function fmtDay(iso: string): string {
+  if (!iso) return ''
+  const d = new Date(iso + 'T12:00:00')
+  if (isNaN(d.getTime())) return iso
+  const today = todayStr()
+  if (iso === today) return 'Vandaag'
+  const y = new Date(); y.setDate(y.getDate() - 1)
+  if (iso === toISODate(y)) return 'Gisteren'
+  const opts: Intl.DateTimeFormatOptions = { weekday: 'short', day: 'numeric', month: 'short' }
+  if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric'
+  return d.toLocaleDateString('nl-NL', opts).replace(/\./g, '')
+}
+
 // m is 0-based (zoals Date.getMonth())
 export function monthStartOf(y: number, m: number): string {
   return `${y}-${pad2(m + 1)}-01`

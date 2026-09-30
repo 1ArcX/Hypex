@@ -1,7 +1,7 @@
 import { Pencil, Trash2 } from 'lucide-react'
 import type { CategoryConfig, Expense } from '../types'
 import { findCategory, findIncomeCategory } from '../lib/categories'
-import { fmt } from '../lib/format'
+import { fmt, fmtDay } from '../lib/format'
 
 export function TransactionRow({ exp, allCategories, onEdit, onDelete }: {
   exp: Expense
@@ -21,7 +21,7 @@ export function TransactionRow({ exp, allCategories, onEdit, onDelete }: {
         style={{ background: `color-mix(in srgb, ${color} 8%, transparent)` }}>{cat.emoji}</div>
       <div className="flex-1 min-w-0">
         <p className="text-[13px] font-semibold text-white/85 m-0 truncate">{exp.description || cat.label}</p>
-        <p className="text-[11px] text-white/30 m-0">{exp.date}{isInc ? ' · inkomsten' : ''}</p>
+        <p className="text-[11px] text-white/30 m-0">{fmtDay(exp.date)}{isInc ? ' · inkomsten' : ''}</p>
       </div>
       <div className="flex flex-col items-end gap-0.5 shrink-0">
         <span className="text-[15px] font-bold tabular-nums" style={{ color }}>{isInc ? '+' : ''}{fmt(exp.amount)}</span>

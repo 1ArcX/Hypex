@@ -1,16 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from './supabaseClient'
 import AuthPage from './components/AuthPage'
-import Timeline from './components/Timeline'
 import TaskModal from './components/TaskModal'
 import TaskDetailModal from './components/TaskDetailModal'
-import PomodoroTimer from './components/PomodoroTimer'
 import { RefreshCw, Settings } from 'lucide-react'
 import ThemeSettings from './components/ThemeSettings'
 import AdminPanel from './components/AdminPanel'
-import HabitsWidget from './components/HabitsWidget'
-import WorkWidget from './components/WorkWidget'
-import VrachttijdenWidget from './components/VrachttijdenWidget'
 import PasswordResetPage from './components/PasswordResetPage'
 import OnboardingModal from './components/OnboardingModal'
 
@@ -21,27 +16,30 @@ import { ensureSomtodayCreds } from './utils/somtodayApi'
 import { awardXP, XP_TASK } from './utils/xp'
 import { advanceOnComplete, revertOnUncomplete, isDoneToday, todayISO } from './utils/recurrence'
 import { isOverdue } from './utils/taskStatus'
+import { fetchLatestVersion } from './utils/version'
 import { VAPID_PUBLIC, urlBase64ToUint8Array } from './utils/push'
 import XPToast from './components/XPToast'
 import BottomNav from './components/BottomNav'
 import DashboardPage from './pages/DashboardPage'
 import PomodoroPage from './pages/PomodoroPage'
 import AgendaPage from './pages/AgendaPage'
-import SchoolPage from './pages/SchoolPage'
 import TakenPage from './pages/TakenPage'
-import GewoontesPage from './pages/GewoontesPage'
-import GymPage from './pages/GymPage'
 import NotitiesPage from './pages/NotitiesPage'
-import JumboPage from './pages/JumboPage'
-import StatsPage from './pages/StatsPage'
-import GeldPage from './pages/GeldPage'
-import HypexAIPage from './pages/HypexAIPage'
 import CommandPalette from './components/CommandPalette'
+
+// Minder gebruikte / zware pagina's (Geld → recharts, Jumbo → maplibre) pas laden bij openen
+const SchoolPage = lazy(() => import('./pages/SchoolPage'))
+const GewoontesPage = lazy(() => import('./pages/GewoontesPage'))
+const GymPage = lazy(() => import('./pages/GymPage'))
+const JumboPage = lazy(() => import('./pages/JumboPage'))
+const StatsPage = lazy(() => import('./pages/StatsPage'))
+const GeldPage = lazy(() => import('./pages/GeldPage'))
+const HypexAIPage = lazy(() => import('./pages/HypexAIPage'))
 
 const ADMIN_EMAIL = 'zhafirfachri@gmail.com'
 
 const PAGE_NAMES = {
-  dashboard: 'Dashboard', agenda: 'Agenda', taken: 'Taken',
+  dashboard: 'Home', agenda: 'Agenda', taken: 'Taken',
   pomodoro: 'Pomodoro', school: 'School',
   gewoontes: 'Gewoontes', gym: 'Gym', notities: 'Notities', statistieken: 'Statistieken', jumbo: 'Jumbo', geld: 'Geld', hypexai: 'Hypex AI',
 }
@@ -184,12 +182,8 @@ export default function App() {
   // Controleer elke 5 minuten of er een nieuwe deploy beschikbaar is
   useEffect(() => {
     const check = async () => {
-      try {
-        const res = await fetch('/version.json?t=' + Date.now())
-        if (!res.ok) return
-        const { t } = await res.json()
-        if (t > __BUILD_TIME__) setUpdateAvailable(true)
-      } catch {}
+      const t = await fetchLatestVersion()
+      if (t && t > __BUILD_TIME__) setUpdateAvailable(true)
     }
     check()
     const id = setInterval(check, 5 * 60 * 1000)
@@ -231,7 +225,7 @@ export default function App() {
         const pmtCreds = JSON.parse(localStorage.getItem('pmt_credentials'))
         if (!pmtCreds) return
         const cached = JSON.parse(localStorage.getItem('pmt_work_shifts')) || []
-        const todayStr = new Date().toISOString().slice(0, 10)
+        const todayStr = todayISO()
         if (cached.some(s => s.date >= todayStr)) return // al vers
         const isoWeek = (d = new Date()) => {
           const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
@@ -840,6 +834,8 @@ export default function App() {
             onTouchEnd={onPullEnd}
             onTouchMove={onPullMove}>
 
+            <Suspense fallback={<div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}><RefreshCw size={18} className="animate-spin" style={{ color: 'var(--c-text-3)' }} /></div>}>
+
             {activePage === 'dashboard' && (
               <DashboardPage
                 isBreak={isBreak}
@@ -954,6 +950,8 @@ export default function App() {
                 onNavigateToTasks={(filter) => { setTaskHighlight(filter); setActivePage('taken') }}
                 onNavigateToAgenda={(date, highlightKey) => { setAgendaJump({ date, highlightKey }); handleSetActivePage('agenda') }} />
             )}
+
+            </Suspense>
 
           </div>
           </div>

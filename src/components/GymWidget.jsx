@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../supabaseClient'
 import { awardXP, XP_GYM } from '../utils/xp'
+import { toISO } from '../utils/recurrence'
 import {
   Dumbbell, Star, Plus, X, ChevronRight, Check, Trash2,
   CalendarPlus, Play, Square, Clock, Search, ChevronDown, ChevronUp,
@@ -18,14 +19,14 @@ function getNLDay() {
 }
 
 function getTodayDateStr() {
-  return new Date().toISOString().slice(0, 10)
+  return toISO(new Date())
 }
 
 function getDayDateStr(nlDay) {
   const todayNL = getNLDay()
   const d = new Date()
   d.setDate(d.getDate() + (nlDay - todayNL))
-  return d.toISOString().slice(0, 10)
+  return toISO(d)
 }
 
 const MUSCLE_GROUPS = [
@@ -1205,7 +1206,7 @@ export default function GymWidget({ userId, onXPEarned }) {
       // Ankerdatum = deze week (de dag van deze nlDay)
       const anchor = new Date(today)
       anchor.setDate(today.getDate() - todayNL + nlDay)
-      const dateStr = anchor.toISOString().slice(0, 10)
+      const dateStr = toISO(anchor)
 
       events.push({
         user_id: userId,
@@ -1490,7 +1491,7 @@ export default function GymWidget({ userId, onXPEarned }) {
         while (logs[check]) {
           streak++
           const d = new Date(check); d.setDate(d.getDate() - 1)
-          check = d.toISOString().slice(0, 10)
+          check = toISO(d)
         }
 
         // ── Totaal volume ─────────────────────────────────────────────────────
@@ -1535,7 +1536,7 @@ export default function GymWidget({ userId, onXPEarned }) {
           for (let d = 0; d < 7; d++) {
             const day = new Date(today)
             day.setDate(today.getDate() - todayNL - w * 7 + d)
-            const ds = day.toISOString().slice(0, 10)
+            const ds = toISO(day)
             const isFuture = day > today
             days.push({ ds, trained: !!logs[ds], isFuture })
           }

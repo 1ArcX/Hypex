@@ -2,15 +2,18 @@ import React from 'react'
 import { CalendarCheck, Plus } from 'lucide-react'
 import { CardHeader, IconButton, CheckButton } from '../ui'
 import { taskCategory, categoryColor } from '../../utils/category'
+import { isDueToday, isDoneToday } from '../../utils/recurrence'
 
 // Dashboard-widget "Vandaag": voortgangsring (afgerond / gepland vandaag, incl. routines)
 // + de eerstvolgende open taken met afvinkknop.
-export default function TodayWidget({ tasks, today, onToggleTask, onOpenTask, onNewTask, onOpenList }) {
-  const todays = tasks.filter(t => t.date === today)
-  const done = todays.filter(t => t.completed).length
+export default function TodayWidget({ tasks, today, scheduleCount = 0, onToggleTask, onOpenTask, onNewTask, onOpenList }) {
+  // Routines tellen mee zoals in Taken → Vandaag (TodayView): due of vandaag al afgevinkt
+  const isDone = t => t.recurrence ? isDoneToday(t, today) : t.completed
+  const todays = tasks.filter(t => t.recurrence ? (isDueToday(t, today) || isDoneToday(t, today)) : t.date === today)
+  const done = todays.filter(isDone).length
   const total = todays.length
   const open = todays
-    .filter(t => !t.completed)
+    .filter(t => !isDone(t))
     .sort((a, b) => ((a.priority ?? 2) - (b.priority ?? 2)) || (a.start_time || a.time || '99').localeCompare(b.start_time || b.time || '99'))
   const shown = open.slice(0, 3)
 
@@ -22,7 +25,7 @@ export default function TodayWidget({ tasks, today, onToggleTask, onOpenTask, on
       <CardHeader icon={CalendarCheck} title="Vandaag"
         action={<IconButton icon={Plus} label="Nieuwe taak" onClick={onNewTask} size={26} />} />
       {total === 0 ? (
-        <p className="t-meta" style={{ margin: 0 }}>Niets gepland voor vandaag.</p>
+        <p className="t-meta" style={{ margin: 0 }}>Geen taken voor vandaag{scheduleCount > 0 ? ` · ${scheduleCount} ${scheduleCount === 1 ? 'item' : 'items'} in je schema` : '.'}</p>
       ) : (
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
           <span style={{ position: 'relative', width: 64, height: 64, flexShrink: 0 }} role="img" aria-label={`${done} van ${total} voltooid`}>

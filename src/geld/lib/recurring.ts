@@ -1,5 +1,6 @@
 import type { BudgetConfig, RecurringSource } from '../types'
 import { todayStr, monthStart, monthEnd } from './format'
+import { toISODate } from './format'
 
 const DAY_MS = 86400000
 
@@ -9,13 +10,13 @@ export function getNextPayDate(src: RecurringSource): string | null {
   if (src.type === 'monthly') {
     const now = new Date()
     let d = new Date(now.getFullYear(), now.getMonth(), src.day || 1)
-    if (d.toISOString().slice(0, 10) <= todayISO) d = new Date(now.getFullYear(), now.getMonth() + 1, src.day || 1)
+    if (toISODate(d) <= todayISO) d = new Date(now.getFullYear(), now.getMonth() + 1, src.day || 1)
     return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
   }
   if (src.type === 'interval' && src.ref_date) {
     const ms = (src.interval_days || 28) * DAY_MS
     let d = new Date(src.ref_date + 'T12:00:00')
-    while (d.toISOString().slice(0, 10) <= todayISO) d = new Date(d.getTime() + ms)
+    while (toISODate(d) <= todayISO) d = new Date(d.getTime() + ms)
     return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
   }
   return null
@@ -47,8 +48,8 @@ export function isPayDayToday(src: RecurringSource): boolean {
     const todayISO = todayStr()
     const ms = (src.interval_days || 28) * DAY_MS
     let d = new Date(src.ref_date + 'T12:00:00')
-    while (d.toISOString().slice(0, 10) < todayISO) d = new Date(d.getTime() + ms)
-    return d.toISOString().slice(0, 10) === todayISO
+    while (toISODate(d) < todayISO) d = new Date(d.getTime() + ms)
+    return toISODate(d) === todayISO
   }
   return false
 }

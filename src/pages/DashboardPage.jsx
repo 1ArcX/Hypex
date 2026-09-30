@@ -15,6 +15,8 @@ import { isOverdue, isUrgent, daysLate, shortDate } from '../utils/taskStatus'
 import { eventDisplay } from '../utils/eventTitle'
 import { buildUpcoming, countdownLabel } from '../utils/upcoming'
 import { useIsDesktop } from '../hooks/useIsDesktop'
+import { toISO, isDueToday, isDoneToday } from '../utils/recurrence'
+import { greeting } from '../utils/greeting'
 
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -22,11 +24,6 @@ function pad2(n) { return String(n).padStart(2, '0') }
 function todayDateStr() {
   const d = new Date()
   return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`
-}
-
-function getGreeting() {
-  const h = new Date().getHours()
-  return h < 12 ? 'Goedemorgen' : h < 18 ? 'Goedemiddag' : 'Goedenavond'
 }
 
 function longDate(d = new Date()) {
@@ -46,12 +43,12 @@ function useTodayItems(tasks, magisterLessons, calendarEvents) {
     const now = new Date()
     const weekStart = (() => { const d = new Date(now); const day = d.getDay(); d.setDate(d.getDate() - (day === 0 ? 6 : day - 1)); d.setHours(0,0,0,0); return d })()
     const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6)
-    const cacheKey = `magister_sched_${weekStart.toISOString().slice(0,10)}_${weekEnd.toISOString().slice(0,10)}`
+    const cacheKey = `magister_sched_${toISO(weekStart)}_${toISO(weekEnd)}`
     const lessons = (() => { try { return JSON.parse(sessionStorage.getItem(cacheKey)) || [] } catch { return [] } })()
     const allLessons = lessons.length ? lessons : (magisterLessons || [])
     for (const l of allLessons) {
       if (!l.start || l.uitgevallen) continue
-      if (new Date(l.start).toISOString().slice(0,10) !== today) continue
+      if (toISO(new Date(l.start)) !== today) continue
       const s = new Date(l.start)
       const e = l.einde ? new Date(l.einde) : null
       items.push({
@@ -205,7 +202,7 @@ export default function DashboardPage({
   const overdueTasks = tasks.filter(t => isOverdue(t, today)).sort((a, b) => a.date.localeCompare(b.date))
   const urgentTasks  = tasks.filter(isUrgent)
   const openCount    = tasks.filter(t => !t.completed).length
-  const todayOpen    = tasks.filter(t => !t.completed && t.date === today).length
+  const todayOpen    = tasks.filter(t => t.recurrence ? (isDueToday(t, today) && !isDoneToday(t, today)) : (!t.completed && t.date === today)).length
 
   // Werkruimte: eerst te laat, daarna urgent (zonder dubbelingen)
   const overdueIds = new Set(overdueTasks.map(t => t.id))
@@ -233,7 +230,7 @@ export default function DashboardPage({
         <header className="dash-header">
           <div style={{ minWidth: 0 }}>
             <h1 className="t-page" style={{ margin: 0, fontSize: 18, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {getGreeting()}{displayName ? `, ${displayName}` : ''}
+              {greeting()}{displayName ? `, ${displayName}` : ''}
             </h1>
             <p className="t-meta" style={{ margin: '2px 0 0', fontSize: 12 }}>{longDate()}</p>
           </div>
@@ -253,7 +250,7 @@ export default function DashboardPage({
           <KpiTile icon={Flame} value={urgentTasks.length} label="Urgent" tone="danger" onClick={() => onNavigateToTasks?.('urgent')} />
           <KpiTile icon={Clock3} value={overdueTasks.length} label="Te laat" tone="warning" onClick={() => onNavigateToTasks?.('telaat')} />
           <KpiTile icon={CheckCircle2} value={openCount} label="Open" tone="success" onClick={() => onNavigateToTasks?.('open')} />
-          <KpiTile icon={CalendarDays} value={todayOpen} label="Vandaag" tone="persoonlijk" onClick={() => onNavigateToTasks?.('vandaag')} />
+          <KpiTile icon={CalendarDays} value={todayOpen} label="Taken vandaag" tone="persoonlijk" onClick={() => onNavigateToTasks?.('vandaag')} />
         </section>
 
         {/* ── RIJ 3: werkruimte — aandacht nodig + volgende afspraak ── */}
@@ -364,7 +361,7 @@ export default function DashboardPage({
 
         {/* ── RIJ 4: compacte widgets ── */}
         <section className="dash-widgets" style={{ '--cols': widgetCount }} aria-label="Widgets">
-          <TodayWidget tasks={tasks} today={today} onToggleTask={t => onToggleTask?.(t)} onOpenTask={setDetailTask}
+          <TodayWidget tasks={tasks} today={today} scheduleCount={todayItems.filter(i => i.type !== 'task').length} onToggleTask={t => onToggleTask?.(t)} onOpenTask={setDetailTask}
             onNewTask={() => openNewTask()} onOpenList={() => onNavigateToTasks?.('vandaag')} />
           <PomodoroMiniWidget onOpen={() => onNavigate('pomodoro')} />
           {isAdmin && <GeldMiniWidget userId={userId} onOpen={() => onNavigate('geld')} />}

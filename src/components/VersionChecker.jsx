@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
+import { fetchLatestVersion } from '../utils/version'
 
 const CURRENT = __BUILD_TIME__
 const INTERVAL = 5 * 60 * 1000  // 5 minuten
@@ -14,13 +15,10 @@ export default function VersionChecker() {
 
   useEffect(() => {
     const check = async () => {
-      try {
-        const r = await fetch('/version.json?_=' + Date.now())
-        if (!r.ok) return
-        const { t } = await r.json()
-        setLatest(t)
-        if (t && t !== CURRENT) setUpdateAvailable(true)
-      } catch (_) {}
+      const t = await fetchLatestVersion()
+      if (!t) return
+      setLatest(t)
+      if (t !== CURRENT) setUpdateAvailable(true)
     }
     check()
     const id = setInterval(check, INTERVAL)

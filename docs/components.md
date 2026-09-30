@@ -9,6 +9,7 @@ Fast lookup for resolving informal component references ("de sidebar", "de stats
 - **Routing:** *No router library.* Navigation is state-based via `activePage`
   (a string) in [App.jsx](../src/App.jsx). Pages are conditionally rendered, not URL-routed.
   Page key → title mapping lives in `PAGE_NAMES` / `PAGE_ORDER` in App.jsx.
+  Less-used/heavy pages (School, Gewoontes, Gym, Jumbo, Stats, Geld, Hypex AI) are `React.lazy`-loaded behind one `<Suspense>` in App.jsx.
 - **Styling:** Tailwind CSS + heavy inline styles + CSS variables (`--accent`, `--bg-base`,
   `--text-1/2/3`, `--border`) defined in [index.css](../src/index.css) and set at runtime in App.jsx.
 - **State/data:** Supabase ([supabaseClient.js](../src/supabaseClient.js)) for auth + DB;
@@ -164,6 +165,9 @@ Self-contained money/budget app, mounted via [pages/GeldPage.jsx](../src/pages/G
 - **Task status** — [utils/taskStatus.js](../src/utils/taskStatus.js): `isOverdue` (excl. routines), `isUrgent`, `daysLate`, `shortDate` — one definition for Dashboard, Sidebar badge, Taken.
 - **Upcoming items** — [utils/upcoming.js](../src/utils/upcoming.js): `buildUpcoming()` (tasks, lessons, events, PMT shifts) + `countdownLabel()`; used by Dashboard and Hypex AI.
 - **Event names** — [utils/eventTitle.js](../src/utils/eventTitle.js): `eventDisplay(ev)` → readable course name + code for MyX events.
+- **Dates** — use `toISO(d)` / `todayISO()` from [utils/recurrence.js](../src/utils/recurrence.js) (Geld: `toISODate`/`todayStr`/`fmtDay` in `geld/lib/format.ts`) for YYYY-MM-DD keys — **never** `toISOString().slice(0,10)` (UTC → wrong day after midnight).
+- **Greeting** — [utils/greeting.js](../src/utils/greeting.js): `greeting()` (Goedenacht/-morgen/-middag/-avond), used by Dashboard + Hypex AI.
+- **Version check** — [utils/version.js](../src/utils/version.js): `fetchLatestVersion()` (deduped), used by App + VersionChecker.
 - **Category colors** — [utils/category.js](../src/utils/category.js): `taskCategory`, `eventCategory`, `CATEGORIES`
   (School/Werk/Persoonlijk/Routine/Overig, derived from the item's source).
 - `src/geld/components/ui/` — [Glass.tsx](../src/geld/components/ui/Glass.tsx) (glass card + `Spinner`),

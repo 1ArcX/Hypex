@@ -55,7 +55,15 @@ export default function GeldPage({ userId }: { userId: string; onClose?: () => v
   const [editing, setEditing] = useState<Expense | null>(null)
   const [editingSavings, setEditingSavings] = useState<Expense | null>(null)
   const [showEarlyIncome, setShowEarlyIncome] = useState<RecurringSource | null>(null)
-  const [incomeDone, setIncomeDone] = useState(false)
+  // Betaaldag-popup: pas vanaf 08:00, en 'Later' geldt voor de rest van de dag
+  const incomeLaterKey = `geld_income_later_${todayStr()}`
+  const [incomeDone, setIncomeDone] = useState(() => {
+    try { return localStorage.getItem(incomeLaterKey) === '1' } catch { return false }
+  })
+  const postponeIncome = () => {
+    setIncomeDone(true)
+    try { localStorage.setItem(incomeLaterKey, '1') } catch {}
+  }
 
   const saveExpense = async (data: ExpenseInput) => {
     if (editing) {
@@ -186,12 +194,12 @@ export default function GeldPage({ userId }: { userId: string; onClose?: () => v
           onLater={() => setShowEarlyIncome(null)}
           onDone={() => { setShowEarlyIncome(null); refresh() }} />
       )}
-      {pendingIncomeSource && !incomeDone && (
+      {pendingIncomeSource && !incomeDone && new Date().getHours() >= 8 && (
         <IncomeDayModal source={pendingIncomeSource}
           adjustedBase={minBalance} savingsGoal={stats.savingsGoal}
           alreadySavedThisMonth={savings.alreadySavedThisMonth} totalLoanRemaining={savings.remainingLoan}
           userId={userId}
-          onLater={() => setIncomeDone(true)}
+          onLater={postponeIncome}
           onDone={async () => {
             setIncomeDone(true)
             await confirmIncomeToday(pendingIncomeSource.id)

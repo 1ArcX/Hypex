@@ -5,6 +5,7 @@ import { supabase } from '../supabaseClient'
 import FocusMode from './FocusMode'
 import useAmbientSound from '../hooks/useAmbientSound'
 import { awardXP } from '../utils/xp'
+import { toISO } from '../utils/recurrence'
 
 const VAPID_PUBLIC = 'BCsu1QaHUead0cgQ23qUKIu3_MnSi0s21LaD_c9wBcqdP43A9ojEx-nWZ4_xUDYLVMQn0CqzqdhSuLQr6eOQqh4'
 
@@ -77,7 +78,7 @@ async function clearTimerSession(userId) {
 const LS_KEY   = 'pomodoro_v3'
 const LS_STATS = 'pomodoro_stats'
 
-function getTodayKey() { return new Date().toISOString().slice(0, 10) }
+function getTodayKey() { return toISO(new Date()) }
 
 function getTodayMins() {
   try { return (JSON.parse(localStorage.getItem(LS_STATS)) || {})[getTodayKey()] || 0 }
@@ -417,7 +418,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
       onSessionComplete?.({
         mode: s.mode, durationMins: getMins(s), tag: s.task,
         startedAt: startTimeRef.current, completedAt: Date.now(),
-        date: new Date().toISOString().slice(0, 10),
+        date: toISO(new Date()),
       })
       if (s.mode === 'work' && userIdRef.current) {
         supabase.from('pomodoro_sessions').insert({

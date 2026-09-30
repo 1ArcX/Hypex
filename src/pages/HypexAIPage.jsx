@@ -1,7 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { supabase } from '../supabaseClient'
-import { isDueToday, isDoneToday, appliesOn, advanceOnComplete, todayISO } from '../utils/recurrence'
+import { isDueToday, isDoneToday, appliesOn, advanceOnComplete, todayISO, toISO } from '../utils/recurrence'
 import DagbriefingStrip from '../components/ai/DagbriefingStrip'
+import { useExpenses } from '../geld/hooks/useExpenses'
+import { useBudgetConfig } from '../geld/hooks/useBudgetConfig'
+import { useYearExpenses } from '../geld/hooks/useYearExpenses'
+import { useBudgetStats } from '../geld/hooks/useBudgetStats'
+import { greeting } from '../utils/greeting'
 
 const ACCENT = 'var(--accent)'
 
@@ -73,11 +78,6 @@ const CHIPS = [
   { icon: '📋', label: 'Wat staat er te laat?', prompt: 'Welke taken staan er te laat en hoe pak ik die het beste aan?' },
 ]
 
-function greeting() {
-  const h = new Date().getHours()
-  return h < 12 ? 'Goedemorgen' : h < 18 ? 'Goedemiddag' : 'Goedenavond'
-}
-
 // ── agentische acties ──
 const CMD_RE = /\b(voeg|maak|zet|log|noteer|onthoud|herinner|schrijf|vink|streep|afvinken|toevoegen|gedaan|klaar|betaald|uitgegeven|gespendeerd|gekocht|uitgave|kostte|plan)\b/i
 function looksLikeCommand(t) {
@@ -86,7 +86,7 @@ function looksLikeCommand(t) {
 function normDateISO(s) {
   const v = String(s || '').toLowerCase().trim()
   if (!v || v === 'vandaag' || v === 'today') return todayISO()
-  if (v === 'morgen' || v === 'tomorrow') { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10) }
+  if (v === 'morgen' || v === 'tomorrow') { const d = new Date(); d.setDate(d.getDate() + 1); return toISO(d) }
   const m = v.match(/(\d{4})-(\d{2})-(\d{2})/)
   return m ? `${m[1]}-${m[2]}-${m[3]}` : todayISO()
 }
@@ -113,7 +113,17 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [budgetLine, setBudgetLine] = useState('')
+  // Budget: dezelfde berekening als de Geld-pagina en het Dashboard (useBudgetStats)
+  const { expenses, prevExpenses, loading: expLoading } = useExpenses(userId)
+  const { config: budgetConfig, loading: cfgLoading } = useBudgetConfig(userId)
+  const { yearExpenses } = useYearExpenses(userId)
+  const budgetStats = useBudgetStats({ expenses, prevExpenses, yearExpenses, config: budgetConfig })
+  const budgetLine = useMemo(() => {
+    if (expLoading || cfgLoading || !budgetConfig) return ''
+    const s = budgetStats
+    const left = s.adjustedRemaining
+    return `Budget deze maand: ongeveer €${Math.round(s.totalSpent)} uitgegeven van €${Math.round(s.adjustedBase)} (${left < 0 ? `€${Math.round(-left)} over het budget` : `€${Math.round(left)} over`}).`
+  }, [budgetStats, budgetConfig, expLoading, cfgLoading])
   const [briefing, setBriefing] = useState('')
   const [briefBusy, setBriefBusy] = useState(false)
   const [appH, setAppH] = useState(0)
@@ -121,30 +131,6 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
   const endRef = useRef(null)
   const scrollRef = useRef(null)
   const pageRef = useRef(null)
-
-  // Budgetsamenvatting van deze maand ophalen (indicatief)
-  useEffect(() => {
-    if (!userId) return
-    let cancelled = false
-    ;(async () => {
-      try {
-        const today = todayISO()
-        const monthStart = today.slice(0, 8) + '01'
-        const [{ data: cfg }, { data: exp }] = await Promise.all([
-          supabase.from('budget_config').select('monthly_budget').eq('user_id', userId).maybeSingle(),
-          supabase.from('expenses').select('amount,is_income,is_savings_withdrawal,is_savings_contribution,is_loan_repayment,paid_from_savings,category,is_planned,date')
-            .eq('user_id', userId).gte('date', monthStart).lte('date', today),
-        ])
-        if (cancelled) return
-        const budget = cfg?.monthly_budget || 0
-        const spent = (exp || [])
-          .filter(e => !e.is_income && !e.is_savings_withdrawal && !e.is_savings_contribution && !e.is_loan_repayment && !e.paid_from_savings && (!e.is_planned || e.amount > 0))
-          .reduce((s, e) => s + Number(e.amount), 0)
-        if (budget > 0) setBudgetLine(`Budget deze maand: ongeveer €${Math.round(spent)} uitgegeven van €${Math.round(budget)} (±€${Math.round(budget - spent)} over).`)
-      } catch { /* stil */ }
-    })()
-    return () => { cancelled = true }
-  }, [userId])
 
   const dataSummary = useMemo(() => {
     const today = todayISO()
@@ -368,14 +354,15 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
   return (
     <div ref={pageRef} style={{ height: appH ? `${appH}px` : '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 56, padding: '0 16px', borderBottom: '1px solid var(--c-border)', background: 'rgba(255,255,255,0.02)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+      {/* Op mobiel staat de titel al in de app-balk; daar alleen de 'Nieuw gesprek'-knop */}
+      <div className="h-11 md:h-14" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', borderBottom: '1px solid var(--c-border)', background: 'rgba(255,255,255,0.02)', flexShrink: 0 }}>
+        <div className="hidden md:flex items-center" style={{ gap: 9 }}>
           <div style={{ width: 24, height: 24, borderRadius: 8, background: 'linear-gradient(140deg, color-mix(in srgb, var(--accent) 90%, transparent), color-mix(in srgb, var(--accent) 55%, #3b82f6))', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 14px color-mix(in srgb, var(--accent) 40%, transparent)' }}>
             <span style={{ fontSize: 13, lineHeight: 1 }}>✦</span>
           </div>
           <h1 className="t-page" style={{ margin: 0, fontSize: 17 }}>Hypex AI</h1>
         </div>
-        <button onClick={() => setMessages([])} title="Nieuw gesprek" aria-label="Nieuw gesprek" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', padding: 8, display: 'flex', alignItems: 'center' }}>
+        <button onClick={() => setMessages([])} title="Nieuw gesprek" aria-label="Nieuw gesprek" style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', padding: 8, display: 'flex', alignItems: 'center' }}>
           <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
         </button>
       </div>

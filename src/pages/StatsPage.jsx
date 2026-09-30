@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import ReactDOM from 'react-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { supabase } from '../supabaseClient'
+import { toISO } from '../utils/recurrence'
 
 const DAYS = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo']
 const MONTHS_NL = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec']
@@ -13,7 +14,7 @@ function getWeekDays(offset = 0) {
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(now)
     d.setDate(now.getDate() + mondayOffset + i)
-    return d.toISOString().slice(0, 10)
+    return toISO(d)
   })
 }
 
@@ -130,7 +131,7 @@ function FocusCard({ userId, weekOffset }) {
   const [data, setData] = useState({})
   const [loading, setLoading] = useState(true)
   const days = getWeekDays(weekOffset)
-  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayStr = toISO(new Date())
 
   useEffect(() => {
     if (!userId) return
@@ -143,7 +144,7 @@ function FocusCard({ userId, weekOffset }) {
       .then(({ data: rows }) => {
         const map = {}
         for (const r of (rows || [])) {
-          const d = r.completed_at?.slice(0, 10)
+          const d = r.completed_at ? toISO(new Date(r.completed_at)) : undefined
           if (d) map[d] = (map[d] || 0) + (r.duration_minutes || 0)
         }
         // Merge localStorage for current week (this device's data)
@@ -180,21 +181,21 @@ function FocusCard({ userId, weekOffset }) {
 // ── Taken ─────────────────────────────────────────────────────────────────────
 function TakenCard({ tasks, weekOffset }) {
   const days = getWeekDays(weekOffset)
-  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayStr = toISO(new Date())
 
   // A task counts as "completed this week" if:
   // - completed=true AND updated_at is in this week's range
   // - fallback: date is in this week (for tasks without updated_at)
   const completedThisWeek = tasks.filter(t => {
     if (!t.completed) return false
-    const completedOn = t.updated_at?.slice(0, 10)
+    const completedOn = t.updated_at ? toISO(new Date(t.updated_at)) : undefined
     if (completedOn) return days.includes(completedOn)
     return t.date && days.includes(t.date)
   })
   const scheduledThisWeek = tasks.filter(t => t.date && days.includes(t.date))
   const incompleteDue = scheduledThisWeek.filter(t => !t.completed)
   const completedPerDay = days.map(d =>
-    completedThisWeek.filter(t => (t.updated_at?.slice(0, 10) || t.date) === d).length
+    completedThisWeek.filter(t => ((t.updated_at && toISO(new Date(t.updated_at))) || t.date) === d).length
   )
 
   return (
@@ -247,7 +248,7 @@ function GewoontesCard({ userId, weekOffset }) {
     })
   }, [userId, weekOffset]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayStr = toISO(new Date())
 
   const habitRows = habits.map(habit => {
     const freq = habit.frequency ?? [0, 1, 2, 3, 4, 5, 6]
@@ -437,7 +438,7 @@ function LeaderboardCard({ userId, profiles, xpMap }) {
     <div className="card" style={{ padding: '18px 20px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
         <h2 className="t-card" style={{ margin: 0 }}>🏆 Leaderboard</h2>
-        <span className="t-meta">Gewoontes XP</span>
+        <span className="t-meta">Totaal XP</span>
       </div>
       {loading ? (
         <div style={{ color: 'var(--text-3)', fontSize: 12 }}>Laden…</div>
@@ -609,7 +610,7 @@ export default function StatsPage({ tasks, userId, profiles = [], onLevelUpSeen 
         <div className="stats-grid">
           <FocusCard userId={userId} weekOffset={weekOffset} />
           <TakenCard tasks={tasks} weekOffset={weekOffset} />
-          <GewoontesCard userId={userId} weekOffset={weekOffset} />
+          {/* <GewoontesCard userId={userId} weekOffset={weekOffset} />  INACTIVE — Gewoontes-pagina staat uit */}
           <JumboCard />
         </div>
 

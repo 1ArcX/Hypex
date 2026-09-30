@@ -1,3 +1,4 @@
+import { useRef, useState, useEffect } from 'react'
 import { toneColor, tint } from './tone'
 
 /**
@@ -7,10 +8,23 @@ import { toneColor, tint } from './tone'
  */
 export function FilterTabs({ items, value, onChange, variant = 'pills', label, wrap = false, style }) {
   const segmented = variant === 'segmented'
+  // Horizontaal scrollbare pills: zachte fade aan de rand zolang er nog tabs buiten beeld staan
+  const ref = useRef(null)
+  const [moreRight, setMoreRight] = useState(false)
+  useEffect(() => {
+    const el = ref.current
+    if (!el || wrap) return
+    const check = () => setMoreRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 2)
+    check()
+    el.addEventListener('scroll', check, { passive: true })
+    window.addEventListener('resize', check)
+    return () => { el.removeEventListener('scroll', check); window.removeEventListener('resize', check) }
+  }, [wrap, items.length])
+  const fade = moreRight ? 'linear-gradient(to right, #000 calc(100% - 28px), transparent)' : undefined
   return (
-    <div role="tablist" aria-label={label} style={{
+    <div ref={ref} role="tablist" aria-label={label} style={{
       display: 'flex', gap: segmented ? 2 : 6, alignItems: 'center', minWidth: 0,
-      ...(wrap ? { flexWrap: 'wrap' } : { overflowX: 'auto', scrollbarWidth: 'none' }),
+      ...(wrap ? { flexWrap: 'wrap' } : { overflowX: 'auto', scrollbarWidth: 'none', maskImage: fade, WebkitMaskImage: fade }),
       ...(segmented ? { padding: 2, borderRadius: 'var(--r-sm)', background: 'var(--c-surface-2)', border: '1px solid var(--c-border)' } : null),
       ...style,
     }}>

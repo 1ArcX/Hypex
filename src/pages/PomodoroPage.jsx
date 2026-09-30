@@ -3,6 +3,7 @@ import PomodoroTimer from '../components/PomodoroTimer'
 import StudieBuddiesWidget from '../components/StudieBuddiesWidget'
 import PomodoroStats from '../components/PomodoroStats'
 import { Target, Clock3 } from 'lucide-react'
+import { toISO } from '../utils/recurrence'
 
 const SESSION_LOG_KEY = 'pomodoro_session_log'
 const MODE_META = {
@@ -23,8 +24,8 @@ function fmtTime(ts) {
 function fmtDate(dateStr) {
   if (!dateStr) return ''
   const d = new Date(dateStr + 'T12:00:00')
-  const today = new Date().toISOString().slice(0, 10)
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+  const today = toISO(new Date())
+  const yesterday = toISO(new Date(Date.now() - 86400000))
   if (dateStr === today) return 'Vandaag'
   if (dateStr === yesterday) return 'Gisteren'
   return `${d.getDate()} ${MONTHS[d.getMonth()]}`
@@ -105,7 +106,7 @@ export default function PomodoroPage({ onModeChange, onFocusModeChange, onPomodo
     })
   }
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = toISO(new Date())
   const byDate = {}
   for (const s of sessions) {
     if (!byDate[s.date]) byDate[s.date] = []

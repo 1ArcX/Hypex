@@ -526,7 +526,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
               const isToday = isSameDay(d, now)
               return (
                 <div key={i} style={{ padding: '8px 6px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 500, letterSpacing: '0.06em', color: isToday ? 'var(--accent)' : 'var(--c-text-3)', marginBottom: '4px', textTransform: 'uppercase', fontWeight: isToday ? 700 : 500 }}>
+                  <div style={{ fontSize: '11px', letterSpacing: '0.06em', color: isToday ? 'var(--accent)' : 'var(--c-text-3)', marginBottom: '4px', textTransform: 'uppercase', fontWeight: isToday ? 700 : 500 }}>
                     {DAYS_SHORT[d.getDay()]}
                   </div>
                   <div
@@ -614,7 +614,8 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
               <React.Fragment key={h}>
                 <div style={{ position: 'absolute', top: `${h * HOUR_H}px`, left: 0, width: `${TIME_COL}px`, height: `${HOUR_H}px`, display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end', paddingRight: '10px', boxSizing: 'border-box', pointerEvents: 'none', transform: h === 0 ? 'none' : 'translateY(-8px)' }}>
                   <span style={{ fontSize: '10px', color: 'var(--c-text-3)', fontVariantNumeric: 'tabular-nums', lineHeight: 1, userSelect: 'none' }}>
-                    {h === 0 ? '' : `${pad(h)}:00`}
+                    {/* verberg het uurlabel als de rode nu-pill er overheen valt */}
+                    {h === 0 || (showNowLine && Math.abs(nowMins - h * 60) < 15) ? '' : `${pad(h)}:00`}
                   </span>
                 </div>
                 <div style={{ position: 'absolute', top: `${h * HOUR_H}px`, left: `${TIME_COL}px`, right: 0, height: `${HOUR_H}px`, borderTop: '1px solid rgba(255,255,255,0.045)', display: 'grid', gridTemplateColumns: `repeat(${N}, minmax(0, 1fr))` }}>

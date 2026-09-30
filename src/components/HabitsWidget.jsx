@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import ReactDOM from 'react-dom'
 import { supabase } from '../supabaseClient'
 import { Plus, X, Trash2, Flame, Pencil, Minus, Trophy, Search, ChevronLeft, PauseCircle, PlayCircle, BarChart2, BookOpen } from 'lucide-react'
+import { toISO } from '../utils/recurrence'
 
 const EMOJIS = [
   '🏃','📚','💧','🧘','🥗','😴','💪','🎯','✍️','🎨',
@@ -155,13 +156,13 @@ function saveNote(habitId, date, text) {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function jsDayToFreq(jsDay) { return (jsDay + 6) % 7 }
-function todayStr() { return new Date().toISOString().slice(0, 10) }
+function todayStr() { return toISO(new Date()) }
 
 function getLast7Days() {
   const days = []
   for (let i = 6; i >= 0; i--) {
     const d = new Date(); d.setDate(d.getDate() - i)
-    days.push(d.toISOString().slice(0, 10))
+    days.push(toISO(d))
   }
   return days
 }
@@ -170,7 +171,7 @@ function getLast30Days() {
   const days = []
   for (let i = 29; i >= 0; i--) {
     const d = new Date(); d.setDate(d.getDate() - i)
-    days.push(d.toISOString().slice(0, 10))
+    days.push(toISO(d))
   }
   return days
 }
@@ -180,7 +181,7 @@ function calcStreak(completionSet, habit) {
   let streak = 0
   const d = new Date()
   for (let i = 0; i < 365; i++) {
-    const dateStr = d.toISOString().slice(0, 10)
+    const dateStr = toISO(d)
     const dayFreq = jsDayToFreq(d.getDay())
     if (freq.includes(dayFreq)) {
       if (completionSet.has(dateStr)) streak++
@@ -196,7 +197,7 @@ function calcBestStreak(completionSet, habit) {
   let best = 0, cur = 0
   const d = new Date(); d.setDate(d.getDate() - 364)
   for (let i = 0; i < 365; i++) {
-    const dateStr = d.toISOString().slice(0, 10)
+    const dateStr = toISO(d)
     const dayFreq = jsDayToFreq(d.getDay())
     if (freq.includes(dayFreq)) {
       if (completionSet.has(dateStr)) { cur++; best = Math.max(best, cur) }
@@ -227,7 +228,7 @@ function isScheduledToday(habit, date = todayStr()) {
   const type = habit.frequency_type || 'specific_days'
   if (type === 'times_per_week') return true
   if (type === 'every_n_days') {
-    const start = habit.created_at ? new Date(habit.created_at).toISOString().slice(0, 10) : date
+    const start = habit.created_at ? toISO(new Date(habit.created_at)) : date
     const diff = Math.round((new Date(date + 'T12:00:00') - new Date(start + 'T12:00:00')) / 86400000)
     return diff >= 0 && diff % (habit.frequency_value || 1) === 0
   }
@@ -257,7 +258,7 @@ function calcStreakNew(completionSet, habit) {
       const wEnd = new Date(wStart); wEnd.setDate(wStart.getDate() + 6)
       let count = 0
       const c = new Date(wStart)
-      while (c <= wEnd && c <= now) { if (completionSet.has(c.toISOString().slice(0,10))) count++; c.setDate(c.getDate()+1) }
+      while (c <= wEnd && c <= now) { if (completionSet.has(toISO(c))) count++; c.setDate(c.getDate()+1) }
       if (w === 0 && count === 0 && streak === 0) break
       if (count >= target) streak++
       else if (w > 0) break
@@ -266,11 +267,11 @@ function calcStreakNew(completionSet, habit) {
   }
   if (type === 'every_n_days') {
     const n = habit.frequency_value || 1
-    const start = habit.created_at ? new Date(habit.created_at).toISOString().slice(0, 10) : todayStr()
+    const start = habit.created_at ? toISO(new Date(habit.created_at)) : todayStr()
     let streak = 0
     const d = new Date()
     for (let i = 0; i < 365; i++) {
-      const ds = d.toISOString().slice(0, 10)
+      const ds = toISO(d)
       const diff = Math.round((new Date(ds + 'T12:00:00') - new Date(start + 'T12:00:00')) / 86400000)
       if (diff >= 0 && diff % n === 0) {
         if (completionSet.has(ds)) streak++; else break
@@ -286,7 +287,7 @@ function calcStreakNew(completionSet, habit) {
     for (let m = 0; m < 24; m++) {
       const cd = new Date(now.getFullYear(), now.getMonth() - m, targetDay)
       if (cd > now) continue
-      if (completionSet.has(cd.toISOString().slice(0,10))) streak++; else break
+      if (completionSet.has(toISO(cd))) streak++; else break
     }
     return streak
   }
@@ -294,7 +295,7 @@ function calcStreakNew(completionSet, habit) {
   let streak = 0
   const d = new Date()
   for (let i = 0; i < 365; i++) {
-    const ds = d.toISOString().slice(0, 10)
+    const ds = toISO(d)
     if (freq.includes(jsDayToFreq(d.getDay()))) {
       if (completionSet.has(ds)) streak++; else break
     }
@@ -316,18 +317,18 @@ function calcBestStreakNew(completionSet, habit) {
       const wEnd = new Date(wStart); wEnd.setDate(wStart.getDate() + 6)
       let count = 0
       const c = new Date(wStart)
-      while (c <= wEnd && c <= now) { if (completionSet.has(c.toISOString().slice(0,10))) count++; c.setDate(c.getDate()+1) }
+      while (c <= wEnd && c <= now) { if (completionSet.has(toISO(c))) count++; c.setDate(c.getDate()+1) }
       if (count >= target) { cur++; best = Math.max(best, cur) } else cur = 0
     }
     return best
   }
   if (type === 'every_n_days') {
     const n = habit.frequency_value || 1
-    const start = habit.created_at ? new Date(habit.created_at).toISOString().slice(0, 10) : todayStr()
+    const start = habit.created_at ? toISO(new Date(habit.created_at)) : todayStr()
     let best = 0, cur = 0
     const d = new Date(); d.setDate(d.getDate() - 364)
     for (let i = 0; i < 365; i++) {
-      const ds = d.toISOString().slice(0, 10)
+      const ds = toISO(d)
       const diff = Math.round((new Date(ds + 'T12:00:00') - new Date(start + 'T12:00:00')) / 86400000)
       if (diff >= 0 && diff % n === 0) {
         if (completionSet.has(ds)) { cur++; best = Math.max(best, cur) } else cur = 0
@@ -343,7 +344,7 @@ function calcBestStreakNew(completionSet, habit) {
     for (let m = 23; m >= 0; m--) {
       const cd = new Date(now.getFullYear(), now.getMonth() - m, targetDay)
       if (cd > now) continue
-      if (completionSet.has(cd.toISOString().slice(0,10))) { cur++; best = Math.max(best, cur) } else cur = 0
+      if (completionSet.has(toISO(cd))) { cur++; best = Math.max(best, cur) } else cur = 0
     }
     return best
   }
@@ -351,7 +352,7 @@ function calcBestStreakNew(completionSet, habit) {
   let best = 0, cur = 0
   const d = new Date(); d.setDate(d.getDate() - 364)
   for (let i = 0; i < 365; i++) {
-    const ds = d.toISOString().slice(0, 10)
+    const ds = toISO(d)
     if (freq.includes(jsDayToFreq(d.getDay()))) {
       if (completionSet.has(ds)) { cur++; best = Math.max(best, cur) } else cur = 0
     }
@@ -457,7 +458,7 @@ function HabitDetailModal({ habit, completions, counterConfig, counterValues, on
       const dt = new Date(d + 'T12:00:00')
       const dow = (dt.getDay() + 6) % 7
       const mon = new Date(dt); mon.setDate(dt.getDate() - dow)
-      const wk = mon.toISOString().slice(0, 10)
+      const wk = toISO(mon)
       if (!weekMap[wk]) weekMap[wk] = []
       weekMap[wk].push(d)
     }
@@ -704,7 +705,7 @@ function HabitLibraryModal({ onPick, onCreateOwn, onClose }) {
 // ─── Weekly Review Modal ──────────────────────────────────────────────────────
 function WeeklyReviewModal({ habits, completions, counterConfig, counterValues, onClose }) {
   const last7 = getLast7Days()
-  const prevWeek = Array.from({length:7}, (_,i) => { const d = new Date(); d.setDate(d.getDate() - 7 + i); return d.toISOString().slice(0,10) })
+  const prevWeek = Array.from({length:7}, (_,i) => { const d = new Date(); d.setDate(d.getDate() - 7 + i); return toISO(d) })
   // Ma = prevWeek[0], Zo = prevWeek[6] — but last7 is already the right prev 7 days
   const weekLabel = (() => {
     const fmt = (ds) => { const d = new Date(ds+'T12:00:00'); return `${d.getDate()} ${['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'][d.getMonth()]}` }
@@ -1057,7 +1058,7 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
       setShowPerfectDay(true)
       const recentPerfect = [...perfectDaysRef.current].filter(d => {
         const ago = new Date(); ago.setDate(ago.getDate() - 7)
-        return d >= ago.toISOString().slice(0, 10)
+        return d >= toISO(ago)
       }).length
       const achKey = recentPerfect >= 7 ? 'perfect_7' : recentPerfect >= 3 ? 'perfect_3' : null
       if (achKey && !seenAchievementsRef.current.has(achKey)) {
@@ -1079,7 +1080,7 @@ export default function HabitsWidget({ userId, compact = false, syncTrigger = 0,
   const fetchCompletions = useCallback(async () => {
     const from = new Date(); from.setDate(from.getDate() - 60)
     const { data } = await supabase.from('habit_completions').select('habit_id, date')
-      .eq('user_id', userId).gte('date', from.toISOString().slice(0, 10))
+      .eq('user_id', userId).gte('date', toISO(from))
     const map = {}
     for (const row of (data || [])) {
       if (!map[row.habit_id]) map[row.habit_id] = new Set()

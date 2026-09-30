@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { X, Trash2, Save, Repeat, Clock } from 'lucide-react'
 import { RECURRENCE, recurrenceLabel, snapToPattern } from '../utils/recurrence'
 import { DAYPARTS } from '../utils/daypart'
+import { toISO } from '../utils/recurrence'
 
 const EVENT_COLORS = ['#00FFD1','#818CF8','#FF8C42','#FF6B6B','#4ADE80','#FACC15','#38BDF8']
 const DURATION_PRESETS = [15, 30, 45, 60, 90]
@@ -50,13 +51,13 @@ function formatDutchDate(d) {
 
 function suggestFreeSlots(durationMins, tasks, calendarEvents, maxResults = 8) {
   const now = new Date()
-  const todayStr = now.toISOString().slice(0, 10)
+  const todayStr = toISO(now)
   const nowMins = now.getHours() * 60 + now.getMinutes() + 30 // 30 min buffer
   const results = []
   for (let i = 0; i < 14 && results.length < maxResults; i++) {
     const d = new Date(now)
     d.setDate(now.getDate() + i)
-    const dateStr = d.toISOString().slice(0, 10)
+    const dateStr = toISO(d)
     const slots = getFreeSlots(dateStr, durationMins, tasks, calendarEvents)
     for (const slot of slots) {
       if (dateStr === todayStr && timeStrToMins(slot.startStr) < nowMins) continue
@@ -79,7 +80,7 @@ function getFreeSlots(dateStr, durationMins, tasks, calendarEvents) {
         lessons
           .filter(l => {
             if (!l.start || l.uitgevallen) return false
-            if (new Date(l.start).toISOString().slice(0, 10) !== dateStr) return false
+            if (toISO(new Date(l.start)) !== dateStr) return false
             const vak = (l.vak || '').toUpperCase().trim()
             if (vak === 'LNK' || vak.startsWith('LNK ')) return false // keuze werktijd
             return true
@@ -111,7 +112,7 @@ function getFreeSlots(dateStr, durationMins, tasks, calendarEvents) {
   ;(calendarEvents || []).forEach(ev => {
     try {
       const s = new Date(ev.start_time)
-      if (s.toISOString().slice(0, 10) !== dateStr) return
+      if (toISO(s) !== dateStr) return
       const e = new Date(ev.end_time)
       bezet.push({ start: s.getHours() * 60 + s.getMinutes(), end: e.getHours() * 60 + e.getMinutes() })
     } catch {}
@@ -185,7 +186,7 @@ function getConflicts(dateStr, startMins, endMins, tasks, calendarEvents, exclud
         const lessons = JSON.parse(sessionStorage.getItem(k)) || []
         lessons.forEach(l => {
           if (!l.start || l.uitgevallen) return
-          if (new Date(l.start).toISOString().slice(0, 10) !== dateStr) return
+          if (toISO(new Date(l.start)) !== dateStr) return
           const vak = (l.vak || '').toUpperCase().trim()
           if (vak === 'LNK' || vak.startsWith('LNK ')) return
           const s = new Date(l.start), e = new Date(l.einde || l.start)
@@ -207,7 +208,7 @@ function getConflicts(dateStr, startMins, endMins, tasks, calendarEvents, exclud
   ;(calendarEvents || []).forEach(ev => {
     try {
       const s = new Date(ev.start_time)
-      if (s.toISOString().slice(0, 10) !== dateStr) return
+      if (toISO(s) !== dateStr) return
       const e = new Date(ev.end_time)
       const es = s.getHours() * 60 + s.getMinutes()
       const ee = e.getHours() * 60 + e.getMinutes()
@@ -264,7 +265,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
       setDescription(task.description || '')
       const hasNoDate = !task.date
       setNoDate(hasNoDate)
-      setDate(task.date || new Date().toISOString().slice(0, 10))
+      setDate(task.date || toISO(new Date()))
       const isAllDay = !task.start_time && !task.time && !task.end_time
       setAllDay(hasNoDate ? false : isAllDay)
       setStartTime(task.start_time || task.time || '09:00')
@@ -281,7 +282,7 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
       setDaypart(task.daypart || null)
     } else {
       setNoDate(false)
-      setDate(defaultDate || new Date().toISOString().slice(0, 10))
+      setDate(defaultDate || toISO(new Date()))
       setStartTime(defaultTime || '09:00')
       setEndTime(defaultTime ? (defaultTime.slice(0, 2) < '23' ? `${String(parseInt(defaultTime) + 1).padStart(2, '0')}:00` : '23:59') : '10:00')
       // Standaard hele dag; alleen met een echt tijdslot (defaultTime) een tijd
@@ -357,8 +358,8 @@ export default function TaskModal({ task, defaultTime, defaultDate, subjects, ca
     })
   }
 
-  const quickToday = new Date().toISOString().slice(0, 10)
-  const quickTomorrow = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10) })()
+  const quickToday = toISO(new Date())
+  const quickTomorrow = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return toISO(d) })()
   const chipStyle = (active, accent) => ({
     padding: '6px 12px', borderRadius: 9,
     border: `1px solid ${active ? (accent ? `${accent}66` : 'color-mix(in srgb, var(--accent) 50%, transparent)') : 'rgba(255,255,255,0.1)'}`,

@@ -9,6 +9,7 @@ import {
 import { calcRecurringThisMonth } from '../lib/recurring'
 import { calcWeekBudget, calcWeekTotals, weekIndexOfDay } from '../lib/weekBudget'
 import { useGeldStore } from '../store/geldStore'
+import { toISODate } from '../lib/format'
 
 export interface BudgetStatsInput {
   expenses: Expense[]
@@ -119,7 +120,7 @@ export function useBudgetStats({ expenses, prevExpenses, yearExpenses, config }:
     let spaarStreak = 0
     for (let i = 0; i < 366; i++) {
       const d = new Date(); d.setDate(d.getDate() - i)
-      const ds = d.toISOString().slice(0, 10)
+      const ds = toISODate(d)
       if (savingsWithdrawals.some(e => e.date === ds)) break
       spaarStreak++
     }
