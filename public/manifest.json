@@ -8,6 +8,8 @@
   "theme_color": "#0b0b0f",
   "description": "Jouw persoonlijk student dashboard",
   "icons": [
-    { "src": "/icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "/icon.png?v=2", "sizes": "1024x1024", "type": "image/png", "purpose": "any" },
+    { "src": "/icon.png?v=2", "sizes": "1024x1024", "type": "image/png", "purpose": "maskable" },
+    { "src": "/apple-touch-icon.png?v=2", "sizes": "180x180", "type": "image/png" }
   ]
 }

@@ -49,14 +49,10 @@ export default function Sidebar({
       {/* Logo */}
       <div style={{ padding: '16px 14px 12px', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 30, height: 30, borderRadius: '50%',
-            border: '2px solid var(--accent)',
-            boxShadow: '0 0 10px color-mix(in srgb, var(--accent) 30%, transparent)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-          }} aria-hidden="true">
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)' }} />
-          </div>
+          <img
+            src="/logo.png" alt="" aria-hidden="true" width={30} height={30}
+            style={{ width: 30, height: 30, flexShrink: 0, display: 'block' }}
+          />
           <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--c-text)', letterSpacing: '-0.02em' }}>Hypex</span>
           {/* Sync indicator */}
           <RefreshCw

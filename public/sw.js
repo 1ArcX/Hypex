@@ -1,4 +1,4 @@
-const CACHE = 'hypex-v3'
+const CACHE = 'hypex-v4'
 const ICON  = '/icon.png'
 
 self.addEventListener('install', e => {
