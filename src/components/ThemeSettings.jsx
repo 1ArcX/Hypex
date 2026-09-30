@@ -1,8 +1,12 @@
 import React, { useState } from 'react'
-import { X, Palette, RotateCcw, LogOut, Bell, BellOff, Home, Calendar, CheckSquare, Play, CalendarPlus } from 'lucide-react'
+import { X, Palette, RotateCcw, LogOut, Bell, BellOff, Home, Calendar, CheckSquare, Play, CalendarPlus, Download } from 'lucide-react'
 import { IconButton, ProgressBar, Pill } from './ui'
 import { pushSupported, requestAndSubscribe } from '../utils/push'
 import CalendarConnections from './CalendarConnections'
+
+// Download van de Windows-app (desktop/); niet tonen binnen de app zelf.
+const DESKTOP_DOWNLOAD = '/downloads/Hypex-Setup.exe'
+const IS_WINDOWS_BROWSER = typeof window !== 'undefined' && !window.__HYPEX_DESKTOP__ && /Windows NT/.test(navigator.userAgent)
 
 const PRESETS = [
   { name: 'Neon Cyan', accent: '#00FFD1', bg1: '#0a0a1a', bg2: '#0d1117' },
@@ -185,6 +189,18 @@ export default function ThemeSettings({ onClose, theme, setTheme, onLogout, user
             <CalendarPlus size={14} aria-hidden="true" /> Google Agenda of MijnX koppelen
           </button>
         </div>
+
+        {IS_WINDOWS_BROWSER && (
+          <div style={{ marginBottom: 18 }}>
+            <p style={label}>Desktop-app</p>
+            <a href={DESKTOP_DOWNLOAD} download className="btn-ghost" style={{ width: '100%', padding: '9px 12px', textDecoration: 'none' }}>
+              <Download size={14} aria-hidden="true" /> Download Hypex voor Windows
+            </a>
+            <div style={{ fontSize: 11, color: 'var(--c-text-3)', marginTop: 6, lineHeight: 1.5 }}>
+              Eigen venster, werkt zichzelf bij. Zie je "Windows heeft uw pc beschermd"? Kies Meer info → Toch uitvoeren.
+            </div>
+          </div>
+        )}
 
         <button onClick={resetTheme} className="btn-ghost" style={{ width: '100%', padding: '9px 12px', marginBottom: 8, color: 'var(--c-text-2)' }}>
           <RotateCcw size={13} aria-hidden="true" /> Standaard herstellen

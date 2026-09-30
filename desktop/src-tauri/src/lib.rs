@@ -43,6 +43,8 @@ fn build_main(app: &tauri::AppHandle) -> tauri::Result<()> {
         .min_inner_size(900.0, 620.0)
         .theme(Some(tauri::Theme::Dark))
         .background_color(BG)
+        // Lets the site know it runs inside the app (hides the download button).
+        .initialization_script("window.__HYPEX_DESKTOP__ = true;")
         .on_new_window(move |url, features| {
             if !open_in_app(&url) {
                 let _ = handle.opener().open_url(url.as_str(), None::<&str>);

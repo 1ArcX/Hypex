@@ -114,7 +114,7 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 - **DagbriefingStrip** — [components/ai/DagbriefingStrip.jsx](../src/components/ai/DagbriefingStrip.jsx) — structured briefing tiles (Urgent, Te laat, Volgende afspraak, Dagbudget) from real data above the AI text. Aliases: "dagbriefing", "briefing".
 
 ### Settings / admin / onboarding / auth
-- **ThemeSettings** — [components/ThemeSettings.jsx](../src/components/ThemeSettings.jsx) — "Instellingen": accent color presets + eigen kleur, "Live preview" mini-UI, meldingen, external calendars. Aliases: "instellingen", "settings", "thema", "accentkleur".
+- **ThemeSettings** — [components/ThemeSettings.jsx](../src/components/ThemeSettings.jsx) — "Instellingen": accent color presets + eigen kleur, "Live preview" mini-UI, meldingen, external calendars, "Desktop-app" download (Windows browsers only, hidden inside the app via `window.__HYPEX_DESKTOP__`). Aliases: "instellingen", "settings", "thema", "accentkleur".
 - **CalendarConnections** — [components/CalendarConnections.jsx](../src/components/CalendarConnections.jsx) — "Agenda's koppelen" (Google / MyX). Opened from ThemeSettings. Aliases: "agenda koppelen", "calendar connections", "externe agenda's".
 - **AdminPanel** — [components/AdminPanel.jsx](../src/components/AdminPanel.jsx) — "Admin Paneel": user management, push test, `werk_tab` toggle. Aliases: "admin", "admin paneel", "gebruikersbeheer".
 - **OnboardingModal** — [components/OnboardingModal.jsx](../src/components/OnboardingModal.jsx) — first-login flow ("Welkom bij Dash", location, Magister, notifications). Aliases: "onboarding", "welkom scherm", "intro".
@@ -190,7 +190,8 @@ Self-contained money/budget app, mounted via [pages/GeldPage.jsx](../src/pages/G
   so every Netlify deploy appears in the app automatically. Logic in [desktop/src-tauri/src/lib.rs](../desktop/src-tauri/src/lib.rs):
   auth/`about:blank`/same-site popups open as in-app windows (keeps `window.opener`/`postMessage` working for
   Google agenda + Simacan), other `window.open` / `_blank` links go to the default browser; single instance; remembers window size.
-- Build: `cd desktop && npm run build` → `desktop/src-tauri/target/release/bundle/nsis/Hypex_<version>_x64-setup.exe`.
+- Build: `cd desktop && npm run release` → builds the NSIS installer and copies it to `public/downloads/Hypex-Setup.exe`
+  (served by Netlify; linked from ThemeSettings). The app injects `window.__HYPEX_DESKTOP__ = true`.
   Only rebuild when the shell itself changes (icon, window behaviour). Aliases: "desktop app", "exe", "pc app", "tauri".
 
 ## Known unused / naming notes

@@ -7,7 +7,8 @@
     "tauri": "tauri",
     "dev": "tauri dev",
     "build": "tauri build",
-    "icons": "tauri icon ../public/icon.png"
+    "icons": "tauri icon ../public/icon.png",
+    "release": "tauri build && node -e \"require('fs').mkdirSync('../public/downloads',{recursive:true});require('fs').copyFileSync('src-tauri/target/release/bundle/nsis/Hypex_'+require('./package.json').version+'_x64-setup.exe','../public/downloads/Hypex-Setup.exe')\""
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.9.0"
