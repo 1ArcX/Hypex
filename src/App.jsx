@@ -11,7 +11,6 @@ import OnboardingModal from './components/OnboardingModal'
 
 import Sidebar from './components/Sidebar'
 import { useNavLayout } from './hooks/useNavLayout'
-import { useViewport } from './hooks/useViewport'
 import VersionChecker from './components/VersionChecker'
 import { callMagister } from './utils/magisterApi'
 import { ensureSomtodayCreds } from './utils/somtodayApi'
@@ -714,7 +713,6 @@ export default function App() {
 
   // Desktop-navigatie: positie (links/boven) + automatisch verbergen (per apparaat)
   const [navLayout] = useNavLayout()
-  const viewport = useViewport()
   const navTop = navLayout.position === 'top'
   const [navShown, setNavShown] = useState(false)
   const navHideTimer = useRef(null)
@@ -791,7 +789,6 @@ export default function App() {
           onMouseLeave={navLayout.autoHide ? hideNavSoon : undefined}>
           <Sidebar
             orientation={navTop ? 'horizontal' : 'vertical'}
-            rail={!navTop && !navLayout.autoHide && viewport.w < 1200}
             activePage={activePage}
             setActivePage={handleSetActivePage}
             isAdmin={isAdmin}

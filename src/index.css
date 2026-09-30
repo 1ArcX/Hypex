@@ -735,44 +735,44 @@ select {
   font-weight: 600;
 }
 .hx-nav-item { position: relative; }
-.hx-dot { display: none; position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--c-danger); box-shadow: 0 0 0 2px var(--bg-base); }
-.hx-dot--accent { background: var(--accent); }
 .hx-avatar {
   width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
   background: var(--accent); color: var(--on-accent);
   display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700;
 }
 
-/* Zijbalk verticaal: vol (208px) of icoonrail (64px) */
+/* Zijbalk links */
 .hx-sidebar--v {
   width: 208px; flex-shrink: 0; height: 100vh; position: sticky; top: 0; overflow-y: auto;
   display: flex; flex-direction: column;
   background: rgba(255, 255, 255, 0.02); border-right: 1px solid var(--c-border);
-  transition: width var(--t-base) ease;
 }
-.hx-sidebar--v.is-rail { width: 64px; }
-.hx-sidebar.is-rail .hx-label, .hx-sidebar.is-rail .hx-badge { display: none; }
-.hx-sidebar.is-rail .hx-dot { display: block; }
-.hx-sidebar.is-rail .hx-nav-item { justify-content: center; padding: 0; height: 40px; }
 
-/* Balk bovenaan */
+/* Balk bovenaan — navknoppen 45° schuin, uiteinde rechtsonder.
+   Elke knop zit in een vaste slot en draait om zijn linkerbovenhoek. */
 .hx-topbar {
-  container: topbar / inline-size; width: 100%; height: 52px; flex-shrink: 0;
+  container: topbar / inline-size; width: 100%; height: 118px; flex-shrink: 0;
   background: rgba(255, 255, 255, 0.02); border-bottom: 1px solid var(--c-border);
 }
-.hx-topbar-inner { height: 100%; display: flex; align-items: center; gap: 16px; padding: 0 12px 0 14px; }
-.hx-topbar-nav { flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px; overflow: hidden; }
-.hx-topbar .hx-nav-item { width: auto; margin: 0; flex-shrink: 0; }
-.hx-topbar .hx-nav-item .hx-label { flex: none !important; }
-@container topbar (max-width: 1080px) {
-  .hx-topbar .hx-label, .hx-topbar .hx-badge { display: none; }
-  .hx-topbar .hx-dot { display: block; }
-  .hx-topbar .hx-nav-item { padding: 0 11px; }
+.hx-topbar-inner { height: 100%; display: flex; align-items: flex-start; gap: 16px; padding: 12px 12px 0 14px; box-sizing: border-box; }
+.hx-topbar-side { display: flex; align-items: center; gap: 8px; flex-shrink: 0; height: 34px; }
+.hx-topbar-nav {
+  flex: 1; min-width: 0; height: 100%; display: flex; align-items: flex-start;
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: none; padding-left: 24px;
 }
-@container topbar (max-width: 1340px) {
-  .hx-topbar.is-many .hx-label, .hx-topbar.is-many .hx-badge { display: none; }
-  .hx-topbar.is-many .hx-dot { display: block; }
-  .hx-topbar.is-many .hx-nav-item { padding: 0 11px; }
+.hx-topbar-nav::-webkit-scrollbar { display: none; }
+.hx-tilt-slot { position: relative; flex: 0 0 56px; height: 100%; }
+.hx-tilt-slot:last-child { margin-right: 84px; }
+.hx-topbar .hx-nav-item { width: auto; margin: 0; flex-shrink: 0; }
+.hx-topbar .hx-tilt-slot .hx-nav-item {
+  position: absolute; top: 2px; left: 0; width: 112px; height: 30px; padding: 0 10px; gap: 7px;
+  transform: rotate(45deg); transform-origin: top left;
+  background: var(--c-surface); border-color: var(--c-border);
+}
+.hx-topbar .hx-tilt-slot .hx-nav-item:hover { background: var(--c-surface-2); }
+.hx-topbar .hx-tilt-slot .hx-nav-item.is-active { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+@container topbar (max-width: 1000px) {
+  .hx-tilt-slot { flex-basis: 48px; }
 }
 
 /* Automatisch verbergen: nav schuift over de inhoud, verschijnt via een hot-zone aan de rand */
