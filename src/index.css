@@ -996,19 +996,23 @@ select {
 @media (max-width: 767px) { .hide-mobile { display: none !important; } }
 
 /* ===== POMODORO (sfeervolle hero) ===== */
-.pomo-page { height: 100%; overflow-y: auto; padding: 16px 20px 100px; box-sizing: border-box; background: var(--bg-base); container: pomo / inline-size; --pomo-w: 820px; --ring: 260px; }
+.pomo-page { --pomo-pad-t: 16px; height: 100%; overflow-y: auto; padding: var(--pomo-pad-t) 20px 20px; box-sizing: border-box; background: var(--bg-base); container: pomo / inline-size; --pomo-w: 820px; --ring: 260px; }
+/* Eén scène-paneel: achtergrond en inhoud delen één gridcel. De achtergrond is sticky en zo hoog als
+   het zichtbare deel (--scene-h, gemeten in PomodoroHero), dus hij loopt bij scrollen tot de onderkant
+   door zonder dat de scène uitrekt. overflow: clip (niet hidden) zodat sticky t.o.v. .pomo-page werkt. */
 .pomo-hero {
-  position: relative; isolation: isolate; overflow: hidden;
+  position: relative; isolation: isolate; overflow: clip; background: #050a17;
   border-radius: var(--r-xl); border: 1px solid rgba(120, 160, 255, 0.12);
-  min-height: calc(100vh - 32px); display: flex; justify-content: center;
+  min-height: calc(100vh - 32px);
+  display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); justify-items: center;
 }
-.pomo-bg, .pomo-bg-shade, .pomo-scene, .pomo-scene-canvas { position: absolute; inset: 0; }
-.pomo-bg { z-index: -1; background: #050a17; }
+/* negatieve marge: de achtergrond telt niet mee voor de hoogte van de hero */
+.pomo-bg {
+  grid-area: 1 / 1; align-self: start; position: sticky; top: calc(-1 * var(--pomo-pad-t)); width: 100%; z-index: -1;
+  height: var(--scene-h, 100vh); margin-bottom: calc(-1 * var(--scene-h, 100vh));
+}
+.pomo-bg-shade, .pomo-scene, .pomo-scene-canvas { position: absolute; inset: 0; }
 .pomo-scene-canvas { width: 100%; height: 100%; display: block; }
-.pomo-scene::after {
-  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 22%;
-  background: linear-gradient(180deg, rgba(5, 10, 23, 0), #050a17);
-}
 .pomo-bg-shade {
   background:
     radial-gradient(600px 360px at 50% 30%, color-mix(in srgb, var(--pomo-mode) 10%, transparent), transparent 70%),
@@ -1042,6 +1046,7 @@ select {
   background: rgba(4, 8, 20, 0.7); color: var(--accent);
 }
 .pomo-content {
+  grid-area: 1 / 1; align-self: start;
   width: 100%; max-width: var(--pomo-w); padding: 28px 24px 24px; box-sizing: border-box;
   display: flex; flex-direction: column; align-items: center; gap: 18px;
 }
@@ -1259,8 +1264,12 @@ select {
 }
 .pomo-picker-row:hover { background: var(--accent-soft); color: var(--c-text); }
 
-/* Onder de hero */
-.pomo-below { max-width: var(--pomo-w); margin: 16px auto 0; display: flex; flex-direction: column; gap: 12px; }
+/* Onder de kaarten, op de scène: Studiebuddies, weekstats, sessie-log als glas-kaarten */
+.pomo-below { width: 100%; margin-top: 2px; display: flex; flex-direction: column; gap: 12px; }
+.pomo-below .card {
+  background: rgba(10, 18, 38, 0.62); border-color: rgba(140, 170, 255, 0.14);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+}
 .pomo-below-grid { display: flex; flex-direction: column; gap: 12px; }
 .pomo-log { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; align-items: start; }
 
@@ -1278,8 +1287,8 @@ select {
 @media (min-width: 768px) and (min-height: 1300px) {
   .pomo-page { --pomo-w: 980px; --ring: clamp(260px, 23vh, 460px); display: flex; flex-direction: column; padding-bottom: 20px; }
   /* Hero vult de overgebleven hoogte; de inhoud staat verticaal gecentreerd */
-  .pomo-hero { min-height: 0; flex: 1 0 auto; align-items: center; }
-  .pomo-below { width: 100%; flex-shrink: 0; }
+  .pomo-hero { min-height: 0; flex: 1 0 auto; }
+  .pomo-content { align-self: center; }
   .pomo-content { padding: 36px 28px 28px; gap: 20px; }
   .pomo-ring-title { font-size: 16px; }
   .pomo-ring-mode { font-size: 17px; }
@@ -1295,7 +1304,7 @@ select {
   .pomo-hero { min-height: 0; }
 }
 @media (max-width: 767px) {
-  .pomo-page { padding: 0 0 100px; }
+  .pomo-page { --pomo-pad-t: 0px; padding: 0 0 100px; }
   .pomo-hero { border-radius: 0; border-width: 0 0 1px; min-height: 0; }
   .pomo-content { padding: 62px 16px 20px; gap: 16px; }
   .pomo-mode { padding: 8px 14px; font-size: 13px; }
@@ -1310,7 +1319,6 @@ select {
   .pomo-start { min-width: 0; flex: 1; padding: 0 20px; }
   .pomo-controls { width: 100%; max-width: 420px; }
   .pomo-popover { width: min(280px, calc(100vw - 32px)); }
-  .pomo-below { padding: 0 16px; }
   .pomo-log { grid-template-columns: minmax(0, 1fr); }
 }
 @media (prefers-reduced-motion: reduce) {

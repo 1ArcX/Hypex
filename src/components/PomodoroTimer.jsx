@@ -324,7 +324,7 @@ function CompletionPopup({ prevMode, nextMode, onStart, onSkip }) {
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusModeChange, userId, noFocusOverlay = false, fullPage = false, onSessionComplete, onXPEarned, renderCards, seedTask, onSeedConsumed }) {
+export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusModeChange, userId, noFocusOverlay = false, fullPage = false, onSessionComplete, onXPEarned, renderCards, renderFooter, seedTask, onSeedConsumed }) {
   const [state, dispatch] = useReducer(reducer, INIT)
   const stateRef           = useRef(state)
   const endTimeRef         = useRef(null)
@@ -827,6 +827,7 @@ export default function PomodoroTimer({ onModeChange, onPomodoroActive, onFocusM
           onToggleNotif={toggleNotif}
           onTestNotif={() => sendPushNotif(userId, 'Test melding 🔔', 'Push meldingen werken correct!')}
           dispatch={dispatch}
+          footer={renderFooter?.()}
         >
           {renderCards?.({ ...state, goalApi })}
         </PomodoroHero>

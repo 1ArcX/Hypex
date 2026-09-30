@@ -176,30 +176,30 @@ export default function PomodoroPage({ onModeChange, onFocusModeChange, onPomodo
             <SpotifyWidget compact title="Focus playlist" className="pomo-card" />
           </>
         )}
-      />
-
-      {/* Onder de hero: wie studeert er, weekstats en sessie-log */}
-      <div className="pomo-below">
-        <div className="pomo-below-grid">
-          <StudieBuddiesWidget profiles={profiles} onlineUsers={onlineUsers} />
-          <PomodoroStats refreshKey={sessions.length} userId={userId} />
-        </div>
-
-        {sessions.length > 0 && (
+        renderFooter={() => (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-              <div style={{ flex: 1, height: 1, background: 'var(--c-border)' }} />
-              <span className="t-overline" style={{ color: 'var(--c-text-3)' }}>Sessie log</span>
-              <div style={{ flex: 1, height: 1, background: 'var(--c-border)' }} />
+            <div className="pomo-below-grid">
+              <StudieBuddiesWidget profiles={profiles} onlineUsers={onlineUsers} />
+              <PomodoroStats refreshKey={sessions.length} userId={userId} />
             </div>
-            <div className="pomo-log">
-              {sortedDates.map(date => (
-                <DayLog key={date} label={fmtDate(date)} sessions={byDate[date]} />
-              ))}
-            </div>
+
+            {sessions.length > 0 && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                  <div style={{ flex: 1, height: 1, background: 'var(--c-border)' }} />
+                  <span className="t-overline" style={{ color: 'var(--c-text-3)' }}>Sessie log</span>
+                  <div style={{ flex: 1, height: 1, background: 'var(--c-border)' }} />
+                </div>
+                <div className="pomo-log">
+                  {sortedDates.map(date => (
+                    <DayLog key={date} label={fmtDate(date)} sessions={byDate[date]} />
+                  ))}
+                </div>
+              </>
+            )}
           </>
         )}
-      </div>
+      />
     </div>
   )
 }

@@ -116,7 +116,7 @@ export default function PomodoroHero({
   state, modes, soundTypes, progress, timeLabel, isFresh,
   soundType, onSoundType, scene = 'auto', onScene, volume, onVolume,
   onToggleRunning, onReset, onSkip, onSwitchMode, onToggleNotif, onTestNotif, dispatch,
-  children,
+  children, footer,
 }) {
   const { mode, running, task, showSettings } = state
   const modeColor = modes[mode].color
@@ -127,18 +127,19 @@ export default function PomodoroHero({
   const maxMins = modes[mode].maxMins
   const [pickerOpen, setPickerOpen] = useState(false)
 
-  // De scène beslaat het "podium" tot bovenkant van de kaarten; daaronder vervaagt hij naar donker
-  const contentRef = useRef(null)
-  const cardsRef = useRef(null)
-  const [stageH, setStageH] = useState(null)
+  // De scène vult het zichtbare deel van de pagina (sticky), zodat hij bij scrollen tot de onderkant
+  // doorloopt zonder dat de compositie uitrekt: hoogte = min(hero, zichtbare hoogte scrollcontainer)
+  const heroRef = useRef(null)
+  const [sceneH, setSceneH] = useState(null)
   useLayoutEffect(() => {
-    const measure = () => {
-      const c = cardsRef.current
-      setStageH(c ? c.offsetTop + 80 : null)
-    }
+    const hero = heroRef.current
+    if (!hero) return
+    const scroller = hero.closest('.pomo-page') || hero.parentElement
+    const measure = () => setSceneH(Math.min(hero.offsetHeight, scroller.clientHeight))
     measure()
     const ro = new ResizeObserver(measure)
-    if (contentRef.current) ro.observe(contentRef.current)
+    ro.observe(hero)
+    ro.observe(scroller)
     return () => ro.disconnect()
   }, [])
   const accent = useMemo(() => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(), [])
@@ -191,9 +192,10 @@ export default function PomodoroHero({
   const startLabel = running ? 'Pauzeer' : isFresh ? (mode === 'work' ? 'Start focus' : mode === 'break' ? 'Start pauze' : 'Start lange pauze') : 'Hervat'
 
   return (
-    <section className={`pomo-hero${running ? ' is-running' : ''}`} style={{ '--pomo-mode': modeColor }}>
+    <section ref={heroRef} className={`pomo-hero${running ? ' is-running' : ''}`}
+      style={{ '--pomo-mode': modeColor, ...(sceneH ? { '--scene-h': `${sceneH}px` } : null) }}>
       <div className="pomo-bg" aria-hidden="true">
-        <SceneCanvas scene={activeScene} height={stageH} />
+        <SceneCanvas scene={activeScene} />
         <div className="pomo-bg-shade" />
       </div>
 
@@ -209,7 +211,7 @@ export default function PomodoroHero({
         )}
       </div>
 
-      <div className="pomo-content" ref={contentRef}>
+      <div className="pomo-content">
         {/* Modus selectie */}
         <div className="pomo-modes" role="tablist" aria-label="Timer modus">
           {Object.entries(modes).map(([key, { label, color }]) => {
@@ -332,7 +334,8 @@ export default function PomodoroHero({
           </div>
         </div>
 
-        {children && <div className="pomo-cards" ref={cardsRef}>{children}</div>}
+        {children && <div className="pomo-cards">{children}</div>}
+        {footer && <div className="pomo-below">{footer}</div>}
       </div>
     </section>
   )
