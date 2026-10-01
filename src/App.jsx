@@ -18,6 +18,7 @@ import { awardXP, XP_TASK } from './utils/xp'
 import { advanceOnComplete, revertOnUncomplete, isDoneToday, todayISO } from './utils/recurrence'
 import { isOverdue } from './utils/taskStatus'
 import { fetchLatestVersion } from './utils/version'
+import { autoSyncCalendars } from './utils/calendarSync'
 import { VAPID_PUBLIC, urlBase64ToUint8Array } from './utils/push'
 import XPToast from './components/XPToast'
 import BottomNav from './components/BottomNav'
@@ -522,12 +523,21 @@ export default function App() {
     setSyncing(false)
     setSyncFlash(true)
     setTimeout(() => setSyncFlash(false), 2000)
+    // Gekoppelde agenda's (Google/MijnX) bij de bron bijwerken — hooguit elke 5 min, op de achtergrond
+    autoSyncCalendars().then(ran => {
+      if (!ran) return
+      fetchExternalEvents()
+      window.dispatchEvent(new Event('refreshExternalCalendarEvents'))
+    })
   }, [user?.id])
 
   useEffect(() => {
     if (!session || !user?.id) return
     const interval = setInterval(doSync, 30000)
-    return () => clearInterval(interval)
+    // Terug naar de app/tab: meteen bijwerken
+    const onVisible = () => { if (document.visibilityState === 'visible') doSync() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => { clearInterval(interval); document.removeEventListener('visibilitychange', onVisible) }
   }, [session, user?.id, doSync])
 
   const fetchTasks = async () => {

@@ -93,7 +93,11 @@ async function refreshGoogle(credentials) {
   const d = await r.json(); if (!r.ok) throw new Error(d.error_description || 'Google-token vernieuwen mislukt')
   return { ...credentials, access_token: d.access_token, expiry: Date.now() + d.expires_in * 1000 }
 }
-async function syncConnection(connection) {
+// Automatische syncs (cron + open app) slaan een koppeling over die net al is bijgewerkt, zodat twee
+// syncs niet tegelijk delete+insert doen (dubbele afspraken). Handmatig/koppelen gebruikt force.
+const MIN_AUTO_INTERVAL = 4 * 60 * 1000
+async function syncConnection(connection, { force = false } = {}) {
+  if (!force && connection.last_synced_at && Date.now() - new Date(connection.last_synced_at).getTime() < MIN_AUTO_INTERVAL) return null
   let events = []
   if (connection.provider === 'myx') {
     const { feedUrl } = decrypt(connection.secret)
@@ -135,11 +139,24 @@ async function googleCallback(event) {
     const credentials = { access_token: d.access_token, refresh_token: d.refresh_token, expiry: Date.now() + d.expires_in * 1000 }
     const { data: connection, error } = await supabase.from('calendar_connections').upsert({ user_id: state.userId, provider: 'google', name: 'Primaire Google Agenda', secret: encrypt(credentials), config: { calendarId: 'primary' }, enabled: true, updated_at: new Date().toISOString() }, { onConflict: 'user_id,provider,name' }).select().single()
     if (error) throw error
-    try { await syncConnection(connection) } catch (e) { await supabase.from('calendar_connections').update({ last_error: e.message }).eq('id', connection.id) }
+    try { await syncConnection(connection, { force: true }) } catch (e) { await supabase.from('calendar_connections').update({ last_error: e.message }).eq('id', connection.id) }
     return htmlCallback('')
   } catch (e) { return htmlCallback(e.message || 'Koppeling mislukt') }
 }
 function htmlCallback(error) { return { statusCode: 200, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' }, body: `<!doctype html><title>Hypex</title><script>window.opener&&window.opener.postMessage({calendarOAuth:{error:${JSON.stringify(error)}}},window.location.origin);window.close()</script><p>${error ? 'Koppeling mislukt: ' + error : 'Google Agenda is gekoppeld. Dit venster sluit nu.'}</p>` } }
+
+async function syncEach(connections, options) {
+  const results = []
+  for (const c of connections) try { results.push({ id: c.id, count: await syncConnection(c, options) }) } catch (e) { await supabase.from('calendar_connections').update({ last_error: e.message }).eq('id', c.id); results.push({ id: c.id, error: e.message }) }
+  return results
+}
+
+// Geplande sync (netlify/functions/calendar-sync): alle actieve koppelingen van alle gebruikers
+exports.syncAll = async () => {
+  const { data, error } = await supabase.from('calendar_connections').select('*').eq('enabled', true)
+  if (error) throw error
+  return syncEach(data || [], { force: false })
+}
 
 exports.handler = async event => {
   if ((event.queryStringParameters || {}).action === 'google_callback') return googleCallback(event)
@@ -155,15 +172,13 @@ exports.handler = async event => {
       const feedUrl = String(body.feedUrl || ''), name = String(body.name || 'MijnX rooster').slice(0, 80)
       const parsed = new URL(feedUrl); if (parsed.protocol !== 'https:') throw new Error('Gebruik een HTTPS-feed-URL')
       const { data: connection, error } = await supabase.from('calendar_connections').upsert({ user_id: user.id, provider: 'myx', name, secret: encrypt({ feedUrl }), config: {}, enabled: true, updated_at: new Date().toISOString() }, { onConflict: 'user_id,provider,name' }).select().single()
-      if (error) throw error; const count = await syncConnection(connection); return json(200, { count })
+      if (error) throw error; const count = await syncConnection(connection, { force: true }); return json(200, { count })
     }
     if (body.action === 'sync') {
       let query = supabase.from('calendar_connections').select('*').eq('user_id', user.id).eq('enabled', true)
       if (body.connectionId) query = query.eq('id', body.connectionId)
       const { data, error } = await query; if (error) throw error
-      const results = []
-      for (const c of data || []) try { results.push({ id: c.id, count: await syncConnection(c) }) } catch (e) { await supabase.from('calendar_connections').update({ last_error: e.message }).eq('id', c.id); results.push({ id: c.id, error: e.message }) }
-      return json(200, { results })
+      return json(200, { results: await syncEach(data || [], { force: body.force === true }) })
     }
     if (body.action === 'disconnect') { const { error } = await supabase.from('calendar_connections').delete().eq('id', body.connectionId).eq('user_id', user.id); if (error) throw error; return json(200, { ok: true }) }
     return json(400, { error: 'Onbekende actie' })

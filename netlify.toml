@@ -26,6 +26,9 @@
 [functions."simacan-check/simacan-check"]
   schedule = "* * * * *"
 
+[functions."calendar-sync/calendar-sync"]
+  schedule = "*/15 * * * *"
+
 [[headers]]
   for = "/simacan-arrival.html"
   [headers.values]
