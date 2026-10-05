@@ -105,8 +105,8 @@ export default function TakenPage({
     const todayOneoff = tasks.filter(t => !t.recurrence && !t.completed && taskOnDay(t, ts)).length
     const overdueOneoff = tasks.filter(t => !t.recurrence && !t.completed && t.date && taskLastDate(t) < ts).length
     const base = {
-      // Overzicht: alles wat open staat met een datum (te laat, vandaag en later) + open routines van vandaag
-      overzicht: openRoutines + tasks.filter(t => !t.recurrence && !t.completed && t.date).length,
+      // Overzicht: alle open eenmalige taken (te laat, vandaag, later én nog in te plannen) + open routines van vandaag
+      overzicht: openRoutines + tasks.filter(t => !t.recurrence && !t.completed).length,
       vandaag:   openRoutines + todayOneoff + overdueOneoff,
       alles:     tasks.filter(t => !t.completed).length,
       morgen:    tasks.filter(t => !t.recurrence && !t.completed && taskOnDay(t, tom)).length

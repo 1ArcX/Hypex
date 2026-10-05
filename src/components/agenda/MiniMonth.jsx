@@ -71,7 +71,7 @@ export default function MiniMonth({ current, inView, onPick }) {
 
   const grid = { display: 'grid', gridTemplateColumns: '18px repeat(7, minmax(0, 1fr))', gap: 2, textAlign: 'center' }
   return (
-    <div className="card" style={{ padding: 12 }}>
+    <div className="card glow-card" style={{ '--glow': 'var(--cat-persoonlijk)', padding: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
         <p className="t-card" aria-live="polite" style={{ margin: 0, flex: 1, textTransform: 'capitalize' }}>{MONTHS_FULL[focus.m]} {focus.y}</p>
         <IconButton icon={ChevronLeft} label="Vorige maand" size={24} iconSize={13} onClick={() => shiftMonth(-1)} />

@@ -226,7 +226,7 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
 
   // ─── Detail / editor ─────────────────────────────────────────
   const editor = activeNote && (
-    <div className={split ? 'notes-detail' : 'card'} style={split ? undefined : { padding: 16, display: 'flex', flexDirection: 'column' }}>
+    <div className={split ? 'notes-detail glow-bg' : 'card glow-bg'} style={{ '--glow': activeNote?.folder_id ? folderColor(activeNote.folder_id) : 'var(--accent)', ...(split ? {} : { padding: 16, display: 'flex', flexDirection: 'column' }) }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexShrink: 0 }}>
         {!split && (
           <button onClick={goBack} className="btn-ghost" style={{ padding: '4px 10px 4px 6px' }}>
@@ -291,8 +291,8 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
 
   // ─── Lijst ────────────────────────────────────────────────────
   const list = (
-    <div className={split ? 'notes-list' : seamless ? 'flex flex-col' : 'card flex flex-col'}
-      style={split ? undefined : { ...(seamless ? {} : { padding: 16 }), ...(fullHeight ? { height: '100%' } : {}) }}>
+    <div className={split ? 'notes-list glow-bg' : seamless ? 'flex flex-col' : 'card glow-bg flex flex-col'}
+      style={{ '--glow': 'var(--accent)', ...(split ? {} : { ...(seamless ? {} : { padding: 16 }), ...(fullHeight ? { height: '100%' } : {}) }) }}>
       {/* Kop: zoeken + nieuw */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexShrink: 0 }}>
         <div className="notes-search">
@@ -397,7 +397,7 @@ export default function NotesWidget({ userId, fullHeight = false, syncTrigger = 
     <div className="notes-split" style={fullHeight ? { height: '100%' } : undefined}>
       {list}
       {editor || (
-        <div className="notes-detail" style={{ justifyContent: 'center' }}>
+        <div className="notes-detail glow-bg" style={{ '--glow': 'var(--accent)', justifyContent: 'center' }}>
           <EmptyState icon={StickyNote} title="Geen notitie geselecteerd" text="Kies een notitie links of maak een nieuwe."
             action={<button onClick={createNote} className="btn-primary"><Plus size={15} aria-hidden="true" /> Nieuwe notitie</button>} />
         </div>

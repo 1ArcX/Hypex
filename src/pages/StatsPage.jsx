@@ -92,7 +92,7 @@ function XPCard({ userId, rank }) {
   const labelMap = { streak_7:'🔥 7d', streak_14:'🔥 14d', streak_30:'🔥 30d', perfect_3:'💎 3d', perfect_7:'💎 7d', level_5:'⭐ Lvl5', level_10:'🌟 Lvl10' }
 
   return (
-    <div className="card card-tone" style={{ '--tone': '#FACC15', padding: '18px 20px' }}>
+    <div className="card card-tone glow-card" style={{ '--tone': '#FACC15', '--glow': '#FACC15', padding: '18px 20px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
         <div aria-hidden="true" style={{ width: 56, height: 56, borderRadius: 'var(--r-lg)', flexShrink: 0, background: 'rgba(250,204,21,0.1)', border: '2px solid rgba(250,204,21,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>
           {level >= 5 ? '🌟' : level >= 3 ? '⭐' : '✨'}
@@ -163,7 +163,7 @@ function FocusCard({ userId, weekOffset }) {
   const total = values.reduce((a, b) => a + b, 0)
 
   return (
-    <div className="card" style={{ padding: '18px 20px' }}>
+    <div className="card glow-card" style={{ '--glow': 'var(--accent)', padding: '18px 20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
         <span className="t-card">Focus (Pomodoro)</span>
         {total > 0 && <span style={{ fontSize: 15, color: 'var(--accent)', fontWeight: 700 }}>{fmtMins(total)}</span>}
@@ -199,7 +199,7 @@ function TakenCard({ tasks, weekOffset }) {
   )
 
   return (
-    <div className="card" style={{ padding: '18px 20px' }}>
+    <div className="card glow-card" style={{ '--glow': 'var(--c-success)', padding: '18px 20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
         <span className="t-card">Taken</span>
         <span style={{ fontSize: 15, color: 'var(--accent)', fontWeight: 700 }}>{completedThisWeek.length} voltooid</span>
@@ -274,7 +274,7 @@ function GewoontesCard({ userId, weekOffset }) {
   )
 
   if (loading) return (
-    <div className="card" style={{ padding: '18px 20px' }}>
+    <div className="card glow-card" style={{ '--glow': 'var(--cat-routine)', padding: '18px 20px' }}>
       <span className="t-card">Gewoontes</span>
       <div style={{ marginTop: 16, color: 'var(--text-3)', fontSize: 12 }}>Laden…</div>
     </div>
@@ -285,7 +285,7 @@ function GewoontesCard({ userId, weekOffset }) {
   const overallPct = totalScheduled > 0 ? Math.round((totalDone / totalScheduled) * 100) : 0
 
   return (
-    <div className="card" style={{ padding: '18px 20px' }}>
+    <div className="card glow-card" style={{ '--glow': 'var(--cat-routine)', padding: '18px 20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
         <span className="t-card">Gewoontes</span>
         {totalScheduled > 0 && <span style={{ fontSize: 15, color: overallPct >= 80 ? 'var(--accent)' : 'var(--text-2)', fontWeight: 700 }}>{overallPct}%</span>}
@@ -367,7 +367,7 @@ function JumboCard() {
   const maxMins = Math.max(...weeks.map(w => w.mins), 1)
 
   return (
-    <div className="card" style={{ padding: '18px 20px' }}>
+    <div className="card glow-card" style={{ '--glow': 'var(--cat-werk)', padding: '18px 20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
         <span className="t-card">Jumbo — {MONTHS[now.getMonth()]}</span>
         <span style={{ fontSize: 15, color: '#FACC15', fontWeight: 700 }}>{hStr}</span>
@@ -435,7 +435,7 @@ function LeaderboardCard({ userId, profiles, xpMap }) {
   const MEDALS = ['🥇', '🥈', '🥉']
 
   return (
-    <div className="card" style={{ padding: '18px 20px' }}>
+    <div className="card glow-card" style={{ '--glow': '#FACC15', padding: '18px 20px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
         <h2 className="t-card" style={{ margin: 0 }}>🏆 Leaderboard</h2>
         <span className="t-meta">Totaal XP</span>

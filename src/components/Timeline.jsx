@@ -1174,7 +1174,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
     const inView = d => view === 'week' ? weekDays.some(w => isSameDay(w, d)) : view === 'month' ? (d.getMonth() === current.getMonth() && d.getFullYear() === current.getFullYear()) : isSameDay(d, current)
     return (
       <aside className="agenda-rail" aria-label="Legenda en maandoverzicht">
-        <div className="card" style={{ padding: 14 }}>
+        <div className="card glow-card" style={{ '--glow': 'var(--accent)', padding: 14 }}>
           <p className="t-card" style={{ margin: '0 0 10px' }}>Kleuren</p>
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
             {CATEGORY_ORDER.map(c => (
@@ -1226,7 +1226,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
     <div className="agenda-shell" style={{ display: 'flex', height: '100%', overflow: 'hidden', gap: 12, transition: 'padding-right 0.22s ease',
       // Split-screen: het paneel van ItemModal staat rechts; het rooster schuift opzij en blijft zichtbaar
       paddingRight: splitOpen ? 'calc(var(--split-w) - 16px)' : 0 }}>
-    <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderRadius: 'var(--r-lg)', background: 'var(--c-surface)', border: '1px solid var(--c-border)' }}>
+    <div className="glow-bg" style={{ '--glow': 'var(--accent)', flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderRadius: 'var(--r-lg)', backgroundColor: 'var(--c-surface)', border: '1px solid var(--c-border)' }}>
       {/* Toolbar */}
       {!hideToolbar && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderBottom: '1px solid var(--c-border)', flexShrink: 0, gap: '8px', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>

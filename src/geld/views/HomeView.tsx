@@ -1,6 +1,7 @@
 import { AlertTriangle, BarChart3, PiggyBank, Settings2, CalendarDays, CalendarRange, TrendingUp, ShieldCheck, ArrowRight, Wallet } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { GlassCard, ProgressBar, SectionLabel } from '../components/ui/Glass'
+import { SectionLabel } from '../components/ui/Glass'
+import LionMark from '../../components/dashboard/LionMark'
 import { TransactionRow } from '../components/TransactionRow'
 import { MonthHeader } from '../components/MonthHeader'
 import type { BudgetStats } from '../hooks/useBudgetStats'
@@ -22,8 +23,6 @@ export function HomeView({ stats, isCurrentMonth, remainingLoan, openLoansCount,
   onDelete: (id: string) => void
 }) {
   const s = stats
-  const heroColor = s.adjustedRemaining < 0 || s.adjustedRemainPct < 15 ? 'var(--c-danger)'
-    : s.adjustedRemainPct < 40 ? 'var(--c-warning)' : 'var(--accent)'
 
   const dagLeft = s.dagBudget - s.todayTotal
   const dagColor = s.dagBudget > 15 ? '#34D399' : s.dagBudget > 5 ? '#FBBF24' : '#F87171'
@@ -72,31 +71,41 @@ export function HomeView({ stats, isCurrentMonth, remainingLoan, openLoansCount,
       {/* Alert: carryover */}
       <AlertStrip stats={s} />
 
-      {/* Hero (Level 1): nog over deze maand */}
-      <GlassCard className="relative overflow-hidden px-5 pt-5 pb-4 mb-3"
-        style={{ borderColor: `color-mix(in srgb, ${heroColor} 35%, transparent)`, background: `color-mix(in srgb, ${heroColor} 5%, var(--c-surface))` }}>
-        <div className="flex items-center gap-2 mb-1.5">
-          <Wallet size={14} style={{ color: heroColor }} aria-hidden="true" />
-          <p className="text-[12px] font-semibold m-0" style={{ color: 'var(--c-text-2)' }}>
-            {s.adjustedRemaining < 0 ? '🚨 Budget overschreden' : s.vacationMode ? 'Nog over op vakantie' : 'Nog over deze maand'}
-          </p>
-        </div>
-        <p className="text-[40px] font-extrabold leading-none mb-3.5 tabular-nums" style={{ color: s.adjustedRemaining < 0 ? 'var(--c-danger)' : 'var(--c-text)', letterSpacing: '-0.02em' }}>
-          {s.adjustedRemaining < 0 ? '−' : ''}{fmt(Math.abs(s.adjustedRemaining))}
-        </p>
-        <ProgressBar pct={100 - s.adjustedRemainPct} color={heroColor} height={6} />
-        <div className="flex justify-between items-baseline gap-3 mt-2">
-          <span className="text-[12px] tabular-nums" style={{ color: 'var(--c-text-3)' }}>
-            {s.savingsExpTotal > 0 ? `💳 ${fmt(s.savingsExpTotal)} spaar` : ''}
-          </span>
-          <span className="text-[12px] font-semibold tabular-nums" style={{ color: 'var(--c-text-2)' }}>
-            {fmt(s.totalSpent)} / {fmt(s.adjustedBase)}
-          </span>
-        </div>
-        {!s.vacationMode && budgetBreakdown(s).includes('=') && (
-          <p className="text-[11px] m-0 mt-1 text-right tabular-nums" style={{ color: 'var(--c-text-3)' }}>{budgetBreakdown(s)}</p>
-        )}
-      </GlassCard>
+      {/* Hero (Level 1): nog over deze maand — ING-stijl (donker, oranje accenten, leeuw als watermerk; .ing-card in index.css) */}
+      {(() => {
+        const over = s.adjustedRemaining < 0
+        const low = !over && s.adjustedRemainPct < 15
+        const spent = Math.max(0, Math.min(100, 100 - s.adjustedRemainPct))
+        return (
+          <div className={`ing-card rounded-r-lg px-5 pt-5 pb-4 mb-3${over ? ' is-over' : ''}`}>
+            <LionMark />
+            <div className="flex items-center gap-2 mb-1.5">
+              <Wallet size={14} aria-hidden="true" className="ing-label" />
+              <p className="ing-sub text-[12px] font-semibold m-0 flex-1">
+                {over ? '🚨 Budget overschreden' : s.vacationMode ? 'Nog over op vakantie' : 'Nog over deze maand'}
+              </p>
+              {low && <span className="ing-pill">Bijna op</span>}
+            </div>
+            <p className="text-[40px] font-extrabold leading-none mb-3.5 tabular-nums" style={{ color: over ? 'var(--c-danger)' : 'inherit', letterSpacing: '-0.02em' }}>
+              {over ? '−' : ''}{fmt(Math.abs(s.adjustedRemaining))}
+            </p>
+            <div className={`ing-bar${low ? ' is-low' : ''}`} role="progressbar" aria-valuenow={Math.round(spent)} aria-valuemin={0} aria-valuemax={100} aria-label="Deel van het budget uitgegeven">
+              <span style={{ width: `${spent}%` }} />
+            </div>
+            <div className="flex justify-between items-baseline gap-3 mt-2">
+              <span className="ing-sub text-[12px] tabular-nums">
+                {s.savingsExpTotal > 0 ? `💳 ${fmt(s.savingsExpTotal)} spaar` : ''}
+              </span>
+              <span className="ing-sub text-[12px] font-semibold tabular-nums">
+                {fmt(s.totalSpent)} / {fmt(s.adjustedBase)}
+              </span>
+            </div>
+            {!s.vacationMode && budgetBreakdown(s).includes('=') && (
+              <p className="ing-sub text-[11px] m-0 mt-1 text-right tabular-nums">{budgetBreakdown(s)}</p>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Level 2: vandaag · deze week · inkomsten */}
       <div className={`grid ${isCurrentMonth ? 'grid-cols-3' : 'grid-cols-2'} gap-2 mb-2`}>

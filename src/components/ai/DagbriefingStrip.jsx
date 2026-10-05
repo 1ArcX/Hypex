@@ -9,7 +9,7 @@ import { useYearExpenses } from '../../geld/hooks/useYearExpenses'
 import { useBudgetStats } from '../../geld/hooks/useBudgetStats'
 import { useMonthNav } from '../../geld/hooks/useMonthNav'
 import { fmt } from '../../geld/lib/format'
-import { tint } from '../ui'
+import { tint, toneColor } from '../ui'
 
 // Gestructureerde dagbriefing uit echte Hypex-data (geen AI): urgent, te laat,
 // volgende afspraak en dagbudget. De AI-tekst eronder blijft de bestaande integratie.
@@ -18,10 +18,11 @@ function Tile({ icon: Icon, tone, label, value, sub, onClick }) {
   const Tag = onClick ? 'button' : 'div'
   return (
     <Tag type={onClick ? 'button' : undefined} onClick={onClick}
-      className={onClick ? 'card-interactive' : undefined}
+      className={onClick ? 'card-interactive glow-bg' : 'glow-bg'}
       style={{
+        '--glow': toneColor(tone),
         display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', borderRadius: 'var(--r-md)',
-        background: 'var(--c-surface-2)', border: '1px solid var(--c-border)', textAlign: 'left', minWidth: 0,
+        backgroundColor: 'var(--c-surface-2)', border: '1px solid var(--c-border)', textAlign: 'left', minWidth: 0,
         font: 'inherit', color: 'inherit', cursor: onClick ? 'pointer' : 'default',
       }}>
       <span aria-hidden="true" style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: tint(tone, 16), color: `var(--c-${tone}, ${tone})` }}>

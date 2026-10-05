@@ -63,8 +63,8 @@ export default function ThemeSettings({ onClose, theme, setTheme, onLogout, user
 
   return (
     <div className="modal-overlay" style={{ zIndex: 100, padding: 16 }}>
-      <div className="card modal-content" role="dialog" aria-modal="true" aria-labelledby="settings-title"
-        style={{ width: '100%', maxWidth: 460, padding: 22, maxHeight: 'calc(100dvh - 32px)', overflowY: 'auto' }}>
+      <div className="card modal-content glow-bg" role="dialog" aria-modal="true" aria-labelledby="settings-title"
+        style={{ '--glow': 'var(--accent)', width: '100%', maxWidth: 460, padding: 22, maxHeight: 'calc(100dvh - 32px)', overflowY: 'auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Palette size={17} style={{ color: 'var(--accent)' }} aria-hidden="true" />

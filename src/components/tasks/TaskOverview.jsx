@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import { Repeat, CalendarDays } from 'lucide-react'
+import { Repeat, CalendarDays, Inbox } from 'lucide-react'
 import TodayView, { taskTimeSort } from '../TodayView'
 import TaskRow from './TaskRow'
 import { Pill } from '../ui'
@@ -56,11 +56,16 @@ export default function TaskOverview({ tasks, subjects = [], onToggleTask, onTog
     return [...map.values()].sort((a, b) => a.date.localeCompare(b.date)).map(d => ({ ...d, tasks: d.tasks.sort(taskTimeSort) }))
   }, [tasks, today])
 
+  // Taken zonder datum (urgent eerst)
+  const unplanned = tasks.filter(t => !t.recurrence && !t.completed && !t.date)
+    .sort((a, b) => (a.priority ?? 2) - (b.priority ?? 2) || (a.created_at || '').localeCompare(b.created_at || ''))
+
   return (
     <div className="task-overview">
       <div className="task-overview__grid">
+        <div className="task-overview__left">
         {/* Vandaag: gemarkeerd */}
-        <section className="task-overview__today" aria-labelledby="ov-today">
+        <section className="task-overview__today glow-card" style={{ '--glow': 'var(--accent)' }} aria-labelledby="ov-today">
           <header style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <h2 id="ov-today" className="t-page" style={{ margin: 0 }}>Vandaag</h2>
             <Pill tone="accent" solid>Nu</Pill>
@@ -71,6 +76,24 @@ export default function TaskOverview({ tasks, subjects = [], onToggleTask, onTog
           <TodayView tasks={tasks} subjects={subjects} compactHeader showDone
             onToggleRoutine={onToggleRoutine} onToggleTask={onToggleTask} onOpen={onOpen} onNew={onNew} />
         </section>
+
+        {/* Nog in te plannen: taken zonder datum, direct onder Vandaag zodat ze niet vergeten worden */}
+        {unplanned.length > 0 && (
+          <section className="task-overview__unplanned glow-card" style={{ '--glow': 'var(--cat-school)' }} aria-labelledby="ov-unplanned">
+            <header style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <Inbox size={15} aria-hidden="true" style={{ color: 'var(--cat-school)' }} />
+              <h2 id="ov-unplanned" className="t-section" style={{ margin: 0 }}>Nog in te plannen</h2>
+              <Pill tone="var(--cat-school)">{unplanned.length}</Pill>
+              <span className="t-meta" style={{ marginLeft: 'auto', fontSize: 11 }}>Geef ze een dag</span>
+            </header>
+            <div className="task-list">
+              {unplanned.map(t => (
+                <TaskRow key={t.id} task={t} today={today} subjectName={subjectName(t)} onToggle={onToggleTask} onOpen={onOpen} />
+              ))}
+            </div>
+          </section>
+        )}
+        </div>
 
         {/* Komende dagen */}
         <section className="task-overview__upcoming" aria-labelledby="ov-upcoming">

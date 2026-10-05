@@ -973,6 +973,34 @@ select {
 .glow-card--live::before { animation: glowDrift 22s ease-in-out infinite alternate; }
 @keyframes glowDrift { from { transform: translate(0, 0) scale(1); } to { transform: translate(6%, 4%) scale(1.08); } }
 
+.glow-card--soft::before { opacity: 0.14; filter: blur(56px); }
+
+/* ===== ING-KAART (Geld): donker met ING-oranje accenten en een leeuw als watermerk ===== */
+.ing-card {
+  --ing: #FF6200; --ing-soft: #FF8A3D;
+  position: relative; overflow: hidden; isolation: isolate; color: var(--c-text);
+  background:
+    radial-gradient(70% 90% at 100% 0%, rgba(255, 98, 0, 0.16), transparent 65%),
+    radial-gradient(60% 70% at 0% 100%, rgba(255, 98, 0, 0.07), transparent 70%),
+    var(--c-surface);
+  border: 1px solid rgba(255, 98, 0, 0.32);
+}
+.ing-lion {
+  position: absolute; z-index: -1; pointer-events: none; color: var(--ing); object-fit: contain;
+  height: 108%; width: auto; right: -4px; bottom: -14px; opacity: 0.11;
+}
+.ing-card .ing-sub { color: var(--c-text-2); }
+.ing-card .ing-label { color: var(--ing-soft); }
+.ing-card .ing-btn { background: rgba(255, 98, 0, 0.12); border: none; color: var(--ing-soft); }
+.ing-card .ing-btn:hover { background: rgba(255, 98, 0, 0.22); }
+.ing-bar { height: 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.ing-bar > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--ing), var(--ing-soft)); transition: width 0.6s ease; }
+.ing-bar.is-low > span { background: var(--c-danger); }
+.ing-pill { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: rgba(255, 98, 0, 0.16); color: var(--ing-soft); border: 1px solid rgba(255, 98, 0, 0.35); }
+/* Budget over: rode rand en bedrag */
+.ing-card.is-over { border-color: color-mix(in srgb, var(--c-danger) 50%, transparent); }
+.ing-card.is-over .ing-bar > span { background: var(--c-danger); }
+
 /* ===== POMODORO-BANNER (dashboard, zolang er een timer loopt) ===== */
 .pomo-banner {
   position: relative; overflow: hidden; isolation: isolate; border-radius: var(--r-lg);
@@ -1118,6 +1146,12 @@ select {
   border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 6%, transparent), 0 10px 30px rgba(0,0,0,0.25);
 }
+.task-overview__left { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.task-overview__unplanned {
+  padding: 14px 16px; border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--cat-school) 5%, var(--c-surface));
+  border: 1px solid color-mix(in srgb, var(--cat-school) 30%, transparent);
+}
 .task-overview__week {
   display: flex; align-items: center; gap: 8px; margin: 14px 0 6px;
   font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--c-text-3);
@@ -1135,7 +1169,7 @@ select {
 .task-overview__routines button:hover { color: var(--c-text); text-decoration: underline; }
 @container (min-width: 820px) {
   .task-overview__grid { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 24px; }
-  .task-overview__today { position: sticky; top: 0; max-height: calc(100dvh - 190px); overflow-y: auto; }
+  .task-overview__left { position: sticky; top: 0; max-height: calc(100dvh - 190px); overflow-y: auto; }
 }
 @media (max-width: 767px) {
   .task-overview__today { padding: 14px 12px; }
@@ -1517,4 +1551,14 @@ select {
 @media (prefers-reduced-motion: reduce) {
   .pomo-hero.is-running .pomo-ring-arc { animation: none; }
   .pomo-scene-canvas { transition: none !important; }
+}
+
+/* ===== GLOW-ACHTERGROND voor grote of scrollende vlakken (agenda-rooster, notities) =====
+   Zelfde idee als .glow-card, maar als achtergrondverloop: geen overflow/pseudo-element nodig.
+   Staat onderaan zodat hij de `background`-shorthand van .notes-list e.d. aanvult. */
+.glow-bg.glow-bg {
+  background-image:
+    radial-gradient(55% 45% at 0% 0%, color-mix(in srgb, var(--glow) 13%, transparent), transparent 72%),
+    radial-gradient(50% 45% at 100% 100%, color-mix(in srgb, var(--glow) 9%, transparent), transparent 72%);
+  border-color: color-mix(in srgb, var(--glow) 20%, var(--c-border));
 }

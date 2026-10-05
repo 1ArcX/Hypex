@@ -374,7 +374,7 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
 
         {/* Briefing */}
         {messages.length === 0 && briefing && (
-          <div className="card" style={{ position: 'relative', padding: '16px 16px 15px', borderColor: 'color-mix(in srgb, var(--accent) 22%, transparent)', background: 'color-mix(in srgb, var(--accent) 4%, var(--c-surface))' }}>
+          <div className="card glow-card" style={{ '--glow': 'var(--accent)', position: 'relative', padding: '16px 16px 15px', borderColor: 'color-mix(in srgb, var(--accent) 22%, transparent)', background: 'color-mix(in srgb, var(--accent) 4%, var(--c-surface))' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                 <span style={{ fontSize: 12 }}>✦</span>
