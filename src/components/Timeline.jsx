@@ -10,6 +10,7 @@ import { loadExternalEvents } from '../utils/externalEvents'
 import { taskOnDay, isMultiDay } from '../utils/taskStatus'
 import ExternalEventModal from './agenda/ExternalEventModal'
 import MiniMonth from './agenda/MiniMonth'
+import WeekStrip from './agenda/WeekStrip'
 import ItemModal from './ItemModal'
 import { FilterTabs, IconButton } from './ui'
 import { useViewport } from '../hooks/useViewport'
@@ -1084,7 +1085,25 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
             </div>
           </div>
         )}
-        {view === 'day'   && TimeGrid({ days: [current], hideHeader: isMobile })}
+        {view === 'day' && isMobile && TimeGrid({ days: [current], hideHeader: true })}
+        {/* Desktop dagweergave: dezelfde weekstrook als op de telefoon, om snel van dag te wisselen */}
+        {view === 'day' && !isMobile && (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+            <WeekStrip
+              selectedDay={current}
+              onSelectDay={d => { setCurrent(d); onDateChange?.(d) }}
+              onPrevWeek={() => setCurrent(c => { const n = new Date(c); n.setDate(n.getDate() - 7); return n })}
+              onNextWeek={() => setCurrent(c => { const n = new Date(c); n.setDate(n.getDate() + 7); return n })}
+              tasks={tasks}
+              calendarEvents={events.filter(ev => showHidden || !ev.hidden)}
+              magisterLessons={[...magisterLessons, ...somtodayLessons]}
+              showToday={false}
+            />
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+              {TimeGrid({ days: [current], hideHeader: true })}
+            </div>
+          </div>
+        )}
       </div>
 
     </div>
