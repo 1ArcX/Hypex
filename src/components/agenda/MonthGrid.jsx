@@ -5,8 +5,8 @@ import { taskCategory, eventCategory, categoryColor } from '../../utils/category
 import { eventDisplay } from '../../utils/eventTitle'
 
 // Maandweergave in de stijl van Apple/iCloud Agenda (mobiel): maanden onder elkaar, per dag
-// gekleurde blokjes, meerdaagse items als doorlopende balk. Knijpen (2 vingers), Ctrl+scroll of
-// de −/+ knoppen zoomen tussen alleen stipjes en grote vakken met tijden.
+// gekleurde blokjes, meerdaagse items als doorlopende balk. Knijpen (2 vingers) zoomt tussen alleen
+// stipjes en grote vakken met tijden; met een muis ook Ctrl+scroll en de −/+ knoppen.
 
 const MONTHS = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December']
 const WEEKDAYS = ['M', 'D', 'W', 'D', 'V', 'Z', 'Z']
@@ -155,9 +155,18 @@ export default function MonthGrid({ selectedDay, onSelectDay, tasks, calendarEve
     el.addEventListener('touchmove', onMove, { passive: false })
     el.addEventListener('touchend', onEnd)
     el.addEventListener('wheel', onWheel, { passive: false })
-    return () => { el.removeEventListener('touchstart', onStart); el.removeEventListener('touchmove', onMove); el.removeEventListener('touchend', onEnd); el.removeEventListener('wheel', onWheel) }
+    // iOS Safari: eigen gesture-events, anders zoomt de hele pagina mee
+    const noPageZoom = e => e.preventDefault()
+    el.addEventListener('gesturestart', noPageZoom)
+    el.addEventListener('gesturechange', noPageZoom)
+    return () => {
+      el.removeEventListener('touchstart', onStart); el.removeEventListener('touchmove', onMove); el.removeEventListener('touchend', onEnd); el.removeEventListener('wheel', onWheel)
+      el.removeEventListener('gesturestart', noPageZoom); el.removeEventListener('gesturechange', noPageZoom)
+    }
   }, [])
 
+  // Zoomknoppen alleen met een muis; op een touchscreen zoom je met twee vingers
+  const [finePointer] = useState(() => typeof window !== 'undefined' && window.matchMedia?.('(hover: hover) and (pointer: fine)').matches)
   const dots = rowH < 70
   const showTime = rowH >= 140
   const scrollToToday = () => {
@@ -288,12 +297,12 @@ export default function MonthGrid({ selectedDay, onSelectDay, tasks, calendarEve
       {/* Zwevende knoppen: vandaag + zoom */}
       <div style={{ position: 'absolute', right: 12, bottom: 'calc(84px + env(safe-area-inset-bottom))', display: 'flex', gap: 6, alignItems: 'center' }}>
         <button type="button" onClick={scrollToToday} className="btn-ghost" style={{ padding: '7px 14px', fontSize: 13, borderRadius: 20, background: 'var(--c-surface-solid)', boxShadow: 'var(--shadow-float)' }}>Vandaag</button>
-        <div style={{ display: 'flex', borderRadius: 20, overflow: 'hidden', border: '1px solid var(--c-border-strong)', background: 'var(--c-surface-solid)', boxShadow: 'var(--shadow-float)' }}>
+        {finePointer && <div style={{ display: 'flex', borderRadius: 20, overflow: 'hidden', border: '1px solid var(--c-border-strong)', background: 'var(--c-surface-solid)', boxShadow: 'var(--shadow-float)' }}>
           <button type="button" aria-label="Uitzoomen" onClick={() => zoomTo(rowH / 1.35)} disabled={rowH <= MIN_H}
             style={{ width: 36, height: 32, border: 'none', background: 'transparent', color: 'var(--c-text-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: rowH <= MIN_H ? 0.4 : 1 }}><Minus size={15} /></button>
           <button type="button" aria-label="Inzoomen" onClick={() => zoomTo(rowH * 1.35)} disabled={rowH >= MAX_H}
             style={{ width: 36, height: 32, border: 'none', borderLeft: '1px solid var(--c-border)', background: 'transparent', color: 'var(--c-text-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: rowH >= MAX_H ? 0.4 : 1 }}><Plus size={15} /></button>
-        </div>
+        </div>}
       </div>
     </div>
   )
