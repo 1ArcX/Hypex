@@ -57,7 +57,7 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 
 - **Mobile header / top bar** — inline in [App.jsx](../src/App.jsx) (the `md:hidden` 52px bar)
   - Aliases: "top bar", "mobiele header", "titelbalk", "sync-knop", "settings-knop bovenaan"
-  - Where: top of every page on mobile. Centered page title (`PAGE_NAMES`), sync dot, settings gear. No separate file.
+  - Where: top of every page on mobile. Centered page title (`PAGE_NAMES`), sync dot, settings gear. Height includes `env(safe-area-inset-top)` (iOS status bar is black-translucent, so the app runs under the clock/Dynamic Island). No separate file.
 
 ## Feature components
 

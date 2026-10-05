@@ -796,11 +796,13 @@ export default function App() {
             (zelfde --app-height-referentie als de inhoud, geen verspringende band) */}
         <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
 
-          {/* Mobile header — iOS navigation bar: titel gecentreerd */}
+          {/* Mobile header — iOS navigation bar: titel gecentreerd.
+              Statusbalk is 'black-translucent' (viewport-fit=cover): de app loopt door onder klok/notch/
+              Dynamic Island, dus de header krijgt de safe-area erbij en zet de inhoud eronder. */}
           <div className="md:hidden flex items-center justify-between px-4"
-            style={{ height: 52, borderBottom: '1px solid var(--border)', background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', flexShrink: 0, position: 'relative' }}>
+            style={{ height: 'calc(52px + env(safe-area-inset-top))', paddingTop: 'env(safe-area-inset-top)', boxSizing: 'border-box', borderBottom: '1px solid var(--border)', background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', flexShrink: 0, position: 'relative' }}>
             <span style={{
-              position: 'absolute', left: 0, right: 0, textAlign: 'center', pointerEvents: 'none',
+              position: 'absolute', left: 0, right: 0, bottom: 0, height: 52, lineHeight: '52px', textAlign: 'center', pointerEvents: 'none',
               fontWeight: 600, fontSize: 17, color: 'var(--text-1)', letterSpacing: '-0.02em',
             }}>
               {PAGE_NAMES[activePage] || 'Hypex'}
