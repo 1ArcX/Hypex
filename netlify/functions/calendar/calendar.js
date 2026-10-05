@@ -70,7 +70,7 @@ function parseIcsDate(value) {
 function icsEvents(text) {
   const unfolded = String(text).replace(/\r?\n[ \t]/g, '')
   const blocks = unfolded.match(/BEGIN:VEVENT[\s\S]*?END:VEVENT/g) || []
-  return blocks.map(block => {
+  const events = blocks.map(block => {
     const data = {}
     for (const line of block.split(/\r?\n/)) {
       const pivot = line.indexOf(':'); if (pivot < 1) continue
@@ -84,9 +84,51 @@ function icsEvents(text) {
     const endDate = start.allDay
       ? new Date((data.DTEND ? end.date.getTime() : start.date.getTime() + 86400000) - 60000)
       : (end.date > start.date ? end.date : new Date(start.date.getTime() + 3600000))
-    return { external_id: data.UID, title: data.SUMMARY || 'Roosteritem', description: data.DESCRIPTION || null, location: data.LOCATION || null, start_time: start.date.toISOString(), end_time: endDate.toISOString(), all_day: start.allDay, color: '#FACC15', raw: data }
+    // Een gewijzigde instantie van een herhalend item deelt de UID; RECURRENCE-ID maakt hem uniek.
+    const externalId = data['RECURRENCE-ID'] ? `${data.UID}@${data['RECURRENCE-ID']}` : data.UID
+    return { external_id: externalId, title: data.SUMMARY || 'Roosteritem', description: data.DESCRIPTION || null, location: data.LOCATION || null, start_time: start.date.toISOString(), end_time: endDate.toISOString(), all_day: start.allDay, color: '#FACC15', raw: data }
   }).filter(Boolean)
+  // Dubbele UID's (zou de unique-constraint breken en de hele feed leegmaken): laatste wint.
+  return [...new Map(events.map(e => [e.external_id, e])).values()]
 }
+
+// ── Wijzigingen bepalen ─────────────────────────────────────────────────────
+// Velden die voor de gebruiker iets betekenen; een nieuwe beschrijving of een ander
+// Google-etag wordt wel opgeslagen, maar telt niet als "gewijzigd" in de melding.
+const time = v => (v ? new Date(v).getTime() : null)
+const sameEvent = (a, b) => a.title === b.title && time(a.start_time) === time(b.start_time) &&
+  time(a.end_time) === time(b.end_time) && !!a.all_day === !!b.all_day && (a.location || null) === (b.location || null)
+const snapshot = e => ({ title: e.title, start_time: e.start_time, end_time: e.end_time, all_day: !!e.all_day, location: e.location || null })
+
+/**
+ * Vergelijk opgeslagen items met de nieuwe feed. Geeft terug wat er geschreven moet worden en
+ * welke wijzigingen gemeld worden. Alleen items die nog niet voorbij zijn tellen mee in de melding.
+ */
+function diffEvents(existing, incoming, now = Date.now()) {
+  const old = new Map(existing.map(e => [e.external_id, e]))
+  const fresh = new Map(incoming.map(e => [e.external_id, e]))
+  const upserts = [], removedIds = [], changes = []
+  const relevant = e => time(e.end_time) >= now - 86400000
+  for (const [id, e] of fresh) {
+    const prev = old.get(id)
+    if (!prev) {
+      upserts.push(e)
+      if (relevant(e)) changes.push({ external_id: id, kind: 'added', title: e.title, before: null, after: snapshot(e) })
+    } else if (!sameEvent(prev, e)) {
+      upserts.push(e)
+      if (relevant(e) || relevant(prev)) changes.push({ external_id: id, kind: 'changed', title: e.title, before: snapshot(prev), after: snapshot(e) })
+    } else if ((prev.description || null) !== (e.description || null)) {
+      upserts.push(e) // stil bijwerken
+    }
+  }
+  for (const [id, prev] of old) {
+    if (fresh.has(id)) continue
+    removedIds.push(prev.id)
+    if (relevant(prev)) changes.push({ external_id: id, kind: 'removed', title: prev.title, before: snapshot(prev), after: null })
+  }
+  return { upserts, removedIds, changes }
+}
+exports.diffEvents = diffEvents
 async function refreshGoogle(credentials) {
   if (credentials.expiry && credentials.expiry > Date.now() + 60_000) return credentials
   const r = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: GOOGLE_CLIENT_ID, client_secret: GOOGLE_CLIENT_SECRET, grant_type: 'refresh_token', refresh_token: credentials.refresh_token }) })
@@ -121,10 +163,32 @@ async function syncConnection(connection, { force = false } = {}) {
       return { external_id: e.id, title: e.summary || '(zonder titel)', description: e.description || null, location: e.location || null, start_time: start, end_time: end, all_day: allDay, color: '#4285F4', raw: e }
     })
   }
-  // Replacing a connection's cached window keeps cancellations and moved appointments correct.
-  const deleted = await supabase.from('external_calendar_events').delete().eq('connection_id', connection.id)
-  if (deleted.error) throw deleted.error
-  if (events.length) { const inserted = await supabase.from('external_calendar_events').insert(events.map(e => ({ ...e, connection_id: connection.id }))); if (inserted.error) throw inserted.error }
+  // Vergelijken i.p.v. alles vervangen: rijen blijven stabiel, verwijderde/verschoven items kloppen
+  // nog steeds, en we weten precies wat er veranderd is (voor de melding in de app).
+  const existingRows = []
+  for (let from = 0; ; from += 1000) { // Supabase geeft max. 1000 rijen per verzoek
+    const page = await supabase.from('external_calendar_events').select('id,external_id,title,description,location,start_time,end_time,all_day')
+      .eq('connection_id', connection.id).order('id').range(from, from + 999)
+    if (page.error) throw page.error
+    existingRows.push(...(page.data || []))
+    if (!page.data || page.data.length < 1000) break
+  }
+  const existing = { data: existingRows }
+  const { upserts, removedIds, changes } = diffEvents(existingRows, events)
+  for (let i = 0; i < upserts.length; i += 500) {
+    const chunk = upserts.slice(i, i + 500).map(e => ({ ...e, connection_id: connection.id, updated_at: new Date().toISOString() }))
+    const r = await supabase.from('external_calendar_events').upsert(chunk, { onConflict: 'connection_id,external_id' })
+    if (r.error) throw r.error
+  }
+  for (let i = 0; i < removedIds.length; i += 200) {
+    const r = await supabase.from('external_calendar_events').delete().in('id', removedIds.slice(i, i + 200))
+    if (r.error) throw r.error
+  }
+  // Eerste sync van een koppeling: niet alles als "nieuw" melden.
+  if (changes.length && (existing.data || []).length) {
+    const logged = await supabase.from('external_calendar_changes').insert(changes.map(c => ({ ...c, user_id: connection.user_id, connection_id: connection.id })))
+    if (logged.error) console.warn('[calendar] wijzigingslog mislukt:', logged.error.message) // bv. migratie nog niet gedraaid
+  }
   const updated = await supabase.from('calendar_connections').update({ last_synced_at: new Date().toISOString(), last_error: null, updated_at: new Date().toISOString() }).eq('id', connection.id)
   if (updated.error) throw updated.error
   return events.length

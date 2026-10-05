@@ -20,6 +20,8 @@ import { isOverdue } from './utils/taskStatus'
 import { fetchLatestVersion } from './utils/version'
 import { autoSyncCalendars } from './utils/calendarSync'
 import { loadItemTypes, useItemTypes } from './hooks/useItemTypes'
+import { loadExternalEvents, loadUnseenChanges, markChangesSeen } from './utils/externalEvents'
+import { FeedChangesToast, FeedChangesSheet } from './components/FeedChanges'
 import { VAPID_PUBLIC, urlBase64ToUint8Array } from './utils/push'
 import XPToast from './components/XPToast'
 import BottomNav from './components/BottomNav'
@@ -83,6 +85,8 @@ export default function App() {
   // Geïmporteerde agenda's (MyX/Google) — alleen-lezen, voor Dashboard "Volgende afspraak" en zoeken.
   // Los van calendarEvents zodat de Timeline haar eigen (bewerkbare) lijst houdt.
   const [externalEvents, setExternalEvents] = useState([])
+  const [feedChanges, setFeedChanges] = useState([]) // niet-geziene wijzigingen in gekoppelde agenda's
+  const [feedSheetOpen, setFeedSheetOpen] = useState(false)
   const [magisterError, setMagisterError] = useState(null)
   const [detailTask, setDetailTask] = useState(null)
   const [pomodoroSeedTask, setPomodoroSeedTask] = useState(null)
@@ -396,10 +400,17 @@ export default function App() {
 
   const fetchExternalEvents = useCallback(async () => {
     const since = new Date(Date.now() - 86400000).toISOString()
-    const { data, error } = await supabase.from('external_calendar_events').select('*').gte('end_time', since).order('start_time').limit(500)
-    if (error || !data) return
-    setExternalEvents(data.map(ev => ({ ...ev, id: `external:${ev.id}`, external: true, description: ev.description || '' })))
+    const data = await loadExternalEvents({ since, limit: 500 })
+    if (!data) return
+    setExternalEvents(data.filter(ev => !ev.hidden))
+    setFeedChanges(await loadUnseenChanges())
   }, [])
+
+  const markFeedChangesSeen = useCallback(() => {
+    const ids = feedChanges.map(c => c.id)
+    setFeedChanges([]); setFeedSheetOpen(false)
+    markChangesSeen(ids)
+  }, [feedChanges])
 
   // Load data
   useEffect(() => {
@@ -1112,6 +1123,23 @@ export default function App() {
         </div>
       )}
 
+      {feedChanges.length > 0 && !feedSheetOpen && (
+        <FeedChangesToast changes={feedChanges} onOpen={() => setFeedSheetOpen(true)} onDismiss={markFeedChangesSeen} />
+      )}
+      {feedSheetOpen && (
+        <FeedChangesSheet
+          changes={feedChanges}
+          editedKeys={new Set(externalEvents.filter(ev => ev._override).map(ev => `${ev.connection_id}|${ev.external_id}`))}
+          onClose={() => setFeedSheetOpen(false)}
+          onSeen={markFeedChangesSeen}
+          onJump={c => {
+            const ev = externalEvents.find(e => e.connection_id === c.connection_id && e.external_id === c.external_id)
+            const when = (c.after || c.before)?.start_time
+            setFeedSheetOpen(false)
+            setAgendaJump({ date: new Date(ev?.start_time || when), highlightKey: ev ? `event:${ev.id}` : null })
+            handleSetActivePage('agenda')
+          }} />
+      )}
       {xpToast && (
         <XPToast
           xp={xpToast.xp}

@@ -6,6 +6,8 @@ import { callSomtoday, ensureSomtodayCreds } from '../utils/somtodayApi'
 import { appliesOn } from '../utils/recurrence'
 import { taskCategory, eventCategory, categoryColor, CATEGORIES, CATEGORY_ORDER } from '../utils/category'
 import { eventDisplay } from '../utils/eventTitle'
+import { loadExternalEvents } from '../utils/externalEvents'
+import ExternalEventModal from './agenda/ExternalEventModal'
 import { FilterTabs, IconButton } from './ui'
 import { useViewport } from '../hooks/useViewport'
 
@@ -122,6 +124,13 @@ function layoutOverlaps(items) {
   return sorted
 }
 
+// Hele-dag-item: expliciet (feed/aanpassing) of start om 00:00 (eigen items)
+function isAllDayEvent(ev) {
+  if (ev.all_day) return true
+  const s = new Date(ev.start_time)
+  return s.getHours() === 0 && s.getMinutes() === 0
+}
+
 const emptyForm = (date, hour, minute = 0) => ({
   title: '', description: '',
   date: toDateStr(date || new Date()),
@@ -149,6 +158,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
   const [magisterLessons, setMagisterLessons] = useState([])
   const [somtodayLessons, setSomtodayLessons] = useState([])
   const [lessonDetail, setLessonDetail] = useState(null)
+  const [showHidden, setShowHidden] = useState(() => { try { return localStorage.getItem('agenda_show_hidden') === '1' } catch { return false } })
   const [scheduleVersion, setScheduleVersion] = useState(0)
   const [magisterSyncing, setMagisterSyncing] = useState(false)
   const [magisterError, setMagisterError] = useState(null)
@@ -382,12 +392,11 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
   }, [toDateStr(getWeekDays(current)[0]), scheduleVersion])
 
   const fetchEvents = async () => {
-    const [own, external] = await Promise.all([
+    const [own, imported] = await Promise.all([
       supabase.from('calendar_events').select('*').eq('user_id', userId),
-      supabase.from('external_calendar_events').select('*'),
+      loadExternalEvents(),
     ])
-    const imported = (external.data || []).map(ev => ({ ...ev, id: `external:${ev.id}`, external: true, description: ev.description || '' }))
-    if (own.data) setEvents([...own.data, ...imported])
+    if (own.data) setEvents([...own.data, ...(imported || [])])
   }
 
   const getWorkShiftsForDay = (date) => {
@@ -402,7 +411,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
     return isSameDay(new Date(les.start), date)
   })
 
-  const getEventsForDay = (date) => events.filter(ev => !ev.description?.startsWith('pmt:')).filter(ev => {
+  const getEventsForDay = (date) => events.filter(ev => !ev.description?.startsWith('pmt:') && (showHidden || !ev.hidden)).filter(ev => {
     const start = new Date(ev.start_time)
     const end = new Date(ev.end_time)
     const startD = new Date(start.getFullYear(), start.getMonth(), start.getDate())
@@ -563,10 +572,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
           {/* All-day events strip — sticky inside scrollRef so it works regardless of outer layout */}
           {(() => {
             const allDayByDay = days.map(d => {
-              const allDayEvs = getEventsForDay(d).filter(ev => {
-                const s = new Date(ev.start_time)
-                return s.getHours() === 0 && s.getMinutes() === 0
-              }).map(ev => ({ kind: 'event', key: ev.id, color: categoryColor(eventCategory(ev)), title: eventDisplay(ev).title, onClick: e => openEditEvent(ev, e) }))
+              const allDayEvs = getEventsForDay(d).filter(isAllDayEvent).map(ev => ({ kind: 'event', key: ev.id, color: categoryColor(eventCategory(ev)), title: `${ev.hidden ? '🙈 ' : ''}${eventDisplay(ev).title}`, edited: ev.edited, onClick: e => openEditEvent(ev, e) }))
               const allDayLes = getMagisterLessonsForDay(d).filter(les => {
                 const s = new Date(les.start)
                 return s.getHours() === 0 && s.getMinutes() === 0
@@ -602,7 +608,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                     {items.map(item => (
                       <div key={item.key} onClick={item.onClick}
                         style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, cursor: 'pointer', background: `color-mix(in srgb, ${item.color} 16%, var(--c-surface-solid))`, borderLeft: `3px solid ${item.color}`, color: `color-mix(in srgb, ${item.color} 60%, white)`, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {item.title}
+                        {item.title}{item.edited ? ' ✎' : ''}
                       </div>
                     ))}
                   </div>
@@ -687,10 +693,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                   const endMins = Math.max(startMins + 30, en.getHours()*60 + en.getMinutes())
                   return { type: 'lesson', key: `les-${di}-${li}`, startMins, endMins, data: les }
                 }),
-                ...colEvents.filter(ev => {
-                  const s = new Date(ev.start_time)
-                  return !(s.getHours() === 0 && s.getMinutes() === 0)
-                }).map(ev => {
+                ...colEvents.filter(ev => !isAllDayEvent(ev)).map(ev => {
                   const s = new Date(ev.start_time), en = new Date(ev.end_time)
                   const startMins = s.getHours()*60 + s.getMinutes()
                   const endMins = Math.max(startMins + 30, en.getHours()*60 + en.getMinutes())
@@ -782,9 +785,9 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                           onClick={e => openEditEvent(ev, e)}
                           {...kbdClick(`${disp.title}, ${fmtTime(s)} tot ${fmtTime(en)}`, e => openEditEvent(ev, e))}
                           title={[disp.title, disp.code, ev.location].filter(Boolean).join(' · ')}
-                          style={blockStyle(color, { top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, zIndex: 2, ...hlStyle })}>
+                          style={blockStyle(color, { top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, zIndex: 2, opacity: ev.hidden ? 0.45 : 1, ...hlStyle })}>
                           <div style={blockTitle(color)}>
-                            {disp.title}
+                            {ev.hidden ? '🙈 ' : ''}{disp.title}{ev.edited ? ' ✎' : ''}
                           </div>
                           {showDetail && (
                             <div style={blockMeta(color)}>
@@ -948,6 +951,13 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
               </li>
             ))}
           </ul>
+          {events.some(ev => ev.hidden) && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--c-border)', fontSize: 12, color: 'var(--c-text-2)', cursor: 'pointer' }}>
+              <input type="checkbox" checked={showHidden} style={{ accentColor: 'var(--accent)', cursor: 'pointer' }}
+                onChange={e => { setShowHidden(e.target.checked); try { localStorage.setItem('agenda_show_hidden', e.target.checked ? '1' : '0') } catch {} }} />
+              Toon verborgen ({events.filter(ev => ev.hidden).length})
+            </label>
+          )}
         </div>
         <div className="card" style={{ padding: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
@@ -1146,55 +1156,8 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
         </div>
       )}
 
-      {/* Geïmporteerd event (read-only) */}
-      {modal?.mode === 'view' && (() => {
-        const ev = modal.event
-        const { title, code } = eventDisplay(ev)
-        const s = new Date(ev.start_time), en = new Date(ev.end_time)
-        const allDay = ev.all_day || (s.getHours() === 0 && s.getMinutes() === 0 && en.getHours() === 23 && en.getMinutes() === 59)
-        const dateLabel = s.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })
-        const rawDesc = ev.description || ''
-        // HTML (Google) → tekst met behoud van regeleinden; platte tekst (MyX/ICS) blijft zoals hij is
-        const description = (/<[a-z/][^>]*>/i.test(rawDesc)
-          ? rawDesc.replace(/<br\s*\/?>|<\/p>|<\/li>/gi, '\n').replace(/<[^>]*>/g, '')
-              .replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
-              .replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n')
-          : rawDesc).trim()
-        const row = (label, value, extra) => (
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-            <span style={{ fontSize: '11px', color: 'var(--c-text-3)', width: '72px', flexShrink: 0, paddingTop: '2px' }}>{label}</span>
-            <span style={{ fontSize: '13px', color: 'var(--c-text)', fontWeight: 500, lineHeight: 1.4, minWidth: 0, overflowWrap: 'anywhere', ...extra }}>{value}</span>
-          </div>
-        )
-        return (
-          <div className="modal-overlay" style={{ padding: '16px' }} onClick={() => setModal(null)}>
-            <div className="glass-card modal-content" style={{ width: '100%', maxWidth: '400px', padding: '24px', maxHeight: '90vh', overflowY: 'auto' }}
-              onClick={e => e.stopPropagation()}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '20px' }}>
-                <div style={{ minWidth: 0 }}>
-                  <h2 style={{ color: 'white', fontWeight: 700, fontSize: '16px', margin: 0, overflowWrap: 'anywhere' }}>{title}</h2>
-                  <span style={{ display: 'inline-block', marginTop: '6px', fontSize: '10px', fontWeight: 600, color: 'var(--c-text-2)', background: 'var(--c-surface-2)', border: '1px solid var(--c-border)', borderRadius: '6px', padding: '1px 6px' }}>
-                    Geïmporteerd
-                  </span>
-                </div>
-                <button onClick={() => setModal(null)} aria-label="Sluiten" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', flexShrink: 0 }}>
-                  <X size={18} />
-                </button>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {row('Tijd', <span style={{ textTransform: 'capitalize' }}>{dateLabel} · {allDay ? 'Hele dag' : `${fmtTime(s)} – ${fmtTime(en)}`}</span>)}
-                {code && row('Code', code)}
-                {ev.location && row('Locatie', ev.location)}
-                {description && row('Beschrijving', description, { fontSize: '12px', fontWeight: 400, color: 'var(--c-text-2)', whiteSpace: 'pre-wrap' })}
-              </div>
-              <button onClick={() => setModal(null)}
-                style={{ width: '100%', marginTop: '20px', padding: '9px', borderRadius: '10px', border: '1px solid var(--c-border-strong)', background: 'transparent', color: 'var(--c-text-2)', cursor: 'pointer', fontSize: '12px' }}>
-                Sluiten
-              </button>
-            </div>
-          </div>
-        )
-      })()}
+      {/* Geïmporteerd item (Google / MijnX): bekijken + aanpassen */}
+      {modal?.mode === 'view' && <ExternalEventModal ev={modal.event} onClose={() => setModal(null)} />}
 
       {/* Event modal */}
       {modal && modal.mode !== 'view' && (
