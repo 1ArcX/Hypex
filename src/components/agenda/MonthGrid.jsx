@@ -1,5 +1,4 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Minus, Plus } from 'lucide-react'
 import { taskOnDay, isMultiDay } from '../../utils/taskStatus'
 import { taskCategory, eventCategory, categoryColor } from '../../utils/category'
 import { eventDisplay } from '../../utils/eventTitle'
@@ -8,8 +7,8 @@ import { daypartEmoji } from '../../utils/daypart'
 const DAYPART_SORT = { ochtend: 8 * 60, middag: 12 * 60, avond: 17 * 60 }
 
 // Maandweergave in de stijl van Apple/iCloud Agenda (mobiel): maanden onder elkaar, per dag
-// gekleurde blokjes, meerdaagse items als doorlopende balk. Knijpen (2 vingers) zoomt tussen alleen
-// stipjes en grote vakken met tijden; met een muis ook Ctrl+scroll en de −/+ knoppen.
+// gekleurde blokjes, meerdaagse items als doorlopende balk. Het dunne balkje rechts (of Ctrl+scroll)
+// zoomt tussen alleen stipjes en grote vakken met tijden.
 
 const MONTHS = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December']
 const WEEKDAYS = ['M', 'D', 'W', 'D', 'V', 'Z', 'Z']
@@ -17,6 +16,7 @@ const MIN_H = 52, MAX_H = 210, DEFAULT_H = 112
 const NUM_H = 26     // hoogte van de dagnummer-regel
 const LINE = 16      // hoogte van één blokje/balk (incl. ruimte)
 const ZOOM_KEY = 'agenda_month_zoom'
+const RAIL_GUTTER = 14 // vrije marge rechts voor de zoombalk
 
 const pad = n => String(n).padStart(2, '0')
 const ds = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
@@ -149,32 +149,15 @@ export default function MonthGrid({ selectedDay, onSelectDay, tasks, calendarEve
 
   const zoomTo = (h, cy) => { zoomCenter.current = cy ?? null; setRowH(Math.min(MAX_H, Math.max(MIN_H, h))) }
 
-  // Knijpen (touch) en Ctrl+scroll — niet-passieve listeners om browser-zoom te voorkomen
+  // Ctrl+scroll (muis/trackpad) zoomt ook — niet-passief zodat de browser niet de pagina zoomt
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
-    let pinch = null
-    const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY)
-    const onStart = e => { if (e.touches.length === 2) pinch = { d: dist(e.touches), h: prevH.current, cy: (e.touches[0].clientY + e.touches[1].clientY) / 2 - el.getBoundingClientRect().top } }
-    const onMove = e => { if (pinch && e.touches.length === 2) { e.preventDefault(); zoomTo(pinch.h * dist(e.touches) / pinch.d, pinch.cy) } }
-    const onEnd = e => { if (e.touches.length < 2) pinch = null }
     const onWheel = e => { if (!e.ctrlKey) return; e.preventDefault(); zoomTo(prevH.current * Math.exp(-e.deltaY / 300), e.clientY - el.getBoundingClientRect().top) }
-    el.addEventListener('touchstart', onStart, { passive: true })
-    el.addEventListener('touchmove', onMove, { passive: false })
-    el.addEventListener('touchend', onEnd)
     el.addEventListener('wheel', onWheel, { passive: false })
-    // iOS Safari: eigen gesture-events, anders zoomt de hele pagina mee
-    const noPageZoom = e => e.preventDefault()
-    el.addEventListener('gesturestart', noPageZoom)
-    el.addEventListener('gesturechange', noPageZoom)
-    return () => {
-      el.removeEventListener('touchstart', onStart); el.removeEventListener('touchmove', onMove); el.removeEventListener('touchend', onEnd); el.removeEventListener('wheel', onWheel)
-      el.removeEventListener('gesturestart', noPageZoom); el.removeEventListener('gesturechange', noPageZoom)
-    }
+    return () => el.removeEventListener('wheel', onWheel)
   }, [])
 
-  // Zoomknoppen alleen met een muis; op een touchscreen zoom je met twee vingers
-  const [finePointer] = useState(() => typeof window !== 'undefined' && window.matchMedia?.('(hover: hover) and (pointer: fine)').matches)
   const dots = rowH < 70
   const showTime = rowH >= 140
   const scrollToToday = () => {
@@ -284,10 +267,10 @@ export default function MonthGrid({ selectedDay, onSelectDay, tasks, calendarEve
   return (
     <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
       {/* Weekdagen + zoom */}
-      <div style={{ flexShrink: 0, display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', padding: '6px 0 4px', borderBottom: '1px solid var(--c-border)', background: 'var(--c-surface-solid)' }}>
+      <div style={{ flexShrink: 0, display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', padding: `6px ${RAIL_GUTTER}px 4px 0`, borderBottom: '1px solid var(--c-border)', background: 'var(--c-surface-solid)' }}>
         {WEEKDAYS.map((w, i) => <span key={i} style={{ textAlign: 'center', fontSize: 11, fontWeight: 600, color: i >= 5 ? 'var(--c-text-3)' : 'var(--c-text-2)' }}>{w}</span>)}
       </div>
-      <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', touchAction: 'pan-y', WebkitOverflowScrolling: 'touch', paddingBottom: 90 }}>
+      <div ref={scrollRef} className="mini-month-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', paddingBottom: 90, paddingRight: RAIL_GUTTER, scrollbarWidth: 'none' }}>
         {months.map(m => {
           const y = m.getFullYear(), mo = m.getMonth()
           const weeks = []
@@ -302,16 +285,61 @@ export default function MonthGrid({ selectedDay, onSelectDay, tasks, calendarEve
           )
         })}
       </div>
-      {/* Zwevende knoppen: vandaag + zoom */}
-      <div style={{ position: 'absolute', right: 12, bottom: 'calc(84px + env(safe-area-inset-bottom))', display: 'flex', gap: 6, alignItems: 'center' }}>
+      {/* Zoombalk rechts (in de marge naast zondag) */}
+      <ZoomRail value={rowH} onChange={h => zoomTo(h)} />
+      {/* Vandaag */}
+      <div style={{ position: 'absolute', right: 22, bottom: 'calc(84px + env(safe-area-inset-bottom))' }}>
         <button type="button" onClick={scrollToToday} className="btn-ghost" style={{ padding: '7px 14px', fontSize: 13, borderRadius: 20, background: 'var(--c-surface-solid)', boxShadow: 'var(--shadow-float)' }}>Vandaag</button>
-        {finePointer && <div style={{ display: 'flex', borderRadius: 20, overflow: 'hidden', border: '1px solid var(--c-border-strong)', background: 'var(--c-surface-solid)', boxShadow: 'var(--shadow-float)' }}>
-          <button type="button" aria-label="Uitzoomen" onClick={() => zoomTo(rowH / 1.35)} disabled={rowH <= MIN_H}
-            style={{ width: 36, height: 32, border: 'none', background: 'transparent', color: 'var(--c-text-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: rowH <= MIN_H ? 0.4 : 1 }}><Minus size={15} /></button>
-          <button type="button" aria-label="Inzoomen" onClick={() => zoomTo(rowH * 1.35)} disabled={rowH >= MAX_H}
-            style={{ width: 36, height: 32, border: 'none', borderLeft: '1px solid var(--c-border)', background: 'transparent', color: 'var(--c-text-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: rowH >= MAX_H ? 0.4 : 1 }}><Plus size={15} /></button>
-        </div>}
       </div>
+    </div>
+  )
+}
+
+/** Dun, verticaal zoombalkje: omhoog = inzoomen. In rust bijna onzichtbaar, tijdens slepen helder. */
+function ZoomRail({ value, onChange }) {
+  const trackRef = useRef(null)
+  const [active, setActive] = useState(false)
+  const TRACK = 150
+  const frac = (value - MIN_H) / (MAX_H - MIN_H)
+  const fromY = (clientY) => {
+    const r = trackRef.current.getBoundingClientRect()
+    const f = 1 - Math.min(1, Math.max(0, (clientY - r.top) / r.height))
+    onChange(MIN_H + f * (MAX_H - MIN_H))
+  }
+  const onDown = (e) => {
+    e.preventDefault()
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+    setActive(true)
+    fromY(e.clientY)
+  }
+  const onMove = (e) => { if (active) fromY(e.clientY) }
+  const onUp = () => setActive(false)
+  const onKey = (e) => {
+    const step = (MAX_H - MIN_H) / 10
+    if (e.key === 'ArrowUp' || e.key === 'ArrowRight') { e.preventDefault(); onChange(Math.min(MAX_H, value + step)) }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') { e.preventDefault(); onChange(Math.max(MIN_H, value - step)) }
+  }
+  return (
+    <div role="slider" aria-label="Zoom maandweergave" aria-orientation="vertical" tabIndex={0}
+      aria-valuemin={MIN_H} aria-valuemax={MAX_H} aria-valuenow={Math.round(value)}
+      onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} onKeyDown={onKey}
+      style={{
+        position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', width: RAIL_GUTTER + 8, height: TRACK + 28,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between', padding: '2px 0',
+        touchAction: 'none', cursor: 'ns-resize', zIndex: 5, outline: 'none',
+        opacity: active ? 1 : 0.45, transition: 'opacity 0.25s',
+      }}>
+      <span aria-hidden="true" style={{ fontSize: 10, lineHeight: 1, color: 'var(--c-text-3)', userSelect: 'none' }}>+</span>
+      <div ref={trackRef} style={{ position: 'relative', width: 3, height: TRACK, borderRadius: 2, background: 'rgba(255,255,255,0.12)' }}>
+        <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${frac * 100}%`, borderRadius: 2, background: 'color-mix(in srgb, var(--accent) 55%, transparent)' }} />
+        <div style={{
+          position: 'absolute', left: '50%', top: `${(1 - frac) * 100}%`, transform: 'translate(-50%, -50%)',
+          width: active ? 12 : 9, height: active ? 22 : 18, borderRadius: 6,
+          background: active ? 'var(--accent)' : 'var(--c-text-2)', boxShadow: '0 1px 4px rgba(0,0,0,0.5)',
+          transition: 'width 0.15s, height 0.15s, background 0.15s',
+        }} />
+      </div>
+      <span aria-hidden="true" style={{ fontSize: 12, lineHeight: 1, color: 'var(--c-text-3)', userSelect: 'none' }}>−</span>
     </div>
   )
 }
