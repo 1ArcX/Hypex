@@ -1157,7 +1157,11 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
       )}
 
       {/* Geïmporteerd item (Google / MijnX): bekijken + aanpassen */}
-      {modal?.mode === 'view' && <ExternalEventModal ev={modal.event} onClose={() => setModal(null)} />}
+      {modal?.mode === 'view' && (
+        <ExternalEventModal ev={modal.event} onClose={() => setModal(null)}
+          siblings={events.filter(e => e.external && e.id !== modal.event.id && e.connection_id === modal.event.connection_id &&
+            (e._original?.title ?? e.title) === (modal.event._original?.title ?? modal.event.title))} />
+      )}
 
       {/* Event modal */}
       {modal && modal.mode !== 'view' && (

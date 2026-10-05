@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { X, EyeOff, Eye, RotateCcw, Save } from 'lucide-react'
 import { eventDisplay } from '../../utils/eventTitle'
 import { eventCategory, typeIdOf } from '../../utils/category'
-import { saveOverride, resetOverride } from '../../utils/externalEvents'
+import { saveOverrides, resetOverrides } from '../../utils/externalEvents'
 import { TypeSelect } from '../ui'
 
 const pad = n => String(n).padStart(2, '0')
@@ -30,8 +30,11 @@ function formFrom(ev) {
 }
 
 /** Geïmporteerd item (Google / MijnX) bekijken en aanpassen. Aanpassingen overleven elke sync. */
-export default function ExternalEventModal({ ev, onClose }) {
+export default function ExternalEventModal({ ev, siblings = [], onClose }) {
   const [form, setForm] = useState(() => formFrom(ev))
+  // Zelfde titel in dezelfde feed (bv. 7× "herfstvakantie", één per dag): in één keer aanpassen.
+  const [applyAll, setApplyAll] = useState(false)
+  const targets = applyAll ? [ev, ...siblings] : [ev]
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const set = (patch) => setForm(f => ({ ...f, ...patch }))
@@ -70,14 +73,30 @@ export default function ExternalEventModal({ ev, onClose }) {
     const origAllDay = isAllDay(orig.all_day, os, oe)
     const timeChanged = form.allDay !== origAllDay || start.getTime() !== os.getTime() || end.getTime() !== oe.getTime()
     const title = form.title.trim()
-    return run(() => saveOverride(ev, {
+    const shared = {
       title: title && title !== orig.title ? title : null,
       note: form.note.trim() || null,
-      start_time: timeChanged ? start.toISOString() : null,
-      end_time: timeChanged ? end.toISOString() : null,
-      all_day: timeChanged ? form.allDay : null,
       type_id: form.cat !== autoCat ? typeIdOf(form.cat) : null,
-    }))
+    }
+    const items = [{ ev, patch: { ...shared, start_time: timeChanged ? start.toISOString() : null, end_time: timeChanged ? end.toISOString() : null, all_day: timeChanged ? form.allDay : null } }]
+    // Andere items: zelfde hele-dag/tijden, maar op hun eigen datum(s).
+    for (const sib of applyAll ? siblings : []) {
+      const so = sib._original || sib
+      const ss = new Date(so.start_time), se = new Date(so.end_time)
+      const sStart = form.allDay ? new Date(ss.getFullYear(), ss.getMonth(), ss.getDate(), 0, 0)
+        : new Date(`${dateStr(ss)}T${form.startTime}`)
+      let sEnd = form.allDay ? new Date(se.getFullYear(), se.getMonth(), se.getDate(), 23, 59)
+        : new Date(`${dateStr(se)}T${form.endTime}`)
+      if (sEnd <= sStart) sEnd = new Date(sStart.getTime() + 3600000)
+      const changed = form.allDay !== isAllDay(so.all_day, ss, se) || sStart.getTime() !== ss.getTime() || sEnd.getTime() !== se.getTime()
+      const keepOwnTime = !timeChanged // alleen titel/type/notitie aangepast → tijden van dat item laten staan
+      items.push({ ev: sib, patch: { ...shared,
+        start_time: !keepOwnTime && changed ? sStart.toISOString() : keepOwnTime ? sib._override?.start_time ?? null : null,
+        end_time: !keepOwnTime && changed ? sEnd.toISOString() : keepOwnTime ? sib._override?.end_time ?? null : null,
+        all_day: !keepOwnTime && changed ? form.allDay : keepOwnTime ? sib._override?.all_day ?? null : null,
+      } })
+    }
+    return run(() => saveOverrides(items))
   }
 
   const lbl = { fontSize: 10, color: 'var(--c-text-3)', marginBottom: 4, letterSpacing: '0.05em' }
@@ -144,16 +163,28 @@ export default function ExternalEventModal({ ev, onClose }) {
             onChange={e => set({ note: e.target.value })} style={{ resize: 'vertical', minHeight: 56 }} />
         </div>
 
+        {siblings.length > 0 && (
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9, marginTop: 14, padding: '10px 12px', borderRadius: 'var(--r-md)', cursor: 'pointer',
+            background: applyAll ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'var(--c-surface-2)',
+            border: `1px solid ${applyAll ? 'color-mix(in srgb, var(--accent) 35%, transparent)' : 'var(--c-border)'}`, fontSize: 12, color: 'var(--c-text-2)', lineHeight: 1.45 }}>
+            <input type="checkbox" checked={applyAll} onChange={e => setApplyAll(e.target.checked)} style={{ accentColor: 'var(--accent)', marginTop: 2, cursor: 'pointer' }} />
+            <span>
+              Ook toepassen op de <b style={{ color: 'var(--c-text)' }}>{siblings.length} andere {siblings.length === 1 ? 'item' : 'items'}</b> met de titel "{orig.title}"
+              <span style={{ display: 'block', color: 'var(--c-text-3)', fontSize: 11 }}>Elk item houdt zijn eigen datum; hele dag, tijden, titel, type en notitie worden overgenomen.</span>
+            </span>
+          </label>
+        )}
+
         {error && <div style={{ fontSize: 12, color: 'var(--c-danger)', marginTop: 12, lineHeight: 1.5 }}>{error}</div>}
 
         <div style={{ display: 'flex', gap: 8, marginTop: 20, flexWrap: 'wrap' }}>
           <button type="button" className="btn-ghost" disabled={saving} title={ev.hidden ? 'Weer tonen' : 'Verbergen'}
-            onClick={() => run(() => saveOverride(ev, { hidden: !ev.hidden }))} style={{ padding: '9px 12px', fontSize: 12 }}>
+            onClick={() => run(() => saveOverrides(targets.map(t => ({ ev: t, patch: { hidden: !ev.hidden } }))))} style={{ padding: '9px 12px', fontSize: 12 }}>
             {ev.hidden ? <Eye size={13} /> : <EyeOff size={13} />} {ev.hidden ? 'Tonen' : 'Verbergen'}
           </button>
-          {ev._override && (
+          {targets.some(t => t._override) && (
             <button type="button" className="btn-ghost" disabled={saving} title="Alle aanpassingen weg, terug naar de feed"
-              onClick={() => run(() => resetOverride(ev))} style={{ padding: '9px 12px', fontSize: 12 }}>
+              onClick={() => run(() => resetOverrides(targets))} style={{ padding: '9px 12px', fontSize: 12 }}>
               <RotateCcw size={13} /> Herstel origineel
             </button>
           )}

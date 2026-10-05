@@ -67,30 +67,40 @@ export async function loadExternalEvents({ since, limit } = {}) {
   ))
 }
 
-/** Aanpassing opslaan (upsert). `patch`: title, note, start_time, end_time, all_day, type_id, hidden. */
-export async function saveOverride(ev, patch) {
+const overrideRow = (userId, ev, patch) => ({
+  user_id: userId, connection_id: ev.connection_id, external_id: ev.external_id,
+  title: null, note: null, start_time: null, end_time: null, all_day: null, type_id: null, hidden: false,
+  ...(ev._override ? {
+    title: ev._override.title, note: ev._override.note, start_time: ev._override.start_time, end_time: ev._override.end_time,
+    all_day: ev._override.all_day, type_id: ev._override.type_id, hidden: ev._override.hidden,
+  } : {}),
+  ...patch,
+  updated_at: new Date().toISOString(),
+})
+
+/**
+ * Aanpassingen opslaan (upsert), voor één of meer items tegelijk.
+ * `items`: [{ ev, patch }] met patch-velden title, note, start_time, end_time, all_day, type_id, hidden.
+ */
+export async function saveOverrides(items) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: new Error('Niet ingelogd') }
-  const row = {
-    user_id: user.id, connection_id: ev.connection_id, external_id: ev.external_id,
-    ...(ev._override ? {
-      title: ev._override.title, note: ev._override.note, start_time: ev._override.start_time, end_time: ev._override.end_time,
-      all_day: ev._override.all_day, type_id: ev._override.type_id, hidden: ev._override.hidden,
-    } : {}),
-    ...patch,
-    updated_at: new Date().toISOString(),
-  }
-  const res = await supabase.from('external_event_overrides').upsert(row, { onConflict: 'connection_id,external_id' })
+  const rows = items.map(({ ev, patch }) => overrideRow(user.id, ev, patch))
+  const res = await supabase.from('external_event_overrides').upsert(rows, { onConflict: 'connection_id,external_id' })
   if (!res.error) window.dispatchEvent(new Event('refreshExternalCalendarEvents'))
   return res
 }
+export const saveOverride = (ev, patch) => saveOverrides([{ ev, patch }])
 
 /** Alle aanpassingen weg → weer precies zoals in de feed. */
-export async function resetOverride(ev) {
-  const res = await supabase.from('external_event_overrides').delete().eq('connection_id', ev.connection_id).eq('external_id', ev.external_id)
-  if (!res.error) window.dispatchEvent(new Event('refreshExternalCalendarEvents'))
-  return res
+export async function resetOverrides(evs) {
+  const results = await Promise.all(evs.map(ev =>
+    supabase.from('external_event_overrides').delete().eq('connection_id', ev.connection_id).eq('external_id', ev.external_id)))
+  const failed = results.find(r => r.error)
+  if (!failed) window.dispatchEvent(new Event('refreshExternalCalendarEvents'))
+  return failed || results[0]
 }
+export const resetOverride = (ev) => resetOverrides([ev])
 
 /** Niet-geziene feed-wijzigingen (nieuwste eerst). Leeg als de migratie nog niet gedraaid is. */
 export async function loadUnseenChanges() {
