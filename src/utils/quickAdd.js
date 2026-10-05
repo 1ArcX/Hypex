@@ -70,6 +70,32 @@ export function parseQuickAdd(text, { now = new Date(), types = [], ignore = [] 
   // ── Hele dag ──
   take(new RegExp(`${B}(hele dag|de hele dag)${E}`, 'gi'), () => { fields.allDay = true; return { key: 'allDay', label: 'Hele dag' } })
 
+  // ── Dagdeel: "vanavond", "morgenochtend", "'s middags", "avond", "vrijdagavond" ──
+  const DP = { ochtend: 'ochtend', morgen: 'ochtend', middag: 'middag', avond: 'avond' }
+  const DP_EMOJI = { ochtend: '🌅', middag: '☀️', avond: '🌙' }
+  const setDp = (w) => { const dp = DP[w.toLowerCase()]; fields.daypart = dp; return dp }
+  // vandaag/morgen/overmorgen + dagdeel in één woord ("vanavond" = vandaag 's avonds)
+  take(new RegExp(`${B}(van|morgen|overmorgen)(ochtend|morgen|middag|avond)${E}`, 'gi'), (_, day, part) => {
+    if (fields.daypart || (day.toLowerCase() === 'morgen' && part.toLowerCase() === 'morgen')) return false
+    const offset = { van: 0, morgen: 1, overmorgen: 2 }[day.toLowerCase()]
+    if (!fields.date) fields.date = iso(addDays(today, offset))
+    const dp = setDp(part)
+    return { key: 'daypart', label: `${DP_EMOJI[dp]} ${['vandaag', 'morgen', 'overmorgen'][offset]} ${dp}` }
+  })
+  // weekdag + dagdeel ("vrijdagavond", "zaterdagochtend")
+  take(new RegExp(`${B}(${DAY_FULL})(ochtend|morgen|middag|avond)${E}`, 'gi'), (_, day, part) => {
+    if (fields.daypart || fields.date) return false
+    fields.date = iso(nextDow(today, dayIndex(day)))
+    const dp = setDp(part)
+    return { key: 'daypart', label: `${DP_EMOJI[dp]} ${day.toLowerCase()} ${dp}` }
+  })
+  // los dagdeel ("'s avonds", "in de middag", "avond")
+  take(new RegExp(`${B}(?:'s\\s*|s\\s+|in de\\s+|de\\s+)?(ochtends?|middags?|avonds?)${E}`, 'gi'), (_, part) => {
+    if (fields.daypart) return false
+    const dp = setDp(part.replace(/s$/i, ''))
+    return { key: 'daypart', label: `${DP_EMOJI[dp]} ${dp}` }
+  })
+
   // ── Dagbereik: "ma-vr", "ma t/m vr", "maandag tot en met vrijdag" ──
   take(new RegExp(`${B}(${DAY_ANY})\\s*(?:-|–|t/m|tm|tot en met|tot)\\s*(${DAY_ANY})${E}`, 'gi'), (_, a, b) => {
     const start = nextDow(today, dayIndex(a))

@@ -15,6 +15,8 @@ import { useIsDesktop } from '../hooks/useIsDesktop'
 // vak en groep toe; Event voegt beschrijving en event-herhaling toe. Het type bepaalt de kleur.
 
 const DURATION_CHIPS = [30, 60, 90, 120]
+// Tijdvak per dagdeel voor events (quick-add "vanavond etentje" → 19:00–22:00)
+const DAYPART_WINDOW = { ochtend: ['09:00', '12:00'], middag: ['13:00', '17:00'], avond: ['19:00', '22:00'] }
 const TASK_RECURRENCE = [
   { value: RECURRENCE.NONE,     label: 'Eenmalig' },
   { value: RECURRENCE.DAILY,    label: 'Elke dag' },
@@ -157,6 +159,18 @@ export default function ItemModal({
     }
     if (was.cat && !now.cat) { patch.cat = b.cat; patch.catTouched = false }
     if (was.priority && !now.priority) patch.priority = b.priority
+    // Dagdeel: taak → dagdeel (hele dag); event heeft een tijd nodig → tijdvak van dat dagdeel
+    if (now.daypart && 'daypart' in patch) {
+      if (isTask) { if (!now.startTime) patch.allDay = true }
+      else {
+        delete patch.daypart
+        if (!now.startTime) { const [s, e] = DAYPART_WINDOW[now.daypart]; Object.assign(patch, { allDay: false, startTime: s, endTime: e }) }
+      }
+    }
+    if (was.daypart && !now.daypart) {
+      patch.daypart = b.daypart
+      if (!now.startTime) Object.assign(patch, { allDay: b.allDay, startTime: b.startTime, endTime: b.endTime })
+    }
     if (now.cat && 'cat' in patch) patch.catTouched = true
     if (patch.date) patch.noDate = false
     lastParse.current = p.fields

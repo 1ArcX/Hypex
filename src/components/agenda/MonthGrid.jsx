@@ -3,6 +3,9 @@ import { Minus, Plus } from 'lucide-react'
 import { taskOnDay, isMultiDay } from '../../utils/taskStatus'
 import { taskCategory, eventCategory, categoryColor } from '../../utils/category'
 import { eventDisplay } from '../../utils/eventTitle'
+import { daypartEmoji } from '../../utils/daypart'
+
+const DAYPART_SORT = { ochtend: 8 * 60, middag: 12 * 60, avond: 17 * 60 }
 
 // Maandweergave in de stijl van Apple/iCloud Agenda (mobiel): maanden onder elkaar, per dag
 // gekleurde blokjes, meerdaagse items als doorlopende balk. Knijpen (2 vingers) zoomt tussen alleen
@@ -87,7 +90,12 @@ function buildIndex({ from, to, tasks, calendarEvents, magisterLessons }) {
     if (!t.recurrence && t.completed) continue
     const color = categoryColor(taskCategory(t))
     const time = t.start_time || t.time || null
-    const base = { key: `task-${t.id}`, title: `${t.recurrence ? '🔁 ' : ''}${t.title}`, color, time: time?.slice(0, 5) || null, sort: time ? +time.slice(0, 2) * 60 + +time.slice(3, 5) : 2000 + (t.recurrence ? 1 : 0) }
+    // Dagdeel zonder tijd: emoji ervoor en sorteren op het begin van het dagdeel
+    const dp = !time && DAYPART_SORT[t.daypart] != null ? t.daypart : null
+    const base = {
+      key: `task-${t.id}`, title: `${t.recurrence ? '🔁 ' : ''}${dp ? `${daypartEmoji(dp)} ` : ''}${t.title}`, color, time: time?.slice(0, 5) || null,
+      sort: time ? +time.slice(0, 2) * 60 + +time.slice(3, 5) : dp ? DAYPART_SORT[dp] : 2000 + (t.recurrence ? 1 : 0),
+    }
     if (isMultiDay(t)) {
       const sd = new Date(t.date + 'T00:00:00'), ed = new Date(t.end_date + 'T00:00:00')
       if (ed >= from && sd <= to) spans.push({ ...base, from: sd, to: ed })

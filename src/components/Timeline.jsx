@@ -8,6 +8,7 @@ import { taskCategory, eventCategory, categoryColor, CATEGORIES, CATEGORY_ORDER 
 import { eventDisplay } from '../utils/eventTitle'
 import { loadExternalEvents } from '../utils/externalEvents'
 import { taskOnDay, isMultiDay } from '../utils/taskStatus'
+import { DAYPARTS } from '../utils/daypart'
 import ExternalEventModal from './agenda/ExternalEventModal'
 import MiniMonth from './agenda/MiniMonth'
 import WeekStrip from './agenda/WeekStrip'
@@ -128,6 +129,9 @@ function layoutOverlaps(items) {
 }
 
 // Hele-dag-item: expliciet (feed/aanpassing) of start om 00:00 (eigen items)
+// Dagdelen in het rooster (minuten): ochtend 08–12, middag 12–17, avond 17–22
+const DAYPART_RANGE = { ochtend: [8 * 60, 12 * 60], middag: [12 * 60, 17 * 60], avond: [17 * 60, 22 * 60] }
+
 function isAllDayEvent(ev) {
   if (ev.all_day) return true
   const s = new Date(ev.start_time)
@@ -581,7 +585,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
               })
               // Taken zonder tijd (hele dag / dagdeel) + routines op deze dag
               const allDayTasks = getTasksForDay(d)
-                .filter(t => !t.start_time && !t.time && !spanTask(t))
+                .filter(t => !t.start_time && !t.time && !spanTask(t) && !t.daypart)
                 .filter(t => t.recurrence || !t.completed)
                 .map(t => {
                   const color = categoryColor(taskCategory(t))
@@ -733,6 +737,11 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                   const endMins = Math.max(startMins + 30, en.getHours()*60 + en.getMinutes())
                   return { type: 'event', key: `ev-${ev.id}`, startMins, endMins, data: ev }
                 }),
+                // Taken met een dagdeel (zonder tijd): één gestippeld blok per dagdeel over dat hele dagdeel
+                ...Object.entries(colTasks
+                  .filter(t => !t.start_time && !t.time && t.daypart && DAYPART_RANGE[t.daypart] && !(isMultiDay(t)) && (t.recurrence || !t.completed))
+                  .reduce((g, t) => { (g[t.daypart] ||= []).push(t); return g }, {}))
+                  .map(([dp, list]) => ({ type: 'daypart', key: `dp-${di}-${dp}`, startMins: DAYPART_RANGE[dp][0], endMins: DAYPART_RANGE[dp][1], data: { dp, list } })),
                 ...colTasks.filter(task => task.start_time || task.time).map(task => {
                   const timeStr = task.start_time || task.time
                   const startMins = timeStrToMins(timeStr)
@@ -831,6 +840,36 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                           {height >= 58 && disp.code && (
                             <div style={{ ...blockMeta(color), fontSize: '9px', letterSpacing: '0.02em', opacity: 0.85 }}>{ev.external ? '↗ ' : ''}{disp.code}</div>
                           )}
+                        </div>
+                      )
+                    }
+
+                    if (item.type === 'daypart') {
+                      const { dp, list } = item.data
+                      const label = DAYPARTS.find(x => x.id === dp)
+                      return (
+                        <div key={item.key} style={{
+                          position: 'absolute', top, height, left: leftStyle, width: widthStyle, zIndex: 1, overflow: 'hidden',
+                          borderRadius: 8, border: '1px dashed var(--c-border-strong)', background: 'color-mix(in srgb, var(--c-text-3) 7%, transparent)',
+                          padding: '4px 6px', display: 'flex', flexDirection: 'column', gap: 3,
+                        }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--c-text-3)', letterSpacing: '0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {label?.emoji} {label?.label}{list.length > 1 ? ` · ${list.length}` : ''}
+                          </div>
+                          {list.map(t => {
+                            const c = categoryColor(taskCategory(t))
+                            return (
+                              <div key={t.id}
+                                onClick={e => { e.stopPropagation(); onViewDetail ? onViewDetail(t) : onEditTask?.(t) }}
+                                {...kbdClick(`Taak ${t.title} (${label?.label})`, e => { e.stopPropagation(); onViewDetail ? onViewDetail(t) : onEditTask?.(t) })}
+                                title={t.title}
+                                style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 11, fontWeight: 600, padding: '2px 5px', borderRadius: 5,
+                                  background: `color-mix(in srgb, ${c} 16%, var(--c-surface-solid))`, borderLeft: `3px solid ${c}`, color: `color-mix(in srgb, ${c} 60%, white)`,
+                                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', opacity: t.completed ? 0.55 : 1, textDecoration: t.completed ? 'line-through' : 'none' }}>
+                                {t.recurrence ? '🔁 ' : ''}{t.title}
+                              </div>
+                            )
+                          })}
                         </div>
                       )
                     }
