@@ -827,7 +827,9 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                   const timeStr = task.start_time || task.time
                   const startMins = timeStrToMins(timeStr)
                   const endMins = task.end_time ? timeStrToMins(task.end_time) : startMins + 60
-                  return { type: 'task', key: `task-${task.id}`, startMins, endMins, data: task }
+                  // Reistijd hoort bij het blok (zoals bij events)
+                  const tb = Math.min(startMins, task.travel_before || 0), ta = Math.min(24 * 60 - endMins, task.travel_after || 0)
+                  return { type: 'task', key: `task-${task.id}`, startMins: startMins - tb, endMins: endMins + ta, tb, ta, evStart: startMins, evEnd: endMins, data: task }
                 }),
               ]
 
@@ -1019,22 +1021,44 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                       const task = item.data
                       const subject = subjects?.find(s => s.id === task.subject_id)
                       const color = task.completed ? 'var(--c-success)' : categoryColor(taskCategory(task))
-                      return (
-                        <div key={item.key}
-                          ref={isHL ? highlightRef : undefined}
-                          draggable
-                          onDragStart={e => e.dataTransfer.setData('taskId', task.id)}
-                          onClick={e => { e.stopPropagation(); onViewDetail ? onViewDetail(task) : onEditTask?.(task) }}
-                          {...kbdClick(`Taak ${task.title}`, e => { e.stopPropagation(); onViewDetail ? onViewDetail(task) : onEditTask?.(task) })}
-                          style={blockStyle(color, { top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, zIndex: 3, opacity: task.completed ? 0.55 : 1, ...hlStyle })}>
+                      const open = e => { e.stopPropagation(); onViewDetail ? onViewDetail(task) : onEditTask?.(task) }
+                      const hm = m => `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`
+                      const travel = item.tb || item.ta
+                      const tbH = (item.tb / 60) * HOUR_H, taH = (item.ta / 60) * HOUR_H
+                      const ownH = travel ? Math.max(20, ((item.evEnd - item.evStart) / 60) * HOUR_H - 2) : height
+                      const body = (
+                        <>
                           <div style={blockTitle(color, { textDecoration: task.completed ? 'line-through' : 'none' })}>
                             {task.completed ? '✓ ' : ''}{task.title}
                           </div>
-                          {showDetail && (
+                          {ownH >= 36 && (
                             <div style={blockMeta(color)}>
-                              {pad(Math.floor(item.startMins / 60))}:{pad(item.startMins % 60)} – {pad(Math.floor(item.endMins / 60) % 24)}:{pad(item.endMins % 60)}{subject ? ` · ${subject.name}` : ''}
+                              {hm(item.evStart)} – {hm(item.evEnd)}{subject ? ` · ${subject.name}` : ''}
                             </div>
                           )}
+                        </>
+                      )
+                      const common = {
+                        ref: isHL ? highlightRef : undefined, draggable: true,
+                        onDragStart: e => e.dataTransfer.setData('taskId', task.id), onClick: open,
+                        ...kbdClick(`Taak ${task.title}`, open),
+                      }
+                      if (!travel) return (
+                        <div key={item.key} {...common}
+                          style={blockStyle(color, { top: `${top}px`, height: `${height}px`, left: leftStyle, width: widthStyle, zIndex: 3, opacity: task.completed ? 0.55 : 1, ...hlStyle })}>
+                          {body}
+                        </div>
+                      )
+                      return (
+                        <div key={item.key} {...common}
+                          title={[task.title, item.tb ? `${item.tb} min reistijd heen` : '', item.ta ? `${item.ta} min reistijd terug` : ''].filter(Boolean).join(' · ')}
+                          style={{ position: 'absolute', top, height: tbH + ownH + taH, left: leftStyle, width: widthStyle, marginLeft: 2, zIndex: 3, display: 'flex', flexDirection: 'column', cursor: 'pointer', opacity: task.completed ? 0.55 : 1, ...hlStyle }}>
+                          {item.tb > 0 && <div style={travelStyle(color, 'top', tbH)}>{tbH >= 13 && <>🚗 {item.tb} min</>}</div>}
+                          <div style={blockStyle(color, { position: 'relative', marginLeft: 0, height: ownH, flexShrink: 0,
+                            ...(item.tb ? { borderTopLeftRadius: 0, borderTopRightRadius: 0 } : {}), ...(item.ta ? { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 } : {}) })}>
+                            {body}
+                          </div>
+                          {item.ta > 0 && <div style={travelStyle(color, 'bottom', taH)}>{taH >= 13 && <>🚗 {item.ta} min</>}</div>}
                         </div>
                       )
                     }

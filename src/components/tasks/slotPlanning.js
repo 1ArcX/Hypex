@@ -94,7 +94,7 @@ export function getFreeSlots(dateStr, durationMins, tasks, calendarEvents) {
 
   // 4. Al geplande taken (geen reistijd)
   ;(tasks || []).filter(t => !t.recurrence && taskOnDay(t, dateStr) && t.start_time && t.end_time).forEach(t => {
-    bezet.push({ start: timeStrToMins(t.start_time), end: timeStrToMins(t.end_time) })
+    bezet.push({ start: timeStrToMins(t.start_time) - (t.travel_before || 0), end: timeStrToMins(t.end_time) + (t.travel_after || 0) })
   })
 
   // Merge bezette blokken
@@ -191,8 +191,8 @@ export function getConflicts(dateStr, startMins, endMins, tasks, calendarEvents,
   })
 
   ;(tasks || []).filter(t => !t.recurrence && taskOnDay(t, dateStr) && t.id !== excludeId && t.start_time && t.end_time).forEach(t => {
-    const ts = timeStrToMins(t.start_time), te = timeStrToMins(t.end_time)
-    if (startMins < te && endMins > ts) hits.push(t.title || 'Taak')
+    const ts = timeStrToMins(t.start_time) - (t.travel_before || 0), te = timeStrToMins(t.end_time) + (t.travel_after || 0)
+    if (startMins < te && endMins > ts) hits.push(t.travel_before || t.travel_after ? `${t.title || 'Taak'} (incl. reistijd)` : (t.title || 'Taak'))
   })
 
   return [...new Set(hits)]

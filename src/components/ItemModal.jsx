@@ -71,6 +71,7 @@ function formFromTask(t) {
     allDay: !timed, startTime: t.start_time || t.time || '09:00', endTime: t.end_time || minsToTimeStr(timeStrToMins(t.start_time || t.time || '09:00') + (t.duration_minutes || 60)),
     subjectId: t.subject_id || '', priority: t.priority ?? 2, dueDate: t.due_date || '', groupName: t.group_name || '',
     recurrence: t.recurrence || RECURRENCE.NONE, recurrenceDays: t.recurrence_days || [], daypart: t.daypart || null, completed: !!t.completed,
+    travelBefore: timed ? t.travel_before || 0 : 0, travelAfter: timed ? t.travel_after || 0 : 0,
   }
 }
 
@@ -223,7 +224,7 @@ export default function ItemModal({
     onDraftChange({
       kind: kind || 'event', start, end, allDay: f.allDay, color: categoryColor(f.cat), title: f.title || (isTask ? 'Nieuwe taak' : 'Nieuw event'), id: editing?.id,
       dateFromUser, multiDay: !!f.endDate && f.endDate > f.date,
-      travelBefore: !isTask && !f.allDay ? f.travelBefore : 0, travelAfter: !isTask && !f.allDay ? f.travelAfter : 0,
+      travelBefore: !f.allDay ? f.travelBefore : 0, travelAfter: !f.allDay ? f.travelAfter : 0,
     })
   }, [kind, f.date, f.endDate, f.allDay, f.startTime, f.endTime, f.cat, f.title, f.noDate, f.travelBefore, f.travelAfter, dateFromUser]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -247,6 +248,7 @@ export default function ItemModal({
         duration_minutes: timed ? duration : 30, due_date: f.dueDate || null, group_name: f.groupName.trim() || null,
         recurrence: f.recurrence || null, recurrence_days: recDays, daypart: f.daypart || null,
         type_id: typeIdOf(f.cat),
+        travel_before: timed ? f.travelBefore : 0, travel_after: timed ? f.travelAfter : 0,
       }, editing && kind === 'task' ? editing : null)
     } else {
       const { start, end } = formRange(f)
@@ -262,7 +264,7 @@ export default function ItemModal({
     setSaving(false)
     if (res?.error) {
       const msg = res.error.message || String(res.error)
-      setError(msg.includes('travel_') ? 'Reistijd opslaan kan pas na de database-migratie (add_travel_time.sql).' : `Opslaan mislukt: ${msg}`)
+      setError(msg.includes('travel_') ? `Reistijd opslaan kan pas na de database-migratie (${isTask ? 'add_task_travel_time.sql' : 'add_travel_time.sql'}).` : `Opslaan mislukt: ${msg}`)
       return
     }
     close()
@@ -506,11 +508,13 @@ export default function ItemModal({
           </div>
 
           {/* Event: beschrijving + herhaling */}
+          {/* Reistijd (event én taak met tijdslot) */}
+          {!f.allDay && !(isTask && f.noDate) && (
+            <TravelTimeField before={f.travelBefore} after={f.travelAfter}
+              onChange={({ before, after }) => set({ travelBefore: before, travelAfter: after })} />
+          )}
+
           {!isTask && (<>
-            {!f.allDay && (
-              <TravelTimeField before={f.travelBefore} after={f.travelAfter}
-                onChange={({ before, after }) => set({ travelBefore: before, travelAfter: after })} />
-            )}
             <textarea className="glass-input" placeholder="Beschrijving" value={f.description}
               onChange={e => set({ description: e.target.value })} style={{ resize: 'vertical', minHeight: 56 }} />
             <div>

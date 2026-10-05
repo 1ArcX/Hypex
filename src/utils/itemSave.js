@@ -31,6 +31,8 @@ export async function saveTask(userId, data, orig = null) {
   if (data.daypart || orig?.daypart) fields.daypart = data.daypart || null
   if (data.type_id || orig?.type_id) fields.type_id = data.type_id || null
   if (data.end_date || orig?.end_date) fields.end_date = data.end_date || null
+  if (data.travel_before || orig?.travel_before) fields.travel_before = data.travel_before || null
+  if (data.travel_after || orig?.travel_after) fields.travel_after = data.travel_after || null
 
   const res = data.id
     ? await supabase.from('tasks').update(fields).eq('id', data.id).eq('user_id', userId)
