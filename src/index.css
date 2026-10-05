@@ -366,6 +366,32 @@ html, body, #root {
 .modal-overlay.modal-closing { animation: fadeOut 0.2s ease forwards; }
 .modal-content.modal-closing { animation: slideDown 0.2s cubic-bezier(0.4, 0, 1, 1) forwards; }
 
+/* ItemModal als paneel rechts (desktop agenda, split-screen): rooster links blijft zichtbaar */
+:root { --split-w: clamp(420px, 42vw, 640px); }
+.modal-overlay.item-panel {
+  left: auto; width: var(--split-w); padding: 0;
+  align-items: stretch; justify-content: stretch;
+  background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none;
+  animation: none;
+}
+.modal-overlay.item-panel .glass-card {
+  width: 100%; max-width: none; max-height: none; height: 100%;
+  border-radius: 0; border-width: 0 0 0 1px; border-style: solid;
+  box-shadow: -18px 0 40px rgba(0,0,0,0.35);
+  animation: itemPanelIn 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+.modal-overlay.item-panel .glass-card.modal-closing { animation: itemPanelOut 0.18s ease forwards; }
+@keyframes itemPanelIn { from { transform: translateX(24px); opacity: 0 } to { transform: none; opacity: 1 } }
+@keyframes itemPanelOut { to { transform: translateX(24px); opacity: 0 } }
+
+/* Keuzestap Event | Taak: zachte gloed rond de schakelaar */
+@keyframes kindGlow {
+  0%, 100% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent), 0 0 22px color-mix(in srgb, var(--accent) 18%, transparent); }
+  50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 12%, transparent), 0 0 34px color-mix(in srgb, var(--accent) 26%, transparent); }
+}
+.kind-choose { animation: kindGlow 2.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .kind-choose, .modal-overlay.item-panel .glass-card { animation: none; } }
+
 /* ===== PAGINA-TRANSITIE ===== */
 .page-transition {
   animation: pageIn 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;

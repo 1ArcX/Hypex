@@ -82,13 +82,13 @@ export function getFreeSlots(dateStr, durationMins, tasks, calendarEvents) {
     })
   } catch {}
 
-  // 3. Agenda-events (geen reistijd)
+  // 3. Agenda-events (+ hun eigen reistijd heen/terug)
   ;(calendarEvents || []).forEach(ev => {
     try {
       const s = new Date(ev.start_time)
       if (toISO(s) !== dateStr) return
       const e = new Date(ev.end_time)
-      bezet.push({ start: s.getHours() * 60 + s.getMinutes(), end: e.getHours() * 60 + e.getMinutes() })
+      bezet.push({ start: s.getHours() * 60 + s.getMinutes() - (ev.travel_before || 0), end: e.getHours() * 60 + e.getMinutes() + (ev.travel_after || 0) })
     } catch {}
   })
 
@@ -184,9 +184,9 @@ export function getConflicts(dateStr, startMins, endMins, tasks, calendarEvents,
       const s = new Date(ev.start_time)
       if (ev.id === excludeId || ev.hidden || toISO(s) !== dateStr) return
       const e = new Date(ev.end_time)
-      const es = s.getHours() * 60 + s.getMinutes()
-      const ee = e.getHours() * 60 + e.getMinutes()
-      if (startMins < ee && endMins > es) hits.push(ev.title || 'Event')
+      const es = s.getHours() * 60 + s.getMinutes() - (ev.travel_before || 0)
+      const ee = e.getHours() * 60 + e.getMinutes() + (ev.travel_after || 0)
+      if (startMins < ee && endMins > es) hits.push(ev.travel_before || ev.travel_after ? `${ev.title || 'Event'} (incl. reistijd)` : (ev.title || 'Event'))
     } catch {}
   })
 

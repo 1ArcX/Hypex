@@ -182,20 +182,47 @@ export function parseQuickAdd(text, { now = new Date(), types = [], ignore = [] 
     fields.startTime = s; fields.endTime = e; fields.allDay = false
     return { key: 'time', label: `${s}–${e}` }
   })
-  take(new RegExp(`${B}(?:om\\s+)?(\\d{1,2})(?:[:.](\\d{2})|u(\\d{2})?)${E}`, 'gi'), (_, h, m, u) => {
+  // Reistijd: "reistijd 20m", "20m reis", "reis 1u" → heen; "terug 15m", "15m terug" → terug
+  const DUR = '(?:(\\d{1,3})\\s*(?:m|min|minuten)|(\\d)(?:[,.](\\d))?\\s*(?:u|uur)(?:(\\d{2}))?)'
+  const durMins = (mins, h, frac, hm) => mins ? +mins : (+h * 60 + (frac ? Math.round(+frac * 6) : 0) + (hm ? +hm : 0))
+  const durLabel = (n) => n >= 60 ? `${Math.floor(n / 60)}u${n % 60 ? pad(n % 60) : ''}` : `${n}m`
+  const travel = (key, word) => (...m) => {
+    const [mins, h, frac, hm] = m.slice(1, 5)
+    const n = durMins(mins, h, frac, hm)
+    if (!n || fields[key] != null) return false
+    fields[key] = n
+    return { key, label: `🚗 ${word} ${durLabel(n)}` }
+  }
+  take(new RegExp(`${B}(?:reistijd|reis|heen)\\s+${DUR}${E}`, 'gi'), travel('travelBefore', 'heen'))
+  take(new RegExp(`${B}${DUR}\\s+(?:reistijd|reis|heen)${E}`, 'gi'), travel('travelBefore', 'heen'))
+  take(new RegExp(`${B}(?:terug|terugreis)\\s+${DUR}${E}`, 'gi'), travel('travelAfter', 'terug'))
+  take(new RegExp(`${B}${DUR}\\s+(?:terug|terugreis)${E}`, 'gi'), travel('travelAfter', 'terug'))
+
+  // "om 2 uur" is een tijd, geen duur
+  take(new RegExp(`${B}om\\s+(\\d{1,2})\\s+uur${E}`, 'gi'), (_, h) => {
     if (fields.startTime) return false
+    const s = toTime(h, 0)
+    if (!s) return false
+    fields.startTime = s; fields.allDay = false
+    return { key: 'time', label: s }
+  })
+  // Losse tijd: "14:00", "14u", "om 9u". Een kale "1u"–"4u" / "1u30" (zonder "om") is eerder een duur.
+  take(new RegExp(`${B}(om\\s+)?(\\d{1,2})(?:[:.](\\d{2})|u(\\d{2})?)${E}`, 'gi'), (_, om, h, m, u) => {
+    if (fields.startTime) return false
+    if (!om && m == null && +h >= 1 && +h <= 4) return false
     const s = toTime(h, m || u || 0)
     if (!s) return false
     fields.startTime = s; fields.allDay = false
     return { key: 'time', label: s }
   })
-  // Duur: "90m", "90 min", "1u30" (na een begintijd), "2 uur"
-  take(new RegExp(`${B}(?:voor\\s+)?(?:(\\d{1,3})\\s*(?:m|min|minuten)|(\\d)(?:[,.](\\d))?\\s*(?:u|uur)(?:(\\d{2}))?)${E}`, 'gi'), (_, mins, h, frac, hm) => {
-    if (!fields.startTime || fields.endTime) return false
-    const total = mins ? +mins : (+h * 60 + (frac ? +frac * 6 : 0) + (hm ? +hm : 0))
-    if (!total) return false
-    fields.endTime = fromMinutes(minutes(fields.startTime) + total)
-    return { key: 'duration', label: total >= 60 ? `${Math.floor(total / 60)}u${total % 60 ? pad(total % 60) : ''}` : `${total}m` }
+  // Duur: "1.5u", "90m", "30 min", "1u30", "2 uur", "voor 2u" — ook zonder begintijd
+  take(new RegExp(`${B}(?:voor\\s+)?${DUR}${E}`, 'gi'), (_, mins, h, frac, hm) => {
+    if (fields.duration || fields.endTime) return false
+    const total = durMins(mins, h, frac, hm)
+    if (!total || total > 24 * 60) return false
+    fields.duration = total
+    if (fields.startTime) fields.endTime = fromMinutes(minutes(fields.startTime) + total)
+    return { key: 'duration', label: durLabel(total) }
   })
   if (fields.startTime && !fields.endTime) fields.endTime = fromMinutes(minutes(fields.startTime) + 60)
 

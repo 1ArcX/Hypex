@@ -37,6 +37,18 @@ const kbdClick = (label, fn) => ({
 const blockTitle = (color, extra = {}) => ({ fontSize: '11px', fontWeight: 700, color: `color-mix(in srgb, ${color} 55%, white)`, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', ...extra })
 const blockMeta = (color) => ({ fontSize: '10px', color: `color-mix(in srgb, ${color} 45%, var(--c-text-2))`, lineHeight: 1.3, marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' })
 
+// Reistijd boven/onder een event: zelfde kleur, veel lichter en gestreept
+const travelStyle = (color, edge, h) => ({
+  height: h, flexShrink: 0, boxSizing: 'border-box', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 4,
+  padding: '0 6px', fontSize: 9, fontWeight: 600, whiteSpace: 'nowrap', opacity: 0.75,
+  color: `color-mix(in srgb, ${color} 60%, var(--c-text-2))`,
+  background: `repeating-linear-gradient(135deg, color-mix(in srgb, ${color} 16%, transparent) 0 4px, color-mix(in srgb, ${color} 6%, transparent) 4px 8px)`,
+  border: `1px dashed color-mix(in srgb, ${color} 30%, transparent)`,
+  ...(edge === 'top' ? { borderBottom: 'none', borderRadius: '6px 6px 0 0' } : { borderTop: 'none', borderRadius: '0 0 6px 6px' }),
+})
+// Dagdeel-blok: kop + één regel per taak (px), zodat het blok zo hoog is als de inhoud
+const DP_HEAD_PX = 20, DP_ROW_PX = 21, DP_PAD_PX = 8
+
 const BASE_HOUR_H = 56 // mobiel; desktop schaalt mee met de vensterhoogte (zie hourHeight)
 
 // Uurhoogte zodat ~15 uur (07–22) in beeld past; hoge schermen krijgen fijnere vakjes
@@ -159,13 +171,37 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
     const b = new Date(draft.end.getFullYear(), draft.end.getMonth(), draft.end.getDate())
     return day >= a && day <= b
   }
-  // Preview springt mee naar de gekozen week/dag als die buiten beeld valt
+  // Preview springt mee naar de gekozen week/dag als die buiten beeld valt.
+  // Split-screen (desktop): zelf een dag gekozen → dagweergave van die dag; meerdere dagen → week.
   const draftDayKey = draft ? toDateStr(draft.start) : null
   useEffect(() => {
     if (!draft) return
+    if (draft.dateFromUser && !isMobile) {
+      const want = draft.multiDay ? 'week' : 'day'
+      if (view !== want) setView(want)
+      setCurrent(new Date(draft.start))
+      return
+    }
     const visible = view === 'week' ? getWeekDays(current).some(w => isSameDay(w, draft.start)) : view === 'day' ? isSameDay(current, draft.start) : true
     if (!visible) setCurrent(new Date(draft.start))
-  }, [draftDayKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [draftDayKey, draft?.dateFromUser, draft?.multiDay]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Preview met een tijd buiten beeld: rooster ernaartoe scrollen
+  const draftTimeKey = draft && !draft.allDay ? `${draftDayKey}-${draft.start.getHours()}-${draft.start.getMinutes()}` : null
+  useEffect(() => {
+    if (!draftTimeKey || !scrollRef.current) return
+    const t = setTimeout(() => {
+      const el = scrollRef.current
+      if (!el) return
+      const top = ((draft.start.getHours() * 60 + draft.start.getMinutes() - (draft.travelBefore || 0)) / 60) * HOUR_H
+      const bottom = ((draft.end.getHours() * 60 + draft.end.getMinutes() + (draft.travelAfter || 0)) / 60) * HOUR_H
+      if (top < el.scrollTop || bottom > el.scrollTop + el.clientHeight) el.scrollTo({ top: Math.max(0, top - HOUR_H), behavior: 'smooth' })
+    }, 60)
+    return () => clearTimeout(t)
+  }, [draftTimeKey, view]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Weergave van vóór het openen van de modal; bij sluiten gaan we daarheen terug
+  const restoreRef = useRef(null)
+  const [pick, setPick] = useState(null) // klik in het rooster terwijl het paneel open is
+  const splitOpen = !isMobile && !!modal && modal.mode !== 'view'
   const [magisterLessons, setMagisterLessons] = useState([])
   const [somtodayLessons, setSomtodayLessons] = useState([])
   const [lessonDetail, setLessonDetail] = useState(null)
@@ -458,21 +494,59 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
   }
 
   // Nieuw item vanuit de agenda: ItemModal (standaard Event, met Event | Taak-schakelaar)
+  // Modal openen en de huidige weergave onthouden (bij sluiten terug)
+  const openModal = (m) => {
+    if (m.mode !== 'view') restoreRef.current = { view, current }
+    setModal(m)
+  }
+  const closeModal = () => {
+    setModal(null); setDraft(null); setPick(null)
+    const r = restoreRef.current
+    restoreRef.current = null
+    if (r && !isMobile) { setView(r.view); setCurrent(r.current) }
+  }
+  // Klik op een leeg tijdslot: eerst Event of Taak kiezen. Is het paneel al open, dan neemt dat het tijdslot over.
   const openNew = (date, hour, minute = 0) => {
     const d = date || current
-    setModal({
-      mode: 'new',
-      defaults: hour !== undefined
-        ? { date: toDateStr(d), startTime: `${pad(hour)}:${pad(minute)}`, endTime: hour >= 23 ? '23:59' : `${pad(hour + 1)}:${pad(minute)}`, allDay: false }
-        : { date: toDateStr(d) },
-    })
+    const slot = hour !== undefined
+      ? { date: toDateStr(d), startTime: `${pad(hour)}:${pad(minute)}`, endTime: hour >= 23 ? '23:59' : `${pad(hour + 1)}:${pad(minute)}` }
+      : { date: toDateStr(d) }
+    if (modal && modal.mode !== 'view') { setPick({ ...slot, seq: Date.now() }); return }
+    openModal({ mode: 'new', choose: true, defaults: hour !== undefined ? { ...slot, allDay: false } : slot })
   }
+  // "Nieuw" / spatie: keuzestap, begint in weekweergave; de agenda volgt zodra je een dag kiest
+  const openFresh = () => {
+    if (modal) return
+    openModal({ mode: 'new', choose: true, defaults: { date: toDateStr(current) } })
+    if (!isMobile && view !== 'week') setView('week')
+  }
+  // Plusje bij een dagdeel-blok: direct een taak in dat dagdeel
+  const openDaypartTask = (d, dp) => {
+    if (modal) return
+    openModal({ mode: 'new', kind: 'task', defaults: { date: toDateStr(d), allDay: true, daypart: dp } })
+  }
+
+  // Spatie (niet in een invoerveld/knop, geen andere popup open) = Nieuw
+  useEffect(() => {
+    if (isMobile || hideToolbar) return
+    const onKey = (e) => {
+      if (e.code !== 'Space' || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
+      const t = e.target
+      if (t?.closest?.('input, textarea, select, button, [contenteditable="true"], [role="button"], [role="tab"], [role="slider"]')) return
+      if (modal || lessonDetail || document.querySelector('.modal-overlay')) return
+      e.preventDefault()
+      openFresh()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
 
   const openEditEvent = (ev, e) => {
     e?.stopPropagation()
+    if (modal) return
     // Geïmporteerde items (Google / MyX): eigen popup met aanpassingen bovenop de feed
-    if (ev.external) { setModal({ mode: 'view', event: ev }); return }
-    setModal({ mode: 'edit', event: ev })
+    if (ev.external) { openModal({ mode: 'view', event: ev }); return }
+    openModal({ mode: 'edit', event: ev })
   }
 
   const navigate = (dir) => {
@@ -700,10 +774,15 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                   position: 'absolute', top, height, zIndex: 6, pointerEvents: 'none', borderRadius: 8, padding: '4px 6px',
                   left: `calc(${TIME_COL}px + (100% - ${TIME_COL}px) * ${di / N} + 2px)`, width: `calc((100% - ${TIME_COL}px) / ${N} - 6px)`,
                   border: `1.5px dashed ${draft.color}`, background: `color-mix(in srgb, ${draft.color} 14%, transparent)`,
-                  color: `color-mix(in srgb, ${draft.color} 70%, white)`, fontSize: 11, fontWeight: 700, overflow: 'hidden',
+                  color: `color-mix(in srgb, ${draft.color} 70%, white)`, fontSize: 11, fontWeight: 700, boxSizing: 'border-box',
                 }}>
-                  {draft.title}
-                  <div style={{ fontSize: 10, fontWeight: 500, opacity: 0.85 }}>{fmtTime(s)} – {fmtTime(e)}</div>
+                  <div style={{ overflow: 'hidden', height: '100%' }}>
+                    {draft.title}
+                    <div style={{ fontSize: 10, fontWeight: 500, opacity: 0.85 }}>{fmtTime(s)} – {fmtTime(e)}</div>
+                  </div>
+                  {/* Reistijd in de preview: lichte gestreepte strook erboven/eronder */}
+                  {draft.travelBefore > 0 && isSameDay(d, s) && <div style={{ ...travelStyle(draft.color, 'top', (draft.travelBefore / 60) * HOUR_H), position: 'absolute', left: -1.5, right: -1.5, bottom: '100%' }}>🚗 {draft.travelBefore} min</div>}
+                  {draft.travelAfter > 0 && isSameDay(d, e) && <div style={{ ...travelStyle(draft.color, 'bottom', (draft.travelAfter / 60) * HOUR_H), position: 'absolute', left: -1.5, right: -1.5, top: '100%' }}>🚗 {draft.travelAfter} min</div>}
                 </div>
               )
             })}
@@ -733,11 +812,13 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                 }),
                 ...colEvents.filter(ev => !isAllDayEvent(ev)).map(ev => {
                   const s = new Date(ev.start_time), en = new Date(ev.end_time)
-                  const startMins = s.getHours()*60 + s.getMinutes()
-                  const endMins = Math.max(startMins + 30, en.getHours()*60 + en.getMinutes())
-                  return { type: 'event', key: `ev-${ev.id}`, startMins, endMins, data: ev }
+                  const evStart = s.getHours()*60 + s.getMinutes()
+                  const evEnd = Math.max(evStart + 30, en.getHours()*60 + en.getMinutes())
+                  // Reistijd hoort bij het blok: neemt ook ruimte in naast andere items
+                  const tb = Math.min(evStart, ev.travel_before || 0), ta = Math.min(24 * 60 - evEnd, ev.travel_after || 0)
+                  return { type: 'event', key: `ev-${ev.id}`, startMins: evStart - tb, endMins: evEnd + ta, tb, ta, evStart, evEnd, data: ev }
                 }),
-                // Taken met een dagdeel (zonder tijd): één gestippeld blok per dagdeel over dat hele dagdeel
+                // Taken met een dagdeel (zonder tijd): één compact blok per dagdeel (zie plaatsing hieronder)
                 ...Object.entries(colTasks
                   .filter(t => !t.start_time && !t.time && t.daypart && DAYPART_RANGE[t.daypart] && !(isMultiDay(t)) && (t.recurrence || !t.completed))
                   .reduce((g, t) => { (g[t.daypart] ||= []).push(t); return g }, {}))
@@ -750,7 +831,28 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                 }),
               ]
 
-              const laid = layoutOverlaps(allItems)
+              // Dagdeel-blokken: zo hoog als hun inhoud, in het eerste vrije gat binnen het dagdeel.
+              // Past het nergens, dan doet het mee in de naast-elkaar-indeling zoals andere items.
+              const busy = allItems.filter(it => it.type !== 'daypart').sort((a, b) => a.startMins - b.startMins)
+              const placed = []
+              const flow = allItems.filter(it => {
+                if (it.type !== 'daypart') return true
+                const px = DP_HEAD_PX + it.data.list.length * DP_ROW_PX + DP_PAD_PX
+                const need = Math.ceil((px / HOUR_H) * 60)
+                const [rs, re] = DAYPART_RANGE[it.data.dp]
+                let cursor = rs, at = null
+                for (const b of busy) {
+                  if (b.endMins <= rs || b.startMins >= re) continue
+                  if (b.startMins - cursor >= need) { at = cursor; break }
+                  cursor = Math.max(cursor, b.endMins)
+                }
+                if (at === null && re - cursor >= need) at = cursor
+                it.data.px = px
+                if (at !== null) { placed.push({ ...it, startMins: at, endMins: at + need, _col: 0, _colTotal: 1 }); return false }
+                it.startMins = rs; it.endMins = rs + need
+                return true
+              })
+              const laid = [...layoutOverlaps(flow), ...placed]
 
               return (
                 <React.Fragment key={`col-${di}`}>
@@ -817,6 +919,36 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                       )
                     }
 
+                    if (item.type === 'event' && (item.tb || item.ta)) {
+                      const ev = item.data
+                      const s = new Date(ev.start_time), en = new Date(ev.end_time)
+                      const color = categoryColor(eventCategory(ev))
+                      const disp = eventDisplay(ev)
+                      const tbH = (item.tb / 60) * HOUR_H, taH = (item.ta / 60) * HOUR_H
+                      const evH = Math.max(20, ((item.evEnd - item.evStart) / 60) * HOUR_H - 2)
+                      return (
+                        <div key={item.key}
+                          ref={isHL ? highlightRef : undefined}
+                          onClick={e => openEditEvent(ev, e)}
+                          {...kbdClick(`${disp.title}, ${fmtTime(s)} tot ${fmtTime(en)}`, e => openEditEvent(ev, e))}
+                          title={[disp.title, item.tb ? `${item.tb} min reistijd heen` : '', item.ta ? `${item.ta} min reistijd terug` : ''].filter(Boolean).join(' · ')}
+                          style={{ position: 'absolute', top, height: tbH + evH + taH, left: leftStyle, width: widthStyle, marginLeft: 2, zIndex: 2, display: 'flex', flexDirection: 'column', cursor: 'pointer', opacity: ev.hidden ? 0.45 : 1, ...hlStyle }}>
+                          {item.tb > 0 && <div style={travelStyle(color, 'top', tbH)}>{tbH >= 13 && <>🚗 {item.tb} min</>}</div>}
+                          <div style={blockStyle(color, { position: 'relative', marginLeft: 0, height: evH, flexShrink: 0,
+                            ...(item.tb ? { borderTopLeftRadius: 0, borderTopRightRadius: 0 } : {}), ...(item.ta ? { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 } : {}) })}>
+                            <div style={blockTitle(color)}>
+                              {ev.hidden ? '🙈 ' : ''}{disp.title}{ev.edited ? ' ✎' : ''}
+                            </div>
+                            {evH >= 36 && <div style={blockMeta(color)}>{fmtTime(s)} – {fmtTime(en)}</div>}
+                            {evH >= 58 && disp.code && (
+                              <div style={{ ...blockMeta(color), fontSize: '9px', letterSpacing: '0.02em', opacity: 0.85 }}>{ev.external ? '↗ ' : ''}{disp.code}</div>
+                            )}
+                          </div>
+                          {item.ta > 0 && <div style={travelStyle(color, 'bottom', taH)}>{taH >= 13 && <>🚗 {item.ta} min</>}</div>}
+                        </div>
+                      )
+                    }
+
                     if (item.type === 'event') {
                       const ev = item.data
                       const s = new Date(ev.start_time), en = new Date(ev.end_time)
@@ -845,16 +977,25 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                     }
 
                     if (item.type === 'daypart') {
-                      const { dp, list } = item.data
+                      const { dp, list, px } = item.data
                       const label = DAYPARTS.find(x => x.id === dp)
                       return (
+                        // Alleen kop + taken zijn klikbaar; daarnaast valt een klik door naar het rooster (= nieuw event)
                         <div key={item.key} style={{
-                          position: 'absolute', top, height, left: leftStyle, width: widthStyle, zIndex: 1, overflow: 'hidden',
+                          position: 'absolute', top, height: px, left: leftStyle, width: widthStyle, zIndex: 1, overflow: 'hidden', pointerEvents: 'none',
                           borderRadius: 8, border: '1px dashed var(--c-border-strong)', background: 'color-mix(in srgb, var(--c-text-3) 7%, transparent)',
-                          padding: '4px 6px', display: 'flex', flexDirection: 'column', gap: 3,
+                          padding: '3px 5px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 2, marginLeft: 2,
                         }}>
-                          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--c-text-3)', letterSpacing: '0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {label?.emoji} {label?.label}{list.length > 1 ? ` · ${list.length}` : ''}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, height: DP_HEAD_PX - 4, flexShrink: 0 }}>
+                            <span style={{ flex: 1, minWidth: 0, fontSize: 10, fontWeight: 700, color: 'var(--c-text-3)', letterSpacing: '0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {label?.emoji} {label?.label}{list.length > 1 ? ` · ${list.length}` : ''}
+                            </span>
+                            <button type="button" onClick={e => { e.stopPropagation(); openDaypartTask(d, dp) }}
+                              aria-label={`Taak toevoegen aan ${label?.label?.toLowerCase()} van ${d.getDate()} ${MONTHS_SHORT[d.getMonth()].toLowerCase()}`}
+                              title={`Taak toevoegen (${label?.label?.toLowerCase()})`}
+                              style={{ pointerEvents: 'auto', flexShrink: 0, width: 16, height: 16, borderRadius: 5, border: '1px solid var(--c-border-strong)', background: 'var(--c-surface-2)', color: 'var(--c-text-2)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer' }}>
+                              <Plus size={11} aria-hidden="true" />
+                            </button>
                           </div>
                           {list.map(t => {
                             const c = categoryColor(taskCategory(t))
@@ -863,10 +1004,10 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                                 onClick={e => { e.stopPropagation(); onViewDetail ? onViewDetail(t) : onEditTask?.(t) }}
                                 {...kbdClick(`Taak ${t.title} (${label?.label})`, e => { e.stopPropagation(); onViewDetail ? onViewDetail(t) : onEditTask?.(t) })}
                                 title={t.title}
-                                style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 11, fontWeight: 600, padding: '2px 5px', borderRadius: 5,
+                                style={{ pointerEvents: 'auto', height: DP_ROW_PX - 2, boxSizing: 'border-box', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 11, fontWeight: 600, padding: '0 5px', borderRadius: 5,
                                   background: `color-mix(in srgb, ${c} 16%, var(--c-surface-solid))`, borderLeft: `3px solid ${c}`, color: `color-mix(in srgb, ${c} 60%, white)`,
-                                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', opacity: t.completed ? 0.55 : 1, textDecoration: t.completed ? 'line-through' : 'none' }}>
-                                {t.recurrence ? '🔁 ' : ''}{t.title}
+                                  whiteSpace: 'nowrap', overflow: 'hidden', opacity: t.completed ? 0.55 : 1, textDecoration: t.completed ? 'line-through' : 'none' }}>
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.recurrence ? '🔁 ' : ''}{t.title}</span>
                               </div>
                             )
                           })}
@@ -889,9 +1030,9 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                           <div style={blockTitle(color, { textDecoration: task.completed ? 'line-through' : 'none' })}>
                             {task.completed ? '✓ ' : ''}{task.title}
                           </div>
-                          {showDetail && subject && (
+                          {showDetail && (
                             <div style={blockMeta(color)}>
-                              {subject.name}
+                              {pad(Math.floor(item.startMins / 60))}:{pad(item.startMins % 60)} – {pad(Math.floor(item.endMins / 60) % 24)}:{pad(item.endMins % 60)}{subject ? ` · ${subject.name}` : ''}
                             </div>
                           )}
                         </div>
@@ -1058,7 +1199,9 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
   }
 
   return (
-    <div className="agenda-shell" style={{ display: 'flex', height: '100%', overflow: 'hidden', gap: 12 }}>
+    <div className="agenda-shell" style={{ display: 'flex', height: '100%', overflow: 'hidden', gap: 12, transition: 'padding-right 0.22s ease',
+      // Split-screen: het paneel van ItemModal staat rechts; het rooster schuift opzij en blijft zichtbaar
+      paddingRight: splitOpen ? 'calc(var(--split-w) - 16px)' : 0 }}>
     <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderRadius: 'var(--r-lg)', background: 'var(--c-surface)', border: '1px solid var(--c-border)' }}>
       {/* Toolbar */}
       {!hideToolbar && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderBottom: '1px solid var(--c-border)', flexShrink: 0, gap: '8px', flexWrap: 'wrap' }}>
@@ -1084,7 +1227,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <FilterTabs variant="segmented" label="Weergave" value={view} onChange={setView}
             items={(isMobile ? [['week','Week'], ['month','Maand']] : [['day','Dag'], ['week','Week'], ['month','Maand']]).map(([value, label]) => ({ value, label }))} />
-          <button onClick={() => openNew(current)} className="btn-primary">
+          <button onClick={openFresh} className="btn-primary" title="Nieuw (spatie)">
             <Plus size={14} aria-hidden="true" /> Nieuw
           </button>
         </div>
@@ -1146,7 +1289,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
       </div>
 
     </div>
-    {!isMobile && !hideToolbar && SideRail()}
+    {!isMobile && !hideToolbar && !splitOpen && SideRail()}
 
       {/* Lesson detail popup (fixed, dus positie in de flex-rij maakt niet uit) */}
       {lessonDetail && (
@@ -1217,7 +1360,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
 
       {/* Geïmporteerd item (Google / MijnX): bekijken + aanpassen */}
       {modal?.mode === 'view' && (
-        <ExternalEventModal ev={modal.event} onClose={() => setModal(null)}
+        <ExternalEventModal ev={modal.event} onClose={closeModal}
           siblings={events.filter(e => e.external && e.id !== modal.event.id && e.connection_id === modal.event.connection_id &&
             (e._original?.title ?? e.title) === (modal.event._original?.title ?? modal.event.title))} />
       )}
@@ -1225,7 +1368,9 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
       {/* Nieuw / bewerken: gedeelde ItemModal (Event | Taak) met live preview in het rooster */}
       {modal && modal.mode !== 'view' && (
         <ItemModal
-          kind="event"
+          kind={modal.kind || 'event'}
+          chooseKind={!!modal.choose}
+          pick={pick}
           event={modal.mode === 'edit' ? modal.event : null}
           defaults={modal.defaults}
           userId={userId}
@@ -1235,7 +1380,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
           calendarEvents={events}
           preview={!isMobile}
           onDraftChange={setDraft}
-          onClose={() => { setModal(null); setDraft(null) }}
+          onClose={closeModal}
         />
       )}
     </div>

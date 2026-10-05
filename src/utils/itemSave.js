@@ -55,6 +55,11 @@ export async function saveEvent(userId, data) {
   }
   if (data.type_id) payload.type_id = data.type_id
   else if (data.id && data.hadType) payload.type_id = null
+  // Reistijd alleen meesturen als die gezet is (of was): werkt ook vóór de migratie
+  for (const k of ['travel_before', 'travel_after']) {
+    if (data[k]) payload[k] = data[k]
+    else if (data.id && data.hadTravel) payload[k] = null
+  }
   const res = data.id
     ? await supabase.from('calendar_events').update(payload).eq('id', data.id)
     : await supabase.from('calendar_events').insert(payload)

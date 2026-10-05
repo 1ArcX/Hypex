@@ -9,10 +9,12 @@ import { saveTask, deleteTask, saveEvent, deleteEvent } from '../utils/itemSave'
 import { getFreeSlots, suggestFreeSlots, getConflicts, formatDutchDate, timeStrToMins, minsToTimeStr } from './tasks/slotPlanning'
 import { TypeSelect } from './ui'
 import { useIsDesktop } from '../hooks/useIsDesktop'
+import TravelTimeField from './agenda/TravelTimeField'
 
 // Eén modal voor taken én eigen agenda-items (Event | Taak). Gedeelde velden: titel (met quick-add),
 // type, datum t/m datum, hele dag of tijdslot. Taak voegt dagdeel, prioriteit, herhaling, deadline,
-// vak en groep toe; Event voegt beschrijving en event-herhaling toe. Het type bepaalt de kleur.
+// vak en groep toe; Event voegt beschrijving, reistijd en event-herhaling toe. Het type bepaalt de kleur.
+// `chooseKind`: eerst Event of Taak kiezen (rest vervaagd). `preview` op desktop: paneel rechts (split-screen).
 
 const DURATION_CHIPS = [30, 60, 90, 120]
 // Tijdvak per dagdeel voor events (quick-add "vanavond etentje" → 19:00–22:00)
@@ -54,9 +56,9 @@ function blankForm(defaults = {}) {
     allDay: defaults.allDay ?? !defaults.startTime,
     startTime: start, endTime: defaults.endTime || minsToTimeStr(timeStrToMins(start) + 60),
     // taak
-    subjectId: '', priority: 2, dueDate: '', groupName: '', recurrence: RECURRENCE.NONE, recurrenceDays: [], daypart: null, completed: false,
+    subjectId: '', priority: 2, dueDate: '', groupName: '', recurrence: RECURRENCE.NONE, recurrenceDays: [], daypart: defaults.daypart || null, completed: false,
     // event
-    evRecurrence: '', evRecurrenceDays: [],
+    evRecurrence: '', evRecurrenceDays: [], travelBefore: 0, travelAfter: 0,
   }
 }
 
@@ -83,6 +85,7 @@ function formFromEvent(ev) {
     startTime: allDay ? '09:00' : `${pad(s.getHours())}:${pad(s.getMinutes())}`,
     endTime: allDay ? '10:00' : `${pad(e.getHours())}:${pad(e.getMinutes())}`,
     evRecurrence: ev.recurrence || '', evRecurrenceDays: ev.recurrence_days || [],
+    travelBefore: ev.travel_before || 0, travelAfter: ev.travel_after || 0,
   }
 }
 
@@ -100,15 +103,21 @@ function formRange(f) {
  * @param kind      'task' | 'event' — beginsoort bij een nieuw item
  * @param task      te bewerken taak, of event: te bewerken agenda-item
  * @param defaults  { date, endDate, startTime, endTime, allDay } voor een nieuw item
- * @param onDraftChange  live preview: ({ kind, start, end, allDay, color } | null)
+ * @param onDraftChange  live preview: ({ kind, start, end, allDay, color, dateFromUser, travelBefore, travelAfter } | null)
+ * @param chooseKind  nieuw item: eerst Event of Taak kiezen
+ * @param pick      { date, startTime, endTime, seq } — klik in het rooster terwijl het paneel open is
  */
 export default function ItemModal({
   kind: initialKind = 'task', task, event, defaults, userId,
   subjects = [], calendarEvents, tasks, allTasks,
-  onClose, onDraftChange, preview = false,
+  onClose, onDraftChange, preview = false, chooseKind = false, pick,
 }) {
   const isDesktop = useIsDesktop()
-  const [kind, setKind] = useState(task ? 'task' : event ? 'event' : initialKind)
+  const [kind, setKind] = useState(task ? 'task' : event ? 'event' : chooseKind ? null : initialKind)
+  const [pending, setPending] = useState('event') // keuzestap: welke knop toetsenbord-focus heeft
+  const choosing = kind === null
+  // Heb je zelf een datum gekozen (chip, datumveld, quick-add)? Dan springt de agenda naar die dag.
+  const [dateFromUser, setDateFromUser] = useState(false)
   const [editing, setEditing] = useState(task || event || null) // null = nieuw (ook na Dupliceer)
   const [f, setF] = useState(() => task ? formFromTask(task) : event ? formFromEvent(event) : blankForm(defaults))
   const [rawTitle, setRawTitle] = useState(f.title)
@@ -139,7 +148,15 @@ export default function ItemModal({
     setTimeout(() => { setClosing(false); onClose() }, 180)
   }
 
-  useEffect(() => { titleRef.current?.focus() }, [])
+  // Focus op de titel zodra de soort gekozen is (bij de keuzestap pas daarna)
+  useEffect(() => { if (!choosing) titleRef.current?.focus() }, [choosing])
+  const choose = (k) => { setKind(k); setPending(k) }
+
+  // Klik in het rooster terwijl het paneel open is: dat tijdslot overnemen
+  useEffect(() => {
+    if (!pick) return
+    set({ date: pick.date, endDate: '', noDate: false, ...(pick.startTime ? { allDay: false, startTime: pick.startTime, endTime: pick.endTime } : {}) })
+  }, [pick?.seq]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Quick-add (nieuw én bewerken). Velden volgen de invoer; wat je daarna zelf
   // aanpast blijft staan zolang dat stukje in de invoer niet verandert.
@@ -171,8 +188,18 @@ export default function ItemModal({
       patch.daypart = b.daypart
       if (!now.startTime) Object.assign(patch, { allDay: b.allDay, startTime: b.startTime, endTime: b.endTime })
     }
+    // Duur zonder begintijd ("gym 1.5u"): eindtijd = huidige begintijd + duur, en een tijdslot
+    if (now.duration && 'duration' in patch && !now.startTime) {
+      Object.assign(patch, { allDay: false, endTime: minsToTimeStr(timeStrToMins(f.startTime) + now.duration) })
+    }
+    if (was.duration && !now.duration && !now.startTime) Object.assign(patch, { allDay: b.allDay, endTime: b.endTime })
+    delete patch.duration
+    // Reistijd ("reis 20m", "terug 15m")
+    if (was.travelBefore && !now.travelBefore) patch.travelBefore = b.travelBefore
+    if (was.travelAfter && !now.travelAfter) patch.travelAfter = b.travelAfter
+    if ((now.travelBefore || now.travelAfter) && !now.startTime && f.allDay && !('allDay' in patch)) patch.allDay = false
     if (now.cat && 'cat' in patch) patch.catTouched = true
-    if (patch.date) patch.noDate = false
+    if (patch.date) { patch.noDate = false; setDateFromUser(true) }
     lastParse.current = p.fields
     set(patch)
   }
@@ -193,13 +220,17 @@ export default function ItemModal({
     if (!onDraftChange) return
     if (f.noDate || !f.date) { onDraftChange(null); return }
     const { start, end } = formRange(f)
-    onDraftChange({ kind, start, end, allDay: f.allDay, color: categoryColor(f.cat), title: f.title || (isTask ? 'Nieuwe taak' : 'Nieuw event'), id: editing?.id })
-  }, [kind, f.date, f.endDate, f.allDay, f.startTime, f.endTime, f.cat, f.title, f.noDate]) // eslint-disable-line react-hooks/exhaustive-deps
+    onDraftChange({
+      kind: kind || 'event', start, end, allDay: f.allDay, color: categoryColor(f.cat), title: f.title || (isTask ? 'Nieuwe taak' : 'Nieuw event'), id: editing?.id,
+      dateFromUser, multiDay: !!f.endDate && f.endDate > f.date,
+      travelBefore: !isTask && !f.allDay ? f.travelBefore : 0, travelAfter: !isTask && !f.allDay ? f.travelAfter : 0,
+    })
+  }, [kind, f.date, f.endDate, f.allDay, f.startTime, f.endTime, f.cat, f.title, f.noDate, f.travelBefore, f.travelAfter, dateFromUser]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Opslaan ──
   const save = async () => {
     const title = (f.title || rawTitle).trim()
-    if (!title || saving) return
+    if (!title || saving || choosing) return
     setSaving(true); setError(null)
     let res
     if (isTask) {
@@ -224,10 +255,16 @@ export default function ItemModal({
         title, description: f.description, start_time: start.toISOString(), end_time: end.toISOString(),
         color: categoryHex(f.cat), type_id: typeIdOf(f.cat),
         recurrence: f.evRecurrence || null, recurrence_days: (f.evRecurrence === 'weekly' || f.evRecurrence === 'biweekly') ? f.evRecurrenceDays : null,
+        travel_before: f.allDay ? 0 : f.travelBefore, travel_after: f.allDay ? 0 : f.travelAfter,
+        hadTravel: !!(editing?.travel_before || editing?.travel_after),
       })
     }
     setSaving(false)
-    if (res?.error) { setError(`Opslaan mislukt: ${res.error.message || res.error}`); return }
+    if (res?.error) {
+      const msg = res.error.message || String(res.error)
+      setError(msg.includes('travel_') ? 'Reistijd opslaan kan pas na de database-migratie (add_travel_time.sql).' : `Opslaan mislukt: ${msg}`)
+      return
+    }
     close()
   }
 
@@ -250,7 +287,15 @@ export default function ItemModal({
   // Toetsenbord: Esc sluit, Ctrl/⌘+Enter slaat op (ook vanuit een textarea)
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); close() }
+      if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); close(); return }
+      // Keuzestap: E = event, T = taak, ←/→ + Enter
+      if (choosing) {
+        const k = e.key.toLowerCase()
+        if (k === 'e' || k === 't') { e.preventDefault(); choose(k === 'e' ? 'event' : 'task') }
+        else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); setPending(p => p === 'event' ? 'task' : 'event') }
+        else if (e.key === 'Enter') { e.preventDefault(); choose(pending) }
+        return
+      }
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); save() }
     }
     window.addEventListener('keydown', onKey)
@@ -283,28 +328,50 @@ export default function ItemModal({
   const label = { color: 'var(--c-text-3)', fontSize: 11, display: 'block', marginBottom: 6 }
   const side = preview && isDesktop
 
+  // Event | Taak-schakelaar; `big` = keuzestap (groot, met gloed, toetsenbord-focus op `pending`)
+  const kindSwitch = (big) => (
+    <div role="tablist" aria-label="Soort item" id={big ? undefined : 'item-modal-title'} className={big ? 'kind-choose' : undefined}
+      style={{ display: 'inline-flex', padding: big ? 4 : 3, gap: big ? 4 : 2, borderRadius: big ? 14 : 10, background: 'var(--c-surface-2)', border: `1px solid ${big ? 'color-mix(in srgb, var(--accent) 45%, transparent)' : 'var(--c-border)'}` }}>
+      {[['event', 'Event', CalendarDays, 'E'], ['task', 'Taak', CheckSquare, 'T']].map(([k, l, Icon, key]) => {
+        const on = big ? pending === k : kind === k
+        return (
+          <button key={k} type="button" role="tab" aria-selected={kind === k} onClick={() => choose(k)}
+            onMouseEnter={big ? () => setPending(k) : undefined} autoFocus={big && k === 'event'}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: big ? 8 : 6, padding: big ? '12px 26px' : '6px 14px', borderRadius: big ? 11 : 8, border: 'none', cursor: 'pointer', fontSize: big ? 15 : 13, fontWeight: 600, transition: 'background 0.15s, color 0.15s',
+              background: on ? (big ? 'color-mix(in srgb, var(--accent) 16%, var(--c-surface-3))' : 'var(--c-surface-3)') : 'transparent', color: on ? 'var(--c-text)' : 'var(--c-text-3)' }}>
+            <Icon size={big ? 17 : 14} aria-hidden="true" style={{ color: on ? 'var(--accent)' : undefined }} /> {l}
+            {big && isDesktop && <kbd style={{ fontSize: 10, padding: '1px 5px', borderRadius: 4, border: '1px solid var(--c-border-strong)', color: 'var(--c-text-3)', fontFamily: 'inherit' }}>{key}</kbd>}
+          </button>
+        )
+      })}
+    </div>
+  )
+
   // Portal naar <body>: anders valt de modal binnen de stacking context van de pagina (onder de BottomNav)
   return createPortal(
-    <div className={closing ? 'modal-overlay modal-closing' : 'modal-overlay'}
-      style={{ padding: 16, ...(side ? { justifyContent: 'flex-end', background: 'rgba(0,0,0,0.28)', backdropFilter: 'none', paddingRight: 24 } : {}) }}
+    <div className={`modal-overlay${side ? ' item-panel' : ''}${closing ? ' modal-closing' : ''}`}
+      style={side ? undefined : { padding: 16 }}
       onMouseDown={e => { mouseDownOnOverlay.current = e.target === e.currentTarget }}
       onMouseUp={e => { if (mouseDownOnOverlay.current && e.target === e.currentTarget) close(); mouseDownOnOverlay.current = false }}>
-      <div className={`glass-card modal-content${closing ? ' modal-closing' : ''}`} role="dialog" aria-modal="true" aria-labelledby="item-modal-title"
-        style={{ width: '100%', maxWidth: 460, padding: 22, maxHeight: side ? 'calc(100dvh - 32px)' : '90vh', overflowY: 'auto' }}>
+      <div className={`glass-card modal-content${closing ? ' modal-closing' : ''}`} role="dialog" aria-modal={side ? undefined : 'true'} aria-labelledby={choosing ? 'item-modal-choose' : 'item-modal-title'}
+        style={side ? { padding: '22px 28px', overflowY: 'auto' } : { width: '100%', maxWidth: 460, padding: 22, maxHeight: '90vh', overflowY: 'auto' }}>
 
+        {/* Keuzestap: eerst Event of Taak, de rest is nog vervaagd */}
+        {choosing && (
+          <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '14px 0 18px' }}>
+            <button type="button" aria-label="Sluiten" onClick={close} style={{ position: 'absolute', top: -6, right: -6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', display: 'flex' }}><X size={18} /></button>
+            <h2 id="item-modal-choose" style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--c-text-2)' }}>Wat wil je toevoegen?</h2>
+            {kindSwitch(true)}
+            {isDesktop && <span style={{ fontSize: 10, color: 'var(--c-text-3)' }}>Klik, of druk E / T · ←/→ + Enter</span>}
+          </div>
+        )}
+
+        <div {...(choosing ? { inert: '', 'aria-hidden': true } : {})}
+          style={{ transition: 'filter 0.25s, opacity 0.25s', ...(choosing ? { filter: 'blur(3px)', opacity: 0.4, pointerEvents: 'none', userSelect: 'none' } : {}) }}>
         {/* Kop: Event | Taak (alleen bij nieuw) of titel bij bewerken */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 16 }}>
           {isNew ? (
-            <div role="tablist" aria-label="Soort item" id="item-modal-title"
-              style={{ display: 'inline-flex', padding: 3, gap: 2, borderRadius: 10, background: 'var(--c-surface-2)', border: '1px solid var(--c-border)' }}>
-              {[['event', 'Event', CalendarDays], ['task', 'Taak', CheckSquare]].map(([k, l, Icon]) => (
-                <button key={k} type="button" role="tab" aria-selected={kind === k} onClick={() => setKind(k)}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                    background: kind === k ? 'var(--c-surface-3)' : 'transparent', color: kind === k ? 'var(--c-text)' : 'var(--c-text-3)' }}>
-                  <Icon size={14} aria-hidden="true" style={{ color: kind === k ? 'var(--accent)' : undefined }} /> {l}
-                </button>
-              ))}
-            </div>
+            choosing ? <span /> : kindSwitch(false)
           ) : (
             <h2 id="item-modal-title" style={{ color: 'white', fontWeight: 700, fontSize: 16, margin: 0 }}>
               {isTask ? 'Taak bewerken' : 'Event bewerken'}
@@ -327,7 +394,7 @@ export default function ItemModal({
           <div>
             <input ref={titleRef} className="glass-input" value={rawTitle} onChange={e => onTitleChange(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) { e.preventDefault(); save() } }}
-              placeholder={isNew ? (isTask ? 'Bv. 19 t/m 25 okt stage #werk of morgen 14:00 wiskunde !urgent' : 'Bv. vrijdag 19u etentje #persoonlijk') : 'Titel — typ bv. "morgen 14:00" om te verplaatsen'}
+              placeholder={isNew ? (isTask ? 'Bv. 19 t/m 25 okt stage #werk of morgen 14:00 wiskunde !urgent' : 'Bv. vrijdag 19u etentje 2u reis 20m #persoonlijk') : 'Titel — typ bv. "morgen 14:00" om te verplaatsen'}
               aria-label="Titel" style={{ fontSize: 16, width: '100%' }} />
             {parsed?.tokens.length > 0 && (
               <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 7, alignItems: 'center' }}>
@@ -353,20 +420,20 @@ export default function ItemModal({
           <div>
             <span style={label}>Wanneer</span>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {dateChips.map(c => <button key={c.label} type="button" onClick={() => set(c.apply)} style={chip(c.active, c.tone)}>{c.label}</button>)}
+              {dateChips.map(c => <button key={c.label} type="button" onClick={() => { set(c.apply); if (!c.apply.noDate) setDateFromUser(true) }} style={chip(c.active, c.tone)}>{c.label}</button>)}
             </div>
             {!(isTask && f.noDate) && (
               <div style={{ display: 'grid', gridTemplateColumns: isRecurring ? '1fr' : '1fr 1fr', gap: 8, marginTop: 8 }}>
                 <label style={{ minWidth: 0 }}>
                   <span style={{ ...label, fontSize: 10, marginBottom: 3 }}>{isRecurring ? 'Vanaf' : 'Van'}</span>
                   <input type="date" className="glass-input" value={f.date} style={{ colorScheme: 'dark', width: '100%' }}
-                    onChange={e => { const v = e.target.value; set({ date: v, noDate: false, endDate: f.endDate && f.endDate <= v ? '' : f.endDate }) }} />
+                    onChange={e => { const v = e.target.value; set({ date: v, noDate: false, endDate: f.endDate && f.endDate <= v ? '' : f.endDate }); setDateFromUser(true) }} />
                 </label>
                 {!isRecurring && (
                   <label style={{ minWidth: 0 }}>
                     <span style={{ ...label, fontSize: 10, marginBottom: 3 }}>Tot en met</span>
                     <input type="date" className="glass-input" value={f.endDate || f.date} min={f.date} style={{ colorScheme: 'dark', width: '100%' }}
-                      onChange={e => { const v = e.target.value; set({ endDate: v > f.date ? v : '' }) }} />
+                      onChange={e => { const v = e.target.value; set({ endDate: v > f.date ? v : '' }); setDateFromUser(true) }} />
                   </label>
                 )}
               </div>
@@ -440,6 +507,10 @@ export default function ItemModal({
 
           {/* Event: beschrijving + herhaling */}
           {!isTask && (<>
+            {!f.allDay && (
+              <TravelTimeField before={f.travelBefore} after={f.travelAfter}
+                onChange={({ before, after }) => set({ travelBefore: before, travelAfter: after })} />
+            )}
             <textarea className="glass-input" placeholder="Beschrijving" value={f.description}
               onChange={e => set({ description: e.target.value })} style={{ resize: 'vertical', minHeight: 56 }} />
             <div>
@@ -596,6 +667,7 @@ export default function ItemModal({
           </button>
         </div>
         <p style={{ margin: '10px 0 0', fontSize: 10, color: 'var(--c-text-3)', textAlign: 'center' }}>Ctrl+Enter opslaan · Esc sluiten</p>
+        </div>
       </div>
     </div>,
     document.body,

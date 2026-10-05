@@ -45,6 +45,8 @@ export function applyOverride(rawEv, ov) {
     type_id: ov.type_id || null,
     note: ov.note || '',
     hidden: !!ov.hidden,
+    travel_before: ov.travel_before || null,
+    travel_after: ov.travel_after || null,
     edited: !!(ov.title || ov.start_time || ov.end_time || ov.all_day != null || ov.type_id || ov.note),
   }
 }
@@ -73,6 +75,9 @@ const overrideRow = (userId, ev, patch) => ({
   ...(ev._override ? {
     title: ev._override.title, note: ev._override.note, start_time: ev._override.start_time, end_time: ev._override.end_time,
     all_day: ev._override.all_day, type_id: ev._override.type_id, hidden: ev._override.hidden,
+    // Reistijd alleen meesturen als die er al was (kolom bestaat pas na add_travel_time.sql)
+    ...(ev._override.travel_before ? { travel_before: ev._override.travel_before } : {}),
+    ...(ev._override.travel_after ? { travel_after: ev._override.travel_after } : {}),
   } : {}),
   ...patch,
   updated_at: new Date().toISOString(),
@@ -80,7 +85,7 @@ const overrideRow = (userId, ev, patch) => ({
 
 /**
  * Aanpassingen opslaan (upsert), voor één of meer items tegelijk.
- * `items`: [{ ev, patch }] met patch-velden title, note, start_time, end_time, all_day, type_id, hidden.
+ * `items`: [{ ev, patch }] met patch-velden title, note, start_time, end_time, all_day, type_id, hidden, travel_before, travel_after.
  */
 export async function saveOverrides(items) {
   const { data: { user } } = await supabase.auth.getUser()

@@ -5,6 +5,7 @@ import { eventDisplay } from '../../utils/eventTitle'
 import { eventCategory, typeIdOf } from '../../utils/category'
 import { saveOverrides, resetOverrides } from '../../utils/externalEvents'
 import { TypeSelect } from '../ui'
+import TravelTimeField from './TravelTimeField'
 
 const pad = n => String(n).padStart(2, '0')
 const dateStr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
@@ -27,6 +28,7 @@ function formFrom(ev) {
     date: dateStr(s), endDate: dateStr(e) !== dateStr(s) ? dateStr(e) : '',
     startTime: allDay ? '09:00' : timeStr(s), endTime: allDay ? '10:00' : timeStr(e),
     cat: eventCategory(ev),
+    travelBefore: ev.travel_before || 0, travelAfter: ev.travel_after || 0,
   }
 }
 
@@ -60,6 +62,7 @@ export default function ExternalEventModal({ ev, siblings = [], onClose }) {
     setSaving(false)
     if (res?.error) setError(res.error.message?.includes('external_event_overrides') || res.error.code === 'PGRST205'
       ? 'Aanpassen kan pas na de database-migratie (add_types_feed_overrides.sql).'
+      : res.error.message?.includes('travel_') ? 'Reistijd opslaan kan pas na de database-migratie (add_travel_time.sql).'
       : `Opslaan mislukt: ${res.error.message}`)
     else onClose()
   }
@@ -78,6 +81,9 @@ export default function ExternalEventModal({ ev, siblings = [], onClose }) {
       title: title && title !== orig.title ? title : null,
       note: form.note.trim() || null,
       type_id: form.cat !== autoCat ? typeIdOf(form.cat) : null,
+      // Reistijd: alleen meesturen als die gezet is of was (kolom bestaat pas na add_travel_time.sql)
+      ...(form.travelBefore || ev.travel_before ? { travel_before: form.travelBefore || null } : {}),
+      ...(form.travelAfter || ev.travel_after ? { travel_after: form.travelAfter || null } : {}),
     }
     const items = [{ ev, patch: { ...shared, start_time: timeChanged ? start.toISOString() : null, end_time: timeChanged ? end.toISOString() : null, all_day: timeChanged ? form.allDay : null } }]
     // Andere items: zelfde hele-dag/tijden, maar op hun eigen datum(s).
@@ -160,6 +166,10 @@ export default function ExternalEventModal({ ev, siblings = [], onClose }) {
               <input type="time" className="glass-input" aria-label="Begintijd" value={form.startTime} onChange={e => set({ startTime: e.target.value })} />
               <input type="time" className="glass-input" aria-label="Eindtijd" value={form.endTime} onChange={e => set({ endTime: e.target.value })} />
             </div>
+          )}
+          {!form.allDay && (
+            <TravelTimeField before={form.travelBefore} after={form.travelAfter}
+              onChange={({ before, after }) => set({ travelBefore: before, travelAfter: after })} />
           )}
           <textarea className="glass-input" placeholder="Eigen notitie" value={form.note}
             onChange={e => set({ note: e.target.value })} style={{ resize: 'vertical', minHeight: 56 }} />
