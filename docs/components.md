@@ -26,7 +26,7 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 |---|---|---|---|---|
 | `dashboard` | [pages/DashboardPage.jsx](../src/pages/DashboardPage.jsx) | Dashboard / Home | Clock, FocusCard, SpotifyWidget, WeatherWidget | all |
 | `agenda` | [pages/AgendaPage.jsx](../src/pages/AgendaPage.jsx) | Agenda | Timeline (desktop), mobile: Dag (WeekStrip + Timeline) / Lijst (AgendaList) / Maand (MonthGrid) | all |
-| `taken` | [pages/TakenPage.jsx](../src/pages/TakenPage.jsx) | Taken | FilterTabs, TodayView (Vandaag/Morgen), TasksWidget (other filters) | all |
+| `taken` | [pages/TakenPage.jsx](../src/pages/TakenPage.jsx) | Taken | FilterTabs, TaskOverview (Overzicht, default), TodayView (Vandaag/Morgen), TasksWidget (other filters) | all |
 | `pomodoro` | [pages/PomodoroPage.jsx](../src/pages/PomodoroPage.jsx) | Pomodoro / (in "Meer") | PomodoroTimer → PomodoroHero (+ Vandaag / SessionGoalCard / Focus playlist cards); below: StudieBuddiesWidget, PomodoroStats, sessie-log | all |
 | `notities` | [pages/NotitiesPage.jsx](../src/pages/NotitiesPage.jsx) | Notities | NotesWidget | all |
 | `statistieken` | [pages/StatsPage.jsx](../src/pages/StatsPage.jsx) | Statistieken / Stats | (self-contained SVG bar charts) | all |
@@ -82,6 +82,7 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 
 ### Tasks / taken
 - **TasksWidget** — [components/TasksWidget.jsx](../src/components/TasksWidget.jsx) — main task list with groups, drag-reorder, complete. Aliases: "takenlijst", "taken widget", "de takenlijst".
+- **TaskOverview** — [components/tasks/TaskOverview.jsx](../src/components/tasks/TaskOverview.jsx) — Taken tab "Overzicht" (default): all tasks with their day. Left a highlighted "Vandaag" card (TodayView with `compactHeader` + `showDone` = "Afgerond vandaag"), right "Komende dagen": per day (Morgen, Overmorgen, weekday + date, "over N dagen") the open one-off tasks + one compact routine line (next 14 days), week separators "Week 42". Two columns via container query (≥820px), one column on mobile. Styles `.task-overview*`. Aliases: "overzicht", "taken overzicht", "alle taken per dag", "komende dagen".
 - **TodayView** — [components/TodayView.jsx](../src/components/TodayView.jsx) — Vandaag/Morgen view inside TakenPage: progress header ("X van Y voltooid" + bar), collapsible sections Urgent / Te laat / dagdelen (Overig) / Routines. Aliases: "vandaag view", "vandaag-lijst", "voortgang".
 - **TaskRow** — [components/tasks/TaskRow.jsx](../src/components/tasks/TaskRow.jsx) — shared compact task row (dot, title, subtitle, date/streak pill, flag, delete-on-hover, checkbox right); used by TodayView + TasksWidget. Styles `.task-row*` in index.css. Aliases: "taakrij", "task row".
 - **ItemModal** — [components/ItemModal.jsx](../src/components/ItemModal.jsx) — one modal for tasks **and** own agenda items, with an **Event | Taak** switch for new items (formerly TaskModal + the inline Timeline event modal).

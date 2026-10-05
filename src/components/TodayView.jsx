@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Flame, Plus, AlertTriangle, Repeat, ListTodo, Sun, Sunset, Moon } from 'lucide-react'
+import { Flame, Plus, AlertTriangle, Repeat, ListTodo, Sun, Sunset, Moon, CheckCircle2 } from 'lucide-react'
 import {
   todayISO, toISO, recurrenceLabel, isDueToday, isDoneToday, isStreakActive, appliesOn,
 } from '../utils/recurrence'
@@ -26,7 +26,7 @@ function lateLabel(n) {
   return `${Math.floor(n / 7)} weken te laat`
 }
 
-const taskTimeSort = (a, b) => {
+export const taskTimeSort = (a, b) => {
   const pa = a.priority ?? 2, pb = b.priority ?? 2
   if (pa !== pb) return pa - pb
   return (a.start_time || a.time || '99:99').localeCompare(b.start_time || b.time || '99:99')
@@ -46,7 +46,9 @@ function useCollapsed() {
   return [set, toggle]
 }
 
-export default function TodayView({ tasks, subjects = [], dateOffset = 0, onToggleRoutine, onToggleTask, onOpen, onNew }) {
+// compactHeader: geen eigen titel (de Overzicht-kaart tekent die), wel de voortgang.
+// showDone: eenmalige taken die vandaag al afgerond zijn, doorgestreept onderaan.
+export default function TodayView({ tasks, subjects = [], dateOffset = 0, onToggleRoutine, onToggleTask, onOpen, onNew, compactHeader = false, showDone = false }) {
   const [collapsed, toggleCollapsed] = useCollapsed()
   const today = todayISO()
   const isToday = dateOffset === 0
@@ -94,7 +96,8 @@ export default function TodayView({ tasks, subjects = [], dateOffset = 0, onTogg
   const total = routines.length + dayTasks.length + doneOneoff
   const done = routinesDone + doneOneoff
   const pct = total > 0 ? Math.round((done / total) * 100) : 0
-  const isEmpty = routines.length === 0 && dayTasks.length === 0 && overdueTasks.length === 0
+  const doneTasks = isToday ? tasks.filter(t => !t.recurrence && t.completed && taskOnDay(t, today)).sort(taskTimeSort) : []
+  const isEmpty = routines.length === 0 && dayTasks.length === 0 && overdueTasks.length === 0 && !(showDone && doneTasks.length)
 
   const section = (id, props, rows) => (
     <section key={id}>
@@ -107,12 +110,14 @@ export default function TodayView({ tasks, subjects = [], dateOffset = 0, onTogg
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Voortgangskop */}
       <div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-          <h2 className="t-page" style={{ margin: 0 }}>{heading}</h2>
-          <span className="t-meta" style={{ fontSize: 12, textTransform: 'capitalize' }}>{dateLabel}</span>
-        </div>
+        {!compactHeader && (
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+            <h2 className="t-page" style={{ margin: 0 }}>{heading}</h2>
+            <span className="t-meta" style={{ fontSize: 12, textTransform: 'capitalize' }}>{dateLabel}</span>
+          </div>
+        )}
         {isToday && total > 0 && (
-          <div style={{ marginTop: 10 }}>
+          <div style={{ marginTop: compactHeader ? 0 : 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
               <span style={{ fontSize: 12, color: 'var(--c-text-2)' }}>
                 <strong className="tnum" style={{ color: 'var(--c-text)' }}>{done} van {total}</strong> voltooid
@@ -158,6 +163,11 @@ export default function TodayView({ tasks, subjects = [], dateOffset = 0, onTogg
           subtitle={[recurrenceLabel(t.recurrence, t.recurrence_days), t.start_time || t.time].filter(Boolean).join(' · ')}
           onToggle={onToggleRoutine} onOpen={onOpen} />
       )))}
+
+      {showDone && isToday && doneTasks.length > 0 && section('afgerond', { icon: CheckCircle2, title: 'Afgerond vandaag', count: doneTasks.length, tone: 'success' },
+        doneTasks.map(t => (
+          <TaskRow key={t.id} task={t} today={today} done subjectName={subjectName(t)} showDate={false} onToggle={onToggleTask} onOpen={onOpen} />
+        )))}
 
       {/* Lege staat */}
       {isEmpty && (

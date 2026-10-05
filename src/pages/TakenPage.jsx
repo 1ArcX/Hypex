@@ -3,6 +3,7 @@ import { taskOnDay, taskLastDate } from '../utils/taskStatus'
 import ReactDOM from 'react-dom'
 import TasksWidget from '../components/TasksWidget'
 import TodayView from '../components/TodayView'
+import TaskOverview from '../components/tasks/TaskOverview'
 import { useIsDesktop } from '../hooks/useIsDesktop'
 import { Plus, CheckCircle2 } from 'lucide-react'
 import { isDueToday, isDoneToday, appliesOn, todayISO, toISO } from '../utils/recurrence'
@@ -27,8 +28,9 @@ function EmptyState({ filter, onNew }) {
   )
 }
 
-// Volgorde volgt de mockup (Vandaag · Week · Alle · Te laat), aangevuld met de bestaande filters
+// Overzicht (alle taken per dag, vandaag gemarkeerd) eerst; daarna de losse filters
 const FILTERS = [
+  { id: 'overzicht', label: 'Overzicht' },
   { id: 'vandaag',   label: 'Vandaag'  },
   { id: 'morgen',    label: 'Morgen'   },
   { id: 'week',      label: 'Week'     },
@@ -57,7 +59,7 @@ export default function TakenPage({
   highlightFilter, onClearHighlight, hideFab,
 }) {
   const isDesktop = useIsDesktop()
-  const [filter, setFilter] = useState('vandaag')
+  const [filter, setFilter] = useState('overzicht')
   const [undoTask, setUndoTask] = useState(null)
   const undoTimerRef = React.useRef(null)
   const [highlightedIds, setHighlightedIds] = useState(new Set())
@@ -103,6 +105,8 @@ export default function TakenPage({
     const todayOneoff = tasks.filter(t => !t.recurrence && !t.completed && taskOnDay(t, ts)).length
     const overdueOneoff = tasks.filter(t => !t.recurrence && !t.completed && t.date && taskLastDate(t) < ts).length
     const base = {
+      // Overzicht: alles wat open staat met een datum (te laat, vandaag en later) + open routines van vandaag
+      overzicht: openRoutines + tasks.filter(t => !t.recurrence && !t.completed && t.date).length,
       vandaag:   openRoutines + todayOneoff + overdueOneoff,
       alles:     tasks.filter(t => !t.completed).length,
       morgen:    tasks.filter(t => !t.recurrence && !t.completed && taskOnDay(t, tom)).length
@@ -156,7 +160,7 @@ export default function TakenPage({
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Kop + filters */}
-      <div className="taken-head">
+      <div className={filter === 'overzicht' ? 'taken-head taken-head--wide' : 'taken-head'}>
         {isDesktop && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
             <h1 className="t-page" style={{ margin: 0 }}>Taken</h1>
@@ -177,7 +181,16 @@ export default function TakenPage({
 
       {/* Task list */}
       <div className="taken-body">
-        {(filter === 'vandaag' || filter === 'morgen') ? (
+        {filter === 'overzicht' ? (
+          <TaskOverview
+            tasks={tasks}
+            subjects={subjects}
+            onToggleRoutine={onToggle}
+            onToggleTask={handleToggleWithUndo}
+            onOpen={onViewDetail || onEdit}
+            onNew={onNew}
+          />
+        ) : (filter === 'vandaag' || filter === 'morgen') ? (
           <TodayView
             tasks={tasks}
             subjects={subjects}
