@@ -6,6 +6,7 @@ import {
 import { taskDaypart, daypartLabel, daypartOrder } from '../utils/daypart'
 import { ProgressBar, SectionHeader, EmptyState } from './ui'
 import TaskRow from './tasks/TaskRow'
+import { taskOnDay, taskLastDate } from '../utils/taskStatus'
 
 // Vandaag / Morgen (mockup paneel 3): voortgangskop + gegroepeerde, inklapbare secties
 // Urgent → Te laat → dagdelen (Ochtend/Middag/Avond/Overig) → Routines.
@@ -70,12 +71,12 @@ export default function TodayView({ tasks, subjects = [], dateOffset = 0, onTogg
 
   // Te laat (alleen op de vandaag-weergave): meegenomen naar vandaag, gevlagd.
   const overdueTasks = isToday
-    ? tasks.filter(t => !t.recurrence && !t.completed && t.date && t.date < today)
+    ? tasks.filter(t => !t.recurrence && !t.completed && t.date && taskLastDate(t) < today)
         .sort((a, b) => a.date.localeCompare(b.date) || (a.priority ?? 2) - (b.priority ?? 2))
     : []
 
   // Eenmalige taken van de doeldag: urgent apart, de rest per dagdeel.
-  const dayTasks = tasks.filter(t => !t.recurrence && !t.completed && t.date === target)
+  const dayTasks = tasks.filter(t => !t.recurrence && !t.completed && taskOnDay(t, target))
   const urgentTasks = dayTasks.filter(t => (t.priority ?? 2) === 1).sort(taskTimeSort)
   const buckets = {}
   for (const t of dayTasks) {
@@ -88,7 +89,7 @@ export default function TodayView({ tasks, subjects = [], dateOffset = 0, onTogg
     .map(dp => ({ id: dp, items: buckets[dp].sort(taskTimeSort) }))
 
   // Voortgang: routines van vandaag + eenmalige taken met datum vandaag (open én afgerond)
-  const doneOneoff = isToday ? tasks.filter(t => !t.recurrence && t.completed && t.date === today).length : 0
+  const doneOneoff = isToday ? tasks.filter(t => !t.recurrence && t.completed && taskOnDay(t, today)).length : 0
   const routinesDone = isToday ? routines.filter(t => isDoneToday(t, today)).length : 0
   const total = routines.length + dayTasks.length + doneOneoff
   const done = routinesDone + doneOneoff

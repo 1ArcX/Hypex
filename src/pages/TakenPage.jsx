@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react'
+import { taskOnDay, taskLastDate } from '../utils/taskStatus'
 import ReactDOM from 'react-dom'
 import TasksWidget from '../components/TasksWidget'
 import TodayView from '../components/TodayView'
@@ -99,16 +100,16 @@ export default function TakenPage({
     // Vandaag = openstaande routines van vandaag + taken van vandaag + te-late taken
     // (die worden meegenomen naar vandaag)
     const openRoutines = tasks.filter(t => t.recurrence && isDueToday(t, ts) && !isDoneToday(t, ts)).length
-    const todayOneoff = tasks.filter(t => !t.recurrence && !t.completed && t.date === ts).length
-    const overdueOneoff = tasks.filter(t => !t.recurrence && !t.completed && t.date && t.date < ts).length
+    const todayOneoff = tasks.filter(t => !t.recurrence && !t.completed && taskOnDay(t, ts)).length
+    const overdueOneoff = tasks.filter(t => !t.recurrence && !t.completed && t.date && taskLastDate(t) < ts).length
     const base = {
       vandaag:   openRoutines + todayOneoff + overdueOneoff,
       alles:     tasks.filter(t => !t.completed).length,
-      morgen:    tasks.filter(t => !t.recurrence && !t.completed && t.date === tom).length
+      morgen:    tasks.filter(t => !t.recurrence && !t.completed && taskOnDay(t, tom)).length
                  + tasks.filter(t => t.recurrence && appliesOn(t, tom)).length,
-      week:      tasks.filter(t => !t.completed && t.date && t.date >= ts && t.date <= wEnd).length,
+      week:      tasks.filter(t => !t.completed && t.date && taskLastDate(t) >= ts && t.date <= wEnd).length,
       urgent:    tasks.filter(t => !t.completed && (t.priority ?? 2) === 1).length,
-      telaat:    tasks.filter(t => !t.recurrence && !t.completed && t.date && t.date < ts).length,
+      telaat:    tasks.filter(t => !t.recurrence && !t.completed && t.date && taskLastDate(t) < ts).length,
       ongepland: tasks.filter(t => !t.completed && !t.date).length,
     }
     for (const g of groups) base[`group:${g}`] = tasks.filter(t => !t.completed && t.group_name === g).length
@@ -121,11 +122,11 @@ export default function TakenPage({
       return tasks.filter(t => t.group_name === g)
     }
     switch (filter) {
-      case 'vandaag':   return tasks.filter(t => t.date === ts)
-      case 'morgen':    return tasks.filter(t => t.date === tom)
-      case 'week':      return tasks.filter(t => t.date && t.date >= ts && t.date <= wEnd)
+      case 'vandaag':   return tasks.filter(t => t.recurrence ? t.date === ts : taskOnDay(t, ts))
+      case 'morgen':    return tasks.filter(t => t.recurrence ? t.date === tom : taskOnDay(t, tom))
+      case 'week':      return tasks.filter(t => t.date && taskLastDate(t) >= ts && t.date <= wEnd)
       case 'urgent':    return tasks.filter(t => (t.priority ?? 2) === 1)
-      case 'telaat':    return tasks.filter(t => !t.recurrence && t.date && t.date < ts)
+      case 'telaat':    return tasks.filter(t => !t.recurrence && t.date && taskLastDate(t) < ts)
       case 'ongepland': return tasks.filter(t => !t.date)
       default:          return tasks
     }
@@ -139,8 +140,8 @@ export default function TakenPage({
     // Bepaal welke taken gehighlight worden
     const matchFn = {
       urgent: t => !t.completed && (t.priority ?? 2) === 1,
-      telaat: t => !t.completed && !t.recurrence && t.date && t.date < ts,
-      vandaag: t => !t.completed && t.date === ts,
+      telaat: t => !t.completed && !t.recurrence && t.date && taskLastDate(t) < ts,
+      vandaag: t => !t.completed && (t.recurrence ? t.date === ts : taskOnDay(t, ts)),
       open:   t => !t.completed,
     }[highlightFilter]
     if (matchFn) {

@@ -1,4 +1,5 @@
 import React from 'react'
+import { taskOnDay, taskLastDate } from '../utils/taskStatus'
 import { appliesOn } from '../utils/recurrence'
 import { taskDaypart, daypartLabel } from '../utils/daypart'
 import { taskCategory, eventCategory, categoryColor } from '../utils/category'
@@ -72,7 +73,7 @@ function buildDayItems(date, { tasks, subjects, calendarEvents, magisterLessons 
   }
   // Taken + routines
   for (const t of (tasks || [])) {
-    const match = t.recurrence ? appliesOn(t, ds) : t.date === ds
+    const match = taskOnDay(t, ds)
     if (!match) continue
     if (!t.recurrence && t.completed) continue
     const timed = t.start_time || t.time
@@ -110,7 +111,7 @@ export default function AgendaList({ tasks, subjects, calendarEvents, magisterLe
   // Te laat bovenaan
   const todayStr = toDateStr(today)
   const overdue = (tasks || [])
-    .filter(t => !t.recurrence && !t.completed && t.date && t.date < todayStr)
+    .filter(t => !t.recurrence && !t.completed && t.date && taskLastDate(t) < todayStr)
     .sort((a, b) => a.date.localeCompare(b.date))
 
   if (days.length === 0 && overdue.length === 0) {

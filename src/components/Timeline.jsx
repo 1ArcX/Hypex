@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { supabase } from '../supabaseClient'
-import { Plus, ChevronLeft, ChevronRight, X, Save, Trash2 } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { callMagister } from '../utils/magisterApi'
 import { callSomtoday, ensureSomtodayCreds } from '../utils/somtodayApi'
 import { appliesOn } from '../utils/recurrence'
 import { taskCategory, eventCategory, categoryColor, CATEGORIES, CATEGORY_ORDER } from '../utils/category'
 import { eventDisplay } from '../utils/eventTitle'
 import { loadExternalEvents } from '../utils/externalEvents'
+import { taskOnDay } from '../utils/taskStatus'
 import ExternalEventModal from './agenda/ExternalEventModal'
+import ItemModal from './ItemModal'
 import { FilterTabs, IconButton } from './ui'
 import { useViewport } from '../hooks/useViewport'
 
@@ -51,7 +53,6 @@ const MONTHS_FULL = ['Januari','Februari','Maart','April','Mei','Juni','Juli','A
 const MONTHS_SHORT = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec']
 const DAYS_SHORT = ['Zo','Ma','Di','Wo','Do','Vr','Za']
 const DAYS_FULL = ['Zondag','Maandag','Dinsdag','Woensdag','Donderdag','Vrijdag','Zaterdag']
-const EVENT_COLORS = ['#FF6B6B','#FF8C42','#FACC15','#4ADE80','#00FFD1','#38BDF8','#818CF8','#F472B6']
 
 function pad(n) { return String(n).padStart(2, '0') }
 function stripHtml(html) {
@@ -131,15 +132,6 @@ function isAllDayEvent(ev) {
   return s.getHours() === 0 && s.getMinutes() === 0
 }
 
-const emptyForm = (date, hour, minute = 0) => ({
-  title: '', description: '',
-  date: toDateStr(date || new Date()),
-  endDate: '',
-  allDay: false,
-  startTime: hour !== undefined ? `${pad(hour)}:${pad(minute)}` : '09:00',
-  endTime: hour !== undefined ? (hour >= 23 ? '23:59' : `${pad(hour + 1)}:${pad(minute)}`) : '10:00',
-  color: '#818CF8', recurrence: '', recurrence_days: []
-})
 
 const SOMTODAY_EMAIL = 'jbrugman.prive@gmail.com'
 
@@ -153,8 +145,21 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
   const [current, setCurrent] = useState(initialDate || new Date())
   const [events, setEvents] = useState([])
   const [modal, setModal] = useState(null)
-  const [form, setForm] = useState(emptyForm(new Date()))
-  const [saving, setSaving] = useState(false)
+  const [draft, setDraft] = useState(null) // live preview van ItemModal: { start, end, allDay, color, title, id }
+  const draftOnDay = (d) => {
+    if (!draft) return false
+    const day = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+    const a = new Date(draft.start.getFullYear(), draft.start.getMonth(), draft.start.getDate())
+    const b = new Date(draft.end.getFullYear(), draft.end.getMonth(), draft.end.getDate())
+    return day >= a && day <= b
+  }
+  // Preview springt mee naar de gekozen week/dag als die buiten beeld valt
+  const draftDayKey = draft ? toDateStr(draft.start) : null
+  useEffect(() => {
+    if (!draft) return
+    const visible = view === 'week' ? getWeekDays(current).some(w => isSameDay(w, draft.start)) : view === 'day' ? isSameDay(current, draft.start) : true
+    if (!visible) setCurrent(new Date(draft.start))
+  }, [draftDayKey]) // eslint-disable-line react-hooks/exhaustive-deps
   const [magisterLessons, setMagisterLessons] = useState([])
   const [somtodayLessons, setSomtodayLessons] = useState([])
   const [lessonDetail, setLessonDetail] = useState(null)
@@ -443,68 +448,25 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
   // zonder tijd (hele dag / dagdeel) in de dag-strip bovenaan.
   const getTasksForDay = (date) => {
     const ds = toDateStr(date)
-    return (tasks || []).filter(t => {
-      if (t.recurrence) return appliesOn(t, ds)
-      return t.date === ds
-    })
+    return (tasks || []).filter(t => taskOnDay(t, ds))
   }
 
-  const openNew = (date, hour, minute) => {
-    setForm(emptyForm(date || current, hour, minute))
-    setModal({ mode: 'new' })
+  // Nieuw item vanuit de agenda: ItemModal (standaard Event, met Event | Taak-schakelaar)
+  const openNew = (date, hour, minute = 0) => {
+    const d = date || current
+    setModal({
+      mode: 'new',
+      defaults: hour !== undefined
+        ? { date: toDateStr(d), startTime: `${pad(hour)}:${pad(minute)}`, endTime: hour >= 23 ? '23:59' : `${pad(hour + 1)}:${pad(minute)}`, allDay: false }
+        : { date: toDateStr(d) },
+    })
   }
 
   const openEditEvent = (ev, e) => {
     e?.stopPropagation()
-    // Geïmporteerde items (Google / MyX) zijn read-only: alleen details tonen
+    // Geïmporteerde items (Google / MyX): eigen popup met aanpassingen bovenop de feed
     if (ev.external) { setModal({ mode: 'view', event: ev }); return }
-    const s = new Date(ev.start_time), en = new Date(ev.end_time)
-    const isAllDay = s.getHours() === 0 && s.getMinutes() === 0 && en.getHours() === 23 && en.getMinutes() === 59
-    const startDs = toDateStr(s), endDs = toDateStr(en)
-    setForm({
-      title: ev.title, description: ev.description || '',
-      date: startDs,
-      endDate: endDs !== startDs ? endDs : '',
-      allDay: isAllDay,
-      startTime: isAllDay ? '09:00' : `${pad(s.getHours())}:${pad(s.getMinutes())}`,
-      endTime: isAllDay ? '10:00' : `${pad(en.getHours())}:${pad(en.getMinutes())}`,
-      color: ev.color || '#818CF8',
-      recurrence: ev.recurrence || '', recurrence_days: ev.recurrence_days || []
-    })
     setModal({ mode: 'edit', event: ev })
-  }
-
-  const handleSave = async () => {
-    if (!form.title.trim()) return
-    setSaving(true)
-    const endDateStr = form.endDate || form.date
-    let start, end
-    if (form.allDay) {
-      start = new Date(`${form.date}T00:00`)
-      end = new Date(`${endDateStr}T23:59`)
-    } else {
-      start = new Date(`${form.date}T${form.startTime}`)
-      end = new Date(`${endDateStr}T${form.endTime}`)
-      if (!form.endDate && end <= start) end.setTime(start.getTime() + 3600000)
-    }
-    const payload = {
-      user_id: userId, title: form.title, description: form.description,
-      start_time: start.toISOString(), end_time: end.toISOString(),
-      color: form.color, recurrence: form.recurrence || null,
-      recurrence_days: form.recurrence_days?.length ? form.recurrence_days : null
-    }
-    if (modal?.mode === 'edit' && modal.event) {
-      await supabase.from('calendar_events').update(payload).eq('id', modal.event.id)
-    } else {
-      await supabase.from('calendar_events').insert(payload)
-    }
-    setSaving(false); setModal(null); fetchEvents()
-  }
-
-  const handleDelete = async () => {
-    if (!modal?.event || modal.event.external) return
-    await supabase.from('calendar_events').delete().eq('id', modal.event.id)
-    setModal(null); fetchEvents()
   }
 
   const navigate = (dir) => {
@@ -595,7 +557,9 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                     onClick: e => { e.stopPropagation(); onViewDetail ? onViewDetail(t) : onEditTask?.(t) },
                   }
                 })
-              return [...allDayEvs, ...allDayLes, ...allDayTasks]
+              const draftItem = draft?.allDay && draftOnDay(d)
+                ? [{ kind: 'draft', key: 'draft', color: draft.color, title: draft.title, onClick: undefined }] : []
+              return [...draftItem, ...allDayEvs, ...allDayLes, ...allDayTasks]
             })
             if (allDayByDay.every(arr => arr.length === 0)) return null
             return (
@@ -607,7 +571,8 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                   <div key={di} style={{ padding: '0 2px', display: 'flex', flexDirection: 'column', gap: 2 }}>
                     {items.map(item => (
                       <div key={item.key} onClick={item.onClick}
-                        style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, cursor: 'pointer', background: `color-mix(in srgb, ${item.color} 16%, var(--c-surface-solid))`, borderLeft: `3px solid ${item.color}`, color: `color-mix(in srgb, ${item.color} 60%, white)`, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, cursor: item.onClick ? 'pointer' : 'default', background: `color-mix(in srgb, ${item.color} 16%, var(--c-surface-solid))`, borderLeft: `3px solid ${item.color}`, color: `color-mix(in srgb, ${item.color} 60%, white)`, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          ...(item.kind === 'draft' ? { border: `1px dashed ${item.color}`, borderLeft: `3px solid ${item.color}`, opacity: 0.9 } : {}) }}>
                         {item.title}{item.edited ? ' ✎' : ''}
                       </div>
                     ))}
@@ -669,6 +634,29 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                 </div>
               </React.Fragment>
             ))}
+
+            {/* Live preview van ItemModal: gestippeld blok op de gekozen tijd */}
+            {draft && !draft.allDay && days.map((d, di) => {
+              if (!draftOnDay(d)) return null
+              const s = draft.start, e = draft.end
+              const multi = !isSameDay(s, e)
+              // Taak: zelfde tijdslot elke dag. Event: loopt door van begin tot eind.
+              const startMins = draft.kind === 'task' || isSameDay(d, s) ? s.getHours() * 60 + s.getMinutes() : 0
+              const endMins = draft.kind === 'task' || !multi ? e.getHours() * 60 + e.getMinutes() : isSameDay(d, e) ? e.getHours() * 60 + e.getMinutes() : 24 * 60
+              const top = (startMins / 60) * HOUR_H
+              const height = Math.max(22, ((Math.max(endMins, startMins + 15) - startMins) / 60) * HOUR_H - 2)
+              return (
+                <div key={`draft-${di}`} aria-hidden="true" style={{
+                  position: 'absolute', top, height, zIndex: 6, pointerEvents: 'none', borderRadius: 8, padding: '4px 6px',
+                  left: `calc(${TIME_COL}px + (100% - ${TIME_COL}px) * ${di / N} + 2px)`, width: `calc((100% - ${TIME_COL}px) / ${N} - 6px)`,
+                  border: `1.5px dashed ${draft.color}`, background: `color-mix(in srgb, ${draft.color} 14%, transparent)`,
+                  color: `color-mix(in srgb, ${draft.color} 70%, white)`, fontSize: 11, fontWeight: 700, overflow: 'hidden',
+                }}>
+                  {draft.title}
+                  <div style={{ fontSize: 10, fontWeight: 500, opacity: 0.85 }}>{fmtTime(s)} – {fmtTime(e)}</div>
+                </div>
+              )
+            })}
 
             {/* Events + Lessons + Tasks per day, with overlap layout */}
             {days.map((d, di) => {
@@ -1163,114 +1151,21 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
             (e._original?.title ?? e.title) === (modal.event._original?.title ?? modal.event.title))} />
       )}
 
-      {/* Event modal */}
+      {/* Nieuw / bewerken: gedeelde ItemModal (Event | Taak) met live preview in het rooster */}
       {modal && modal.mode !== 'view' && (
-        <div className="modal-overlay" style={{ padding: '16px' }}
-          onClick={() => setModal(null)}>
-          <div className="glass-card modal-content" style={{ width: '100%', maxWidth: '400px', padding: '24px', maxHeight: '90vh', overflowY: 'auto' }}
-            onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h2 style={{ color: 'white', fontWeight: 700, fontSize: '16px', margin: 0 }}>
-                {modal.mode === 'edit' ? 'Bewerk event' : 'Nieuw event'}
-              </h2>
-              <button onClick={() => setModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)' }}>
-                <X size={18} />
-              </button>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <input className="glass-input" placeholder="Titel *" value={form.title}
-                onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
-                onKeyDown={e => e.key === 'Enter' && handleSave()}
-                style={{ fontSize: '16px' }} />
-              <textarea className="glass-input" placeholder="Beschrijving" value={form.description}
-                onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
-                style={{ resize: 'vertical', minHeight: '56px' }} />
-              {/* Hele dag toggle */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <button type="button" onClick={() => setForm(p => ({ ...p, allDay: !p.allDay }))}
-                  style={{ width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', background: form.allDay ? 'var(--accent, #00FFD1)' : 'rgba(255,255,255,0.14)', position: 'relative', transition: 'background 0.2s', flexShrink: 0, padding: 0 }}>
-                  <span style={{ position: 'absolute', top: 2, left: form.allDay ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: form.allDay ? '#000' : 'rgba(255,255,255,0.7)', transition: 'left 0.2s' }} />
-                </button>
-                <span style={{ fontSize: 12, color: 'var(--c-text-2)' }}>Hele dag</span>
-              </div>
-              {/* Date range */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                <div>
-                  <div style={{ fontSize: 10, color: 'var(--c-text-3)', marginBottom: 4, letterSpacing: '0.05em' }}>Van</div>
-                  <input type="date" className="glass-input" value={form.date}
-                    onChange={e => setForm(p => ({ ...p, date: e.target.value }))} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 10, color: 'var(--c-text-3)', marginBottom: 4, letterSpacing: '0.05em' }}>Tot</div>
-                  <input type="date" className="glass-input" value={form.endDate || form.date} min={form.date}
-                    onChange={e => { const v = e.target.value; setForm(p => ({ ...p, endDate: v === p.date ? '' : v })) }} />
-                </div>
-              </div>
-              {/* Times (only when not all-day) */}
-              {!form.allDay && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                  <input type="time" className="glass-input" value={form.startTime}
-                    onChange={e => setForm(p => ({ ...p, startTime: e.target.value }))} />
-                  <input type="time" className="glass-input" value={form.endTime}
-                    onChange={e => setForm(p => ({ ...p, endTime: e.target.value }))} />
-                </div>
-              )}
-              <select className="glass-input" value={form.recurrence}
-                onChange={e => setForm(p => ({ ...p, recurrence: e.target.value, recurrence_days: [] }))}>
-                <option value="">Geen herhaling</option>
-                <option value="daily">Dagelijks</option>
-                <option value="weekdays">Elke werkdag (ma–vr)</option>
-                <option value="weekly">Wekelijks</option>
-                <option value="biweekly">Om de week</option>
-                <option value="monthly">Maandelijks</option>
-                <option value="yearly">Jaarlijks</option>
-              </select>
-              {(form.recurrence === 'weekly' || form.recurrence === 'biweekly') && (
-                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                  {['Ma','Di','Wo','Do','Vr','Za','Zo'].map((d, i) => {
-                    const dayNum = (i + 1) % 7
-                    const sel = form.recurrence_days.includes(dayNum)
-                    return (
-                      <button key={i} type="button"
-                        onClick={() => setForm(p => ({ ...p, recurrence_days: sel ? p.recurrence_days.filter(x => x !== dayNum) : [...p.recurrence_days, dayNum] }))}
-                        style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', border: '1px solid', borderColor: sel ? 'color-mix(in srgb, var(--accent) 50%, transparent)' : 'rgba(255,255,255,0.1)', background: sel ? 'color-mix(in srgb, var(--accent) 15%, transparent)' : 'transparent', color: sel ? 'var(--accent)' : 'var(--c-text-3)' }}>
-                        {d}
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                {EVENT_COLORS.map(c => (
-                  <button key={c} type="button" onClick={() => setForm(p => ({ ...p, color: c }))}
-                    style={{ width: '24px', height: '24px', borderRadius: '50%', background: c, border: form.color === c ? '2px solid white' : '2px solid transparent', cursor: 'pointer', boxSizing: 'border-box', transform: form.color === c ? 'scale(1.2)' : 'scale(1)', transition: 'transform 0.1s', flexShrink: 0 }} />
-                ))}
-                {/* Custom color picker */}
-                <label title="Eigen kleur" style={{ width: 24, height: 24, borderRadius: '50%', overflow: 'hidden', cursor: 'pointer', flexShrink: 0, border: !EVENT_COLORS.includes(form.color) ? '2px solid white' : '2px solid transparent', boxSizing: 'border-box', transform: !EVENT_COLORS.includes(form.color) ? 'scale(1.2)' : 'scale(1)', transition: 'transform 0.1s', background: form.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <input type="color" value={form.color} onChange={e => setForm(p => ({ ...p, color: e.target.value }))}
-                    style={{ opacity: 0, position: 'absolute', width: 1, height: 1, pointerEvents: 'none' }} />
-                  {EVENT_COLORS.includes(form.color) && <span style={{ fontSize: 12, lineHeight: 1, color: 'var(--c-text-2)', pointerEvents: 'none' }}>+</span>}
-                </label>
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: '8px', marginTop: '20px' }}>
-              {modal.mode === 'edit' && (
-                <button onClick={handleDelete}
-                  style={{ padding: '9px 14px', borderRadius: '10px', border: '1px solid rgba(255,80,80,0.3)', background: 'rgba(255,80,80,0.08)', color: '#ff6b6b', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Trash2 size={13} />
-                </button>
-              )}
-              <button onClick={() => setModal(null)}
-                style={{ flex: 1, padding: '9px', borderRadius: '10px', border: '1px solid var(--c-border-strong)', background: 'transparent', color: 'var(--c-text-3)', cursor: 'pointer', fontSize: '12px' }}>
-                Annuleer
-              </button>
-              <button onClick={handleSave} disabled={!form.title.trim() || saving}
-                style={{ flex: 2, padding: '9px', borderRadius: '10px', border: 'none', background: 'var(--accent, #00FFD1)', color: '#000', cursor: 'pointer', fontSize: '12px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', opacity: !form.title.trim() ? 0.4 : 1 }}>
-                <Save size={13} /> {saving ? 'Opslaan...' : 'Opslaan'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ItemModal
+          kind="event"
+          event={modal.mode === 'edit' ? modal.event : null}
+          defaults={modal.defaults}
+          userId={userId}
+          subjects={subjects}
+          tasks={tasks}
+          allTasks={tasks}
+          calendarEvents={events}
+          preview={!isMobile}
+          onDraftChange={setDraft}
+          onClose={() => { setModal(null); setDraft(null) }}
+        />
       )}
     </div>
   )

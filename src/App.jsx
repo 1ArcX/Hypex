@@ -1,7 +1,7 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from './supabaseClient'
 import AuthPage from './components/AuthPage'
-import TaskModal from './components/TaskModal'
+import ItemModal from './components/ItemModal'
 import TaskDetailModal from './components/TaskDetailModal'
 import { RefreshCw, Settings } from 'lucide-react'
 import ThemeSettings from './components/ThemeSettings'
@@ -590,46 +590,6 @@ export default function App() {
     }
   }
 
-  const handleSaveTask = async (taskData) => {
-    if (!user?.id) return
-    const fields = {
-      title: taskData.title,
-      description: taskData.description || null,
-      time: taskData.time || taskData.start_time,
-      date: taskData.date || null,
-      start_time: taskData.start_time || null,
-      end_time: taskData.end_time || null,
-      subject_id: taskData.subject_id || null,
-      completed: taskData.completed ?? false,
-      priority: taskData.priority ?? 2,
-      duration_minutes: taskData.duration_minutes ?? 30,
-      due_date: taskData.due_date || null,
-      group_name: taskData.group_name || null,
-    }
-    // Herhaling-velden alleen meesturen als ze relevant zijn, zodat gewone taken
-    // blijven werken ook als de DB-migratie (supabase_recurrence.sql) nog niet gedraaid is.
-    const orig = taskData.id ? tasks.find(t => String(t.id) === String(taskData.id)) : null
-    if (taskData.recurrence || orig?.recurrence) {
-      fields.recurrence = taskData.recurrence || null
-      fields.recurrence_days = taskData.recurrence_days || null
-    }
-    // Dagdeel alleen meesturen als relevant, zodat taken blijven werken ook als
-    // de DB-migratie (supabase_daypart.sql) nog niet gedraaid is.
-    if (taskData.daypart || orig?.daypart) {
-      fields.daypart = taskData.daypart || null
-    }
-    let error
-    if (taskData.id) {
-      ({ error } = await supabase.from('tasks').update(fields).eq('id', taskData.id).eq('user_id', user.id))
-    } else {
-      ({ error } = await supabase.from('tasks').insert({ ...fields, completed: false, user_id: user.id }))
-    }
-    if (error) { console.error('Taak opslaan mislukt:', error); alert('Opslaan mislukt: ' + (error.message || JSON.stringify(error))); return }
-    setShowTaskModal(false)
-    setSelectedTask(null)
-    fetchTasks()
-  }
-
   const handleMoveToGroup = async (taskId, groupName) => {
     await supabase.from('tasks').update({ group_name: groupName || null }).eq('id', taskId).eq('user_id', user.id)
     fetchTasks()
@@ -1055,17 +1015,16 @@ export default function App() {
       )}
 
       {showTaskModal && (
-        <TaskModal
+        <ItemModal
+          kind="task"
           task={selectedTask}
-          defaultTime={defaultTime}
-          defaultDate={defaultDate}
+          defaults={{ date: defaultDate || undefined, startTime: defaultTime || undefined }}
+          userId={user?.id}
           subjects={subjects}
-          calendarEvents={calendarEvents}
+          calendarEvents={allEvents}
           tasks={tasks}
           allTasks={tasks}
           onClose={() => { setShowTaskModal(false); setSelectedTask(null) }}
-          onSave={handleSaveTask}
-          onDelete={handleDeleteTask}
         />
       )}
 

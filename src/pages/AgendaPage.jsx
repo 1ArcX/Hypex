@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { taskOnDay } from '../utils/taskStatus'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 // ChevronLeft/Right kept for WeekStrip
 import Timeline from '../components/Timeline'
@@ -40,7 +41,7 @@ function getDayDensity(day, tasks, calendarEvents, magisterLessons) {
   const ds = toDateStr(day)
   let count = 0
   // Taken
-  count += (tasks || []).filter(t => t.date === ds && !t.completed).length
+  count += (tasks || []).filter(t => (t.recurrence ? t.date === ds : taskOnDay(t, ds)) && !t.completed).length
   // Agenda-events
   count += (calendarEvents || []).filter(ev => {
     try {

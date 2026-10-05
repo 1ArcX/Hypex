@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { X, EyeOff, Eye, RotateCcw, Save } from 'lucide-react'
 import { eventDisplay } from '../../utils/eventTitle'
 import { eventCategory, typeIdOf } from '../../utils/category'
@@ -100,7 +101,8 @@ export default function ExternalEventModal({ ev, siblings = [], onClose }) {
   }
 
   const lbl = { fontSize: 10, color: 'var(--c-text-3)', marginBottom: 4, letterSpacing: '0.05em' }
-  return (
+  // Portal naar <body>: anders valt de modal binnen de stacking context van de pagina (onder de BottomNav)
+  return createPortal(
     <div className="modal-overlay" style={{ padding: 16 }} onClick={onClose}>
       <div className="glass-card modal-content" role="dialog" aria-modal="true" aria-labelledby="ext-ev-title"
         style={{ width: '100%', maxWidth: 420, padding: 24, maxHeight: '90vh', overflowY: 'auto' }}
@@ -194,7 +196,8 @@ export default function ExternalEventModal({ ev, siblings = [], onClose }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

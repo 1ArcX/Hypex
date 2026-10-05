@@ -11,7 +11,7 @@ import PomodoroMiniWidget from '../components/dashboard/PomodoroMiniWidget'
 import TodayWidget from '../components/dashboard/TodayWidget'
 import { Card, CardHeader, CardLink, KpiTile, ListRow, CheckButton, Pill, IconButton, FilterTabs, EmptyState } from '../components/ui'
 import { taskCategory, eventCategory, categoryColor } from '../utils/category'
-import { isOverdue, isUrgent, daysLate, shortDate } from '../utils/taskStatus'
+import { isOverdue, isUrgent, daysLate, shortDate, taskOnDay } from '../utils/taskStatus'
 import { eventDisplay } from '../utils/eventTitle'
 import { buildUpcoming, countdownLabel } from '../utils/upcoming'
 import { useIsDesktop } from '../hooks/useIsDesktop'
@@ -207,7 +207,7 @@ export default function DashboardPage({
   const overdueTasks = tasks.filter(t => isOverdue(t, today)).sort((a, b) => a.date.localeCompare(b.date))
   const urgentTasks  = tasks.filter(isUrgent)
   const openCount    = tasks.filter(t => !t.completed).length
-  const todayOpen    = tasks.filter(t => t.recurrence ? (isDueToday(t, today) && !isDoneToday(t, today)) : (!t.completed && t.date === today)).length
+  const todayOpen    = tasks.filter(t => t.recurrence ? (isDueToday(t, today) && !isDoneToday(t, today)) : (!t.completed && taskOnDay(t, today))).length
 
   // Werkruimte: eerst te laat, daarna urgent (zonder dubbelingen)
   const overdueIds = new Set(overdueTasks.map(t => t.id))

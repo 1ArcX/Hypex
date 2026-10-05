@@ -2,7 +2,7 @@ import React from 'react'
 import { Flag, Flame, Repeat, GripVertical, Trash2 } from 'lucide-react'
 import { Pill, CheckButton } from '../ui'
 import { taskCategory, categoryColor } from '../../utils/category'
-import { shortDate } from '../../utils/taskStatus'
+import { shortDate, isMultiDay, spanLabel, taskOnDay } from '../../utils/taskStatus'
 import { recurrenceLabel } from '../../utils/recurrence'
 
 // Compacte taakrij (Hypex v2, mockup paneel 3): Wat? — Wanneer? — Status? — Actie?
@@ -24,10 +24,12 @@ export default function TaskRow({
   const urgent = (task.priority ?? 2) === 1
   const time = task.start_time || task.time
   const dot = done ? 'var(--c-success)' : categoryColor(taskCategory(task))
+  const mins = task.duration_minutes
   const defaultSub = [
+    isMultiDay(task) ? `${spanLabel(task)}${time ? ' elke dag' : ''}` : null,
     task.recurrence ? [recurrenceLabel(task.recurrence, task.recurrence_days), time].filter(Boolean).join(' · ') : (time ? `${time}${task.end_time ? `–${task.end_time}` : ''}` : null),
     subjectName,
-    task.duration_minutes && !task.recurrence ? `${task.duration_minutes} min` : null,
+    mins && !task.recurrence && time ? (mins >= 60 ? `${Math.floor(mins / 60)}u${mins % 60 ? String(mins % 60).padStart(2, '0') : ''}` : `${mins} min`) : null,
     task.due_date && task.due_date !== task.date ? `deadline ${shortDate(task.due_date, today)}` : null,
   ].filter(Boolean).join(' · ')
   const sub = subtitle ?? defaultSub
@@ -61,8 +63,9 @@ export default function TaskRow({
           <Flame size={11} aria-hidden="true" /> {task.streak}
         </Pill>
       )}
-      {showDate && !task.recurrence && task.date && (
-        <Pill tone={late ? 'danger' : task.date === today ? (urgent ? 'danger' : 'accent') : 'neutral'}>{shortDate(task.date, today)}</Pill>
+      {showDate && !task.recurrence && task.date && (isMultiDay(task)
+        ? <Pill tone={late ? 'danger' : taskOnDay(task, today) ? (urgent ? 'danger' : 'accent') : 'neutral'} title={`${shortDate(task.date, today)} t/m ${shortDate(task.end_date, today)}`}>{spanLabel(task)}</Pill>
+        : <Pill tone={late ? 'danger' : task.date === today ? (urgent ? 'danger' : 'accent') : 'neutral'}>{shortDate(task.date, today)}</Pill>
       )}
       {urgent && !done && <Flag size={14} aria-label="Urgent" style={{ color: 'var(--c-danger)', flexShrink: 0 }} />}
       {(task.priority ?? 2) === 3 && <Flag size={14} aria-label="Later" style={{ color: 'var(--c-text-3)', flexShrink: 0 }} />}

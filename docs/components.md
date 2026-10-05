@@ -84,11 +84,16 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 - **TasksWidget** — [components/TasksWidget.jsx](../src/components/TasksWidget.jsx) — main task list with groups, drag-reorder, complete. Aliases: "takenlijst", "taken widget", "de takenlijst".
 - **TodayView** — [components/TodayView.jsx](../src/components/TodayView.jsx) — Vandaag/Morgen view inside TakenPage: progress header ("X van Y voltooid" + bar), collapsible sections Urgent / Te laat / dagdelen (Overig) / Routines. Aliases: "vandaag view", "vandaag-lijst", "voortgang".
 - **TaskRow** — [components/tasks/TaskRow.jsx](../src/components/tasks/TaskRow.jsx) — shared compact task row (dot, title, subtitle, date/streak pill, flag, delete-on-hover, checkbox right); used by TodayView + TasksWidget. Styles `.task-row*` in index.css. Aliases: "taakrij", "task row".
-- **TaskModal** — [components/TaskModal.jsx](../src/components/TaskModal.jsx) — create/edit a task (title, time, subject, priority, recurrence, daypart). Aliases: "taak toevoegen", "nieuwe taak", "taak bewerken", "task modal", "task popup".
+- **ItemModal** — [components/ItemModal.jsx](../src/components/ItemModal.jsx) — one modal for tasks **and** own agenda items, with an **Event | Taak** switch for new items (formerly TaskModal + the inline Timeline event modal).
+  Shared: title with quick-add (`utils/quickAdd.js`, e.g. "morgen 14:00-15:30 wiskunde #school !urgent", recognised parts shown as removable chips), `TypeSelect`, date chips (Vandaag/Morgen/Rest week ma–vr/Volgende week/Geen datum), Van + Tot en met (multi-day), Hele dag / Tijdslot + duration chips, overlap warning.
+  Taak: dagdeel, prioriteit, herhaling, Meer opties (beschrijving, vak, deadline, groep), "Beschikbare momenten". Event: beschrijving, event-herhaling. Edit mode: Dupliceer, verwijderen. Ctrl+Enter saves, Esc closes.
+  Saving via [utils/itemSave.js](../src/utils/itemSave.js) (`saveTask`/`saveEvent`/…, dispatches `refreshTasks`/`refreshCalendarEvents`). Opened from App (Taak) and Timeline "Nieuw"/empty slot (Event, with `onDraftChange` live preview: dashed ghost block in the grid). Rendered in a portal on `<body>`. Free-slot/overlap helpers: [tasks/slotPlanning.js](../src/components/tasks/slotPlanning.js).
+  Aliases: "taak toevoegen", "nieuwe taak", "taak bewerken", "task modal", "task popup", "event modal", "nieuw event", "event/taak modal", "quick add".
 - **TaskDetailModal** — [components/TaskDetailModal.jsx](../src/components/TaskDetailModal.jsx) — read-only task detail + start pomodoro + edit/delete. Aliases: "taak detail", "taakdetail popup".
 
 ### Agenda
-- **Timeline** — [components/Timeline.jsx](../src/components/Timeline.jsx) — full week/day/month calendar grid (desktop agenda) with Magister/SOMtoday lessons, events, tasks, work shifts. Hour height scales with window height (`hourHeight()`, ~15 h in view); ≥96px/h shows 15-min lines + ":30" labels and clicks snap to the quarter. Narrow-but-tall windows show the rail as a strip below the grid (`.agenda-shell`). Category-colored blocks (`blockStyle`), red now-line with time pill, right rail `SideRail` (legend "Kleuren" + mini month, `.agenda-rail`, ≥1280px). Aliases: "timeline", "agenda grid", "week weergave", "kalender", "legenda", "mini kalender".
+- **Timeline** — [components/Timeline.jsx](../src/components/Timeline.jsx) — full week/day/month calendar grid (desktop agenda) with Magister/SOMtoday lessons, events, tasks, work shifts. Hour height scales with window height (`hourHeight()`, ~15 h in view); ≥96px/h shows 15-min lines + ":30" labels and clicks snap to the quarter. Narrow-but-tall windows show the rail as a strip below the grid (`.agenda-shell`). Category-colored blocks (`blockStyle`), red now-line with time pill, right rail `SideRail` (legend "Kleuren" = all types + "Toon verborgen" toggle for hidden feed items, mini month, `.agenda-rail`, ≥1280px). Imported items load via `utils/externalEvents.js` (overrides applied; ✎ = edited) and open **ExternalEventModal**. Aliases: "timeline", "agenda grid", "week weergave", "kalender", "legenda", "mini kalender".
+- **ExternalEventModal** — [components/agenda/ExternalEventModal.jsx](../src/components/agenda/ExternalEventModal.jsx) — imported (Google/MijnX) item: feed info (code, locatie, beschrijving) + edit title, type, hele dag/tijden, eigen notitie, Verbergen, Herstel origineel. Option "Ook toepassen op de N andere items met de titel …" (MijnX stores multi-day items per day, e.g. herfstvakantie). Edits are stored in `external_event_overrides` and survive every sync. Aliases: "geïmporteerd item", "feed item aanpassen", "verbergen".
 - **AgendaList** — [components/AgendaList.jsx](../src/components/AgendaList.jsx) — mobile agenda list ("Niets gepland de komende weken"). Aliases: "agenda lijst", "agenda mobiel".
 
 ### Pomodoro
@@ -120,8 +125,11 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 - **DagbriefingStrip** — [components/ai/DagbriefingStrip.jsx](../src/components/ai/DagbriefingStrip.jsx) — structured briefing tiles (Urgent, Te laat, Volgende afspraak, Dagbudget) from real data above the AI text. Aliases: "dagbriefing", "briefing".
 
 ### Settings / admin / onboarding / auth
-- **ThemeSettings** — [components/ThemeSettings.jsx](../src/components/ThemeSettings.jsx) — "Instellingen": accent color presets + eigen kleur, "Live preview" mini-UI, "Navigatie" (links/boven + automatisch verbergen, desktop, per device), meldingen, external calendars, "Desktop-app" download (Windows browsers only, hidden inside the app via `window.__HYPEX_DESKTOP__`). Aliases: "instellingen", "settings", "thema", "accentkleur".
-- **CalendarConnections** — [components/CalendarConnections.jsx](../src/components/CalendarConnections.jsx) — "Agenda's koppelen" (Google / MyX). Opened from ThemeSettings.
+- **ThemeSettings** — [components/ThemeSettings.jsx](../src/components/ThemeSettings.jsx) — "Instellingen": accent color presets + eigen kleur, "Live preview" mini-UI, "Navigatie" (links/boven + automatisch verbergen, desktop, per device), meldingen, "Types" (TypesManager), external calendars, "Desktop-app" download (Windows browsers only, hidden inside the app via `window.__HYPEX_DESKTOP__`). Aliases: "instellingen", "settings", "thema", "accentkleur".
+- **TypesManager** — [components/TypesManager.jsx](../src/components/TypesManager.jsx) — "Types" in Instellingen: rename, recolour, reorder, add, delete (items move to Overig; Overig can't be deleted). Aliases: "types", "categorieën", "soorten", "kleur per type".
+- **CalendarConnections** — [components/CalendarConnections.jsx](../src/components/CalendarConnections.jsx) — "Agenda's koppelen" (Google / MyX). Opened from ThemeSettings. Per connection a tag button opens
+  [agenda/FeedTypeSettings.jsx](../src/components/agenda/FeedTypeSettings.jsx): standaardtype + titelregels ("titel bevat ___ → type"), stored on `calendar_connections.default_type_id` / `type_rules`.
+  The sync **diffs** instead of delete+insert (`diffEvents`), and logs added/changed/removed items to `external_calendar_changes` (not on a feed's first sync).
   Sync: scheduled Netlify function `calendar-sync` (every 15 min, all users, via `syncAll` in `netlify/functions/calendar/calendar.js`) + `autoSyncCalendars()` in App `doSync` (max every 5 min per device, then `refreshExternalCalendarEvents`). Auto syncs skip a connection synced < 4 min ago; the refresh button forces. Aliases: "agenda koppelen", "calendar connections", "externe agenda's".
 - **AdminPanel** — [components/AdminPanel.jsx](../src/components/AdminPanel.jsx) — "Admin Paneel": user management, push test, `werk_tab` toggle. Aliases: "admin", "admin paneel", "gebruikersbeheer".
 - **OnboardingModal** — [components/OnboardingModal.jsx](../src/components/OnboardingModal.jsx) — first-login flow ("Welkom bij Dash", location, Magister, notifications). Aliases: "onboarding", "welkom scherm", "intro".
@@ -131,6 +139,7 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 
 ### Small / global
 - **VersionChecker** — [components/VersionChecker.jsx](../src/components/VersionChecker.jsx) — shows/refreshes app version. Aliases: "versie", "version".
+- **FeedChangesToast / FeedChangesSheet** — [components/FeedChanges.jsx](../src/components/FeedChanges.jsx) — "Agenda bijgewerkt: MijnX: 2 nieuw · 1 gewijzigd" toast after a sync with unseen `external_calendar_changes`; "Bekijk" opens the list (old → new, "Jouw aanpassing blijft actief"), "Gezien"/× sets `seen_at`, clicking an item jumps to it in the agenda. Rendered by App. Aliases: "feed wijzigingen", "agenda bijgewerkt", "wijzigingen melding".
 - **XPToast** — [components/XPToast.jsx](../src/components/XPToast.jsx) — floating "+XP" toast on task/pomodoro/gym completion. Aliases: "xp toast", "xp popup", "punten melding".
 
 ## Geld sub-app (`src/geld/`, admin only)
@@ -167,6 +176,7 @@ Self-contained money/budget app, mounted via [pages/GeldPage.jsx](../src/pages/G
 - **Shared components** — [components/ui/](../src/components/ui/index.js) (import from `components/ui`):
   - `Card`, `CardHeader`, `CardLink` — [Card.jsx](../src/components/ui/Card.jsx). Aliases: "kaart", "card header", "Bekijk alles-link".
   - `KpiTile` — [KpiTile.jsx](../src/components/ui/KpiTile.jsx). Aliases: "KPI tegel", "stats tile".
+  - `TypeSelect` — [TypeSelect.jsx](../src/components/ui/TypeSelect.jsx) — type dropdown (colour dot + name, "+ Nieuw type"); value = category (built-in key or custom type id). Aliases: "type dropdown", "type kiezen".
   - `ListRow`, `CheckButton` — [ListRow.jsx](../src/components/ui/ListRow.jsx). Aliases: "lijstrij", "taakrij", "afvinkknop".
   - `Pill`, `CountBadge` — [Pill.jsx](../src/components/ui/Pill.jsx). Aliases: "pill", "badge", "datum pill", "teller".
   - `ProgressBar` — [ProgressBar.jsx](../src/components/ui/ProgressBar.jsx). Aliases: "voortgangsbalk".
@@ -174,20 +184,25 @@ Self-contained money/budget app, mounted via [pages/GeldPage.jsx](../src/pages/G
   - `FilterTabs` — [FilterTabs.jsx](../src/components/ui/FilterTabs.jsx) (pills or segmented). Aliases: "filter tabs", "Dag/Week/Maand".
   - `IconButton` — [IconButton.jsx](../src/components/ui/IconButton.jsx) (requires `label`). `EmptyState` — [EmptyState.jsx](../src/components/ui/EmptyState.jsx).
   - `toneColor` / `tint` — [tone.js](../src/components/ui/tone.js): tone name → token color.
-- **Task status** — [utils/taskStatus.js](../src/utils/taskStatus.js): `isOverdue` (excl. routines), `isUrgent`, `daysLate`, `shortDate` — one definition for Dashboard, Sidebar badge, Taken.
+- **Task status** — [utils/taskStatus.js](../src/utils/taskStatus.js): `isOverdue` (excl. routines, uses the last day), `isUrgent`, `daysLate`, `shortDate`, and multi-day helpers `taskOnDay(t, ds)` / `taskLastDate` / `isMultiDay` / `spanLabel` ("ma–vr") — one definition for Dashboard, Sidebar badge, Taken, Agenda. Tasks have an optional `end_date`: shown on every day, one checkbox completes the whole task.
 - **Upcoming items** — [utils/upcoming.js](../src/utils/upcoming.js): `buildUpcoming()` (tasks, lessons, events, PMT shifts) + `countdownLabel()`; used by Dashboard and Hypex AI.
 - **Event names** — [utils/eventTitle.js](../src/utils/eventTitle.js): `eventDisplay(ev)` → readable course name + code for MyX events.
 - **Dates** — use `toISO(d)` / `todayISO()` from [utils/recurrence.js](../src/utils/recurrence.js) (Geld: `toISODate`/`todayStr`/`fmtDay` in `geld/lib/format.ts`) for YYYY-MM-DD keys — **never** `toISOString().slice(0,10)` (UTC → wrong day after midnight).
 - **Greeting** — [utils/greeting.js](../src/utils/greeting.js): `greeting()` (Goedenacht/-morgen/-middag/-avond), used by Dashboard + Hypex AI.
 - **Version check** — [utils/version.js](../src/utils/version.js): `fetchLatestVersion()` (deduped), used by App + VersionChecker.
-- **Category colors** — [utils/category.js](../src/utils/category.js): `taskCategory`, `eventCategory`, `CATEGORIES`
-  (School/Werk/Persoonlijk/Routine/Overig, derived from the item's source).
+- **Types / category colors** — [utils/category.js](../src/utils/category.js): `taskCategory`, `eventCategory`, `categoryColor`, `CATEGORIES`/`CATEGORY_ORDER` (live), `typeIdOf`, `categoryHex`.
+  User types live in Supabase `item_types` (built-ins school/werk/persoonlijk/routine/overig by `key`, custom types by id), loaded by
+  [hooks/useItemTypes.js](../src/hooks/useItemTypes.js) (`loadItemTypes` in App, `useItemTypes()` store) → `setTypes()`; built-in colours also set `--cat-<key>`.
+  Resolution: item `type_id` → (imported: override type → feed title rule → feed default type) → legacy guess from source/colour. The type decides the colour.
+  Schema: [supabase/migrations/add_types_feed_overrides.sql](../supabase/migrations/add_types_feed_overrides.sql) (`item_types`, `tasks.type_id/end_date`, `calendar_events.type_id`, feed overrides, change log).
+- **Imported events** — [utils/externalEvents.js](../src/utils/externalEvents.js): `loadExternalEvents` (applies `external_event_overrides`, converts all-day UTC to local days, attaches `connection`), `saveOverrides`/`resetOverrides`, `loadUnseenChanges`/`markChangesSeen`.
+- **Quick-add** — [utils/quickAdd.js](../src/utils/quickAdd.js): `parseQuickAdd(text)` → `{ title, fields, tokens }` (Dutch dates/days/ranges, times, durations, "hele dag", `#type`, `!urgent`).
 - `src/geld/components/ui/` — [Glass.tsx](../src/geld/components/ui/Glass.tsx) (glass card + `Spinner`),
   [Sheet.tsx](../src/geld/components/ui/Sheet.tsx) (bottom-sheet shell). Geld wrappers, now built on the same tokens.
 
 ## Hooks & utils (non-visual, for reference)
 
-- App hooks: [hooks/useIsDesktop.js](../src/hooks/useIsDesktop.js), [hooks/useViewport.js](../src/hooks/useViewport.js) (`{ w, h, tall, portrait }`, for JS-driven sizes), [hooks/useNavLayout.js](../src/hooks/useNavLayout.js) (nav position/auto-hide), [hooks/useAmbientSound.js](../src/hooks/useAmbientSound.js).
+- App hooks: [hooks/useIsDesktop.js](../src/hooks/useIsDesktop.js), [hooks/useViewport.js](../src/hooks/useViewport.js) (`{ w, h, tall, portrait }`, for JS-driven sizes), [hooks/useNavLayout.js](../src/hooks/useNavLayout.js) (nav position/auto-hide), [hooks/useItemTypes.js](../src/hooks/useItemTypes.js) (types store), [hooks/useAmbientSound.js](../src/hooks/useAmbientSound.js).
 - Utils (`src/utils/`): `magisterApi`, `somtodayApi` (school), `push` (web-push), `xp` (XP/level-up events),
   `recurrence` (recurring tasks), `calendarSync`, `daypart`, `alleVakken`, `openBook`, `openExternal`, `supabaseProfiles`.
 

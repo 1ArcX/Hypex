@@ -1,4 +1,5 @@
 import React from 'react'
+import { taskOnDay } from '../../utils/taskStatus'
 import { CalendarCheck, Plus } from 'lucide-react'
 import { CardHeader, IconButton, CheckButton } from '../ui'
 import { taskCategory, categoryColor } from '../../utils/category'
@@ -9,7 +10,7 @@ import { isDueToday, isDoneToday } from '../../utils/recurrence'
 export default function TodayWidget({ tasks, today, scheduleCount = 0, onToggleTask, onOpenTask, onNewTask, onOpenList }) {
   // Routines tellen mee zoals in Taken → Vandaag (TodayView): due of vandaag al afgevinkt
   const isDone = t => t.recurrence ? isDoneToday(t, today) : t.completed
-  const todays = tasks.filter(t => t.recurrence ? (isDueToday(t, today) || isDoneToday(t, today)) : t.date === today)
+  const todays = tasks.filter(t => t.recurrence ? (isDueToday(t, today) || isDoneToday(t, today)) : taskOnDay(t, today))
   const done = todays.filter(isDone).length
   const total = todays.length
   const open = todays

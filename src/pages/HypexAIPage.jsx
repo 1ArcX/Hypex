@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
+import { taskOnDay, taskLastDate } from '../utils/taskStatus'
 import { supabase } from '../supabaseClient'
 import { isDueToday, isDoneToday, appliesOn, advanceOnComplete, todayISO, toISO } from '../utils/recurrence'
 import DagbriefingStrip from '../components/ai/DagbriefingStrip'
@@ -136,8 +137,8 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
     const today = todayISO()
     const subjName = id => subjects.find(s => s.id === id)?.name
     const oneoff = tasks.filter(t => !t.recurrence && !t.completed)
-    const todayTasks = oneoff.filter(t => t.date === today)
-    const overdue = oneoff.filter(t => t.date && t.date < today)
+    const todayTasks = oneoff.filter(t => taskOnDay(t, today))
+    const overdue = oneoff.filter(t => t.date && taskLastDate(t) < today)
     const unplanned = oneoff.filter(t => !t.date)
     const routines = tasks.filter(t => t.recurrence && (isDueToday(t, today) || isDoneToday(t, today)))
     const fmtTask = t => `${t.title}${(t.start_time || t.time) ? ` om ${t.start_time || t.time}` : ''}${(t.priority ?? 2) === 1 ? ' [urgent]' : ''}${subjName(t.subject_id) ? ` (${subjName(t.subject_id)})` : ''}`
@@ -182,8 +183,8 @@ export default function HypexAIPage({ tasks = [], subjects = [], userId, display
   useEffect(() => {
     const today = todayISO()
     const oneoff = tasks.filter(t => !t.recurrence && !t.completed)
-    const todayCount = oneoff.filter(t => t.date === today).length
-    const overdue = oneoff.filter(t => t.date && t.date < today).length
+    const todayCount = oneoff.filter(t => taskOnDay(t, today)).length
+    const overdue = oneoff.filter(t => t.date && taskLastDate(t) < today).length
     const urgent = oneoff.filter(t => (t.priority ?? 2) === 1)
     const routines = tasks.filter(t => t.recurrence && isDueToday(t, today))
     const routinesTodo = routines.filter(t => !isDoneToday(t, today)).length
