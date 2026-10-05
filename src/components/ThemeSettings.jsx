@@ -5,6 +5,7 @@ import { useNavLayout } from '../hooks/useNavLayout'
 import { useIsDesktop } from '../hooks/useIsDesktop'
 import { pushSupported, requestAndSubscribe } from '../utils/push'
 import CalendarConnections from './CalendarConnections'
+import TypesManager from './TypesManager'
 
 // Download van de Windows-app (desktop/); niet tonen binnen de app zelf.
 const DESKTOP_DOWNLOAD = '/downloads/Hypex-Setup.exe'
@@ -203,6 +204,11 @@ export default function ThemeSettings({ onClose, theme, setTheme, onLogout, user
               <Bell size={14} aria-hidden="true" /> Meldingen staan aan
             </div>
           )}
+        </div>
+
+        <div style={{ marginBottom: 18 }}>
+          <p style={label}>Types <span style={{ fontWeight: 500, color: 'var(--c-text-3)' }}>· kleur per soort item</span></p>
+          <TypesManager />
         </div>
 
         <div style={{ marginBottom: 18 }}>

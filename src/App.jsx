@@ -19,6 +19,7 @@ import { advanceOnComplete, revertOnUncomplete, isDoneToday, todayISO } from './
 import { isOverdue } from './utils/taskStatus'
 import { fetchLatestVersion } from './utils/version'
 import { autoSyncCalendars } from './utils/calendarSync'
+import { loadItemTypes, useItemTypes } from './hooks/useItemTypes'
 import { VAPID_PUBLIC, urlBase64ToUint8Array } from './utils/push'
 import XPToast from './components/XPToast'
 import BottomNav from './components/BottomNav'
@@ -97,6 +98,7 @@ export default function App() {
   const [hasLevelUp, setHasLevelUp] = useState(() => !!localStorage.getItem('levelup_pending'))
   const [hasActiveGymWorkout, setHasActiveGymWorkout] = useState(() => !!localStorage.getItem('gym_active_workout'))
   const [hasActivePomo, setHasActivePomo] = useState(false)
+  useItemTypes() // types veranderd (naam/kleur) → hele app opnieuw renderen met de nieuwe kleuren
 
   // Listen for level-up events dispatched by awardXP utility
   useEffect(() => {
@@ -403,6 +405,7 @@ export default function App() {
   useEffect(() => {
     if (session && user?.id) {
       fetchTasks(); fetchSubjects(); fetchProfiles(); fetchSubjectLinks(); fetchExternalEvents()
+      loadItemTypes(user.id)
       supabase.from('calendar_events').select('*').eq('user_id', user.id).then(({ data }) => {
         if (data) setCalendarEvents(data)
       })
