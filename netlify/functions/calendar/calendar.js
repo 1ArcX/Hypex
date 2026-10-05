@@ -79,17 +79,29 @@ function icsEvents(text) {
     }
     const start = parseIcsDate(data.DTSTART), endValue = data.DTEND || data.DTSTART
     const end = parseIcsDate(endValue)
-    if (!data.UID || Number.isNaN(start.date.valueOf())) return null
+    if (Number.isNaN(start.date.valueOf())) return null
     // DTSTART/DTEND for an all-day ICS item use an exclusive end date.
     const endDate = start.allDay
       ? new Date((data.DTEND ? end.date.getTime() : start.date.getTime() + 86400000) - 60000)
       : (end.date > start.date ? end.date : new Date(start.date.getTime() + 3600000))
-    // Een gewijzigde instantie van een herhalend item deelt de UID; RECURRENCE-ID maakt hem uniek.
-    const externalId = data['RECURRENCE-ID'] ? `${data.UID}@${data['RECURRENCE-ID']}` : data.UID
-    return { external_id: externalId, title: data.SUMMARY || 'Roosteritem', description: data.DESCRIPTION || null, location: data.LOCATION || null, start_time: start.date.toISOString(), end_time: endDate.toISOString(), all_day: start.allDay, color: '#FACC15', raw: data }
+    return { external_id: null, title: data.SUMMARY || 'Roosteritem', description: data.DESCRIPTION || null, location: data.LOCATION || null, start_time: start.date.toISOString(), end_time: endDate.toISOString(), all_day: start.allDay, color: '#FACC15', raw: data }
   }).filter(Boolean)
-  // Dubbele UID's (zou de unique-constraint breken en de hele feed leegmaken): laatste wint.
-  return [...new Map(events.map(e => [e.external_id, e])).values()]
+  // MijnX (HAN) geeft bij elke download nieuwe, willekeurige UID's. Daarom een eigen stabiele sleutel
+  // op basis van de inhoud; twee identieke items krijgen een volgnummer.
+  const seen = new Map()
+  for (const e of events) {
+    const base = fingerprint(e)
+    const n = (seen.get(base) || 0) + 1
+    seen.set(base, n)
+    e.external_id = n === 1 ? base : `${base}#${n}`
+  }
+  return events
+}
+
+/** Stabiele sleutel voor een feed-item zonder betrouwbare UID: titel + begintijd + locatie. */
+function fingerprint(e) {
+  const start = new Date(e.start_time).toISOString()
+  return 'fp:' + crypto.createHash('sha1').update(`${e.title}|${start}|${e.location || ''}`).digest('hex').slice(0, 24)
 }
 
 // ── Wijzigingen bepalen ─────────────────────────────────────────────────────
@@ -101,20 +113,27 @@ const sameEvent = (a, b) => a.title === b.title && time(a.start_time) === time(b
 const snapshot = e => ({ title: e.title, start_time: e.start_time, end_time: e.end_time, all_day: !!e.all_day, location: e.location || null })
 
 /**
- * Vergelijk opgeslagen items met de nieuwe feed. Geeft terug wat er geschreven moet worden en
- * welke wijzigingen gemeld worden. Alleen items die nog niet voorbij zijn tellen mee in de melding.
+ * Vergelijk opgeslagen items met de nieuwe feed. Geeft terug wat er geschreven moet worden, welke
+ * wijzigingen gemeld worden en welke sleutels hernoemd zijn (verschoven items, zodat aanpassingen meegaan).
+ *  - Items van vóór het begin van de feed blijven bewaard (feeds tonen vaak alleen vanaf vandaag).
+ *  - Verdwenen + nieuw item met dezelfde titel (binnen 14 dagen) = verschoven, niet weg + nieuw.
+ *  - Alleen items die nog niet voorbij zijn tellen mee in de melding.
  */
 function diffEvents(existing, incoming, now = Date.now()) {
   const old = new Map(existing.map(e => [e.external_id, e]))
   const fresh = new Map(incoming.map(e => [e.external_id, e]))
-  const upserts = [], removedIds = [], changes = []
+  const upserts = [], removedIds = [], changes = [], renames = []
   const relevant = e => time(e.end_time) >= now - 86400000
+  // Begin van wat de feed nu beslaat; lege feed (storing?) → niets verwijderen.
+  // Afgerond op het begin van die dag (NL-tijd, ruim genomen), en nooit later dan vandaag.
+  const dayStart = ms => { const d = new Date(ms); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - 2 * 3600000 }
+  const windowStart = incoming.length ? Math.min(dayStart(Math.min(...incoming.map(e => time(e.start_time)))), dayStart(now)) : Infinity
+
+  const added = [], removed = []
   for (const [id, e] of fresh) {
     const prev = old.get(id)
-    if (!prev) {
-      upserts.push(e)
-      if (relevant(e)) changes.push({ external_id: id, kind: 'added', title: e.title, before: null, after: snapshot(e) })
-    } else if (!sameEvent(prev, e)) {
+    if (!prev) added.push(e)
+    else if (!sameEvent(prev, e)) {
       upserts.push(e)
       if (relevant(e) || relevant(prev)) changes.push({ external_id: id, kind: 'changed', title: e.title, before: snapshot(prev), after: snapshot(e) })
     } else if ((prev.description || null) !== (e.description || null)) {
@@ -123,12 +142,37 @@ function diffEvents(existing, incoming, now = Date.now()) {
   }
   for (const [id, prev] of old) {
     if (fresh.has(id)) continue
-    removedIds.push(prev.id)
-    if (relevant(prev)) changes.push({ external_id: id, kind: 'removed', title: prev.title, before: snapshot(prev), after: null })
+    if (time(prev.start_time) < windowStart) continue // buiten het bereik van de feed: bewaren
+    removed.push(prev)
   }
-  return { upserts, removedIds, changes }
+
+  // Verschoven items koppelen: zelfde titel, dichtstbijzijnde begintijd binnen 14 dagen.
+  const unpaired = new Set(added)
+  for (const prev of removed) {
+    let best = null, bestDiff = 14 * 86400000
+    for (const e of unpaired) {
+      if (e.title !== prev.title) continue
+      const diff = Math.abs(time(e.start_time) - time(prev.start_time))
+      if (diff <= bestDiff) { best = e; bestDiff = diff }
+    }
+    removedIds.push(prev.id)
+    if (best) {
+      unpaired.delete(best)
+      upserts.push(best)
+      renames.push({ from: prev.external_id, to: best.external_id })
+      if (relevant(best) || relevant(prev)) changes.push({ external_id: best.external_id, kind: 'changed', title: best.title, before: snapshot(prev), after: snapshot(best) })
+    } else if (relevant(prev)) {
+      changes.push({ external_id: prev.external_id, kind: 'removed', title: prev.title, before: snapshot(prev), after: null })
+    }
+  }
+  for (const e of unpaired) {
+    upserts.push(e)
+    if (relevant(e)) changes.push({ external_id: e.external_id, kind: 'added', title: e.title, before: null, after: snapshot(e) })
+  }
+  return { upserts, removedIds, changes, renames }
 }
 exports.diffEvents = diffEvents
+exports.icsEvents = icsEvents
 async function refreshGoogle(credentials) {
   if (credentials.expiry && credentials.expiry > Date.now() + 60_000) return credentials
   const r = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: GOOGLE_CLIENT_ID, client_secret: GOOGLE_CLIENT_SECRET, grant_type: 'refresh_token', refresh_token: credentials.refresh_token }) })
@@ -173,8 +217,27 @@ async function syncConnection(connection, { force = false } = {}) {
     existingRows.push(...(page.data || []))
     if (!page.data || page.data.length < 1000) break
   }
+  // Overgang naar stabiele sleutels (MijnX): oude rijen hebben nog de willekeurige feed-UID.
+  // Reken hun sleutel om, neem aanpassingen mee en meld deze ene sync niets.
+  const legacy = connection.provider === 'myx' && existingRows.some(r => !String(r.external_id).startsWith('fp:'))
+  if (legacy) {
+    for (const r of existingRows) {
+      if (String(r.external_id).startsWith('fp:')) continue
+      const to = fingerprint(r)
+      await supabase.from('external_event_overrides').update({ external_id: to }).eq('connection_id', connection.id).eq('external_id', r.external_id)
+      r.external_id = to
+    }
+    // Dubbele sleutels na omrekenen: oude rijen weg, de feed zet ze zo opnieuw neer.
+    const seen = new Set(), dupes = []
+    for (const r of existingRows) { if (seen.has(r.external_id)) dupes.push(r.id); else seen.add(r.external_id) }
+    if (dupes.length) await supabase.from('external_calendar_events').delete().in('id', dupes)
+    const dupeSet = new Set(dupes)
+    existingRows.splice(0, existingRows.length, ...existingRows.filter(r => !dupeSet.has(r.id)))
+    for (const r of existingRows) await supabase.from('external_calendar_events').update({ external_id: r.external_id }).eq('id', r.id)
+  }
   const existing = { data: existingRows }
-  const { upserts, removedIds, changes } = diffEvents(existingRows, events)
+  const { upserts, removedIds, changes, renames } = diffEvents(existingRows, events)
+  // Nieuwe/gewijzigde rijen schrijven, daarna weggevallen rijen verwijderen en aanpassingen van verschoven items meeverhuizen.
   for (let i = 0; i < upserts.length; i += 500) {
     const chunk = upserts.slice(i, i + 500).map(e => ({ ...e, connection_id: connection.id, updated_at: new Date().toISOString() }))
     const r = await supabase.from('external_calendar_events').upsert(chunk, { onConflict: 'connection_id,external_id' })
@@ -184,8 +247,11 @@ async function syncConnection(connection, { force = false } = {}) {
     const r = await supabase.from('external_calendar_events').delete().in('id', removedIds.slice(i, i + 200))
     if (r.error) throw r.error
   }
-  // Eerste sync van een koppeling: niet alles als "nieuw" melden.
-  if (changes.length && (existing.data || []).length) {
+  for (const { from, to } of renames) {
+    await supabase.from('external_event_overrides').update({ external_id: to }).eq('connection_id', connection.id).eq('external_id', from)
+  }
+  // Eerste sync van een koppeling (of de overgang naar stabiele sleutels): niet alles als "nieuw" melden.
+  if (changes.length && (existing.data || []).length && !legacy) {
     const logged = await supabase.from('external_calendar_changes').insert(changes.map(c => ({ ...c, user_id: connection.user_id, connection_id: connection.id })))
     if (logged.error) console.warn('[calendar] wijzigingslog mislukt:', logged.error.message) // bv. migratie nog niet gedraaid
   }
