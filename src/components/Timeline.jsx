@@ -60,6 +60,13 @@ function stripHtml(html) {
   return html.replace(/<[^>]*>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').replace(/&#(\d+);/g, (_, n) => String.fromCharCode(n)).replace(/\s+/g, ' ').trim()
 }
 function toDateStr(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}` }
+// ISO-weeknummer (week met de eerste donderdag van het jaar = week 1)
+function isoWeek(d) {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+  const day = t.getUTCDay() || 7
+  t.setUTCDate(t.getUTCDate() + 4 - day)
+  return Math.ceil(((t - Date.UTC(t.getUTCFullYear(), 0, 1)) / 86400000 + 1) / 7)
+}
 function isSameDay(a, b) {
   return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate()
 }
@@ -997,13 +1004,30 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
             <IconButton icon={ChevronLeft} label="Vorige maand" size={24} iconSize={13} onClick={() => shiftMonth(-1)} />
             <IconButton icon={ChevronRight} label="Volgende maand" size={24} iconSize={13} onClick={() => shiftMonth(1)} />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 2, textAlign: 'center' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '18px repeat(7, minmax(0, 1fr))', gap: 2, textAlign: 'center' }}>
+            <span className="t-meta" style={{ fontSize: 9, opacity: 0.7 }} title="Weeknummer">wk</span>
             {['M','D','W','D','V','Z','Z'].map((d, i) => <span key={i} className="t-meta" style={{ fontSize: 10 }}>{d}</span>)}
-            {cells.map((d, i) => {
-              if (!d) return <span key={i} />
+            {cells.flatMap((d, i) => {
+              const out = []
+              // Weeknummer vóór elke rij; klik = naar die week
+              if (i % 7 === 0) {
+                const rowDay = cells.slice(i, i + 7).find(Boolean)
+                const monday = new Date(rowDay); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7))
+                const wk = isoWeek(monday)
+                const thisWeek = isoWeek(now) === wk && Math.abs(monday - now) < 7 * 86400000
+                out.push(
+                  <button key={`wk-${i}`} type="button" onClick={() => { setCurrent(monday); onDateChange?.(monday) }}
+                    aria-label={`Week ${wk}`} title={`Week ${wk}`} className="tnum"
+                    style={{ height: 24, border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: 9, fontWeight: thisWeek ? 700 : 500,
+                      color: thisWeek ? 'var(--accent)' : 'var(--c-text-3)', opacity: thisWeek ? 1 : 0.75 }}>
+                    {wk}
+                  </button>
+                )
+              }
+              if (!d) { out.push(<span key={i} />); return out }
               const today = isSameDay(d, now)
               const sel = inView(d)
-              return (
+              out.push(
                 <button key={i} type="button" onClick={() => { setCurrent(d); onDateChange?.(d) }}
                   aria-label={`${d.getDate()} ${MONTHS_FULL[d.getMonth()]}`} aria-current={today ? 'date' : undefined}
                   className="tnum"
@@ -1016,6 +1040,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                   {d.getDate()}
                 </button>
               )
+              return out
             })}
           </div>
         </div>
