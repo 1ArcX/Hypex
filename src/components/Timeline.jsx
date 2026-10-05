@@ -7,7 +7,7 @@ import { appliesOn } from '../utils/recurrence'
 import { taskCategory, eventCategory, categoryColor, CATEGORIES, CATEGORY_ORDER } from '../utils/category'
 import { eventDisplay } from '../utils/eventTitle'
 import { loadExternalEvents } from '../utils/externalEvents'
-import { taskOnDay } from '../utils/taskStatus'
+import { taskOnDay, isMultiDay } from '../utils/taskStatus'
 import ExternalEventModal from './agenda/ExternalEventModal'
 import ItemModal from './ItemModal'
 import { FilterTabs, IconButton } from './ui'
@@ -533,8 +533,40 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
 
           {/* All-day events strip — sticky inside scrollRef so it works regardless of outer layout */}
           {(() => {
+            // Meerdaagse items (taak met einddatum, eigen hele-dag-item over meerdere dagen) als één
+            // doorlopende balk bovenin; de rest per dag eronder.
+            const dayStrs = days.map(toDateStr)
+            const first = dayStrs[0], last = dayStrs[dayStrs.length - 1]
+            const spanEvent = ev => !ev.recurrence && isAllDayEvent(ev) && toDateStr(new Date(ev.start_time)) !== toDateStr(new Date(ev.end_time))
+            const spanTask = t => isMultiDay(t) && !t.start_time && !t.time
+            const draftSpans = draft?.allDay && !isSameDay(draft.start, draft.end)
+            const spans = [
+              ...(draftSpans ? [{ key: 'draft', kind: 'draft', from: toDateStr(draft.start), to: toDateStr(draft.end), color: draft.color, title: draft.title }] : []),
+              ...events.filter(ev => !ev.description?.startsWith('pmt:') && (showHidden || !ev.hidden) && spanEvent(ev)).map(ev => ({
+                key: ev.id, kind: 'event', from: toDateStr(new Date(ev.start_time)), to: toDateStr(new Date(ev.end_time)),
+                color: categoryColor(eventCategory(ev)), title: `${ev.hidden ? '🙈 ' : ''}${eventDisplay(ev).title}${ev.edited ? ' ✎' : ''}`, onClick: e => openEditEvent(ev, e),
+              })),
+              ...(tasks || []).filter(t => spanTask(t) && !t.completed).map(t => ({
+                key: `task-span-${t.id}`, kind: 'task', from: t.date, to: t.end_date,
+                color: categoryColor(taskCategory(t)), title: t.title, onClick: e => { e.stopPropagation(); onViewDetail ? onViewDetail(t) : onEditTask?.(t) },
+              })),
+            ].filter(sp => sp.from <= last && sp.to >= first).map(sp => ({
+              ...sp,
+              s: Math.max(0, dayStrs.findIndex(d => d >= sp.from)),
+              e: (() => { let i = dayStrs.length - 1; while (i > 0 && dayStrs[i] > sp.to) i--; return i })(),
+              cutLeft: sp.from < first, cutRight: sp.to > last,
+            })).sort((a, b) => a.s - b.s || (b.e - b.s) - (a.e - a.s))
+            // Banen: elke balk in de eerste baan waar hij niet overlapt
+            const laneEnds = []
+            for (const sp of spans) {
+              let lane = laneEnds.findIndex(end => end < sp.s)
+              if (lane === -1) { lane = laneEnds.length; laneEnds.push(sp.e) } else laneEnds[lane] = sp.e
+              sp.lane = lane
+            }
+            const lanes = laneEnds.length
+
             const allDayByDay = days.map(d => {
-              const allDayEvs = getEventsForDay(d).filter(isAllDayEvent).map(ev => ({ kind: 'event', key: ev.id, color: categoryColor(eventCategory(ev)), title: `${ev.hidden ? '🙈 ' : ''}${eventDisplay(ev).title}`, edited: ev.edited, onClick: e => openEditEvent(ev, e) }))
+              const allDayEvs = getEventsForDay(d).filter(ev => isAllDayEvent(ev) && !spanEvent(ev)).map(ev => ({ kind: 'event', key: ev.id, color: categoryColor(eventCategory(ev)), title: `${ev.hidden ? '🙈 ' : ''}${eventDisplay(ev).title}`, edited: ev.edited, onClick: e => openEditEvent(ev, e) }))
               const allDayLes = getMagisterLessonsForDay(d).filter(les => {
                 const s = new Date(les.start)
                 return s.getHours() === 0 && s.getMinutes() === 0
@@ -547,7 +579,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
               })
               // Taken zonder tijd (hele dag / dagdeel) + routines op deze dag
               const allDayTasks = getTasksForDay(d)
-                .filter(t => !t.start_time && !t.time)
+                .filter(t => !t.start_time && !t.time && !spanTask(t))
                 .filter(t => t.recurrence || !t.completed)
                 .map(t => {
                   const color = categoryColor(taskCategory(t))
@@ -557,18 +589,30 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                     onClick: e => { e.stopPropagation(); onViewDetail ? onViewDetail(t) : onEditTask?.(t) },
                   }
                 })
-              const draftItem = draft?.allDay && draftOnDay(d)
+              const draftItem = draft?.allDay && !draftSpans && draftOnDay(d)
                 ? [{ kind: 'draft', key: 'draft', color: draft.color, title: draft.title, onClick: undefined }] : []
               return [...draftItem, ...allDayEvs, ...allDayLes, ...allDayTasks]
             })
-            if (allDayByDay.every(arr => arr.length === 0)) return null
+            if (!spans.length && allDayByDay.every(arr => arr.length === 0)) return null
             return (
-              <div style={{ display: 'grid', gridTemplateColumns: `${TIME_COL}px repeat(${N}, minmax(0, 1fr))`, borderBottom: '1px solid var(--c-border)', padding: '4px 0', position: 'sticky', top: 0, zIndex: 15, background: 'var(--c-surface-solid)', maxHeight: 92, overflowY: 'auto' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: `${TIME_COL}px repeat(${N}, minmax(0, 1fr))`, rowGap: 2, borderBottom: '1px solid var(--c-border)', padding: '4px 0', position: 'sticky', top: 0, zIndex: 15, background: 'var(--c-surface-solid)', maxHeight: 92, overflowY: 'auto' }}>
+                <div style={{ gridColumn: 1, gridRow: `1 / span ${lanes + 1}`, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 8 }}>
                   <span style={{ fontSize: 9, color: 'var(--c-text-3)', letterSpacing: '0.06em', textTransform: 'uppercase', userSelect: 'none' }}>dag</span>
                 </div>
+                {spans.map(sp => (
+                  <div key={sp.key} onClick={sp.onClick} title={sp.title}
+                    style={{ gridColumn: `${sp.s + 2} / ${sp.e + 3}`, gridRow: sp.lane + 1, margin: '0 2px', minWidth: 0,
+                      fontSize: 10, fontWeight: 600, padding: '2px 6px', cursor: sp.onClick ? 'pointer' : 'default',
+                      borderRadius: `${sp.cutLeft ? 0 : 4}px ${sp.cutRight ? 0 : 4}px ${sp.cutRight ? 0 : 4}px ${sp.cutLeft ? 0 : 4}px`,
+                      background: `color-mix(in srgb, ${sp.color} 16%, var(--c-surface-solid))`,
+                      borderLeft: sp.cutLeft ? 'none' : `3px solid ${sp.color}`, color: `color-mix(in srgb, ${sp.color} 60%, white)`,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      ...(sp.kind === 'draft' ? { outline: `1px dashed ${sp.color}`, outlineOffset: -1 } : {}) }}>
+                    {sp.cutLeft ? '‹ ' : ''}{sp.title}{sp.cutRight ? ' ›' : ''}
+                  </div>
+                ))}
                 {allDayByDay.map((items, di) => (
-                  <div key={di} style={{ padding: '0 2px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <div key={di} style={{ gridColumn: di + 2, gridRow: lanes + 1, padding: '0 2px', display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
                     {items.map(item => (
                       <div key={item.key} onClick={item.onClick}
                         style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, cursor: item.onClick ? 'pointer' : 'default', background: `color-mix(in srgb, ${item.color} 16%, var(--c-surface-solid))`, borderLeft: `3px solid ${item.color}`, color: `color-mix(in srgb, ${item.color} 60%, white)`, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
