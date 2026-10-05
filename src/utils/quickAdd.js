@@ -34,13 +34,16 @@ const fromMinutes = (n) => `${pad(Math.min(23, Math.floor(n / 60)))}:${pad(n >= 
  * @param {string} text
  * @param {{ now?: Date, types?: { cat: string, label: string }[] }} opts
  */
-export function parseQuickAdd(text, { now = new Date(), types = [] } = {}) {
+export function parseQuickAdd(text, { now = new Date(), types = [], ignore = [] } = {}) {
+  // `ignore`: stukjes tekst die niet herkend mogen worden (bij bewerken: wat al in de titel stond)
+  const skip = new Set(ignore.map(t => t.toLowerCase()))
   let rest = ` ${text} `
   const fields = {}
   const tokens = []
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const take = (re, fn) => {
     rest = rest.replace(re, (...m) => {
+      if (skip.has(m[0].trim().toLowerCase())) return m[0]
       const res = fn(...m)
       if (res === false) return m[0]
       tokens.push({ ...res, text: m[0].trim() })
@@ -81,6 +84,31 @@ export function parseQuickAdd(text, { now = new Date(), types = [] } = {}) {
     fields.endDate = iso(nextDow(start, dayIndex(b)))
     return { key: 'endDate', label: `t/m ${b}` }
   })
+
+  // ── Datumbereik: "19 okt tot 25 okt", "19 t/m 25 okt", "19-25 okt", "19/10 - 25/10", "van 19-10 t/m 25-10" ──
+  const RANGE_SEP = '\\s*(?:-|–|t/m|tm|tot en met|tot)\\s*'
+  const dateRange = (d1, m1, y1, d2, m2, y2) => {
+    let start = new Date(y1 ?? today.getFullYear(), m1, d1)
+    if (y1 == null && start < today && addDays(start, 1) <= today) start = new Date(today.getFullYear() + 1, m1, d1)
+    let end = new Date(y2 ?? start.getFullYear(), m2, d2)
+    if (end < start) end = new Date(end.getFullYear() + 1, m2, d2)
+    if (start.getDate() !== d1 || end.getDate() !== d2 || end <= start) return false
+    fields.date = iso(start); fields.endDate = iso(end)
+    const f = d => `${d.getDate()} ${MONTHS[d.getMonth()].split('|')[0]}`
+    return { key: 'date', label: `${f(start)} – ${f(end)}` }
+  }
+  take(new RegExp(`${B}(?:van\\s+)?(\\d{1,2})(?:\\s+(${MONTH_RE}))?${RANGE_SEP}(\\d{1,2})\\s+(${MONTH_RE})(?:\\s+(\\d{4}))?${E}`, 'gi'),
+    (_, d1, m1, d2, m2, y) => {
+      if (fields.date) return false
+      const mi2 = monthIndex(m2), mi1 = m1 ? monthIndex(m1) : mi2
+      return dateRange(+d1, mi1, y && m1 ? +y : null, +d2, mi2, y ? +y : null)
+    })
+  take(new RegExp(`${B}(?:van\\s+)?(\\d{1,2})[-/](\\d{1,2})${RANGE_SEP}(\\d{1,2})[-/](\\d{1,2})(?:[-/](\\d{2,4}))?${E}`, 'gi'),
+    (_, d1, m1, d2, m2, y) => {
+      if (fields.date || +m1 > 12 || +m2 > 12 || !+m1 || !+m2) return false
+      const year = y ? (+y < 100 ? 2000 + +y : +y) : null
+      return dateRange(+d1, +m1 - 1, null, +d2, +m2 - 1, year)
+    })
 
   // ── Losse dag ──
   take(new RegExp(`${B}(vandaag|morgen|overmorgen)${E}`, 'gi'), (_, w) => {

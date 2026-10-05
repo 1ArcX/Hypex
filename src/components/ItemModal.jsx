@@ -116,6 +116,13 @@ export default function ItemModal({
   const [closing, setClosing] = useState(false)
   const [duplicated, setDuplicated] = useState(false)
   const lastParse = useRef({})
+  // Startwaarden: daar gaan velden naar terug als je een herkend stukje weer weghaalt.
+  const base = useRef(f)
+  // Bij bewerken: wat al in de titel stond (bv. "Tentamen 19 okt") niet als datum lezen,
+  // alleen wat je nieuw typt.
+  const ignore = useRef(task || event
+    ? parseQuickAdd(f.title, { types: CATEGORY_ORDER.map(cat => ({ cat, label: CATEGORIES[cat].label })) }).tokens.map(t => t.text)
+    : [])
   const mouseDownOnOverlay = useRef(false)
   const titleRef = useRef(null)
   const isNew = !editing
@@ -132,23 +139,24 @@ export default function ItemModal({
 
   useEffect(() => { titleRef.current?.focus() }, [])
 
-  // ── Quick-add: alleen bij nieuwe items. Velden volgen de invoer; wat je daarna zelf
+  // ── Quick-add (nieuw én bewerken). Velden volgen de invoer; wat je daarna zelf
   // aanpast blijft staan zolang dat stukje in de invoer niet verandert.
   const types = useMemo(() => CATEGORY_ORDER.map(cat => ({ cat, label: CATEGORIES[cat].label })), [CATEGORIES])
-  const parsed = useMemo(() => isNew ? parseQuickAdd(rawTitle, { types }) : null, [rawTitle, isNew, types])
+  const parsed = useMemo(() => parseQuickAdd(rawTitle, { types, ignore: ignore.current }), [rawTitle, types])
   const onTitleChange = (value) => {
     setRawTitle(value)
-    if (!isNew) { set({ title: value }); return }
-    const p = parseQuickAdd(value, { types })
+    const p = parseQuickAdd(value, { types, ignore: ignore.current })
     const patch = { title: p.title }
     for (const [k, v] of Object.entries(p.fields)) if (lastParse.current[k] !== v) patch[k] = v
-    // Weggehaalde stukjes: terug naar de standaard (alleen wat eerder uit de invoer kwam)
-    const was = lastParse.current, now = p.fields
-    if (was.endDate && !now.endDate) patch.endDate = ''
-    if (was.date && !now.date) { patch.date = defaults?.date || toISO(new Date()); patch.endDate = '' }
-    if ((was.startTime && !now.startTime && !now.allDay) || (was.allDay && !now.allDay && !now.startTime)) patch.allDay = !defaults?.startTime
-    if (was.cat && !now.cat) { patch.cat = defaults?.cat || 'persoonlijk'; patch.catTouched = false }
-    if (was.priority && !now.priority) patch.priority = 2
+    // Weggehaalde stukjes: terug naar de startwaarde (alleen wat eerder uit de invoer kwam)
+    const was = lastParse.current, now = p.fields, b = base.current
+    if (was.endDate && !now.endDate) patch.endDate = now.date ? '' : b.endDate
+    if (was.date && !now.date) { patch.date = b.date; patch.endDate = b.endDate; patch.noDate = b.noDate }
+    if ((was.startTime && !now.startTime && !now.allDay) || (was.allDay && !now.allDay && !now.startTime)) {
+      patch.allDay = b.allDay; patch.startTime = b.startTime; patch.endTime = b.endTime
+    }
+    if (was.cat && !now.cat) { patch.cat = b.cat; patch.catTouched = false }
+    if (was.priority && !now.priority) patch.priority = b.priority
     if (now.cat && 'cat' in patch) patch.catTouched = true
     if (patch.date) patch.noDate = false
     lastParse.current = p.fields
@@ -305,7 +313,7 @@ export default function ItemModal({
           <div>
             <input ref={titleRef} className="glass-input" value={rawTitle} onChange={e => onTitleChange(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) { e.preventDefault(); save() } }}
-              placeholder={isNew ? (isTask ? 'Bv. morgen 14:00-15:30 wiskunde #school !urgent' : 'Bv. vrijdag 19u etentje #persoonlijk') : 'Titel *'}
+              placeholder={isNew ? (isTask ? 'Bv. 19 t/m 25 okt stage #werk of morgen 14:00 wiskunde !urgent' : 'Bv. vrijdag 19u etentje #persoonlijk') : 'Titel — typ bv. "morgen 14:00" om te verplaatsen'}
               aria-label="Titel" style={{ fontSize: 16, width: '100%' }} />
             {parsed?.tokens.length > 0 && (
               <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 7, alignItems: 'center' }}>
