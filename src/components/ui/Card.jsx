@@ -6,12 +6,13 @@ import { toneColor, tint } from './tone'
  * - urgent:      rode tint + subtiele statische gloed
  * - interactive: hover-verhoging (gebruik samen met onClick)
  * - pad:         padding in px (default 16)
+ * - glow:        Spotify-achtige gekleurde, wazige achtergrond in deze kleur (tone-naam of CSS-kleur)
  */
-export function Card({ as: Tag = 'div', tone, urgent, interactive, pad = 16, className = '', style, children, ...rest }) {
-  const cls = ['card', urgent && 'card-urgent', tone && !urgent && 'card-tone', interactive && 'card-interactive', className]
+export function Card({ as: Tag = 'div', tone, urgent, interactive, glow, pad = 16, className = '', style, children, ...rest }) {
+  const cls = ['card', urgent && 'card-urgent', tone && !urgent && 'card-tone', interactive && 'card-interactive', glow && 'glow-card', className]
     .filter(Boolean).join(' ')
   return (
-    <Tag className={cls} style={{ padding: pad, ...(tone ? { '--tone': toneColor(tone) } : null), ...style }} {...rest}>
+    <Tag className={cls} style={{ padding: pad, ...(tone ? { '--tone': toneColor(tone) } : null), ...(glow ? { '--glow': toneColor(glow) } : null), ...style }} {...rest}>
       {children}
     </Tag>
   )

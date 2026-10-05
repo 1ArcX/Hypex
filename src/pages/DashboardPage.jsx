@@ -1,22 +1,22 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import {
-  Search, Flame, Clock3, CheckCircle2, CalendarDays, AlertTriangle, CalendarClock,
-  ChevronLeft, ChevronRight, ArrowRight, MapPin, Plus, CloudRain, ListTodo, Inbox, X,
+  Search, Flame, Clock3, CheckCircle2, CalendarDays,
+  ArrowRight, Plus, CloudRain, Inbox, X,
 } from 'lucide-react'
 import Clock from '../components/Clock'
 import WeatherWidget from '../components/WeatherWidget'
 import SpotifyWidget from '../components/SpotifyWidget'
 import GeldMiniWidget from '../components/dashboard/GeldMiniWidget'
 import PomodoroMiniWidget from '../components/dashboard/PomodoroMiniWidget'
-import TodayWidget from '../components/dashboard/TodayWidget'
-import { Card, CardHeader, CardLink, KpiTile, ListRow, CheckButton, Pill, IconButton, FilterTabs, EmptyState } from '../components/ui'
-import { taskCategory, eventCategory, categoryColor } from '../utils/category'
-import { isOverdue, isUrgent, daysLate, shortDate, taskOnDay } from '../utils/taskStatus'
-import { eventDisplay } from '../utils/eventTitle'
-import { buildUpcoming, countdownLabel } from '../utils/upcoming'
+import PomodoroBanner, { usePomodoroState } from '../components/dashboard/PomodoroBanner'
+import TodayFocusCard from '../components/dashboard/TodayFocusCard'
+import { useTodayItems, useNextEvent, useCurrentItem, useMinuteTick } from '../components/dashboard/useToday'
+import { Card, CardHeader, CardLink, ListRow, Pill, IconButton } from '../components/ui'
+import { taskCategory, categoryColor } from '../utils/category'
+import { isOverdue, isUrgent, shortDate } from '../utils/taskStatus'
+import { buildUpcoming } from '../utils/upcoming'
 import { useIsDesktop } from '../hooks/useIsDesktop'
 import { useViewport } from '../hooks/useViewport'
-import { toISO, isDueToday, isDoneToday } from '../utils/recurrence'
 import { greeting } from '../utils/greeting'
 
 
@@ -34,141 +34,9 @@ function longDate(d = new Date()) {
 
 const hhmm = d => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
 
-// ── Vandaag-strip: haal alle geplande items van vandaag op ─────────────────────
-function useTodayItems(tasks, magisterLessons, calendarEvents) {
-  return useMemo(() => {
-    const today = todayDateStr()
-    const items = []
-
-    // Magister lessen
-    const now = new Date()
-    const weekStart = (() => { const d = new Date(now); const day = d.getDay(); d.setDate(d.getDate() - (day === 0 ? 6 : day - 1)); d.setHours(0,0,0,0); return d })()
-    const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6)
-    const cacheKey = `magister_sched_${toISO(weekStart)}_${toISO(weekEnd)}`
-    const lessons = (() => { try { return JSON.parse(sessionStorage.getItem(cacheKey)) || [] } catch { return [] } })()
-    const allLessons = lessons.length ? lessons : (magisterLessons || [])
-    for (const l of allLessons) {
-      if (!l.start || l.uitgevallen) continue
-      if (toISO(new Date(l.start)) !== today) continue
-      const s = new Date(l.start)
-      const e = l.einde ? new Date(l.einde) : null
-      items.push({
-        sortMins: s.getHours()*60 + s.getMinutes(),
-        time: hhmm(s),
-        label: l.vak || 'Les',
-        color: categoryColor('school'),
-        type: 'lesson',
-        end: e ? hhmm(e) : null,
-        highlightKey: `lesson:${l.start}`,
-      })
-    }
-
-    // Taken met tijd
-    for (const t of tasks) {
-      if (t.date !== today || t.completed) continue
-      const ts = t.start_time || t.time
-      if (!ts) continue
-      const [h, m] = ts.split(':').map(Number)
-      items.push({
-        sortMins: h*60 + m,
-        time: ts.slice(0,5),
-        label: t.title,
-        color: categoryColor(taskCategory(t)),
-        type: 'task',
-        raw: t,
-        end: t.end_time?.slice(0,5) || null,
-      })
-    }
-
-    // Agenda-items (eigen + geïmporteerd), niet hele-dag
-    for (const ev of calendarEvents || []) {
-      if (!ev.start_time || ev.all_day) continue
-      const s = new Date(ev.start_time)
-      const d = `${s.getFullYear()}-${pad2(s.getMonth()+1)}-${pad2(s.getDate())}`
-      if (d !== today) continue
-      const e = ev.end_time ? new Date(ev.end_time) : null
-      items.push({
-        sortMins: s.getHours()*60 + s.getMinutes(),
-        time: hhmm(s),
-        label: eventDisplay(ev).title,
-        color: categoryColor(eventCategory(ev)),
-        type: 'event',
-        end: e ? hhmm(e) : null,
-        highlightKey: `event:${ev.id}`,
-      })
-    }
-
-    // Werkdiensten
-    try {
-      const shifts = JSON.parse(localStorage.getItem('pmt_work_shifts')) || []
-      for (const s of shifts) {
-        if (s.date?.slice(0,10) !== today) continue
-        if (!s.start_time) continue
-        const [h, m] = s.start_time.split(':').map(Number)
-        items.push({
-          sortMins: h*60 + m,
-          time: s.start_time.slice(0,5),
-          label: 'Werk',
-          color: categoryColor('werk'),
-          type: 'work',
-          end: s.end_time?.slice(0,5) || null,
-          highlightKey: `work:${today}:${s.start_time}`,
-        })
-      }
-    } catch {}
-
-    return items.sort((a, b) => a.sortMins - b.sortMins)
-  }, [tasks, magisterLessons, calendarEvents])
-}
-
-// ── Next event hook (bronnen: utils/upcoming.js) ─────────────────────────────
-function useNextEvent({ tasks, calendarEvents, magisterLessons, skip, typeFilter }) {
-  return useMemo(() => {
-    let items = buildUpcoming({ tasks, calendarEvents, magisterLessons })
-    if (typeFilter && typeFilter !== 'alle') {
-      const typeMap = { school: 'lesson', event: 'event', werk: 'work', taak: 'task' }
-      items = items.filter(i => i.type === (typeMap[typeFilter] || typeFilter))
-    }
-    const idx = Math.min(skip, items.length - 1)
-    const next = items[Math.max(0, idx)] || null
-    if (!next) return { item: null, hasMore: false }
-    return { item: next, hasMore: idx < items.length - 1 }
-  }, [tasks, calendarEvents, magisterLessons, skip, typeFilter])
-}
-
-// ── Nu bezig: loopt er op dit moment iets (les, taak met tijd, dienst)? ─────────
-function useCurrentItem(todayItems) {
-  return useMemo(() => {
-    const now = new Date()
-    const nowMins = now.getHours() * 60 + now.getMinutes()
-    const current = todayItems.find(item => {
-      if (!item.end) return false
-      const [eh, em] = item.end.split(':').map(Number)
-      return item.sortMins <= nowMins && (eh * 60 + em) >= nowMins
-    })
-    if (!current) return null
-    const [eh, em] = current.end.split(':').map(Number)
-    return { ...current, minsLeft: Math.max(1, (eh * 60 + em) - nowMins) }
-  }, [todayItems])
-}
-
-// Minuutticker zodat countdowns ("Over 14 min") actueel blijven
-function useMinuteTick() {
-  const [, setT] = useState(0)
-  useEffect(() => {
-    const iv = setInterval(() => setT(t => t + 1), 30000)
-    return () => clearInterval(iv)
-  }, [])
-}
-
-const NEXT_FILTERS = [
-  { value: 'alle',  label: 'Alle' },
-  { value: 'event', label: 'Agenda' },
-  { value: 'werk',  label: 'Werk' },
-  { value: 'taak',  label: 'Taken' },
-]
-
 // ── Main ─────────────────────────────────────────────────────────────────────
+// Volgorde: Pomodoro-banner (als die loopt) → kop met KPI-chips → Vandaag + Volgende (focus) →
+// widgets → deadlines/ongepland/regen → (hoog scherm) Komende dagen.
 export default function DashboardPage({
   isBreak, tasks, subjects, calendarEvents, magisterLessons,
   displayName, homeRain, onNavigate, onNavigateToTasks,
@@ -180,13 +48,17 @@ export default function DashboardPage({
   const vp = useViewport()
   // Hoog scherm (bv. verticale monitor): Spotify groot in een eigen rij, langere lijsten
   const tall = isDesktop && vp.h >= 1100
-  const lim = tall ? { attention: 8, schedule: 10, deadlines: 6, unplanned: 8 } : { attention: 4, schedule: 5, deadlines: 4, unplanned: 4 }
+  const lim = tall
+    ? { attention: 6, schedule: 10, tasks: 6, deadlines: 6, unplanned: 8 }
+    : { attention: 4, schedule: 6, tasks: 4, deadlines: 4, unplanned: 4 }
   const [skip, setSkip] = useState(0)
   const [nextEventFilter, setNextEventFilter] = useState(() => localStorage.getItem('nextEventFilter') || 'alle')
   const setFilter = (f) => { setNextEventFilter(f); setSkip(0); localStorage.setItem('nextEventFilter', f) }
   const { item: ev, hasMore } = useNextEvent({ tasks, calendarEvents, magisterLessons, skip, typeFilter: nextEventFilter })
   const todayItems = useTodayItems(tasks, magisterLessons, calendarEvents)
   const current = useCurrentItem(todayItems)
+  const pomo = usePomodoroState()
+  const pomoActive = pomo.running || pomo.paused
 
   const today = todayDateStr()
   const subjectName = id => subjects?.find(s => s.id === id)?.name
@@ -207,13 +79,10 @@ export default function DashboardPage({
   const overdueTasks = tasks.filter(t => isOverdue(t, today)).sort((a, b) => a.date.localeCompare(b.date))
   const urgentTasks  = tasks.filter(isUrgent)
   const openCount    = tasks.filter(t => !t.completed).length
-  const todayOpen    = tasks.filter(t => t.recurrence ? (isDueToday(t, today) && !isDoneToday(t, today)) : (!t.completed && taskOnDay(t, today))).length
 
-  // Werkruimte: eerst te laat, daarna urgent (zonder dubbelingen)
+  // "Eerst dit": eerst te laat, daarna urgent (zonder dubbelingen)
   const overdueIds = new Set(overdueTasks.map(t => t.id))
   const attention = [...overdueTasks, ...urgentTasks.filter(t => !overdueIds.has(t.id))]
-  const attentionTitle = overdueTasks.length && attention.length > overdueTasks.length ? 'Te laat & urgent'
-    : overdueTasks.length ? 'Te laat' : 'Urgent'
 
   // Naderende deadlines (vandaag t/m +3 dagen)
   const in3 = new Date(); in3.setDate(in3.getDate() + 3)
@@ -229,7 +98,7 @@ export default function DashboardPage({
     if (!tall) return []
     const start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() + 1)
     const days = Array.from({ length: 6 }, (_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return { date: d, items: [] } })
-    for (const it of buildUpcoming({ tasks, calendarEvents, magisterLessons })) {
+    for (const it of buildUpcoming({ tasks, calendarEvents: (calendarEvents || []).filter(e => !e.hidden), magisterLessons })) {
       const idx = Math.floor((new Date(it.ts).setHours(0, 0, 0, 0) - start) / 86400000)
       if (idx >= 0 && idx < 6) days[idx].items.push(it)
     }
@@ -237,19 +106,43 @@ export default function DashboardPage({
   }, [tall, tasks, calendarEvents, magisterLessons])
 
   const showRain = homeRain && !rainHidden && Math.max(...homeRain.map(d => d.precip)) > 0.1
-  const widgetCount = (isAdmin ? 3 : 2) + (isDesktop && !tall ? 1 : 0)
+  const widgetCount = (pomoActive ? 0 : 1) + (isAdmin ? 1 : 0) + (isDesktop && !tall ? 1 : 0)
+
+  const openItem = (item) => {
+    if (!item) return onNavigateToAgenda?.(new Date())
+    if (item.type === 'task' && item.raw) setDetailTask(item.raw)
+    else onNavigateToAgenda?.(item.ts || new Date(), item.highlightKey)
+  }
+
+  const chip = (icon, n, label, tone, filter) => {
+    const Icon = icon
+    return (
+      <button type="button" className={`dash-chip${n > 0 && tone ? ` is-${tone}` : ''}`} onClick={() => onNavigateToTasks?.(filter)}
+        aria-label={`${n} ${label} — naar taken`}>
+        <Icon size={12} aria-hidden="true" /> <span className="tnum">{n}</span> {label}
+      </button>
+    )
+  }
 
   return (
     <div className="dash-scroll">
       <div className={`dash${tall ? ' is-tall' : ''}`}>
 
-        {/* ── RIJ 1: header — begroeting, zoeken, tijd, weer ── */}
+        {/* ── Pomodoro loopt: valt meteen op ── */}
+        {pomoActive && <PomodoroBanner st={pomo} onOpen={() => onNavigate('pomodoro')} />}
+
+        {/* ── Kop: begroeting + KPI-chips, zoeken, tijd, weer ── */}
         <header className="dash-header">
           <div style={{ minWidth: 0 }}>
             <h1 className="t-page" style={{ margin: 0, fontSize: 18, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {greeting()}{displayName ? `, ${displayName}` : ''}
             </h1>
             <p className="t-meta" style={{ margin: '2px 0 0', fontSize: 12 }}>{longDate()}</p>
+            <div className="dash-chips" aria-label="Overzicht taken">
+              {chip(Flame, urgentTasks.length, 'urgent', 'danger', 'urgent')}
+              {chip(Clock3, overdueTasks.length, 'te laat', 'warning', 'telaat')}
+              {chip(CheckCircle2, openCount, 'open', null, 'overzicht')}
+            </div>
           </div>
           <button type="button" onClick={onOpenSearch} className="dash-search" aria-label="Zoek in Hypex (Ctrl K)">
             <Search size={14} aria-hidden="true" />
@@ -262,164 +155,37 @@ export default function DashboardPage({
           </div>
         </header>
 
-        {/* ── RIJ 2: KPI's ── */}
-        <section className="dash-kpis" aria-label="Overzicht taken">
-          <KpiTile icon={Flame} value={urgentTasks.length} label="Urgent" tone="danger" onClick={() => onNavigateToTasks?.('urgent')} />
-          <KpiTile icon={Clock3} value={overdueTasks.length} label="Te laat" tone="warning" onClick={() => onNavigateToTasks?.('telaat')} />
-          <KpiTile icon={CheckCircle2} value={openCount} label="Open" tone="success" onClick={() => onNavigateToTasks?.('open')} />
-          <KpiTile icon={CalendarDays} value={todayOpen} label="Taken vandaag" tone="persoonlijk" onClick={() => onNavigateToTasks?.('vandaag')} />
-        </section>
-
-        {/* ── RIJ 3: werkruimte — aandacht nodig + volgende afspraak ── */}
-        <section className="dash-work">
-          <Card urgent={overdueTasks.length > 0} tone={!overdueTasks.length && attention.length ? 'danger' : undefined} style={{ minWidth: 0 }}>
-            {attention.length > 0 ? (
-              <>
-                <CardHeader icon={AlertTriangle} title={attentionTitle} count={attention.length} tone="danger"
-                  action={<CardLink onClick={() => onNavigateToTasks?.(overdueTasks.length ? 'telaat' : 'urgent')}>Bekijk alles <ArrowRight size={13} /></CardLink>} />
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {attention.slice(0, lim.attention).map(t => {
-                    const late = overdueIds.has(t.id)
-                    const n = late ? daysLate(t, today) : 0
-                    const subj = subjectName(t.subject_id)
-                    return (
-                      <ListRow key={t.id}
-                        dot={categoryColor(taskCategory(t))}
-                        title={t.title}
-                        subtitle={[late ? `${n} ${n === 1 ? 'dag' : 'dagen'} te laat` : (t.date ? null : 'Nog niet ingepland'), subj].filter(Boolean).join(' · ') || null}
-                        trailing={<>
-                          {!late && <Pill tone="danger">Urgent</Pill>}
-                          {t.date && <Pill tone={late ? 'danger' : 'neutral'}>{shortDate(t.date, today)}</Pill>}
-                        </>}
-                        action={<CheckButton checked={false} onChange={() => onToggleTask?.(t)} label={`Markeer "${t.title}" als gedaan`} tone="success" />}
-                        onClick={() => setDetailTask(t)}
-                      />
-                    )
-                  })}
-                  {attention.length > lim.attention && (
-                    <button type="button" onClick={() => onNavigateToTasks?.('telaat')} className="t-meta"
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: '2px 10px' }}>
-                      +{attention.length - lim.attention} meer
-                    </button>
-                  )}
-                </div>
-              </>
-            ) : (
-              <>
-                <CardHeader icon={CheckCircle2} title="Niets te laat" tone="success"
-                  action={<CardLink onClick={() => onNavigateToTasks?.('open')}>Naar taken <ArrowRight size={13} /></CardLink>} />
-                <EmptyState compact title={openCount ? 'Geen achterstallige of urgente taken.' : 'Alles gedaan!'}
-                  text={openCount ? `${openCount} open ${openCount === 1 ? 'taak' : 'taken'} op schema.` : 'Geen openstaande taken.'} />
-              </>
-            )}
-          </Card>
-
-          {/* Volgende afspraak */}
-          <Card style={{ minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-            <CardHeader icon={CalendarClock} title="Volgende afspraak"
-              action={
-                <div style={{ display: 'flex', gap: 2 }}>
-                  <IconButton icon={ChevronLeft} label="Vorige afspraak" size={26} disabled={skip === 0} onClick={() => setSkip(s => Math.max(0, s - 1))} />
-                  <IconButton icon={ChevronRight} label="Volgende afspraak" size={26} disabled={!ev || !hasMore} onClick={() => setSkip(s => s + 1)} />
-                </div>
-              } />
-            <FilterTabs variant="segmented" items={NEXT_FILTERS} value={nextEventFilter} onChange={setFilter} label="Soort afspraak" style={{ marginBottom: 12, alignSelf: 'flex-start' }} />
-
-            {current && skip === 0 && nextEventFilter === 'alle' && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, padding: '6px 10px', borderRadius: 'var(--r-sm)', background: 'var(--accent-soft)' }}>
-                <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 6px var(--accent)' }} />
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>Nu bezig</span>
-                <span style={{ fontSize: 12, color: 'var(--c-text)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{current.label}</span>
-                <span className="t-meta tnum">nog {current.minsLeft} min</span>
-              </div>
-            )}
-
-            {ev ? (
-              <>
-                {(() => {
-                  const cd = countdownLabel(ev.ts)
-                  const soon = ev.ts - new Date() < 3600000
-                  return (
-                    <p style={{ margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: soon ? 'var(--c-warning)' : 'var(--accent)' }}>
-                      <Clock3 size={14} aria-hidden="true" /> {cd}
-                    </p>
-                  )
-                })()}
-                <button type="button"
-                  onClick={() => { if (ev.type === 'task' && ev.raw) setDetailTask(ev.raw); else onNavigateToAgenda?.(ev.ts, ev.highlightKey) }}
-                  style={{ display: 'flex', gap: 10, background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', color: 'inherit', minWidth: 0 }}>
-                  <span aria-hidden="true" style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, background: categoryColor(ev.cat), flexShrink: 0 }} />
-                  <span style={{ minWidth: 0 }}>
-                    <span style={{ display: 'block', fontSize: 15, fontWeight: 700, color: 'var(--c-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.label}</span>
-                    <span className="t-meta tnum" style={{ display: 'block', fontSize: 12, marginTop: 2 }}>
-                      {ev.ts.toDateString() !== new Date().toDateString() && `${ev.ts.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })} · `}
-                      {hhmm(ev.ts)}{ev.end ? ` – ${hhmm(ev.end)}` : ''}
-                    </span>
-                    {ev.code && <span className="t-meta" style={{ display: 'block', fontSize: 11, marginTop: 2, letterSpacing: '0.02em' }}>{ev.code}</span>}
-                    {ev.location && (
-                      <span className="t-meta" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, marginTop: 2 }}>
-                        <MapPin size={11} aria-hidden="true" /> {ev.location}
-                      </span>
-                    )}
-                  </span>
-                </button>
-              </>
-            ) : (
-              <EmptyState compact text="Niets meer gepland." />
-            )}
-            <div style={{ marginTop: 'auto', paddingTop: 14 }}>
-              <button type="button" className="btn-ghost"
-                onClick={() => onNavigateToAgenda?.(ev?.ts || new Date(), ev?.highlightKey)}>
-                Bekijk agenda <ArrowRight size={13} aria-hidden="true" />
-              </button>
-            </div>
-          </Card>
-        </section>
+        {/* ── Focus: Vandaag + Volgende ── */}
+        <TodayFocusCard
+          today={{
+            tasks, subjects, today, todayItems, attention, overdueIds, lim,
+            onToggleTask: t => onToggleTask?.(t), onOpenTask: setDetailTask, onOpenItem: openItem,
+            onNewTask: () => openNewTask(), onOpenList: () => onNavigateToTasks?.('overzicht'),
+          }}
+          next={{
+            ev, hasMore, skip, setSkip, filter: nextEventFilter, setFilter, current,
+            onOpen: openItem, onOpenAgenda: e => onNavigateToAgenda?.(e?.ts || new Date(), e?.highlightKey),
+          }}
+        />
 
         {/* Hoog scherm: Spotify als grote kaart in een eigen rij */}
         {tall && <SpotifyWidget variant="hero" queueLimit={vp.h >= 1600 ? 8 : 5} />}
 
-        {/* ── RIJ 4: compacte widgets ── */}
-        <section className="dash-widgets" style={{ '--cols': widgetCount, '--cols-md': widgetCount === 3 ? 3 : 2 }} aria-label="Widgets">
-          <TodayWidget tasks={tasks} today={today} scheduleCount={todayItems.filter(i => i.type !== 'task').length} onToggleTask={t => onToggleTask?.(t)} onOpenTask={setDetailTask}
-            onNewTask={() => openNewTask()} onOpenList={() => onNavigateToTasks?.('vandaag')} />
-          <PomodoroMiniWidget onOpen={() => onNavigate('pomodoro')} />
-          {isAdmin && <GeldMiniWidget userId={userId} onOpen={() => onNavigate('geld')} />}
-          {/* Spotify (Level 3): op desktop in de widgetrij, op mobiel onderaan */}
-          {isDesktop && !tall && <SpotifyWidget compact />}
-        </section>
+        {/* ── Widgets ── */}
+        {widgetCount > 0 && (
+          <section className="dash-widgets" style={{ '--cols': widgetCount, '--cols-md': Math.min(widgetCount, 3) }} aria-label="Widgets">
+            {!pomoActive && <PomodoroMiniWidget st={pomo} onOpen={() => onNavigate('pomodoro')} />}
+            {isAdmin && <GeldMiniWidget userId={userId} onOpen={() => onNavigate('geld')} />}
+            {/* Spotify: op desktop in de widgetrij, op mobiel onderaan */}
+            {isDesktop && !tall && <SpotifyWidget compact />}
+          </section>
+        )}
 
-        {/* ── RIJ 5 (Level 2/3): schema, deadlines, ongepland, regen ── */}
-        {(todayItems.length > 0 || deadlines.length > 0 || unplanned.length > 0 || showRain) && (
+        {/* ── Deadlines, ongepland, regen ── */}
+        {(deadlines.length > 0 || unplanned.length > 0 || showRain) && (
           <section className="dash-extra">
-            {todayItems.length > 0 && (
-              <Card pad={14} style={{ minWidth: 0 }}>
-                <CardHeader icon={ListTodo} title="Schema vandaag" count={todayItems.length} />
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {todayItems.slice(0, lim.schedule).map((item, i) => {
-                    const nowMins = new Date().getHours() * 60 + new Date().getMinutes()
-                    const endMins = item.end ? (() => { const [eh, em] = item.end.split(':').map(Number); return eh * 60 + em })() : 0
-                    const isNow = item.sortMins <= nowMins && item.end && endMins >= nowMins
-                    const past = item.end ? endMins < nowMins : item.sortMins < nowMins
-                    return (
-                      <ListRow key={i} dot={item.color} title={item.label} style={past && !isNow ? { opacity: 0.5 } : undefined}
-                        trailing={<>
-                          {isNow && <Pill tone="accent">Nu</Pill>}
-                          <span className="t-meta tnum">{item.time}{item.end ? `–${item.end}` : ''}</span>
-                        </>}
-                        onClick={() => {
-                          if (item.type === 'task' && item.raw) setDetailTask(item.raw)
-                          else onNavigateToAgenda?.(new Date(), item.highlightKey)
-                        }} />
-                    )
-                  })}
-                  {todayItems.length > lim.schedule && <p className="t-meta" style={{ margin: '2px 10px 0' }}>+{todayItems.length - lim.schedule} meer</p>}
-                </div>
-              </Card>
-            )}
-
             {deadlines.length > 0 && (
-              <Card pad={14} style={{ minWidth: 0 }}>
+              <Card pad={14} glow="danger" style={{ minWidth: 0 }}>
                 <CardHeader icon={Flame} title="Deadlines" count={deadlines.length} tone="danger" />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   {deadlines.map(t => (
@@ -433,9 +199,9 @@ export default function DashboardPage({
             )}
 
             {unplanned.length > 0 && (
-              <Card pad={14} style={{ minWidth: 0 }}>
+              <Card pad={14} glow="var(--cat-school)" style={{ minWidth: 0 }}>
                 <CardHeader icon={Inbox} title="Nog in te plannen" count={unplanned.length}
-                  action={<CardLink onClick={() => onNavigateToTasks?.('open')}>Alle <ArrowRight size={13} /></CardLink>} />
+                  action={<CardLink onClick={() => onNavigateToTasks?.('ongepland')}>Alle <ArrowRight size={13} /></CardLink>} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   {unplanned.slice(0, lim.unplanned).map(t => (
                     <ListRow key={t.id} dot={categoryColor(taskCategory(t))} title={t.title}
@@ -453,7 +219,7 @@ export default function DashboardPage({
 
         {/* Hoog scherm: vooruitblik op de komende dagen vult de rest van de hoogte */}
         {tall && (
-          <Card pad={14} className="dash-week" style={{ minWidth: 0 }}>
+          <Card pad={14} glow="var(--cat-persoonlijk)" className="dash-week" style={{ minWidth: 0 }}>
             <CardHeader icon={CalendarDays} title="Komende dagen"
               action={<CardLink onClick={() => onNavigateToAgenda?.(weekAhead[0]?.date || new Date())}>Agenda <ArrowRight size={13} /></CardLink>} />
             <div className="dash-week-grid">
@@ -468,8 +234,8 @@ export default function DashboardPage({
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       {items.slice(0, 8).map((it, i) => (
                         <ListRow key={i} dot={categoryColor(it.cat)} title={it.label}
-                          trailing={<span className="t-meta tnum">{hhmm(it.ts)}</span>}
-                          onClick={() => { if (it.type === 'task' && it.raw) setDetailTask(it.raw); else onNavigateToAgenda?.(it.ts, it.highlightKey) }} />
+                          trailing={<span className="t-meta tnum">{it.travelBefore ? `🚗 ${hhmm(new Date(it.ts - it.travelBefore * 60000))} · ` : ''}{hhmm(it.ts)}</span>}
+                          onClick={() => openItem(it)} />
                       ))}
                       {items.length > 8 && <p className="t-meta" style={{ margin: '2px 10px 0' }}>+{items.length - 8} meer</p>}
                     </div>
@@ -482,7 +248,7 @@ export default function DashboardPage({
 
         {!isDesktop && <SpotifyWidget compact />}
 
-        {/* Mobiel: snelle actie onderaan (desktop heeft + in de Vandaag-widget en Ctrl K) */}
+        {/* Mobiel: snelle actie onderaan (desktop heeft + in Vandaag en Ctrl K) */}
         <button className="btn-primary md:hidden" onClick={() => openNewTask()} style={{ width: '100%', padding: 12 }}>
           <Plus size={16} aria-hidden="true" /> Taak toevoegen
         </button>
@@ -510,7 +276,7 @@ function RainCard({ data, onDismiss }) {
   const endTime = data[rainIdxs[rainIdxs.length - 1]]?.time
   const timeLabel = startTime === endTime || !endTime ? `vanaf ${startTime}` : `${startTime}–${endTime}`
   return (
-    <Card pad={14} tone="info" style={{ minWidth: 0 }}>
+    <Card pad={14} tone="info" glow="info" style={{ minWidth: 0 }}>
       <CardHeader icon={CloudRain} title={`${maxLabel} ${timeLabel}`} tone="info"
         action={<IconButton icon={X} label="Regengrafiek verbergen" size={24} iconSize={13} onClick={onDismiss} />} />
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }} role="img" aria-label={`${maxLabel} ${timeLabel}`}>

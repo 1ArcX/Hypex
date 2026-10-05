@@ -24,7 +24,7 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 
 | `activePage` | Page component | Nav label(s) | Main children | Access |
 |---|---|---|---|---|
-| `dashboard` | [pages/DashboardPage.jsx](../src/pages/DashboardPage.jsx) | Dashboard / Home | Clock, FocusCard, SpotifyWidget, WeatherWidget | all |
+| `dashboard` | [pages/DashboardPage.jsx](../src/pages/DashboardPage.jsx) | Dashboard / Home | PomodoroBanner, TodayFocusCard, Clock, SpotifyWidget, WeatherWidget | all |
 | `agenda` | [pages/AgendaPage.jsx](../src/pages/AgendaPage.jsx) | Agenda | Timeline (desktop), mobile: Dag (WeekStrip + Timeline) / Lijst (AgendaList) / Maand (MonthGrid) | all |
 | `taken` | [pages/TakenPage.jsx](../src/pages/TakenPage.jsx) | Taken | FilterTabs, TaskOverview (Overzicht, default), TodayView (Vandaag/Morgen), TasksWidget (other filters) | all |
 | `pomodoro` | [pages/PomodoroPage.jsx](../src/pages/PomodoroPage.jsx) | Pomodoro / (in "Meer") | PomodoroTimer → PomodoroHero (+ Vandaag / SessionGoalCard / Focus playlist cards); below: StudieBuddiesWidget, PomodoroStats, sessie-log | all |
@@ -61,19 +61,21 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 
 ## Feature components
 
-### Dashboard (v2 command center, 4 rows — CSS grid classes `.dash-*` in index.css)
-- **DashboardPage internals** — [pages/DashboardPage.jsx](../src/pages/DashboardPage.jsx)
-  - Row 1 header: greeting + date, search button ("Zoek in Hypex…", opens CommandPalette), inline `Clock`, compact `WeatherWidget`.
-  - Row 2 KPI row (`KpiTile`): "Urgent" / "Te laat" / "Open" / "Vandaag".
-  - Row 3 workspace: "Te laat & urgent" card (compact rows + complete) and "Volgende afspraak" card (countdown, "Nu bezig", filter Alle/Agenda/Werk/Taken, ‹ ›, "Bekijk agenda").
-  - Row 4 widgets: TodayWidget, PomodoroMiniWidget, GeldMiniWidget (admin), `SpotifyWidget compact`.
-    On tall windows (≥1100px high, `.dash.is-tall`) Spotify becomes `variant="hero"` in its own row above the widgets lists show more rows, and a "Komende dagen" card (next 6 days, `.dash-week`) fills the remaining height. Grids use container queries on `.dash-scroll` (container `dash`).
-  - Row 5 extras: "Schema vandaag", "Deadlines", "Nog in te plannen", `RainCard` (regen grafiek).
-  - Aliases: "stats-kaart", "KPI's", "urgent/te laat/open/vandaag tile", "te laat kaart", "volgende afspraak",
-    "schema vandaag", "deadlines kaart", "regen grafiek", "komende dagen". **Inline in DashboardPage.jsx.** (The old FocusCard was folded into these.)
-- **Dashboard widgets** — `src/components/dashboard/`:
-  [TodayWidget](../src/components/dashboard/TodayWidget.jsx) ("Vandaag"-widget, progress ring),
-  [PomodoroMiniWidget](../src/components/dashboard/PomodoroMiniWidget.jsx) (reads `pomodoro_v3`, opens Pomodoro page),
+### Dashboard (CSS grid classes `.dash-*` in index.css, container queries on `.dash-scroll` = container `dash`)
+- **DashboardPage** — [pages/DashboardPage.jsx](../src/pages/DashboardPage.jsx), order top → bottom:
+  1. **PomodoroBanner** while a timer runs or is paused mid-session.
+  2. Header: greeting + date + KPI chips (`.dash-chip`: urgent / te laat / open → Taken), search ("Zoek in Hypex…", CommandPalette), inline `Clock`, compact `WeatherWidget`.
+  3. **TodayFocusCard** (Vandaag + Volgende).
+  4. Tall windows (≥1100px high, `.dash.is-tall`): `SpotifyWidget variant="hero"` in its own row.
+  5. Widgets: PomodoroMiniWidget (hidden while the banner shows), GeldMiniWidget (admin), `SpotifyWidget compact` (desktop, not tall; mobile: at the bottom).
+  6. Extras: "Deadlines", "Nog in te plannen", `RainCard` (regen grafiek).
+  7. Tall: "Komende dagen" (next 6 days, `.dash-week`, 🚗 departure time).
+  Cards use `Card glow` (Spotify-style colour glow, `.glow-card`). Aliases: "KPI's", "chips", "deadlines kaart", "regen grafiek", "komende dagen", "nog in te plannen".
+- **Dashboard components** — `src/components/dashboard/`:
+  [TodayFocusCard](../src/components/dashboard/TodayFocusCard.jsx) — top of the dashboard: "Vandaag" (accent glow: progress, "Eerst dit" = overdue + urgent, tasks per daypart, routines as tick chips, "Schema" timeline of today with now-line, 🚗 travel chips, tick boxes; "Alle taken" → Taken Overzicht) and "Volgende" (glow in the item's colour: countdown, or with reistijd "Vertrek over 12 min" / "Vertrek nu!" + "Vertrek om 18:40 · 20 min reistijd"; ‹ ›, filter Alle/Agenda/Werk/Taken, "Nu bezig"). On narrow widths Volgende comes first. Aliases: "vandaag kaart", "focus kaart", "volgende afspraak", "schema vandaag", "eerst dit", "vertrektijd".
+  [PomodoroBanner](../src/components/dashboard/PomodoroBanner.jsx) — wide bar at the top while a Pomodoro runs: big time, mode + task, session dots, progress, Pauzeer/Hervat (writes `pomodoro_v3`, local only) and Open. Aliases: "pomodoro balk", "timer banner".
+  [pomodoroState.js](../src/components/dashboard/pomodoroState.js) (`readPomodoro`, `pausePomodoro`, `resumePomodoro`) and [useToday.js](../src/components/dashboard/useToday.js) (`useTodayItems`, `useNextEvent`, `useCurrentItem`, `useMinuteTick`) are shared helpers.
+  [PomodoroMiniWidget](../src/components/dashboard/PomodoroMiniWidget.jsx) (reads `pomodoro_v3`, opens Pomodoro page, glow in mode colour),
   [GeldMiniWidget](../src/components/dashboard/GeldMiniWidget.jsx) (reuses Geld hooks `useBudgetStats`, read-only).
 - **Clock** — [components/Clock.jsx](../src/components/Clock.jsx) — clock; `variant="inline"` for the dashboard header, `isBreak` tints it. Aliases: "klok", "de tijd".
 - **CommandPalette** — [components/CommandPalette.jsx](../src/components/CommandPalette.jsx) — "Zoek in Hypex" (Ctrl/⌘K, sidebar "Zoeken", dashboard search field): tasks, agenda items, notes, pages, "Nieuwe taak". Aliases: "zoeken", "search", "command palette", "cmd k".
@@ -178,7 +180,7 @@ Self-contained money/budget app, mounted via [pages/GeldPage.jsx](../src/pages/G
   Global classes: `.card`, `.card-interactive`, `.card-tone` (+ `--tone`), `.card-urgent`, `.btn-primary`, `.btn-ghost`, `.btn-neon`,
   typography roles `.t-display/.t-kpi/.t-page/.t-section/.t-card/.t-body/.t-meta/.t-badge/.t-overline`, `.tnum`.
 - **Shared components** — [components/ui/](../src/components/ui/index.js) (import from `components/ui`):
-  - `Card`, `CardHeader`, `CardLink` — [Card.jsx](../src/components/ui/Card.jsx). Aliases: "kaart", "card header", "Bekijk alles-link".
+  - `Card`, `CardHeader`, `CardLink` — [Card.jsx](../src/components/ui/Card.jsx). `Card glow="accent"|color` = Spotify-style blurred colour background (`.glow-card`, `--glow`). Aliases: "kaart", "card header", "Bekijk alles-link".
   - `KpiTile` — [KpiTile.jsx](../src/components/ui/KpiTile.jsx). Aliases: "KPI tegel", "stats tile".
   - `TypeSelect` — [TypeSelect.jsx](../src/components/ui/TypeSelect.jsx) — type dropdown (colour dot + name, "+ Nieuw type"); value = category (built-in key or custom type id). Aliases: "type dropdown", "type kiezen".
   - `ListRow`, `CheckButton` — [ListRow.jsx](../src/components/ui/ListRow.jsx). Aliases: "lijstrij", "taakrij", "afvinkknop".

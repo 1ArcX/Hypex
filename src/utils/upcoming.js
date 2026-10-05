@@ -17,7 +17,7 @@ function weekLessonsFromCache(now, magisterLessons) {
   return [...(cached.length ? cached : (magisterLessons || [])), ...nextWeek]
 }
 
-/** Alle komende items (start >= nu), oplopend. type: 'task' | 'lesson' | 'event' | 'work'. */
+/** Alle komende items (start >= nu), oplopend. type: 'task' | 'lesson' | 'event' | 'work'. `travelBefore` = reistijd heen (min). */
 export function buildUpcoming({ tasks = [], calendarEvents = [], magisterLessons = [], now = new Date() }) {
   const at = (date, time) => time ? new Date(date + 'T' + time.slice(0, 5)) : null
   const shifts = (() => { try { return JSON.parse(localStorage.getItem('pmt_work_shifts')) || [] } catch { return [] } })()
@@ -25,7 +25,7 @@ export function buildUpcoming({ tasks = [], calendarEvents = [], magisterLessons
     ...tasks.filter(t => t.date && (t.time || t.start_time) && !t.completed)
       .map(t => {
         const ts = (t.start_time || t.time || '').slice(0, 5)
-        return { label: t.title, ts: new Date(t.date + 'T' + ts), end: at(t.date, t.end_time), type: 'task', raw: t, cat: taskCategory(t), highlightKey: `task:${t.id}` }
+        return { label: t.title, ts: new Date(t.date + 'T' + ts), end: at(t.date, t.end_time), type: 'task', raw: t, cat: taskCategory(t), highlightKey: `task:${t.id}`, travelBefore: t.travel_before || 0 }
       })
       .filter(t => t.ts >= now),
     ...weekLessonsFromCache(now, magisterLessons).filter(l => l.start && !l.uitgevallen && new Date(l.start) >= now)
@@ -33,7 +33,7 @@ export function buildUpcoming({ tasks = [], calendarEvents = [], magisterLessons
     ...calendarEvents.filter(ev => ev.start_time && new Date(ev.start_time) >= now)
       .map(ev => {
         const disp = eventDisplay(ev)
-        return { label: disp.title, code: disp.code, ts: new Date(ev.start_time), end: ev.end_time ? new Date(ev.end_time) : null, location: ev.location, type: 'event', raw: ev, cat: eventCategory(ev), highlightKey: `event:${ev.id}` }
+        return { label: disp.title, code: disp.code, ts: new Date(ev.start_time), end: ev.end_time ? new Date(ev.end_time) : null, location: ev.location, type: 'event', raw: ev, cat: eventCategory(ev), highlightKey: `event:${ev.id}`, travelBefore: ev.travel_before || 0 }
       }),
     ...shifts.filter(s => s.date && (s.start_time || s.start))
       .map(s => {
