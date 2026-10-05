@@ -9,6 +9,7 @@ import { eventDisplay } from '../utils/eventTitle'
 import { loadExternalEvents } from '../utils/externalEvents'
 import { taskOnDay, isMultiDay } from '../utils/taskStatus'
 import ExternalEventModal from './agenda/ExternalEventModal'
+import MiniMonth from './agenda/MiniMonth'
 import ItemModal from './ItemModal'
 import { FilterTabs, IconButton } from './ui'
 import { useViewport } from '../hooks/useViewport'
@@ -60,13 +61,6 @@ function stripHtml(html) {
   return html.replace(/<[^>]*>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').replace(/&#(\d+);/g, (_, n) => String.fromCharCode(n)).replace(/\s+/g, ' ').trim()
 }
 function toDateStr(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}` }
-// ISO-weeknummer (week met de eerste donderdag van het jaar = week 1)
-function isoWeek(d) {
-  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
-  const day = t.getUTCDay() || 7
-  t.setUTCDate(t.getUTCDate() + 4 - day)
-  return Math.ceil(((t - Date.UTC(t.getUTCFullYear(), 0, 1)) / 86400000 + 1) / 7)
-}
 function isSameDay(a, b) {
   return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate()
 }
@@ -972,12 +966,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
 
   // ─── RECHTER RAIL: legenda + mini-maandkalender (desktop, ≥1280px via CSS) ─────
   const SideRail = () => {
-    const m = new Date(current.getFullYear(), current.getMonth(), 1)
-    const last = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate()
-    const pad0 = (m.getDay() + 6) % 7
-    const cells = [...Array(pad0).fill(null), ...Array.from({ length: last }, (_, i) => new Date(m.getFullYear(), m.getMonth(), i + 1))]
-    const inView = d => view === 'week' ? weekDays.some(w => isSameDay(w, d)) : isSameDay(d, current)
-    const shiftMonth = dir => { const d = new Date(current); d.setDate(1); d.setMonth(d.getMonth() + dir); setCurrent(d); onDateChange?.(d) }
+    const inView = d => view === 'week' ? weekDays.some(w => isSameDay(w, d)) : view === 'month' ? (d.getMonth() === current.getMonth() && d.getFullYear() === current.getFullYear()) : isSameDay(d, current)
     return (
       <aside className="agenda-rail" aria-label="Legenda en maandoverzicht">
         <div className="card" style={{ padding: 14 }}>
@@ -998,52 +987,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
             </label>
           )}
         </div>
-        <div className="card" style={{ padding: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
-            <p className="t-card" style={{ margin: 0, flex: 1 }}>{MONTHS_FULL[m.getMonth()]} {m.getFullYear()}</p>
-            <IconButton icon={ChevronLeft} label="Vorige maand" size={24} iconSize={13} onClick={() => shiftMonth(-1)} />
-            <IconButton icon={ChevronRight} label="Volgende maand" size={24} iconSize={13} onClick={() => shiftMonth(1)} />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '18px repeat(7, minmax(0, 1fr))', gap: 2, textAlign: 'center' }}>
-            <span className="t-meta" style={{ fontSize: 9, opacity: 0.7 }} title="Weeknummer">wk</span>
-            {['M','D','W','D','V','Z','Z'].map((d, i) => <span key={i} className="t-meta" style={{ fontSize: 10 }}>{d}</span>)}
-            {cells.flatMap((d, i) => {
-              const out = []
-              // Weeknummer vóór elke rij; klik = naar die week
-              if (i % 7 === 0) {
-                const rowDay = cells.slice(i, i + 7).find(Boolean)
-                const monday = new Date(rowDay); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7))
-                const wk = isoWeek(monday)
-                const thisWeek = isoWeek(now) === wk && Math.abs(monday - now) < 7 * 86400000
-                out.push(
-                  <button key={`wk-${i}`} type="button" onClick={() => { setCurrent(monday); onDateChange?.(monday) }}
-                    aria-label={`Week ${wk}`} title={`Week ${wk}`} className="tnum"
-                    style={{ height: 24, border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: 9, fontWeight: thisWeek ? 700 : 500,
-                      color: thisWeek ? 'var(--accent)' : 'var(--c-text-3)', opacity: thisWeek ? 1 : 0.75 }}>
-                    {wk}
-                  </button>
-                )
-              }
-              if (!d) { out.push(<span key={i} />); return out }
-              const today = isSameDay(d, now)
-              const sel = inView(d)
-              out.push(
-                <button key={i} type="button" onClick={() => { setCurrent(d); onDateChange?.(d) }}
-                  aria-label={`${d.getDate()} ${MONTHS_FULL[d.getMonth()]}`} aria-current={today ? 'date' : undefined}
-                  className="tnum"
-                  style={{
-                    height: 24, borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, padding: 0,
-                    background: today ? 'var(--accent)' : sel ? 'var(--accent-soft)' : 'transparent',
-                    color: today ? 'var(--on-accent)' : sel ? 'var(--accent)' : 'var(--c-text-2)',
-                    fontWeight: today || sel ? 700 : 400,
-                  }}>
-                  {d.getDate()}
-                </button>
-              )
-              return out
-            })}
-          </div>
-        </div>
+        <MiniMonth current={current} inView={inView} onPick={d => { setCurrent(d); onDateChange?.(d) }} />
       </aside>
     )
   }

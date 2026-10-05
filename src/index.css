@@ -326,6 +326,9 @@ html, body, #root {
   to   { transform: rotate(360deg); }
 }
 
+/* Doorlopende mini-kalender (agenda-rail): geen zichtbare scrollbalk */
+.mini-month-scroll::-webkit-scrollbar { display: none; }
+
 /* Klein label (bron, "Aangepast", …) */
 .hx-chip {
   display: inline-flex; align-items: center; gap: 4px;
