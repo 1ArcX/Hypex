@@ -6,6 +6,15 @@
 
 export const RELEASES = [
   {
+    id: 8,
+    date: '2026-10-08',
+    title: 'Agenda: lessen van vorige dagen blijven echt staan',
+    items: [
+      { area: 'agenda', text: 'MijnX-lessen van gisteren werden elke nacht rond 00:05 toch nog gewist (tijdzonefout). Dat is opgelost: wat al begonnen of voorbij is, blijft altijd staan.' },
+      { area: 'agenda', text: 'De lessen die zo zijn verdwenen (5 t/m 7 oktober) worden bij de volgende synchronisatie teruggezet.' },
+    ],
+  },
+  {
     id: 7,
     date: '2026-10-08',
     title: 'Kleine verbeteringen',

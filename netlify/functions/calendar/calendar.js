@@ -115,7 +115,7 @@ const snapshot = e => ({ title: e.title, start_time: e.start_time, end_time: e.e
 /**
  * Vergelijk opgeslagen items met de nieuwe feed. Geeft terug wat er geschreven moet worden, welke
  * wijzigingen gemeld worden en welke sleutels hernoemd zijn (verschoven items, zodat aanpassingen meegaan).
- *  - Items die vóór vandaag begonnen blijven altijd bewaard (MijnX toont alleen vanaf vandaag).
+ *  - Items die al begonnen of voorbij zijn worden nooit verwijderd (MijnX toont alleen vanaf vandaag).
  *  - Verdwenen + nieuw item met dezelfde titel (binnen 14 dagen) = verschoven, niet weg + nieuw.
  *  - Alleen items die nog niet voorbij zijn tellen mee in de melding.
  */
@@ -124,10 +124,10 @@ function diffEvents(existing, incoming, now = Date.now()) {
   const fresh = new Map(incoming.map(e => [e.external_id, e]))
   const upserts = [], removedIds = [], changes = [], renames = []
   const relevant = e => time(e.end_time) >= now - 86400000
-  // Alles wat vóór vandaag begon is "bevroren": nooit verwijderen, ook niet als de feed nog een oud
-  // (meerdaags) item meestuurt. Begin van vandaag in NL-tijd, ruim genomen. Lege feed (storing?) → niets verwijderen.
-  const dayStart = ms => { const d = new Date(ms); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - 2 * 3600000 }
-  const windowStart = incoming.length ? dayStart(now) : Infinity
+  // Alles wat al begonnen is, is "bevroren": nooit verwijderen. (Vroeger: "vóór vandaag" in UTC — tussen 00:00 en
+  // 02:00 NL-tijd is het in UTC nog gisteren, terwijl MijnX dan al vanaf de nieuwe dag levert → elke nacht
+  // werden de lessen van gisteren gewist.) Lege feed (storing?) → niets verwijderen.
+  const windowStart = incoming.length ? now : Infinity
 
   const added = [], removed = []
   for (const [id, e] of fresh) {
@@ -142,7 +142,7 @@ function diffEvents(existing, incoming, now = Date.now()) {
   }
   for (const [id, prev] of old) {
     if (fresh.has(id)) continue
-    if (time(prev.start_time) < windowStart) continue // buiten het bereik van de feed: bewaren
+    if (time(prev.start_time) < windowStart) continue // al begonnen/voorbij: bewaren
     removed.push(prev)
   }
 
@@ -172,6 +172,36 @@ function diffEvents(existing, incoming, now = Date.now()) {
   return { upserts, removedIds, changes, renames }
 }
 exports.diffEvents = diffEvents
+
+/**
+ * Herstel: items die verwijderd zijn terwijl ze al voorbij waren (door de oude nachtelijke bug) staan nog
+ * in external_calendar_changes (kind 'removed', met een kopie in `before`). Zet die terug met dezelfde
+ * sleutel, zodat ook je aanpassingen (overrides) weer gelden. Na één keer herstellen is dit een no-op.
+ */
+async function restoreRemovedPast(connection, existingRows) {
+  const { data, error } = await supabase.from('external_calendar_changes').select('before,created_at')
+    .eq('connection_id', connection.id).eq('kind', 'removed').limit(5000)
+  if (error || !data?.length) return []
+  const have = new Set(existingRows.map(r => r.external_id))
+  const rows = []
+  for (const c of data) {
+    const b = c.before
+    if (!b?.start_time || !b?.title) continue
+    if (time(b.start_time) >= time(c.created_at)) continue // was toen nog toekomst: echt vervallen, niet terugzetten
+    const e = { title: b.title, description: null, location: b.location || null, start_time: b.start_time, end_time: b.end_time || b.start_time, all_day: !!b.all_day }
+    const external_id = fingerprint(e)
+    if (have.has(external_id)) continue
+    have.add(external_id)
+    rows.push({ ...e, external_id, connection_id: connection.id, color: connection.provider === 'google' ? '#4285F4' : '#FACC15', updated_at: new Date().toISOString() })
+  }
+  for (let i = 0; i < rows.length; i += 500) {
+    const r = await supabase.from('external_calendar_events').upsert(rows.slice(i, i + 500), { onConflict: 'connection_id,external_id', ignoreDuplicates: true })
+    if (r.error) { console.warn('[calendar] herstel mislukt:', r.error.message); return [] }
+  }
+  if (rows.length) console.log(`[calendar] ${rows.length} verwijderde items van vorige dagen hersteld (${connection.name})`)
+  return rows
+}
+exports.restoreRemovedPast = restoreRemovedPast
 exports.icsEvents = icsEvents
 async function refreshGoogle(credentials) {
   if (credentials.expiry && credentials.expiry > Date.now() + 60_000) return credentials
@@ -236,6 +266,7 @@ async function syncConnection(connection, { force = false } = {}) {
     for (const r of existingRows) await supabase.from('external_calendar_events').update({ external_id: r.external_id }).eq('id', r.id)
   }
   const existing = { data: existingRows }
+  if (!legacy) existingRows.push(...(await restoreRemovedPast(connection, existingRows)).map(r => ({ ...r, id: null })))
   const { upserts, removedIds, changes, renames } = diffEvents(existingRows, events)
   // Nieuwe/gewijzigde rijen schrijven, daarna weggevallen rijen verwijderen en aanpassingen van verschoven items meeverhuizen.
   for (let i = 0; i < upserts.length; i += 500) {
