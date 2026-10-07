@@ -4,8 +4,9 @@ import StudieBuddiesWidget from '../components/StudieBuddiesWidget'
 import PomodoroStats from '../components/PomodoroStats'
 import SpotifyWidget from '../components/SpotifyWidget'
 import SessionGoalCard from '../components/pomodoro/SessionGoalCard'
-import { Target, Clock3, CalendarCheck } from 'lucide-react'
+import { CalendarCheck } from 'lucide-react'
 import { toISO } from '../utils/recurrence'
+import { useFocusProgress, fmtFocus } from '../hooks/useFocusProgress'
 
 const SESSION_LOG_KEY = 'pomodoro_session_log'
 const MODE_META = {
@@ -99,26 +100,49 @@ function DayLog({ label, sessions }) {
   )
 }
 
-function TodayCard({ count, mins, sessionsInCycle, sessionsPerLong }) {
+function TodayCard({ count, progress, liveMins, sessionsInCycle, sessionsPerLong }) {
+  const { todayMins, goal, streak, atRisk, week, weekDelta } = progress
+  const R = 33, C = 2 * Math.PI * R
+  const done = Math.min(1, todayMins / goal)
+  const live = Math.min(1, (todayMins + liveMins) / goal)
+  const goalHit = todayMins >= goal
+  const left = Math.max(0, goal - todayMins - liveMins)
+  const streakCls = streak === 0 ? ' is-off' : atRisk ? ' is-risk' : ''
+  const streakTitle = streak === 0 ? 'Rond vandaag een focussessie af om een streak te starten'
+    : atRisk ? `Je streak van ${streak} dagen loopt door als je vandaag focust` : `${streak} dagen op rij gefocust`
+
   return (
     <div className="card pomo-card">
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
         <CalendarCheck size={15} style={{ color: 'var(--accent)' }} aria-hidden="true" />
         <h3 className="t-card" style={{ margin: 0 }}>Vandaag</h3>
+        <span className={`focus-streak tnum${streakCls}`} title={streakTitle} aria-label={streakTitle} style={{ marginLeft: 'auto' }}>
+          🔥 {streak}
+        </span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-        <div className="pomo-stat">
-          <Target size={16} aria-hidden="true" style={{ color: 'var(--accent)' }} />
-          <span>
-            <span className="t-kpi tnum" style={{ fontSize: 18, display: 'block' }}>{count}</span>
-            <span className="t-meta">{count === 1 ? 'focussessie' : 'focussessies'}</span>
-          </span>
+      <div className="focus-today">
+        <div className={`focus-ring${goalHit ? ' is-goal' : ''}`} role="img" aria-label={`${fmtFocus(todayMins)} van dagdoel ${fmtFocus(goal)}`}>
+          <svg viewBox="0 0 78 78" aria-hidden="true">
+            <circle cx="39" cy="39" r={R} className="focus-ring-track" />
+            {liveMins > 0 && <circle cx="39" cy="39" r={R} className="focus-ring-live" strokeDasharray={C} strokeDashoffset={C * (1 - live)} />}
+            <circle cx="39" cy="39" r={R} className="focus-ring-done" strokeDasharray={C} strokeDashoffset={C * (1 - done)} />
+          </svg>
+          <div className="focus-ring-inner">
+            <span className="focus-ring-val tnum">{fmtFocus(todayMins + liveMins)}</span>
+            <span className="focus-ring-sub tnum">van {fmtFocus(goal)}</span>
+          </div>
         </div>
-        <div className="pomo-stat">
-          <Clock3 size={16} aria-hidden="true" style={{ color: 'var(--accent)' }} />
-          <span>
-            <span className="t-kpi tnum" style={{ fontSize: 18, display: 'block' }}>{mins}<span style={{ fontSize: 12, color: 'var(--c-text-3)', fontWeight: 600 }}> min</span></span>
-            <span className="t-meta">focus tijd</span>
+        <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: goalHit ? 'var(--c-success)' : 'var(--c-text)' }}>
+            {goalHit ? 'Dagdoel gehaald 🎉' : `Nog ${fmtFocus(left)} tot je doel`}
+          </span>
+          {atRisk && <span className="t-meta" style={{ color: '#FFD08A' }}>Focus vandaag om je streak te houden</span>}
+          <span className="t-meta tnum">{count} {count === 1 ? 'sessie' : 'sessies'} vandaag</span>
+          <span className="t-meta tnum focus-week">
+            Week {fmtFocus(week)}
+            {weekDelta != null && (weekDelta >= 0
+              ? <span className="is-up" title="t.o.v. dezelfde dagen vorige week"> ↑ {weekDelta}%</span>
+              : <span className="is-down"> · nog {fmtFocus(progress.prevWeek - week)} tot vorige week</span>)}
           </span>
         </div>
       </div>
@@ -137,6 +161,7 @@ function TodayCard({ count, mins, sessionsInCycle, sessionsPerLong }) {
 
 export default function PomodoroPage({ onModeChange, onFocusModeChange, onPomodoroActive, userId, profiles, onlineUsers = [], onXPEarned, tasks = [], onToggleTask, seedTask, onSeedConsumed }) {
   const [sessions, setSessions] = useState(loadSessions)
+  const progress = useFocusProgress(userId)
 
   const handleSessionComplete = (session) => {
     setSessions(prev => {
@@ -154,7 +179,6 @@ export default function PomodoroPage({ onModeChange, onFocusModeChange, onPomodo
   }
   const sortedDates = Object.keys(byDate).sort((a, b) => b.localeCompare(a)).slice(0, 14)
   const todayFocus = (byDate[today] || []).filter(s => s.mode === 'work')
-  const todayFocusMins = todayFocus.reduce((sum, s) => sum + (s.durationMins || 0), 0)
 
   return (
     <div className="pomo-page">
@@ -171,7 +195,8 @@ export default function PomodoroPage({ onModeChange, onFocusModeChange, onPomodo
         onSeedConsumed={onSeedConsumed}
         renderCards={(t) => (
           <>
-            <TodayCard count={todayFocus.length} mins={todayFocusMins} sessionsInCycle={t.sessionsInCycle} sessionsPerLong={t.sessionsPerLong} />
+            <TodayCard count={todayFocus.length} progress={progress} sessionsInCycle={t.sessionsInCycle} sessionsPerLong={t.sessionsPerLong}
+              liveMins={t.mode === 'work' && t.seconds < t.workMins * 60 ? Math.floor((t.workMins * 60 - t.seconds) / 60) : 0} />
             <SessionGoalCard goal={t.goal} checklist={t.checklist} goalApi={t.goalApi} tasks={tasks} onToggleTask={onToggleTask} />
             <SpotifyWidget compact title="Focus playlist" className="pomo-card" />
           </>

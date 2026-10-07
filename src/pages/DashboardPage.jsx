@@ -129,7 +129,7 @@ export default function DashboardPage({
       <div className={`dash${tall ? ' is-tall' : ''}`}>
 
         {/* ── Pomodoro loopt: valt meteen op ── */}
-        {pomoActive && <PomodoroBanner st={pomo} onOpen={() => onNavigate('pomodoro')} />}
+        {pomoActive && <PomodoroBanner st={pomo} onOpen={() => onNavigate('focus')} />}
 
         {/* ── Kop: begroeting + KPI-chips, zoeken, tijd, weer ── */}
         <header className="dash-header">
@@ -174,7 +174,7 @@ export default function DashboardPage({
         {/* ── Widgets ── */}
         {widgetCount > 0 && (
           <section className="dash-widgets" style={{ '--cols': widgetCount, '--cols-md': Math.min(widgetCount, 3) }} aria-label="Widgets">
-            {!pomoActive && <PomodoroMiniWidget st={pomo} onOpen={() => onNavigate('pomodoro')} />}
+            {!pomoActive && <PomodoroMiniWidget st={pomo} userId={userId} onOpen={() => onNavigate('focus')} />}
             {isAdmin && <GeldMiniWidget userId={userId} onOpen={() => onNavigate('geld')} />}
             {/* Spotify: op desktop in de widgetrij, op mobiel onderaan */}
             {isDesktop && !tall && <SpotifyWidget compact />}

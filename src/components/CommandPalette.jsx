@@ -11,7 +11,7 @@ const PAGES = [
   { id: 'dashboard',    label: 'Dashboard',    Icon: Home },
   { id: 'agenda',       label: 'Agenda',       Icon: Calendar },
   { id: 'taken',        label: 'Taken',        Icon: CheckSquare },
-  { id: 'pomodoro',     label: 'Pomodoro',     Icon: Timer },
+  { id: 'focus',        label: 'Focus',        Icon: Timer },
   { id: 'notities',     label: 'Notities',     Icon: FileText },
   { id: 'statistieken', label: 'Statistieken', Icon: BarChart2 },
   { id: 'jumbo',        label: 'Jumbo',        Icon: Briefcase, access: 'jumbo' },

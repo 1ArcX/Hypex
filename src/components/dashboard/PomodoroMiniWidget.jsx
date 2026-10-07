@@ -3,12 +3,14 @@ import { Timer, Play, Pause } from 'lucide-react'
 import { CardHeader } from '../ui'
 import { fmtClock, POMO_MODE } from './pomodoroState'
 import { usePomodoroState } from './PomodoroBanner'
+import { useFocusProgress, fmtFocus } from '../../hooks/useFocusProgress'
 
 // Dashboard-widget "Pomodoro": leest de timerstatus die PomodoroTimer bewaart (zie pomodoroState.js).
 // Starten gebeurt op de Pomodoro-pagina; loopt de timer, dan toont het dashboard de PomodoroBanner.
 
-export default function PomodoroMiniWidget({ onOpen, st: given }) {
+export default function PomodoroMiniWidget({ onOpen, st: given, userId }) {
   const own = usePomodoroState()
+  const fp = useFocusProgress(userId)
   const st = given || own
   const m = POMO_MODE[st.mode] || POMO_MODE.work
   const pct = st.total > 0 ? 1 - st.remaining / st.total : 0
@@ -36,7 +38,13 @@ export default function PomodoroMiniWidget({ onOpen, st: given }) {
           <span className="t-meta" style={{ color: st.running ? m.color : undefined, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {st.task || m.label}{st.running ? '' : ' · klaar om te starten'}
           </span>
-          <span className="t-meta tnum" style={{ marginTop: 6 }}>Vandaag {st.todayMins} min focus</span>
+          <span className="t-meta tnum" style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span className={`focus-streak${fp.streak === 0 ? ' is-off' : fp.atRisk ? ' is-risk' : ''}`} style={{ fontSize: 11, padding: '1px 7px' }}
+              title={fp.atRisk ? 'Focus vandaag om je streak te houden' : `${fp.streak} dagen op rij`}>🔥 {fp.streak}</span>
+            <span style={{ color: fp.todayMins >= fp.goal ? 'var(--c-success)' : undefined }}>
+              {fmtFocus(fp.todayMins)} / {fmtFocus(fp.goal)}{fp.todayMins >= fp.goal ? ' ✓' : ''}
+            </span>
+          </span>
         </span>
       </button>
     </div>

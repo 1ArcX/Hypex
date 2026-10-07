@@ -16,6 +16,18 @@ const load = () => { try { return JSON.parse(localStorage.getItem(LS_KEY)) } cat
 
 export function readPomodoro() {
   const s = load()
+  if (s?.timerKind === 'stopwatch') {
+    // Stopwatch (Focus-tab): `remaining` is hier de verstreken tijd, `total` 0
+    const elapsed = Math.floor((s.swAccum || 0) + (s.running && s.swStart ? (Date.now() - s.swStart) / 1000 : 0))
+    let todayMins = 0
+    try { todayMins = (JSON.parse(localStorage.getItem('pomodoro_stats')) || {})[toISO(new Date())] || 0 } catch {}
+    const running = !!(s.running && s.swStart)
+    return {
+      mode: 'work', running, remaining: elapsed, total: 0, todayMins, stopwatch: true,
+      task: s.task || '', paused: !running && elapsed > 0,
+      sessionsInCycle: s.sessionsInCycle || 0, sessionsPerLong: s.sessionsPerLong || 4,
+    }
+  }
   const mode = s?.mode || 'work'
   const totalMins = mode === 'work' ? (s?.workMins ?? 25) : mode === 'break' ? (s?.breakMins ?? 5) : (s?.longBreakMins ?? 15)
   const total = totalMins * 60
@@ -44,12 +56,22 @@ function write(patch) {
 
 export function pausePomodoro() {
   const s = load()
+  if (s?.timerKind === 'stopwatch') {
+    if (!s.running || !s.swStart) return
+    write({ running: false, swAccum: (s.swAccum || 0) + (Date.now() - s.swStart) / 1000, swStart: null })
+    return
+  }
   if (!s?.running || !s.endTime) return
   write({ running: false, endTime: null, remainingSeconds: Math.max(0, Math.ceil((s.endTime - Date.now()) / 1000)) })
 }
 
 export function resumePomodoro() {
   const s = load()
+  if (s?.timerKind === 'stopwatch') {
+    if (s.running) return
+    write({ running: true, swStart: Date.now() })
+    return
+  }
   if (!s || s.running || !s.remainingSeconds) return
   write({ running: true, endTime: Date.now() + s.remainingSeconds * 1000 })
 }

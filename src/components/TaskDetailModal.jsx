@@ -203,7 +203,7 @@ export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onE
                 onClick={onStartPomodoro}
                 style={{ flex:1,padding:'10px',borderRadius:10,border:'1px solid rgba(255,100,100,0.3)',background:'rgba(255,100,100,0.08)',color:'#ff8080',cursor:'pointer',fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:5 }}
               >
-                🍅 Pomodoro
+                ⏱ Focus
               </button>
             )}
           </div>

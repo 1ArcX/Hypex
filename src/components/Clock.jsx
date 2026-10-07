@@ -10,6 +10,13 @@ function getPomodoroDisplay() {
   try {
     const s = JSON.parse(localStorage.getItem('pomodoro_v3'))
     if (!s || !s.running) return null
+    if (s.timerKind === 'stopwatch' && s.swStart) {
+      // Focus-stopwatch: telt op
+      const el = Math.floor((s.swAccum || 0) + (Date.now() - s.swStart) / 1000)
+      const h = Math.floor(el / 3600), m = Math.floor((el % 3600) / 60), sec = el % 60
+      const p = (n) => String(n).padStart(2, '0')
+      return { time: h ? `${h}:${p(m)}:${p(sec)}` : `${p(m)}:${p(sec)}`, mode: 'work' }
+    }
     const remaining = s.endTime
       ? Math.max(0, Math.ceil((s.endTime - Date.now()) / 1000))
       : (s.remainingSeconds ?? 0)

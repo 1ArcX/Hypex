@@ -7,7 +7,7 @@ const NAV_ITEMS = [
   { id: 'dashboard',    Icon: Home,           label: 'Dashboard'    },
   { id: 'agenda',       Icon: Calendar,       label: 'Agenda'       },
   { id: 'taken',        Icon: CheckSquare,    label: 'Taken'        },
-  { id: 'pomodoro',     Icon: Timer,          label: 'Pomodoro'     },
+  { id: 'focus',        Icon: Timer,          label: 'Focus'        },
   // { id: 'school', Icon: GraduationCap, label: 'School' },  // INACTIVE
   // { id: 'gewoontes', Icon: Flame, label: 'Gewoontes' },  // INACTIVE
   // { id: 'gym', Icon: Dumbbell, label: 'Gym' },  // INACTIVE
@@ -63,7 +63,7 @@ export default function Sidebar({
     const active = activePage === id
     const levelUp   = id === 'statistieken' && hasLevelUp && !active
     const gymActive = id === 'gym' && hasActiveGymWorkout && !active
-    const pomoActive = id === 'pomodoro' && hasActivePomo && !active
+    const pomoActive = id === 'focus' && hasActivePomo && !active
     const badge = id === 'taken' && overdueCount > 0 && !active
     const button = (
       <button

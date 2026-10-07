@@ -27,7 +27,7 @@ import { IncomeDayModal } from './modals/IncomeDayModal'
 import type { Expense, ExpenseInput, RecurringSource } from './types'
 import { monthEndOf, todayStr } from './lib/format'
 
-export default function GeldPage({ userId }: { userId: string; onClose?: () => void }) {
+export default function GeldPage({ userId, onClose }: { userId: string; onClose?: () => void }) {
   const activeTab = useGeldStore(s => s.activeTab)
   const searchOpen = useGeldStore(s => s.searchOpen)
   const setSearchOpen = useGeldStore(s => s.setSearchOpen)
@@ -142,7 +142,7 @@ export default function GeldPage({ userId }: { userId: string; onClose?: () => v
         </div>
       </div>
 
-      <TabBar onAdd={() => setActionOpen(true)} />
+      <TabBar onAdd={() => setActionOpen(true)} onHome={onClose} />
 
       {/* Sheets */}
       {actionOpen && <ActionSheet onClose={() => setActionOpen(false)} onAction={handleAction} />}

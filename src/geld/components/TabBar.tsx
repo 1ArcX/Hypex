@@ -1,4 +1,4 @@
-import { Home, Mails, CalendarRange, Plus } from 'lucide-react'
+import { Home, Mails, CalendarRange, Plus, X } from 'lucide-react'
 import { useGeldStore, type GeldTab } from '../store/geldStore'
 
 const TABS: { id: GeldTab; label: string; Icon: typeof Home }[] = [
@@ -8,7 +8,7 @@ const TABS: { id: GeldTab; label: string; Icon: typeof Home }[] = [
 ]
 
 // Zwevende glazen tabbar met centrale +-knop (opent het actiemenu)
-export function TabBar({ onAdd }: { onAdd: () => void }) {
+export function TabBar({ onAdd, onHome }: { onAdd: () => void; onHome?: () => void }) {
   const activeTab = useGeldStore(s => s.activeTab)
   const setActiveTab = useGeldStore(s => s.setActiveTab)
 
@@ -23,6 +23,13 @@ export function TabBar({ onAdd }: { onAdd: () => void }) {
         </button>
         {TABS.slice(2).map(t => <TabButton key={t.id} tab={t} active={activeTab === t.id} onClick={() => setActiveTab(t.id)} />)}
       </div>
+      {/* Telefoon: terug naar Home (de Dash-onderbalk is hier verborgen) */}
+      {onHome && (
+        <button onClick={onHome} aria-label="Terug naar Home" title="Terug naar Home"
+          className="md:hidden pointer-events-auto ml-2.5 w-[54px] h-[54px] shrink-0 self-center rounded-full flex items-center justify-center cursor-pointer border border-[#FF453A]/35 bg-[#17171d]/80 backdrop-blur-2xl text-[#FF453A] shadow-[0_12px_40px_rgba(0,0,0,0.55),0_0_18px_rgba(255,69,58,0.25)] active:scale-95 transition-transform">
+          <X size={24} strokeWidth={2.6} />
+        </button>
+      )}
     </div>
   )
 }

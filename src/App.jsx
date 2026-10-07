@@ -40,16 +40,17 @@ const JumboPage = lazy(() => import('./pages/JumboPage'))
 const StatsPage = lazy(() => import('./pages/StatsPage'))
 const GeldPage = lazy(() => import('./pages/GeldPage'))
 const HypexAIPage = lazy(() => import('./pages/HypexAIPage'))
+const FocusPage = lazy(() => import('./focus/FocusPage'))
 
 const ADMIN_EMAIL = 'zhafirfachri@gmail.com'
 
 const PAGE_NAMES = {
   dashboard: 'Home', agenda: 'Agenda', taken: 'Taken',
-  pomodoro: 'Pomodoro', school: 'School',
+  focus: 'Focus', pomodoro: 'Pomodoro', school: 'School',
   gewoontes: 'Gewoontes', gym: 'Gym', notities: 'Notities', statistieken: 'Statistieken', jumbo: 'Jumbo', geld: 'Geld', hypexai: 'Hypex AI',
 }
 
-const PAGE_ORDER = ['dashboard', 'agenda', 'taken', 'pomodoro', 'school', 'gewoontes', 'notities', 'statistieken']
+const PAGE_ORDER = ['dashboard', 'agenda', 'taken', 'focus', 'school', 'gewoontes', 'notities', 'statistieken']
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -75,7 +76,7 @@ export default function App() {
   const [meerOpen, setMeerOpen] = useState(false) // mobiele "Meer"-sheet open → Taken-FAB verbergen
   const [profiles, setProfiles] = useState([])
   const [showAdmin, setShowAdmin] = useState(false)
-  const [activePage, setActivePage] = useState(() => localStorage.getItem('activePage') || 'dashboard')
+  const [activePage, setActivePage] = useState(() => { const p = localStorage.getItem('activePage') || 'dashboard'; return p === 'pomodoro' ? 'focus' : p })
   const [taskHighlight, setTaskHighlight] = useState(null)
   const [agendaJump, setAgendaJump] = useState(null)
   const [paletteOpen, setPaletteOpen] = useState(false) // "Zoek in Hypex" (Ctrl/⌘K)
@@ -457,7 +458,7 @@ export default function App() {
     const trackNow = () => {
       try {
         const saved = JSON.parse(localStorage.getItem('pomodoro_v3'))
-        if (saved?.running && saved?.endTime && saved.endTime > Date.now()) {
+        if (saved?.running && ((saved?.endTime && saved.endTime > Date.now()) || (saved?.timerKind === 'stopwatch' && saved?.swStart))) {
           channel.track({
             userId: user.id,
             name: presenceNameRef.current,
@@ -477,7 +478,7 @@ export default function App() {
     const iv = setInterval(() => {
       try {
         const saved = JSON.parse(localStorage.getItem('pomodoro_v3'))
-        if (saved?.running && saved?.endTime && saved.endTime > Date.now()) {
+        if (saved?.running && ((saved?.endTime && saved.endTime > Date.now()) || (saved?.timerKind === 'stopwatch' && saved?.swStart))) {
           channel.track({
             userId: user.id,
             name: presenceNameRef.current,
@@ -684,7 +685,7 @@ export default function App() {
   }
 
   const handleSetActivePage = (page) => {
-    if (page !== 'pomodoro') setFocusMode(false)
+    if (page !== 'pomodoro' && page !== 'focus') setFocusMode(false)
     setActivePage(page)
     localStorage.setItem('activePage', page)
   }
@@ -871,6 +872,19 @@ export default function App() {
               />
             )}
 
+            {activePage === 'focus' && user && (
+              <FocusPage
+                userId={user.id}
+                onModeChange={setIsBreak}
+                onFocusModeChange={setFocusMode}
+                onPomodoroActive={setHasActivePomo}
+                seedTask={pomodoroSeedTask}
+                onSeedConsumed={() => setPomodoroSeedTask(null)}
+                onHome={() => handleSetActivePage('dashboard')}
+              />
+            )}
+
+            {/* INACTIVE: vervangen door Focus (niet meer in de navigatie) */}
             {activePage === 'pomodoro' && (
               <PomodoroPage
                 onModeChange={setIsBreak}
@@ -956,7 +970,7 @@ export default function App() {
             )}
 
             {activePage === 'geld' && isAdmin && (
-              <GeldPage userId={user.id} onClose={() => setActivePage('home')} />
+              <GeldPage userId={user.id} onClose={() => handleSetActivePage('dashboard')} />
             )}
 
             {activePage === 'hypexai' && isAdmin && (
@@ -972,8 +986,9 @@ export default function App() {
           </div>
           </div>
 
-          {/* Mobile bottom nav — fixed, spacer holds its height in the flex column */}
-          <div className="md:hidden" style={{ height: 'calc(72px + env(safe-area-inset-bottom))', flexShrink: 0 }}>
+          {/* Mobile bottom nav — fixed, spacer holds its height in the flex column.
+              Niet in Focus/Geld: die hebben hun eigen balk met een ✕ terug naar Home. */}
+          {!(activePage === 'focus' || (activePage === 'geld' && isAdmin)) && <div className="md:hidden" style={{ height: 'calc(72px + env(safe-area-inset-bottom))', flexShrink: 0 }}>
             <BottomNav
               activePage={activePage}
               setActivePage={handleSetActivePage}
@@ -984,7 +999,7 @@ export default function App() {
               hasActivePomo={hasActivePomo}
               onSheetChange={setMeerOpen}
             />
-          </div>
+          </div>}
         </div>
       </div>
 
@@ -1038,7 +1053,7 @@ export default function App() {
           onEdit={(task) => { setDetailTask(null); openEditTask(task) }}
           onDelete={(id) => { setDetailTask(null); handleDeleteTask(id) }}
           onClose={() => setDetailTask(null)}
-          onStartPomodoro={() => { setPomodoroSeedTask(detailTask); setDetailTask(null); setActivePage('pomodoro') }}
+          onStartPomodoro={() => { setPomodoroSeedTask(detailTask); setDetailTask(null); setActivePage('focus') }}
           onSaveDescription={async (id, description) => {
             await supabase.from('tasks').update({ description }).eq('id', id)
             fetchTasks()

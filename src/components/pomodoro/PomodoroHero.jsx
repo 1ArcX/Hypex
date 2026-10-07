@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import SceneCanvas from './SceneCanvas'
 import { SCENES, SCENE_BY_ID, SCENE_FOR_SOUND, sceneThumb } from './scenes'
+import { useFocusProgress, setDailyGoal, fmtFocus } from '../../hooks/useFocusProgress'
 
 const SOUND_ICONS = { off: Ban, focus: Target, brown: Wind, rain: CloudRain, ocean: Waves }
 const MODE_ICONS = { work: Brain, break: Coffee, longBreak: Moon }
@@ -45,6 +46,7 @@ function SettingsPopover({ state, modes, dispatch, onToggleNotif, onTestNotif, o
   useDismiss(ref, '[data-pomo-gear]', onClose)
 
   const { soundEnabled, notifEnabled, workMins, breakMins, longBreakMins, sessionsPerLong, running } = state
+  const { goal } = useFocusProgress()
   return (
     <div ref={ref} className="pomo-popover" role="dialog" aria-label="Timer instellingen">
       <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
@@ -83,6 +85,14 @@ function SettingsPopover({ state, modes, dispatch, onToggleNotif, onTestNotif, o
           <button type="button" className="pomo-mini" onClick={() => dispatch({ type: 'SET_SPL', v: sessionsPerLong - 1 })} disabled={sessionsPerLong <= 1} aria-label="Minder sessies"><Minus size={12} /></button>
           <span className="tnum" aria-live="polite">{sessionsPerLong}</span>
           <button type="button" className="pomo-mini" onClick={() => dispatch({ type: 'SET_SPL', v: sessionsPerLong + 1 })} disabled={sessionsPerLong >= 12} aria-label="Meer sessies"><Plus size={12} /></button>
+        </div>
+      </div>
+      <div style={{ paddingTop: 10, marginTop: 10, borderTop: '1px solid var(--c-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <span className="t-meta">Dagdoel focus</span>
+        <div className="pomo-stepper">
+          <button type="button" className="pomo-mini" onClick={() => setDailyGoal(goal - 15)} disabled={goal <= 15} aria-label="Dagdoel 15 minuten lager"><Minus size={12} /></button>
+          <span className="tnum" aria-live="polite" style={{ minWidth: 44 }}>{fmtFocus(goal)}</span>
+          <button type="button" className="pomo-mini" onClick={() => setDailyGoal(goal + 15)} disabled={goal >= 720} aria-label="Dagdoel 15 minuten hoger"><Plus size={12} /></button>
         </div>
       </div>
     </div>

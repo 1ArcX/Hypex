@@ -11,7 +11,7 @@ const PRIMARY_TABS = [
 
 const SHEET_BASE = [
   // { id: 'school', Icon: GraduationCap, label: 'School' },  // INACTIVE
-  { id: 'pomodoro',     Icon: Timer,         label: 'Pomodoro' },
+  { id: 'focus',        Icon: Timer,         label: 'Focus' },
   { id: 'statistieken', Icon: BarChart2,     label: 'Stats'    },
   // { id: 'gym', Icon: Dumbbell, label: 'Gym' },  // INACTIVE
 ]
@@ -115,7 +115,7 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
                 const active = activePage === id
                 const glowingStats = id === 'statistieken' && hasLevelUp && !active
                 const glowingGym   = id === 'gym' && hasActiveGymWorkout && !active
-                const glowingPomo  = id === 'pomodoro' && hasActivePomo && !active
+                const glowingPomo  = id === 'focus' && hasActivePomo && !active
                 const glowing = glowingStats || glowingGym || glowingPomo
                 const glowColor = glowingGym ? '#F97316' : glowingPomo ? '#EF4444' : '#FACC15'
                 const glowBg    = glowingGym ? 'rgba(249,115,22,0.08)' : glowingPomo ? 'rgba(239,68,68,0.08)' : 'rgba(250,204,21,0.08)'
