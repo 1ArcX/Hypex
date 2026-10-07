@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Check } from 'lucide-react'
+import { Check, X } from 'lucide-react'
 import { preview } from './noteFormat'
 
 // Gedeelde stukjes voor de Notities-app: datums/secties zoals Apple, afvinkrondje, menu, alert.
@@ -147,4 +147,24 @@ export function useLongPress(cb, ms = 480) {
     /** true als de tik een long-press was (dan de gewone klik negeren) */
     wasLong: () => fired.current,
   }
+}
+
+/** Telefoon-onderbalk: zwevende glazen balk (links · midden · rechts) + rode ✕ terug naar Home. */
+export function FloatBar({ left, center, right, onHome, tools }) {
+  return (
+    <div className="nx-floatbar-wrap">
+      <div className={`nx-floatbar${tools ? ' is-tools' : ''}`}>
+        {tools || (<>
+          {left || <span className="nx-floatbar__spacer" />}
+          <span className="nx-floatbar__center">{center}</span>
+          {right || <span className="nx-floatbar__spacer" />}
+        </>)}
+      </div>
+      {onHome && (
+        <button type="button" className="nx-home" onClick={onHome} aria-label="Terug naar Home" title="Terug naar Home">
+          <X size={26} strokeWidth={2.6} />
+        </button>
+      )}
+    </div>
+  )
 }

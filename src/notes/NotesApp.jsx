@@ -4,7 +4,7 @@ import { useIsDesktop } from '../hooks/useIsDesktop'
 import { useNotes } from './useNotes'
 import NoteList from './NoteList'
 import NoteEditor from './NoteEditor'
-import { Menu, PromptAlert, useLongPress } from './parts'
+import { Menu, PromptAlert, useLongPress, FloatBar } from './parts'
 import { preview } from './noteFormat'
 import './notes.css'
 
@@ -323,13 +323,12 @@ function PhoneNotes({ data, fh, folders, notes, loaded, needsMigration, pin, don
         onOpen={() => push({ type: 'list', folder: k, key: 'list' })}
         onMenu={(at) => { const items = folderMenuItems(k); if (items.length) setMenu({ at, items }) }} />
       return (
-        <Screen title="Mappen" back="Home" onBack={onHome}
-          toolbar={!editing && (
-            <div className="nx-toolbar">
-              <button type="button" className="nx-icon-btn" onClick={() => setAlert({ kind: 'new' })} aria-label="Nieuwe map"><FolderPlus size={24} /></button>
-              <span className="nx-toolbar__count" />
-              <button type="button" className="nx-icon-btn" onClick={() => newNote('none')} aria-label="Nieuwe notitie"><SquarePen size={24} /></button>
-            </div>
+        <Screen title="Mappen"
+          toolbar={(
+            <FloatBar onHome={onHome}
+              left={<button type="button" className="nx-icon-btn" onClick={() => setAlert({ kind: 'new' })} aria-label="Nieuwe map"><FolderPlus size={24} /></button>}
+              center={`${data.counts.all} ${data.counts.all === 1 ? 'notitie' : 'notities'}`}
+              right={<button type="button" className="nx-icon-btn" onClick={() => newNote('none')} aria-label="Nieuwe notitie"><SquarePen size={24} /></button>} />
           )}>
           <SearchField value={term} onChange={setQ('folders')} />
           {needsMigration && <MigrationBanner />}
@@ -361,11 +360,9 @@ function PhoneNotes({ data, fh, folders, notes, loaded, needsMigration, pin, don
           right={f && <button type="button" className="nx-icon-btn" aria-label="Mapopties"
             onClick={e => { const r = e.currentTarget.getBoundingClientRect(); setMenu({ at: { x: r.right, y: r.bottom + 4, alignRight: true }, items: folderMenuItems(key, () => pop()) }) }}><MoreHorizontal size={24} /></button>}
           toolbar={(
-            <div className="nx-toolbar">
-              <span />
-              <span className="nx-toolbar__count">{list.length} {list.length === 1 ? 'notitie' : 'notities'}</span>
-              <button type="button" className="nx-icon-btn" onClick={() => newNote(key)} aria-label="Nieuwe notitie"><SquarePen size={24} /></button>
-            </div>
+            <FloatBar onHome={onHome}
+              center={`${list.length} ${list.length === 1 ? 'notitie' : 'notities'}`}
+              right={<button type="button" className="nx-icon-btn" onClick={() => newNote(key)} aria-label="Nieuwe notitie"><SquarePen size={24} /></button>} />
           )}>
           <SearchField value={term} onChange={setQ('list')} />
           {!loaded ? <div className="nx-empty">Laden…</div> : (
@@ -392,7 +389,7 @@ function PhoneNotes({ data, fh, folders, notes, loaded, needsMigration, pin, don
           <NoteEditor key={note.id} note={note} saveState={data.saveState} checkable={fh.checkable(note.folder_id)} folders={folders}
             onEdit={f => data.editNote(note.id, f)} onPin={() => pin(note)} onToggleDone={() => done(note)}
             onDelete={() => { pop(); removeNote(note) }} onNew={() => newNote(note.folder_id || 'none')} onMove={fid => data.moveNote(note, fid)}
-            onEditingChange={setEditing} />
+            onEditingChange={setEditing} onHome={onHome} />
         ) : <div className="nx-empty">Notitie niet gevonden.</div>}
       </Screen>
     )

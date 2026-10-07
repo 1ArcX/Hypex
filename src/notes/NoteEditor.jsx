@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ListChecks, Type, Pin, PinOff, Trash2, SquarePen, FolderInput, List, ListOrdered, CheckCircle2, Circle, X } from 'lucide-react'
 import { parse, serialize, parseLine, numberOf, newId } from './noteFormat'
-import { CheckCircle, longDate, Menu } from './parts'
+import { CheckCircle, longDate, Menu, FloatBar } from './parts'
 
 // Blok-editor in Apple Notes-stijl. Elke regel is een blok (tekst, kop, opsomming, genummerd, afvinkpunt)
 // met een eigen auto-groeiend tekstveld; Enter/Backspace/pijltjes/plakken gedragen zich als één document.
@@ -42,7 +42,7 @@ const SHORTCUTS = [
 
 export default function NoteEditor({
   note, mac, saveState, checkable, folders,
-  onEdit, onPin, onToggleDone, onDelete, onNew, onMove, onEditingChange,
+  onEdit, onPin, onToggleDone, onDelete, onNew, onMove, onEditingChange, onHome,
 }) {
   const [title, setTitle] = useState(note.title || '')
   const [blocks, setBlocks] = useState(() => parse(note.content))
@@ -283,7 +283,10 @@ export default function NoteEditor({
         ))}
       </div>
 
-      {!mac && <div className="nx-keybar" style={{ '--nx-kb': `${kb}px`, ...(kb ? { '--nx-kb-safe': '0px' } : {}) }}>{toolbar}</div>}
+      {/* Telefoon: toetsenbord open = werkbalk erboven, anders de zwevende balk met de rode ✕ */}
+      {!mac && (kb > 40 || editing
+        ? <div className="nx-keybar" style={{ '--nx-kb': `${kb}px`, ...(kb ? { '--nx-kb-safe': '0px' } : {}) }}>{toolbar}</div>
+        : <FloatBar tools={toolbar} onHome={onHome} />)}
 
       {fmt && (
         <>
