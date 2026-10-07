@@ -66,6 +66,8 @@ export default function FocusPage({ userId, onModeChange, onFocusModeChange, onP
   // "Start focus" vanuit een taak → timer openen
   useEffect(() => { if (seedTask) setSheet({ kind: 'timer' }) }, [seedTask])
   useEffect(() => { scrollRef.current?.scrollTo({ top: 0 }) }, [tab, openCourse])
+  // Sessie of pauze klaar → timerscherm dicht, zodat de afronding (★, beloning, pauze voorbij) zichtbaar is
+  useEffect(() => { if (popup) setSheet(s => (s?.kind === 'timer' ? null : s)) }, [popup])
 
   const go = (t: FocusTab) => { setOpenCourse(null); setTab(t) }
   const studyCourse = (id: string) => { engine.setMeta({ courseId: id, topicId: null }); setSheet({ kind: 'timer' }) }
