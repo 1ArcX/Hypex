@@ -79,7 +79,7 @@ export default function App() {
   const [meerOpen, setMeerOpen] = useState(false) // mobiele "Meer"-sheet open → Taken-FAB verbergen
   const [profiles, setProfiles] = useState([])
   const [showAdmin, setShowAdmin] = useState(false)
-  const [activePage, setActivePage] = useState(() => { const p = localStorage.getItem('activePage') || 'dashboard'; return p === 'pomodoro' ? 'focus' : p })
+  const [activePage, setActivePage] = useState(() => { const p = localStorage.getItem('activePage') || 'dashboard'; return p === 'pomodoro' ? 'focus' : p === 'hypexai' ? 'dashboard' : p })
   const [taskHighlight, setTaskHighlight] = useState(null)
   const [agendaJump, setAgendaJump] = useState(null)
   const [paletteOpen, setPaletteOpen] = useState(false) // "Zoek in Hypex" (Ctrl/⌘K)
@@ -997,6 +997,7 @@ export default function App() {
               <GeldPage userId={user.id} onClose={() => handleSetActivePage('dashboard')} />
             )}
 
+            {/* INACTIVE: Hypex AI (uit de navigatie; opgeslagen 'hypexai' gaat naar dashboard) */}
             {activePage === 'hypexai' && isAdmin && (
               <HypexAIPage userId={user.id} tasks={tasks} subjects={subjects} displayName={displayName}
                 calendarEvents={allEvents} magisterLessons={magisterLessons}

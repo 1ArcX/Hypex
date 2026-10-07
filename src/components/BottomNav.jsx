@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Home, Calendar, CheckSquare, Timer, MoreHorizontal, GraduationCap, Flame, FileText, Briefcase, BarChart2, Dumbbell, Wallet, Sparkles } from 'lucide-react'
+import { Home, Calendar, CheckSquare, Timer, MoreHorizontal, GraduationCap, Flame, FileText, Briefcase, BarChart2, Dumbbell, Wallet } from 'lucide-react'
 
 const PRIMARY_TABS = [
   { id: 'dashboard', Icon: Home,          label: 'Home'      },
@@ -40,7 +40,7 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
     ...SHEET_BASE,
     ...(showJumbo ? [{ id: 'jumbo', Icon: Briefcase, label: 'Jumbo' }] : []),
     ...(isAdmin ? [{ id: 'geld', Icon: Wallet, label: 'Geld' }] : []),
-    ...(isAdmin ? [{ id: 'hypexai', Icon: Sparkles, label: 'Hypex AI' }] : []),
+    // Hypex AI: INACTIVE (uit de navigatie, code blijft in pages/HypexAIPage.jsx)
   ]
 
   const sheetActive = sheetItems.some(i => i.id === activePage)

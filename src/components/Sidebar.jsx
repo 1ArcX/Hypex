@@ -1,5 +1,5 @@
 import React from 'react'
-import { Home, Timer, Calendar, GraduationCap, CheckSquare, Flame, FileText, Briefcase, Settings, Shield, LogOut, RefreshCw, BarChart2, Dumbbell, Wallet, Sparkles, Search } from 'lucide-react'
+import { Home, Timer, Calendar, GraduationCap, CheckSquare, Flame, FileText, Briefcase, Settings, Shield, LogOut, RefreshCw, BarChart2, Dumbbell, Wallet, Search } from 'lucide-react'
 import VersionChecker from './VersionChecker'
 import { CountBadge, Pill } from './ui'
 
@@ -36,7 +36,7 @@ export default function Sidebar({
     ...NAV_ITEMS,
     ...(showJumbo ? [{ id: 'jumbo', Icon: Briefcase, label: 'Jumbo ★' }] : []),
     ...(isAdmin ? [{ id: 'geld', Icon: Wallet, label: 'Geld' }] : []),
-    ...(isAdmin ? [{ id: 'hypexai', Icon: Sparkles, label: 'Hypex AI' }] : []),
+    // Hypex AI: INACTIVE (uit de navigatie, code blijft in pages/HypexAIPage.jsx)
   ]
 
   const syncIcon = (

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
-import { Search, Home, Calendar, CheckSquare, Timer, FileText, BarChart2, Briefcase, Wallet, Sparkles, Plus, CornerDownLeft, StickyNote } from 'lucide-react'
+import { Search, Home, Calendar, CheckSquare, Timer, FileText, BarChart2, Briefcase, Wallet, Plus, CornerDownLeft, StickyNote } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { taskCategory, eventCategory, categoryColor } from '../utils/category'
 import { eventDisplay } from '../utils/eventTitle'
@@ -16,7 +16,7 @@ const PAGES = [
   { id: 'statistieken', label: 'Statistieken', Icon: BarChart2 },
   { id: 'jumbo',        label: 'Jumbo',        Icon: Briefcase, access: 'jumbo' },
   { id: 'geld',         label: 'Geld',         Icon: Wallet,    access: 'admin' },
-  { id: 'hypexai',      label: 'Hypex AI',     Icon: Sparkles,  access: 'admin' },
+  // Hypex AI: INACTIVE (uit de navigatie)
 ]
 
 const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
