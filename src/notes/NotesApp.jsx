@@ -179,16 +179,23 @@ function MacNotes({ data, fh, folders, notes, loaded, needsMigration, pin, done,
     const n = await data.createNote(key === 'all' || key === 'none' ? null : key)
     if (n) { setQuery(''); setSelectedId(n.id) }
   }
+  const newFolderItem = { label: 'Nieuwe map', icon: FolderPlus, onClick: () => setAlert({ kind: 'new', onCreated: f => choose(f.id) }) }
   const folderRow = (k, label, Icon, count) => (
     <button key={k} type="button" className={`nx-mac-folder${key === k ? ' is-on' : ''}`} onClick={() => choose(k)}
-      onContextMenu={e => { const items = folderMenuItems(k, () => choose('all')); if (items.length) { e.preventDefault(); setMenu({ at: { x: e.clientX, y: e.clientY }, items }) } }}>
+      onContextMenu={e => {
+        e.preventDefault(); e.stopPropagation()
+        const items = folderMenuItems(k, () => choose('all'))
+        setMenu({ at: { x: e.clientX, y: e.clientY }, items: items.length ? [...items, 'sep', newFolderItem] : [newFolderItem] })
+      }}>
       <Icon size={16} /><span>{label}</span><span className="nx-count tnum">{count || ''}</span>
     </button>
   )
 
   return (
     <div className="nx is-mac">
-      <aside className="nx-mac-side" aria-label="Mappen">
+      {/* Rechtsklik in de mappenkolom (ook op lege plek) = menu met "Nieuwe map" */}
+      <aside className="nx-mac-side" aria-label="Mappen"
+        onContextMenu={e => { e.preventDefault(); setMenu({ at: { x: e.clientX, y: e.clientY }, items: [newFolderItem] }) }}>
         <div className="nx-mac-side__head">Hypex</div>
         <div className="nx-mac-side__list">
           {folderRow('all', 'Alle notities', Layers, data.counts.all)}
