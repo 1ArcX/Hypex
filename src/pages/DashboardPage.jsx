@@ -168,9 +168,10 @@ export default function DashboardPage({
         />
 
         {/* ── Widgets ── */}
-        {/* Desktop: Pomodoro + Geld gestapeld links, Spotify ("mini Spotify" met songtekst) groot rechts */}
+        {/* Desktop: Pomodoro + Geld gestapeld links, Spotify ("mini Spotify" met songtekst) groot rechts.
+            Verticaal scherm: Pomodoro + Geld naast elkaar, Spotify over de volle breedte eronder. */}
         {isDesktop ? (
-          <section className={`dash-media${widgetCount ? '' : ' is-solo'}`} aria-label="Widgets">
+          <section className={`dash-media${widgetCount ? '' : ' is-solo'}${vp.portrait ? ' is-column' : ''}`} aria-label="Widgets">
             {widgetCount > 0 && (
               <div className="dash-media__stack">
                 {!pomoActive && <PomodoroMiniWidget st={pomo} userId={userId} onOpen={() => onNavigate('focus')} />}

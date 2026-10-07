@@ -1086,10 +1086,17 @@ select {
 
 /* Body: speler links, songtekst rechts (breed); panelen scrollen binnen de kaart */
 .sp-hero-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
-.sp-hero-body.is-wide { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+.sp-hero-body.is-wide { gap: 0; } /* kolommen via inline style: speler | scheidingslijn | songtekst */
+.sp-split { position: relative; cursor: col-resize; touch-action: none; outline: none; }
+.sp-split::before { content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; transform: translateX(-50%); background: var(--c-border); transition: background 0.15s ease, width 0.15s ease; }
+.sp-split::after { content: ''; position: absolute; top: 50%; left: 50%; width: 4px; height: 32px; border-radius: 2px; transform: translate(-50%, -50%); background: var(--c-text-3); opacity: 0; transition: opacity 0.15s ease; }
+.sp-split:hover::before, .sp-split:focus-visible::before, .is-col-resizing .sp-split::before { width: 2px; background: #1DB954; }
+.sp-split:hover::after, .sp-split:focus-visible::after, .is-col-resizing .sp-split::after { opacity: 0.8; }
+body.is-col-resizing { cursor: col-resize; user-select: none; }
 .sp-hero-pane, .sp-hero-side { min-height: 0; min-width: 0; overflow-y: auto; scrollbar-width: thin; }
 .sp-hero.is-mini .sp-hero-pane { padding-right: 4px; }
-.sp-hero-side { display: flex; flex-direction: column; border-left: 1px solid var(--c-border); padding-left: 18px; overflow: hidden; }
+.sp-hero-side { display: flex; flex-direction: column; padding-left: 12px; overflow: hidden; }
+.sp-hero-body.is-wide .sp-hero-pane { padding-right: 10px; }
 
 .sp-hero-main { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 22px; align-items: center; }
 .sp-hero-cover {
@@ -1187,6 +1194,9 @@ select {
 /* Dashboard-rij: Pomodoro + Geld gestapeld links, Spotify groot rechts */
 .dash-media { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 12px; align-items: stretch; }
 .dash-media.is-solo { grid-template-columns: minmax(0, 1fr); }
+/* Verticaal scherm: Pomodoro + Geld naast elkaar, Spotify er groot onder */
+.dash-media.is-column { grid-template-columns: minmax(0, 1fr); }
+.dash-media.is-column .dash-media__stack { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 .dash-media__stack { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .dash-media .sp-hero { height: clamp(460px, calc(100vh - 520px), 820px); }
 .dash.is-tall .dash-media .sp-hero { height: clamp(560px, calc(100vh - 820px), 900px); }

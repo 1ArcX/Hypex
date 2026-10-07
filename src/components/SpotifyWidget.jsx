@@ -144,6 +144,8 @@ function useWidth(ref) {
   return w
 }
 
+const SPLIT_MIN = 0.3, SPLIT_MAX = 0.78, SPLIT_DEFAULT = 0.56
+
 const TABS = [
   { id: 'nu', label: 'Nu', icon: Disc3 },
   { id: 'zoeken', label: 'Zoeken', icon: Search },
@@ -154,10 +156,43 @@ const TABS = [
 function Hero({ title, className, queueLimit, style }) {
   const st = usePlayer()
   const ref = useRef(null)
-  const wide = useWidth(ref) >= 760
+  const wide = useWidth(ref) >= 680
   const [tab, setTabState] = useState(() => localStorage.getItem('sp_tab') || 'nu')
   const setTab = (t) => { setTabState(t); try { localStorage.setItem('sp_tab', t) } catch {} }
   const shownTab = wide && tab === 'tekst' ? 'nu' : tab
+
+  // Verdeling speler | songtekst, versleepbaar via de scheidingslijn (per apparaat bewaard)
+  const bodyRef = useRef(null)
+  const [split, setSplit] = useState(() => {
+    const v = Number(localStorage.getItem('sp_split'))
+    return v >= SPLIT_MIN && v <= SPLIT_MAX ? v : SPLIT_DEFAULT
+  })
+  const clampSplit = (v) => Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, v))
+  const saveSplit = (v) => { const c = clampSplit(v); setSplit(c); try { localStorage.setItem('sp_split', String(c)) } catch {} }
+  const startDrag = (e) => {
+    const body = bodyRef.current
+    if (!body || e.button !== 0) return
+    e.preventDefault()
+    const handle = e.currentTarget
+    handle.setPointerCapture(e.pointerId)
+    document.body.classList.add('is-col-resizing')
+    let last = split
+    const move = (ev) => {
+      const r = body.getBoundingClientRect()
+      last = clampSplit((ev.clientX - r.left) / r.width)
+      setSplit(last)
+    }
+    const up = () => {
+      handle.removeEventListener('pointermove', move)
+      handle.removeEventListener('pointerup', up)
+      handle.removeEventListener('pointercancel', up)
+      document.body.classList.remove('is-col-resizing')
+      saveSplit(last)
+    }
+    handle.addEventListener('pointermove', move)
+    handle.addEventListener('pointerup', up)
+    handle.addEventListener('pointercancel', up)
+  }
 
   // Laatst afgespeeld: bij laden en bij elk nieuw nummer
   const trackId = st.track?.id
@@ -195,13 +230,24 @@ function Hero({ title, className, queueLimit, style }) {
           <button onClick={player.logout} className="btn-ghost">Ontkoppelen</button>
         </div>
       ) : (
-        <div className={`sp-hero-body${wide ? ' is-wide' : ''}`}>
+        <div ref={bodyRef} className={`sp-hero-body${wide ? ' is-wide' : ''}`}
+          style={wide ? { gridTemplateColumns: `minmax(0, ${split}fr) 14px minmax(0, ${1 - split}fr)` } : undefined}>
           <div className="sp-hero-pane">
             {shownTab === 'nu' && <NowView queueLimit={queueLimit} />}
             {shownTab === 'zoeken' && <SearchView />}
             {shownTab === 'bieb' && <LibraryView />}
             {shownTab === 'tekst' && <LyricsView />}
           </div>
+          {wide && (
+            <div className="sp-split" role="separator" aria-orientation="vertical" aria-label="Breedte songtekst"
+              aria-valuemin={SPLIT_MIN * 100} aria-valuemax={SPLIT_MAX * 100} aria-valuenow={Math.round(split * 100)} tabIndex={0}
+              title="Sleep om de songtekst breder of smaller te maken (dubbelklik = standaard)"
+              onPointerDown={startDrag} onDoubleClick={() => saveSplit(SPLIT_DEFAULT)}
+              onKeyDown={e => {
+                if (e.key === 'ArrowLeft') { e.preventDefault(); saveSplit(split - 0.03) }
+                if (e.key === 'ArrowRight') { e.preventDefault(); saveSplit(split + 0.03) }
+              }} />
+          )}
           {wide && (
             <aside className="sp-hero-side" aria-label="Songtekst">
               <p className="sp-list-title"><Mic2 size={12} aria-hidden="true" /> Songtekst</p>
