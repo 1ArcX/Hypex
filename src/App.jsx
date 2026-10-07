@@ -802,7 +802,8 @@ export default function App() {
           {/* Mobile header — iOS navigation bar: titel gecentreerd.
               Statusbalk is 'black-translucent' (viewport-fit=cover): de app loopt door onder klok/notch/
               Dynamic Island, dus de header krijgt de safe-area erbij en zet de inhoud eronder. */}
-          <div className="md:hidden flex items-center justify-between px-4"
+          {/* Niet op Notities: die heeft een eigen iOS-navigatiebalk */}
+          {activePage !== 'notities' && <div className="md:hidden flex items-center justify-between px-4"
             style={{ height: 'calc(52px + env(safe-area-inset-top))', paddingTop: 'env(safe-area-inset-top)', boxSizing: 'border-box', borderBottom: '1px solid var(--border)', background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', flexShrink: 0, position: 'relative' }}>
             <span style={{
               position: 'absolute', left: 0, right: 0, bottom: 0, height: 52, lineHeight: '52px', textAlign: 'center', pointerEvents: 'none',
@@ -833,11 +834,11 @@ export default function App() {
                 <Settings size={17} />
               </button>
             </div>
-          </div>
+          </div>}
 
           {/* Pomodoro / stopwatch loopt: balk bovenaan elke tab, behalve Focus (daar staat de timer zelf) */}
           {(pomo.running || pomo.paused) && activePage !== 'focus' && (
-            <div className="app-pomo-banner">
+            <div className={`app-pomo-banner${activePage === 'notities' ? ' is-top-edge' : ''}`}>
               <PomodoroBanner st={pomo} onOpen={() => handleSetActivePage('focus')} />
             </div>
           )}
@@ -967,7 +968,7 @@ export default function App() {
             )}
 
             {activePage === 'notities' && (
-              <NotitiesPage userId={user.id} syncTrigger={syncTrigger} openNoteId={noteJump} />
+              <NotitiesPage userId={user.id} syncTrigger={syncTrigger} openNoteId={noteJump} onHome={() => handleSetActivePage('dashboard')} />
             )}
 
             {activePage === 'statistieken' && (
@@ -996,8 +997,8 @@ export default function App() {
           </div>
 
           {/* Mobile bottom nav — fixed, spacer holds its height in the flex column.
-              Niet in Focus/Geld: die hebben hun eigen balk met een ✕ terug naar Home. */}
-          {!(activePage === 'focus' || (activePage === 'geld' && isAdmin)) && <div className="md:hidden" style={{ height: 'calc(72px + env(safe-area-inset-bottom))', flexShrink: 0 }}>
+              Niet in Focus/Geld/Notities: die hebben hun eigen balk met een weg terug naar Home. */}
+          {!(activePage === 'focus' || activePage === 'notities' || (activePage === 'geld' && isAdmin)) && <div className="md:hidden" style={{ height: 'calc(72px + env(safe-area-inset-bottom))', flexShrink: 0 }}>
             <BottomNav
               activePage={activePage}
               setActivePage={handleSetActivePage}

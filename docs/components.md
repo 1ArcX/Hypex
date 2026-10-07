@@ -29,7 +29,7 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 | `taken` | [pages/TakenPage.jsx](../src/pages/TakenPage.jsx) | Taken | FilterTabs, TaskOverview (Overzicht, default), TodayView (Vandaag/Morgen), TasksWidget (other filters) | all |
 | `focus` | [focus/FocusPage.tsx](../src/focus/FocusPage.tsx) | Focus / (in "Meer") | Focus sub-app (see below): Home, Vakken, Kalender, Inzichten, timer | all |
 | `pomodoro` | [pages/PomodoroPage.jsx](../src/pages/PomodoroPage.jsx) | — (**INACTIVE**, replaced by Focus; a stored `activePage: 'pomodoro'` redirects to `focus`) | PomodoroTimer → PomodoroHero (+ Vandaag / SessionGoalCard / Focus playlist cards); below: StudieBuddiesWidget, PomodoroStats, sessie-log | all |
-| `notities` | [pages/NotitiesPage.jsx](../src/pages/NotitiesPage.jsx) | Notities | NotesWidget | all |
+| `notities` | [pages/NotitiesPage.jsx](../src/pages/NotitiesPage.jsx) | Notities | NotesApp (Apple Notes, `src/notes/`) | all |
 | `statistieken` | [pages/StatsPage.jsx](../src/pages/StatsPage.jsx) | Statistieken / Stats | (self-contained SVG bar charts) | all |
 | `jumbo` | [pages/JumboPage.jsx](../src/pages/JumboPage.jsx) | Jumbo ★ | WorkWidget, VrachttijdenWidget | admin or `werk_tab` profile |
 | `geld` | [pages/GeldPage.jsx](../src/pages/GeldPage.jsx) → [geld/GeldPage.tsx](../src/geld/GeldPage.tsx) | Geld | Geld sub-app (see below) | admin only |
@@ -54,12 +54,12 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 - **BottomNav** — [components/BottomNav.jsx](../src/components/BottomNav.jsx)
   - Aliases: "bottom nav", "tab bar", "onderbalk", "onderste menu", "de tabs", "Meer-menu" (the "…"/More sheet)
   - Where: mobile only. Primary tabs (Home/Agenda/Taken/Notities) + a "Meer" bottom sheet for the rest. Swipe between primary tabs.
-  - Hidden in the Focus and Geld sub-apps: their own tab bar has a red ✕ button on the right (phone only) that goes back to Home (`onHome` / `onClose` from App).
+  - Hidden in the Focus and Geld sub-apps (their own tab bar has a red ✕ back to Home, `onHome` / `onClose` from App) and on Notities (own iOS bars, "‹ Home").
   - Related: Sidebar.
 
 - **Mobile header / top bar** — inline in [App.jsx](../src/App.jsx) (the `md:hidden` 52px bar)
   - Aliases: "top bar", "mobiele header", "titelbalk", "sync-knop", "settings-knop bovenaan"
-  - Where: top of every page on mobile. Centered page title (`PAGE_NAMES`), sync dot, settings gear. Height includes `env(safe-area-inset-top)` (iOS status bar is black-translucent, so the app runs under the clock/Dynamic Island). No separate file.
+  - Where: top of every page on mobile (not on Notities, which has its own iOS nav bar). Centered page title (`PAGE_NAMES`), sync dot, settings gear. Height includes `env(safe-area-inset-top)` (iOS status bar is black-translucent, so the app runs under the clock/Dynamic Island). No separate file.
 
 ## Feature components
 
@@ -119,7 +119,10 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 - **StudieBuddiesWidget** — [components/StudieBuddiesWidget.jsx](../src/components/StudieBuddiesWidget.jsx) — shows who is studying now (Supabase presence). Aliases: "studiebuddies", "wie is online", "study buddies".
 
 ### Notes / habits / gym
-- **NotesWidget** — [components/NotesWidget.jsx](../src/components/NotesWidget.jsx) — notes list + editor; `split` = desktop split view (list with search, folder filters, sort | detail with folder tag, delete). Folder colors via `folderColor(id)`. Styles `.notes-*`. Aliases: "notities", "notes", "kladblok", "split view".
+- **Notities (Apple Notes)** — [notes/NotesApp.jsx](../src/notes/NotesApp.jsx) via [pages/NotitiesPage.jsx](../src/pages/NotitiesPage.jsx), own styles [notes.css](../src/notes/notes.css) under `.nx` (black, yellow `#FFD60A`). **Desktop = Mac Notes**: folders sidebar | list | editor (right-click = menu). **Phone = iPhone Notes**: stack Mappen → Lijst → Notitie with iOS push/pop animations, swipe back from the left edge, large titles that collapse, own bottom bar; App hides the mobile header + BottomNav on this page ("‹ Home" goes back).
+  Folders: "Alle notities", "Notities" (no folder), user folders; folder menu (⋯ / long-press / right-click): rename, **Afvinkbaar** (`note_folders.checkable` → each note gets a circle, checked = `notes.done_at`, moves to "Afgerond"), delete. List: sections Vastgezet / Vandaag / Gisteren / Vorige 7 / 30 dagen / month / year, checklist progress "3/7", swipe left = Zet vast / Verwijder (full swipe deletes; "Herstel" toast). Editor [NoteEditor.jsx](../src/notes/NoteEditor.jsx): block editor (title + one textarea per line; Enter continues the list, empty item + Enter ends it, Backspace removes formatting/merges), toolbar Aa (Kop, Tekst, opsomming, genummerd, afvinklijst), checklist button, pin, check off, new note; phone toolbar sits above the keyboard. Empty notes disappear when you leave them.
+  Content stays **plain text** in `notes.content` ([noteFormat.js](../src/notes/noteFormat.js): `# kop`, `- [ ]`/`- [x]`, `- `, `1. `), so CommandPalette search and Hypex AI keep working. Data: [useNotes.js](../src/notes/useNotes.js) (debounced save, optimistic pin/done/move, `restoreNote` for undo); helpers in [parts.jsx](../src/notes/parts.jsx). Migration [add_notes_apple.sql](../supabase/migrations/add_notes_apple.sql) (`pinned`, `done_at`, `checkable`); without it pin/check-off show a notice.
+  Aliases: "notities", "notes", "apple notes", "kladblok", "afvinklijst", "boodschappenlijst", "checklist", "updates afvinken", "vastzetten", "mappen".
 - **HabitsWidget** — [components/HabitsWidget.jsx](../src/components/HabitsWidget.jsx) — habits/streaks (Gewoontes page, INACTIVE). Aliases: "gewoontes", "habits", "streaks".
 - **GymWidget** — [components/GymWidget.jsx](../src/components/GymWidget.jsx) — workout tracking, awards XP (Gym page, INACTIVE). Aliases: "gym", "workout", "training". State: `gym_active_workout` in localStorage.
 
@@ -194,7 +197,7 @@ Self-contained money/budget app, mounted via [pages/GeldPage.jsx](../src/pages/G
   Global classes: `.card`, `.card-interactive`, `.card-tone` (+ `--tone`), `.card-urgent`, `.btn-primary`, `.btn-ghost`, `.btn-neon`,
   typography roles `.t-display/.t-kpi/.t-page/.t-section/.t-card/.t-body/.t-meta/.t-badge/.t-overline`, `.tnum`.
 - **Shared components** — [components/ui/](../src/components/ui/index.js) (import from `components/ui`):
-  - `Card`, `CardHeader`, `CardLink` — [Card.jsx](../src/components/ui/Card.jsx). `Card glow="accent"|color` = Spotify-style blurred colour background (`.glow-card`, `--glow`; `.glow-card--soft` = fainter). For large or scrolling surfaces use the class `.glow-bg` (gradient background, no overflow) — used on the agenda grid, notes list/editor (folder colour), settings modal and Hypex AI briefing tiles. Statistieken cards each have their own glow colour. Aliases: "kaart", "card header", "Bekijk alles-link".
+  - `Card`, `CardHeader`, `CardLink` — [Card.jsx](../src/components/ui/Card.jsx). `Card glow="accent"|color` = Spotify-style blurred colour background (`.glow-card`, `--glow`; `.glow-card--soft` = fainter). For large or scrolling surfaces use the class `.glow-bg` (gradient background, no overflow) — used on the agenda grid, settings modal and Hypex AI briefing tiles. Statistieken cards each have their own glow colour. Aliases: "kaart", "card header", "Bekijk alles-link".
   - `KpiTile` — [KpiTile.jsx](../src/components/ui/KpiTile.jsx). Aliases: "KPI tegel", "stats tile".
   - `TypeSelect` — [TypeSelect.jsx](../src/components/ui/TypeSelect.jsx) — type dropdown (colour dot + name, "+ Nieuw type"); value = category (built-in key or custom type id). Aliases: "type dropdown", "type kiezen".
   - `ListRow`, `CheckButton` — [ListRow.jsx](../src/components/ui/ListRow.jsx). Aliases: "lijstrij", "taakrij", "afvinkknop".
