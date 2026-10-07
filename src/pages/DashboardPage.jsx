@@ -8,7 +8,7 @@ import WeatherWidget from '../components/WeatherWidget'
 import SpotifyWidget from '../components/SpotifyWidget'
 import GeldMiniWidget from '../components/dashboard/GeldMiniWidget'
 import PomodoroMiniWidget from '../components/dashboard/PomodoroMiniWidget'
-import PomodoroBanner, { usePomodoroState } from '../components/dashboard/PomodoroBanner'
+import { usePomodoroState } from '../components/dashboard/PomodoroBanner'
 import TodayFocusCard from '../components/dashboard/TodayFocusCard'
 import { useTodayItems, useNextEvent, useCurrentItem, useMinuteTick } from '../components/dashboard/useToday'
 import { Card, CardHeader, CardLink, ListRow, Pill, IconButton } from '../components/ui'
@@ -128,8 +128,7 @@ export default function DashboardPage({
     <div className="dash-scroll">
       <div className={`dash${tall ? ' is-tall' : ''}`}>
 
-        {/* ── Pomodoro loopt: valt meteen op ── */}
-        {pomoActive && <PomodoroBanner st={pomo} onOpen={() => onNavigate('focus')} />}
+        {/* Loopt er een Pomodoro, dan staat de PomodoroBanner erboven (App.jsx, op elke tab) */}
 
         {/* ── Kop: begroeting + KPI-chips, zoeken, tijd, weer ── */}
         <header className="dash-header">

@@ -56,10 +56,22 @@ export function applyOverride(rawEv, ov) {
  * voorbij zijn. Verborgen items zitten erin met `hidden: true`; filter zelf.
  */
 export async function loadExternalEvents({ since, limit } = {}) {
-  let q = supabase.from('external_calendar_events').select('*').order('start_time')
-  if (since) q = q.gte('end_time', since)
-  if (limit) q = q.limit(limit)
-  const [events, overrides, connections] = await Promise.all([q, loadOverrides(), loadConnections()])
+  const query = () => {
+    let q = supabase.from('external_calendar_events').select('*').order('start_time').order('id')
+    return since ? q.gte('end_time', since) : q
+  }
+  // Supabase geeft max. 1000 rijen per verzoek; de historie groeit, dus zonder limit in pagina's ophalen.
+  const loadEvents = async () => {
+    if (limit) return query().limit(limit)
+    const all = []
+    for (let from = 0; ; from += 1000) {
+      const page = await query().range(from, from + 999)
+      if (page.error) return page
+      all.push(...(page.data || []))
+      if (!page.data || page.data.length < 1000) return { data: all, error: null }
+    }
+  }
+  const [events, overrides, connections] = await Promise.all([loadEvents(), loadOverrides(), loadConnections()])
   if (events.error || !events.data) return null
   const ovMap = new Map(overrides.map(o => [overrideKey(o.connection_id, o.external_id), o]))
   const connMap = new Map(connections.map(c => [c.id, c]))

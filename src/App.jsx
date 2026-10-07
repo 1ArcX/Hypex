@@ -31,6 +31,7 @@ import AgendaPage from './pages/AgendaPage'
 import TakenPage from './pages/TakenPage'
 import NotitiesPage from './pages/NotitiesPage'
 import CommandPalette from './components/CommandPalette'
+import PomodoroBanner, { usePomodoroState } from './components/dashboard/PomodoroBanner'
 
 // Minder gebruikte / zware pagina's (Geld → recharts, Jumbo → maplibre) pas laden bij openen
 const SchoolPage = lazy(() => import('./pages/SchoolPage'))
@@ -103,6 +104,7 @@ export default function App() {
   const [hasLevelUp, setHasLevelUp] = useState(() => !!localStorage.getItem('levelup_pending'))
   const [hasActiveGymWorkout, setHasActiveGymWorkout] = useState(() => !!localStorage.getItem('gym_active_workout'))
   const [hasActivePomo, setHasActivePomo] = useState(false)
+  const pomo = usePomodoroState() // timer-balk bovenaan elke tab (behalve Focus zelf)
   useItemTypes() // types veranderd (naam/kleur) → hele app opnieuw renderen met de nieuwe kleuren
 
   // Listen for level-up events dispatched by awardXP utility
@@ -832,6 +834,13 @@ export default function App() {
               </button>
             </div>
           </div>
+
+          {/* Pomodoro / stopwatch loopt: balk bovenaan elke tab, behalve Focus (daar staat de timer zelf) */}
+          {(pomo.running || pomo.paused) && activePage !== 'focus' && (
+            <div className="app-pomo-banner">
+              <PomodoroBanner st={pomo} onOpen={() => handleSetActivePage('focus')} />
+            </div>
+          )}
 
           {/* Page content */}
           <div style={{ flex: 1, overflow: 'hidden' }}>

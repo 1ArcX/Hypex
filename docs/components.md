@@ -24,7 +24,7 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 
 | `activePage` | Page component | Nav label(s) | Main children | Access |
 |---|---|---|---|---|
-| `dashboard` | [pages/DashboardPage.jsx](../src/pages/DashboardPage.jsx) | Dashboard / Home | PomodoroBanner, TodayFocusCard, Clock, SpotifyWidget, WeatherWidget | all |
+| `dashboard` | [pages/DashboardPage.jsx](../src/pages/DashboardPage.jsx) | Dashboard / Home | TodayFocusCard, Clock, SpotifyWidget, WeatherWidget | all |
 | `agenda` | [pages/AgendaPage.jsx](../src/pages/AgendaPage.jsx) | Agenda | Timeline (desktop), mobile: Dag (WeekStrip + Timeline) / Lijst (AgendaList) / Maand (MonthGrid) | all |
 | `taken` | [pages/TakenPage.jsx](../src/pages/TakenPage.jsx) | Taken | FilterTabs, TaskOverview (Overzicht, default), TodayView (Vandaag/Morgen), TasksWidget (other filters) | all |
 | `focus` | [focus/FocusPage.tsx](../src/focus/FocusPage.tsx) | Focus / (in "Meer") | Focus sub-app (see below): Home, Vakken, Kalender, Inzichten, timer | all |
@@ -65,7 +65,7 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 
 ### Dashboard (CSS grid classes `.dash-*` in index.css, container queries on `.dash-scroll` = container `dash`)
 - **DashboardPage** — [pages/DashboardPage.jsx](../src/pages/DashboardPage.jsx), order top → bottom:
-  1. **PomodoroBanner** while a timer runs or is paused mid-session.
+  1. (PomodoroBanner sits above the page, rendered by App.jsx — see below.)
   2. Header: greeting + date + KPI chips (`.dash-chip`: urgent / te laat / open → Taken), search ("Zoek in Hypex…", CommandPalette), inline `Clock`, compact `WeatherWidget`.
   3. **TodayFocusCard** (Vandaag + Volgende).
   4. Tall windows (≥1100px high, `.dash.is-tall`): `SpotifyWidget variant="hero"` in its own row.
@@ -75,7 +75,7 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
   Cards use `Card glow` (Spotify-style colour glow, `.glow-card`). Aliases: "KPI's", "chips", "deadlines kaart", "regen grafiek", "komende dagen", "nog in te plannen".
 - **Dashboard components** — `src/components/dashboard/`:
   [TodayFocusCard](../src/components/dashboard/TodayFocusCard.jsx) — top of the dashboard: "Vandaag" (accent glow: progress, "Eerst dit" = overdue + urgent, tasks per daypart, routines as tick chips, "Schema" timeline of today with now-line, 🚗 travel chips, tick boxes; "Alle taken" → Taken Overzicht) and "Volgende" (glow in the item's colour: countdown, or with reistijd "Vertrek over 12 min" / "Vertrek nu!" + "Vertrek om 18:40 · 20 min reistijd"; ‹ ›, filter Alle/Agenda/Werk/Taken, "Nu bezig"). On narrow widths Volgende comes first. Aliases: "vandaag kaart", "focus kaart", "volgende afspraak", "schema vandaag", "eerst dit", "vertrektijd".
-  [PomodoroBanner](../src/components/dashboard/PomodoroBanner.jsx) — wide bar at the top while a Pomodoro runs: big time, mode + task, session dots, progress, Pauzeer/Hervat (writes `pomodoro_v3`, local only) and Open. Aliases: "pomodoro balk", "timer banner".
+  [PomodoroBanner](../src/components/dashboard/PomodoroBanner.jsx) — wide bar at the top of **every tab except Focus** while a Pomodoro/stopwatch runs (rendered in App.jsx between the mobile header and the page, wrapper `.app-pomo-banner`; one compact row on mobile): big time, mode + task, session dots, progress, Pauzeer/Hervat (writes `pomodoro_v3`, local only) and Open. Aliases: "pomodoro balk", "timer banner".
   [pomodoroState.js](../src/components/dashboard/pomodoroState.js) (`readPomodoro`, `pausePomodoro`, `resumePomodoro`) and [useToday.js](../src/components/dashboard/useToday.js) (`useTodayItems`, `useNextEvent`, `useCurrentItem`, `useMinuteTick`) are shared helpers.
   [PomodoroMiniWidget](../src/components/dashboard/PomodoroMiniWidget.jsx) (reads `pomodoro_v3`, opens Pomodoro page, glow in mode colour, streak-chip 🔥 + "vandaag / dagdoel" via useFocusProgress),
   [GeldMiniWidget](../src/components/dashboard/GeldMiniWidget.jsx) (reuses Geld hooks `useBudgetStats`, read-only; ING-style dark card `.ing-card` with orange accents and a lion watermark [LionMark](../src/components/dashboard/LionMark.jsx) (the lion from the ING app icon, `public/brand/ing-lion.png`, orange on transparent, bleeding off the bottom-right like the app; falls back to an own geometric lion), "Bijna op" under 15%, red rim when over budget). Aliases: "geld widget", "ing kaart".
@@ -139,7 +139,7 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 - **TypesManager** — [components/TypesManager.jsx](../src/components/TypesManager.jsx) — "Types" in Instellingen: rename, recolour, reorder, add, delete (items move to Overig; Overig can't be deleted). Aliases: "types", "categorieën", "soorten", "kleur per type".
 - **CalendarConnections** — [components/CalendarConnections.jsx](../src/components/CalendarConnections.jsx) — "Agenda's koppelen" (Google / MyX). Opened from ThemeSettings. Per connection a tag button opens
   [agenda/FeedTypeSettings.jsx](../src/components/agenda/FeedTypeSettings.jsx): standaardtype + titelregels ("titel bevat ___ → type"), stored on `calendar_connections.default_type_id` / `type_rules`.
-  The sync **diffs** instead of delete+insert (`diffEvents`), and logs added/changed/removed items to `external_calendar_changes` (not on a feed's first sync).
+  The sync **diffs** instead of delete+insert (`diffEvents`), and logs added/changed/removed items to `external_calendar_changes` (not on a feed's first sync). Items that started before today are never removed by a sync (MijnX only sends from today on), so history is kept; `loadExternalEvents` pages through >1000 rows.
   Sync: scheduled Netlify function `calendar-sync` (every 15 min, all users, via `syncAll` in `netlify/functions/calendar/calendar.js`) + `autoSyncCalendars()` in App `doSync` (max every 5 min per device, then `refreshExternalCalendarEvents`). Auto syncs skip a connection synced < 4 min ago; the refresh button forces. Aliases: "agenda koppelen", "calendar connections", "externe agenda's".
 - **AdminPanel** — [components/AdminPanel.jsx](../src/components/AdminPanel.jsx) — "Admin Paneel": user management, push test, `werk_tab` toggle. Aliases: "admin", "admin paneel", "gebruikersbeheer".
 - **OnboardingModal** — [components/OnboardingModal.jsx](../src/components/OnboardingModal.jsx) — first-login flow ("Welkom bij Dash", location, Magister, notifications). Aliases: "onboarding", "welkom scherm", "intro".

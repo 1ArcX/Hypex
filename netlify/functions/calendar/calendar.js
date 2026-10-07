@@ -115,7 +115,7 @@ const snapshot = e => ({ title: e.title, start_time: e.start_time, end_time: e.e
 /**
  * Vergelijk opgeslagen items met de nieuwe feed. Geeft terug wat er geschreven moet worden, welke
  * wijzigingen gemeld worden en welke sleutels hernoemd zijn (verschoven items, zodat aanpassingen meegaan).
- *  - Items van vóór het begin van de feed blijven bewaard (feeds tonen vaak alleen vanaf vandaag).
+ *  - Items die vóór vandaag begonnen blijven altijd bewaard (MijnX toont alleen vanaf vandaag).
  *  - Verdwenen + nieuw item met dezelfde titel (binnen 14 dagen) = verschoven, niet weg + nieuw.
  *  - Alleen items die nog niet voorbij zijn tellen mee in de melding.
  */
@@ -124,10 +124,10 @@ function diffEvents(existing, incoming, now = Date.now()) {
   const fresh = new Map(incoming.map(e => [e.external_id, e]))
   const upserts = [], removedIds = [], changes = [], renames = []
   const relevant = e => time(e.end_time) >= now - 86400000
-  // Begin van wat de feed nu beslaat; lege feed (storing?) → niets verwijderen.
-  // Afgerond op het begin van die dag (NL-tijd, ruim genomen), en nooit later dan vandaag.
+  // Alles wat vóór vandaag begon is "bevroren": nooit verwijderen, ook niet als de feed nog een oud
+  // (meerdaags) item meestuurt. Begin van vandaag in NL-tijd, ruim genomen. Lege feed (storing?) → niets verwijderen.
   const dayStart = ms => { const d = new Date(ms); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - 2 * 3600000 }
-  const windowStart = incoming.length ? Math.min(dayStart(Math.min(...incoming.map(e => time(e.start_time)))), dayStart(now)) : Infinity
+  const windowStart = incoming.length ? dayStart(now) : Infinity
 
   const added = [], removed = []
   for (const [id, e] of fresh) {

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Pause, Play, ArrowRight } from 'lucide-react'
 import { readPomodoro, pausePomodoro, resumePomodoro, fmtClock, POMO_MODE } from './pomodoroState'
 
-// Brede balk bovenaan het dashboard zolang er een Pomodoro loopt (of gepauzeerd midden in een sessie):
+// Brede balk bovenaan elke tab (App.jsx, niet op Focus) zolang er een Pomodoro loopt (of gepauzeerd midden in een sessie):
 // grote tijd, modus + taak, voortgang over de volle breedte, sessie-stippen, Pauzeer/Hervat en Open.
 export function usePomodoroState() {
   const [st, setSt] = useState(readPomodoro)
@@ -38,7 +38,7 @@ export default function PomodoroBanner({ st, onOpen }) {
             aria-label={st.running ? 'Pauzeer timer' : 'Hervat timer'}>
             {st.running ? <Pause size={16} /> : <Play size={16} />} <span>{st.running ? 'Pauzeer' : 'Hervat'}</span>
           </button>
-          <button type="button" className="pomo-banner__btn pomo-banner__btn--ghost" onClick={onOpen}>
+          <button type="button" className="pomo-banner__btn pomo-banner__btn--ghost" onClick={onOpen} aria-label="Open Focus">
             <span>Open</span> <ArrowRight size={14} aria-hidden="true" />
           </button>
         </span>

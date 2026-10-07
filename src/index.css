@@ -1042,6 +1042,21 @@ select {
   .pomo-banner__actions { width: 100%; margin-left: 0; }
   .pomo-banner__btn { flex: 1; justify-content: center; }
 }
+/* Globale balk (App.jsx) boven elke tab: zelfde banner, iets slanker; op mobiel één regel */
+.app-pomo-banner { flex-shrink: 0; padding: 14px 28px 0; }
+.app-pomo-banner .pomo-banner__main { padding: 10px 16px; }
+.app-pomo-banner .pomo-banner__time { font-size: 28px; }
+@media (max-width: 767px) {
+  .app-pomo-banner { padding: 8px 12px 0; }
+  .app-pomo-banner .pomo-banner__main { flex-wrap: nowrap; gap: 10px; padding: 8px 10px 8px 12px; }
+  .app-pomo-banner .pomo-banner__time { font-size: 22px; }
+  .app-pomo-banner .pomo-banner__info { flex: 1 1 auto; }
+  .app-pomo-banner .pomo-banner__task { font-size: 13px; }
+  .app-pomo-banner .pomo-banner__dots { display: none; }
+  .app-pomo-banner .pomo-banner__actions { width: auto; margin-left: auto; gap: 6px; }
+  .app-pomo-banner .pomo-banner__btn { flex: none; height: 32px; padding: 0 10px; }
+  .app-pomo-banner .pomo-banner__btn span { display: none; }
+}
 @media (prefers-reduced-motion: reduce) {
   .glow-card--live::before, .pomo-banner.is-running::before, .pomo-banner.is-running .pomo-banner__dot { animation: none; }
 }
