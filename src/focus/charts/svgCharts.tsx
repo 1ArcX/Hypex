@@ -14,8 +14,8 @@ export function TopicRing({ mins, target, name, size = 150 }: { mins: number; ta
         <svg viewBox="0 0 150 150" width={size} height={size} style={{ overflow: 'visible', filter: done ? 'drop-shadow(0 0 12px rgba(47,180,99,0.55))' : undefined }} aria-hidden="true">
           <defs>
             <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor={done ? '#5AD27D' : '#F58A2C'} />
-              <stop offset="100%" stopColor={done ? '#2FB463' : '#FB7185'} />
+              <stop offset="0%" stopColor={done ? '#5AD27D' : 'var(--fx-orange-2)'} />
+              <stop offset="100%" stopColor={done ? '#2FB463' : 'var(--fx-orange)'} />
             </linearGradient>
           </defs>
           <circle cx="75" cy="75" r={R} fill="none" stroke="var(--fx-line-2)" strokeWidth="14" />
@@ -65,7 +65,7 @@ export function RadialClock({ hist, peak }: { hist: number[]; peak: { start: num
           fill={ORANGE} fillOpacity={inPeak(h) ? 0.95 : 0.25 + 0.45 * (m / max)} />
       ))}
       <circle cx={cx} cy={cy} r={inner} fill="var(--fx-bg)" stroke="var(--fx-text-3)" strokeDasharray="3 4" />
-      <text x={cx} y={cy + 2} textAnchor="middle" fontSize="20" fontWeight="800" fill="var(--fx-text)">{peak.start}–{peak.end || 24}u</text>
+      <text x={cx} y={cy + 2} textAnchor="middle" fontSize="20" fontWeight="700" fill="var(--fx-text)">{peak.start}–{peak.end || 24}u</text>
       <text x={cx} y={cy + 22} textAnchor="middle" fontSize="13" fill="var(--fx-text-2)">{Math.round(peak.share * 100)}%</text>
     </svg>
   )

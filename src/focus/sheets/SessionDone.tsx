@@ -4,7 +4,7 @@ import RewardScreen from '../../components/pomodoro/RewardScreen'
 import { useFocusStore } from '../store/focusStore'
 import { fmtDur } from '../lib/format'
 import { KIND_BY_ID, NO_COURSE } from '../lib/meta'
-import { KindIcon, RateInput, Sheet } from '../components/ui'
+import { KindIcon, RateInput, Sheet, useFxTheme } from '../components/ui'
 import type { Session } from '../types'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -13,6 +13,7 @@ import type { Session } from '../types'
  * `popup` komt uit de timer-engine: { reward, meta, sessionPromise, stopwatch, nextMode, tag }.
  */
 export function SessionDone({ popup, onStartNext, onClose }: { popup: any; onStartNext: () => void; onClose: () => void }) {
+  const theme = useFxTheme()
   const [step, setStep] = useState<'rate' | 'reward'>('rate')
   const [rating, setRating] = useState<number | null>(null)
   const [note, setNote] = useState<string>(popup.meta?.note || '')
@@ -31,7 +32,7 @@ export function SessionDone({ popup, onStartNext, onClose }: { popup: any; onSta
 
   if (step === 'reward') {
     return ReactDOM.createPortal(
-      <div style={{ '--accent': '#F58A2C' } as React.CSSProperties}>
+      <div style={(theme === 'light' ? { '--accent': '#F58A2C' } : {}) as React.CSSProperties}>
         <RewardScreen reward={popup.reward} xp={popup.reward?.xp} tag={course.id === NO_COURSE.id ? popup.tag : course.name}
           nextMode={popup.nextMode}
           startLabel={popup.stopwatch ? 'Klaar' : undefined}

@@ -32,7 +32,7 @@ export function FocusSettings({ engine, onClose }: { engine: any; onClose: () =>
 
       <div className="fx-field"><span>Weergave</span>
         <div className="fx-seg">
-          {([['dark', 'Donker'], ['light', 'Licht'], ['auto', 'Systeem']] as [ThemePref, string][]).map(([id, l]) => (
+          {([['dark', 'Dash'], ['light', 'Licht'], ['auto', 'Systeem']] as [ThemePref, string][]).map(([id, l]) => (
             <button key={id} type="button" className={theme === id ? 'is-active' : ''} onClick={() => setTheme(id)}>{l}</button>
           ))}
         </div>

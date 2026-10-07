@@ -20,4 +20,5 @@ export const COURSE_COLORS = ['#5B5BD6', '#F0365A', '#22A6B8', '#F58A2C', '#2FB4
 
 export const NO_COURSE = { id: '__none', name: 'Zonder vak', code: '—', color: '#8E8E93' }
 
-export const ORANGE = '#F58A2C'
+/** Accent van de Focus-tab: themakleur in het Dash-thema, oranje in Licht (zie focus.css). Alleen binnen .fx gebruiken. */
+export const ORANGE = 'var(--fx-orange)'
