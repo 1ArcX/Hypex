@@ -24,6 +24,8 @@ import { loadExternalEvents, loadUnseenChanges, markChangesSeen } from './utils/
 import { FeedChangesToast, FeedChangesSheet } from './components/FeedChanges'
 import { VAPID_PUBLIC, urlBase64ToUint8Array } from './utils/push'
 import XPToast from './components/XPToast'
+import WhatsNew from './components/WhatsNew'
+import { unseenReleases, markReleasesSeen } from './changelog'
 import BottomNav from './components/BottomNav'
 import DashboardPage from './pages/DashboardPage'
 import PomodoroPage from './pages/PomodoroPage'
@@ -96,6 +98,7 @@ export default function App() {
   const [showPwaPrompt, setShowPwaPrompt] = useState(false)
   const [homeRain, setHomeRain] = useState(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const [whatsNew, setWhatsNew] = useState(null) // { releases, all } — update-log popup
   const [syncTrigger, setSyncTrigger] = useState(0)
   const [syncing, setSyncing] = useState(false)
   const [syncFlash, setSyncFlash] = useState(false)
@@ -332,6 +335,17 @@ export default function App() {
     const done = localStorage.getItem(`onboarding_done_${user.id}`)
     if (!done) setShowOnboarding(true)
   }, [user])
+
+  // Update-log: na een update (of een paar gemiste) één popup met alles wat nieuw is, per apparaat
+  useEffect(() => {
+    if (!user || showOnboarding) return
+    const t = setTimeout(() => {
+      const list = unseenReleases()
+      if (list.length) setWhatsNew({ releases: list, all: false })
+      else markReleasesSeen()
+    }, 900)
+    return () => clearTimeout(t)
+  }, [user?.id, showOnboarding])
 
   // SOMtoday: zorg dat creds in localStorage staan bij elke app-start (singleton)
   useEffect(() => {
@@ -1038,6 +1052,7 @@ export default function App() {
           onLogout={() => supabase.auth.signOut({ scope: 'local' })}
           userEmail={user?.email}
           userId={user?.id}
+          onOpenChangelog={() => { setShowThemeSettings(false); setWhatsNew({ releases: [], all: true }) }}
         />
       )}
 
@@ -1125,6 +1140,9 @@ export default function App() {
             setAgendaJump({ date: new Date(ev?.start_time || when), highlightKey: ev ? `event:${ev.id}` : null })
             handleSetActivePage('agenda')
           }} />
+      )}
+      {whatsNew && (
+        <WhatsNew releases={whatsNew.releases} all={whatsNew.all} onClose={() => { markReleasesSeen(); setWhatsNew(null) }} />
       )}
       {xpToast && (
         <XPToast

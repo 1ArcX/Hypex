@@ -23,3 +23,10 @@ or by its position ("de sidebar", "de stats-kaart op het dashboard", "het inlogs
 ## Keep the map current
 
 When a component is **added, renamed, moved, or removed**, update `docs/components.md` in the same change.
+
+## Update-log
+
+Bij elke wijziging die de gebruiker merkt: voeg in hetzelfde commit een item toe bovenaan `RELEASES` in
+`src/changelog.js` (id + 1, datum, korte titel, per onderdeel een zin in het Nederlands). De app toont na de
+update automatisch een popup met alle nog niet geziene updates.
+

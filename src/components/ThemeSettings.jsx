@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { X, Palette, RotateCcw, LogOut, Bell, BellOff, Home, Calendar, CheckSquare, Play, CalendarPlus, Download } from 'lucide-react'
+import { X, Palette, RotateCcw, LogOut, Bell, BellOff, Home, Calendar, CheckSquare, Play, CalendarPlus, Download, Sparkles } from 'lucide-react'
 import { IconButton, ProgressBar, Pill, FilterTabs } from './ui'
 import { useNavLayout } from '../hooks/useNavLayout'
 import { useIsDesktop } from '../hooks/useIsDesktop'
@@ -22,7 +22,7 @@ const PRESETS = [
 
 const SOMTODAY_EMAIL = 'jbrugman.prive@gmail.com'
 
-export default function ThemeSettings({ onClose, theme, setTheme, onLogout, userEmail, userId }) {
+export default function ThemeSettings({ onClose, theme, setTheme, onLogout, userEmail, userId, onOpenChangelog }) {
   const [customAccent, setCustomAccent] = useState(theme.accent)
   const [notifState, setNotifState] = useState(() => {
     if (!pushSupported()) return 'unsupported'
@@ -227,6 +227,15 @@ export default function ThemeSettings({ onClose, theme, setTheme, onLogout, user
             <div style={{ fontSize: 11, color: 'var(--c-text-3)', marginTop: 6, lineHeight: 1.5 }}>
               Eigen venster, werkt zichzelf bij. Zie je "Windows heeft uw pc beschermd"? Kies Meer info → Toch uitvoeren.
             </div>
+          </div>
+        )}
+
+        {onOpenChangelog && (
+          <div style={{ marginBottom: 18 }}>
+            <p style={label}>Updates</p>
+            <button onClick={onOpenChangelog} className="btn-ghost" style={{ width: '100%', padding: '9px 12px' }}>
+              <Sparkles size={14} aria-hidden="true" /> Wat is er nieuw (update-log)
+            </button>
           </div>
         )}
 
