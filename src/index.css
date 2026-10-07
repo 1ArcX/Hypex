@@ -1200,6 +1200,13 @@ body.is-col-resizing { cursor: col-resize; user-select: none; }
 .dash-media__stack { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .dash-media .sp-hero { height: clamp(460px, calc(100vh - 520px), 820px); }
 .dash.is-tall .dash-media .sp-hero { height: clamp(560px, calc(100vh - 820px), 900px); }
+/* Tab "Nu": kaart groeit mee met de inhoud (geen mini-scrollbalk), hoogte hierboven is dan het minimum.
+   De songtekst staat absoluut in zijn kolom, zodat die de kaart niet oprekt. */
+.dash-media .sp-hero.is-tab-nu { height: auto; min-height: clamp(460px, calc(100vh - 520px), 820px); }
+.dash.is-tall .dash-media .sp-hero.is-tab-nu { height: auto; min-height: clamp(560px, calc(100vh - 820px), 900px); }
+.sp-hero.is-tab-nu .sp-hero-pane { overflow: visible; }
+.sp-hero.is-tab-nu .sp-hero-side { position: relative; }
+.sp-hero.is-tab-nu .sp-hero-side > .sp-lyrics { position: absolute; top: 24px; right: 0; bottom: 0; left: 12px; }
 @container dash (max-width: 900px) {
   .dash-media { grid-template-columns: minmax(0, 1fr); }
   .dash-media__stack { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }

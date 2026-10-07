@@ -200,7 +200,7 @@ function Hero({ title, className, queueLimit, style }) {
 
   const cover = coverOf(st.track || st.recent?.[0]?.track, 'lg')
   return (
-    <div ref={ref} className={`card sp-hero is-mini ${className}`} style={style}>
+    <div ref={ref} className={`card sp-hero is-mini${shownTab === 'nu' ? ' is-tab-nu' : ''} ${className}`} style={style}>
       {cover && <div className="sp-hero-bg" style={{ backgroundImage: `url(${cover})` }} aria-hidden="true" />}
       <div className="sp-hero-head">
         <Music size={15} style={{ color: GREEN }} aria-hidden="true" />
