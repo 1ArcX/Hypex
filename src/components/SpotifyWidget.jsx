@@ -1,733 +1,270 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { Music, Play, Pause, SkipForward, SkipBack, Shuffle, Repeat, Repeat1, Volume2, VolumeX, History, ListMusic } from 'lucide-react'
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Music, Play, Pause, SkipForward, SkipBack, Shuffle, Repeat, Repeat1, Volume2, VolumeX, History, ListMusic, Heart, Search, Library, Mic2, Disc3 } from 'lucide-react'
+import { login, artistNames, coverOf, formatMs } from './spotify/spotifyApi'
+import { player, usePlayer, useLivePosition, fetchRecent } from './spotify/usePlayer'
+import { TrackRow, Empty } from './spotify/TrackRow'
+import SearchView from './spotify/SearchView'
+import LibraryView from './spotify/LibraryView'
+import LyricsView from './spotify/LyricsView'
 
-// =====================================================
-// VITE_SPOTIFY_CLIENT_ID moet in je .env staan:
-// VITE_SPOTIFY_CLIENT_ID=jouw_client_id_hier
-// VITE_SPOTIFY_REDIRECT_URI=https://hypexdash.netlify.app/callback
-// =====================================================
+// Spotify-widget. Alle instanties delen één speler-store (spotify/usePlayer.js).
+//  - compact: kleine kaart (mobiel dashboard, Focus playlist)
+//  - variant="hero": "mini Spotify" op het desktop-dashboard — Nu / Zoeken / Bibliotheek,
+//    met songtekst rechts als de kaart breed genoeg is (anders als 4e tab).
 
-const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID
-const REDIRECT_URI = import.meta.env.VITE_SPOTIFY_REDIRECT_URI
-const SCOPES = 'user-read-playback-state user-modify-playback-state user-read-currently-playing streaming user-read-recently-played'
+const GREEN = '#1DB954'
+const ctrlStyle = { background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: '50%', color: 'var(--c-text-2)' }
 
-// --- PKCE helpers ---
-function generateCodeVerifier() {
-  const array = new Uint8Array(64)
-  crypto.getRandomValues(array)
-  return btoa(String.fromCharCode(...array)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
-}
-
-async function generateCodeChallenge(verifier) {
-  const data = new TextEncoder().encode(verifier)
-  const digest = await crypto.subtle.digest('SHA-256', data)
-  return btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
-}
-
-function formatMs(ms) {
-  const s = Math.floor(ms / 1000)
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
-}
-
-function nextRepeat(r) {
-  return r === 'off' ? 'context' : r === 'context' ? 'track' : 'off'
-}
-
-// ── TrackRow: track met "▶ Nu" en "+ Queue" knoppen ─────────────────────────
-function TrackRow({ track, onPlayNow, onAddToQueue, compact = false, index }) {
-  if (!track) return null
-  const imgUrl = track.album?.images?.[compact ? 2 : 1]?.url
+function LoginPrompt({ text = 'Koppel je Spotify account om hier te zien wat er speelt.' }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: compact ? 7 : 10, padding: compact ? '2px 4px' : '5px 8px', borderRadius: 8 }}>
-      {imgUrl && (
-        <img src={imgUrl} style={{ width: compact ? 22 : 32, height: compact ? 22 : 32, borderRadius: 4, flexShrink: 0 }} alt="" />
-      )}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: compact ? 11 : 12, color: 'var(--c-text-2)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>
-          {track.name}
-        </p>
-        <p style={{ fontSize: 10, color: 'var(--c-text-3)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {track.artists?.map(a => a.name).join(', ')}
-        </p>
-      </div>
-      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-        <button onClick={onPlayNow} title="Nu afspelen"
-          style={{ background: 'rgba(29,185,84,0.12)', border: '1px solid rgba(29,185,84,0.25)', borderRadius: 6, color: '#1DB954', cursor: 'pointer', padding: '4px 7px', fontSize: 10, fontWeight: 600 }}>
-          ▶
-        </button>
-        <button onClick={onAddToQueue} title="Aan queue toevoegen"
-          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--c-border-strong)', borderRadius: 6, color: 'var(--c-text-3)', cursor: 'pointer', padding: '4px 7px', fontSize: 10, fontWeight: 600 }}>
-          +
-        </button>
-      </div>
-      {index !== undefined && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.18)', marginLeft: 2, flexShrink: 0 }}>{index}</span>}
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 10, padding: '12px 0' }}>
+      <p className="t-meta" style={{ margin: 0 }}>{text}</p>
+      <button onClick={login} className="btn-ghost" style={{ color: GREEN, borderColor: 'rgba(29,185,84,0.35)' }}>Inloggen met Spotify</button>
     </div>
   )
 }
 
-export default function SpotifyWidget({ compact = false, variant, title = 'Spotify', className = '', queueLimit = 6 }) {
-  const hero = variant === 'hero'
-  const [token, setToken] = useState(localStorage.getItem('spotify_token') || null)
-  const [track, setTrack] = useState(null)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [progressMs, setProgressMs] = useState(0)
-  const [durationMs, setDurationMs] = useState(0)
-  const [shuffleState, setShuffleState] = useState(false)
-  const [repeatState, setRepeatState] = useState('off')
-  const [contextUri, setContextUri] = useState(null)
-  const [device, setDevice] = useState(null) // { name, volume_percent, supports_volume }
-  const [volume, setVolume] = useState(null)
-  const [seekDrag, setSeekDrag] = useState(null)
-  const volumeTimer = useRef(null)
-  const volumeDragRef = useRef(false)
-  const [queueTracks, setQueueTracks] = useState([])
-  const [recentTracks, setRecentTracks] = useState(null)
-  const [recentError, setRecentError] = useState(false)
-  const [authError, setAuthError] = useState(false)
-  const [tab, setTab] = useState('nu')
-  const [trackMenu, setTrackMenu] = useState(null) // { uri, x, y }
-  const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 768)
-  const [needsReconnect, setNeedsReconnect] = useState(() =>
-    !!localStorage.getItem('spotify_token') &&
-    !(localStorage.getItem('spotify_scopes') || '').includes('user-read-recently-played')
+function Seek() {
+  const st = usePlayer()
+  const live = useLivePosition(1000)
+  const [drag, setDrag] = useState(null)
+  const dur = st.track?.duration_ms || 0
+  const pos = drag ?? live
+  const commit = (v) => { setDrag(null); player.seek(v) }
+  return (
+    <div className="sp-seek">
+      <input type="range" min={0} max={dur || 1} step={1000} value={Math.min(pos, dur || 1)} aria-label="Positie in nummer"
+        style={{ '--p': `${dur > 0 ? (pos / dur) * 100 : 0}%` }}
+        onChange={e => setDrag(Number(e.target.value))}
+        onPointerUp={e => commit(Number(e.currentTarget.value))}
+        onKeyUp={e => commit(Number(e.currentTarget.value))} />
+      <div className="sp-times tnum"><span>{formatMs(pos)}</span><span>{formatMs(dur)}</span></div>
+    </div>
   )
+}
 
-  const progressIntervalRef = useRef(null)
-  const durationMsRef = useRef(0)
-  const isPlayingRef = useRef(false)
-  const trackRef = useRef(null)
-
-  const getToken = () => localStorage.getItem('spotify_token')
-
-  // --- Login ---
-  const handleLogin = async () => {
-    const verifier = generateCodeVerifier()
-    const challenge = await generateCodeChallenge(verifier)
-    localStorage.setItem('spotify_verifier', verifier)
-
-    const params = new URLSearchParams({
-      client_id: CLIENT_ID,
-      response_type: 'code',
-      redirect_uri: REDIRECT_URI,
-      scope: SCOPES,
-      code_challenge_method: 'S256',
-      code_challenge: challenge,
-    })
-
-    window.location.href = `https://accounts.spotify.com/authorize?${params}`
-  }
-
-  // --- Stap 2: PKCE code-exchange ---
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search)
-    const code = urlParams.get('code')
-    const verifier = localStorage.getItem('spotify_verifier')
-
-    if (code && verifier) {
-      window.history.replaceState({}, '', window.location.pathname)
-
-      fetch('https://accounts.spotify.com/api/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          client_id: CLIENT_ID,
-          grant_type: 'authorization_code',
-          code,
-          redirect_uri: REDIRECT_URI,
-          code_verifier: verifier,
-        }),
-      })
-        .then(r => r.json())
-        .then(data => {
-          if (data.access_token) {
-            localStorage.setItem('spotify_token', data.access_token)
-            if (data.refresh_token) localStorage.setItem('spotify_refresh', data.refresh_token)
-            localStorage.setItem('spotify_expires_at', String(Date.now() + (data.expires_in || 3600) * 1000))
-            localStorage.setItem('spotify_scopes', SCOPES)
-            setToken(data.access_token)
-            setNeedsReconnect(false)
-            localStorage.removeItem('spotify_verifier')
-          }
-        })
-    }
-  }, [])
-
-  // --- Token refresh ---
-  const refreshAccessToken = useCallback(async () => {
-    const refreshToken = localStorage.getItem('spotify_refresh')
-    if (!refreshToken) { localStorage.removeItem('spotify_token'); setToken(null); return null }
-    try {
-      const res = await fetch('https://accounts.spotify.com/api/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          grant_type: 'refresh_token',
-          refresh_token: refreshToken,
-          client_id: CLIENT_ID,
-        })
-      })
-      const data = await res.json()
-      if (data.access_token) {
-        localStorage.setItem('spotify_token', data.access_token)
-        if (data.refresh_token) localStorage.setItem('spotify_refresh', data.refresh_token)
-        localStorage.setItem('spotify_expires_at', String(Date.now() + (data.expires_in || 3600) * 1000))
-        setToken(data.access_token)
-        return data.access_token
-      }
-    } catch {}
-    return null
-  }, [])
-
-  // --- Queue ---
-  const fetchQueue = useCallback(async () => {
-    const res = await fetch('https://api.spotify.com/v1/me/player/queue',
-      { headers: { Authorization: `Bearer ${getToken()}` } })
-    if (!res.ok) return
-    const data = await res.json()
-    setQueueTracks(data.queue?.slice(0, 10) || [])
-  }, [])
-
-  // --- Fetch playback (vervangt fetchTrack) ---
-  const fetchPlayback = useCallback(async () => {
-    let currentToken = getToken()
-    if (!currentToken) return
-    const expiresAt = Number(localStorage.getItem('spotify_expires_at') || 0)
-    if (expiresAt && Date.now() > expiresAt - 120000) {
-      currentToken = await refreshAccessToken()
-      if (!currentToken) return
-    }
-
-    const doFetch = async (tok) => {
-      return fetch('https://api.spotify.com/v1/me/player', {
-        headers: { Authorization: `Bearer ${tok}` }
-      })
-    }
-
-    let res = await doFetch(currentToken)
-    if (res.status === 401) {
-      const newToken = await refreshAccessToken()
-      if (!newToken) return
-      res = await doFetch(newToken)
-    }
-    if (res.status === 403) { setAuthError(true); return }
-    if (res.status === 204 || !res.ok) return
-
-    const data = await res.json()
-    if (!data?.item) return
-
-    setAuthError(false)
-    const prevTrackId = trackRef.current?.id
-    const newTrackId = data.item.id
-
-    setTrack(data.item)
-    setIsPlaying(data.is_playing)
-    setShuffleState(data.shuffle_state)
-    setRepeatState(data.repeat_state)
-    setContextUri(data.context?.uri || null)
-    setDevice(data.device || null)
-    if (!volumeDragRef.current && typeof data.device?.volume_percent === 'number') setVolume(data.device.volume_percent)
-    setProgressMs(data.progress_ms)
-    setDurationMs(data.item.duration_ms)
-
-    durationMsRef.current = data.item.duration_ms
-    isPlayingRef.current = data.is_playing
-    trackRef.current = data.item
-
-    // Reset en herstart lokale voortgangsinterval
-    clearInterval(progressIntervalRef.current)
-    if (data.is_playing) {
-      progressIntervalRef.current = setInterval(() => {
-        setProgressMs(prev => Math.min(prev + 1000, durationMsRef.current))
-      }, 1000)
-    }
-
-    // Track change → queue opnieuw ophalen
-    if (prevTrackId && prevTrackId !== newTrackId) {
-      fetchQueue()
-    }
-  }, [refreshAccessToken, fetchQueue])
-
-  // Poll playback elke 5s
-  useEffect(() => {
-    fetchPlayback()
-    const interval = setInterval(fetchPlayback, 5000)
-    return () => {
-      clearInterval(interval)
-      clearInterval(progressIntervalRef.current)
-    }
-  }, [fetchPlayback])
-
-  // Queue poll elke 15s
-  useEffect(() => {
-    if (!token) return
-    fetchQueue()
-    const interval = setInterval(fetchQueue, 15000)
-    return () => clearInterval(interval)
-  }, [token, fetchQueue])
-
-  // Recent lazy-load bij tab switch
-  const fetchRecent = useCallback(async () => {
-    const res = await fetch('https://api.spotify.com/v1/me/player/recently-played?limit=10',
-      { headers: { Authorization: `Bearer ${getToken()}` } })
-    if (res.status === 403) { setAuthError(true); setRecentError(true); return }
-    if (res.status === 401) { setRecentError(true); return }
-    const data = await res.json()
-    setRecentTracks(data.items || [])
-    setAuthError(false)
-  }, [])
-
-  useEffect(() => {
-    if (tab === 'recent' && recentTracks === null && !recentError) fetchRecent()
-  }, [tab, recentTracks, recentError, fetchRecent])
-
-  // Hero: "Laatst afgespeeld" — bij laden en bij elke trackwissel verversen
-  const trackId = track?.id
-  useEffect(() => {
-    if (!hero || !token || needsReconnect) return
-    fetchRecent()
-  }, [hero, token, needsReconnect, trackId, fetchRecent])
-
-  // Auto-switch naar Recent als niets speelt en er wel history is
-  useEffect(() => {
-    if (!track && !authError && recentTracks?.length > 0 && tab === 'nu') setTab('recent')
-  }, [track, authError, recentTracks])
-
-  // --- Bediening ---
-  const control = async (action) => {
-    const endpoints = {
-      play:    { method: 'PUT',  url: 'https://api.spotify.com/v1/me/player/play' },
-      pause:   { method: 'PUT',  url: 'https://api.spotify.com/v1/me/player/pause' },
-      next:    { method: 'POST', url: 'https://api.spotify.com/v1/me/player/next' },
-      prev:    { method: 'POST', url: 'https://api.spotify.com/v1/me/player/previous' },
-      shuffle: { method: 'PUT',  url: `https://api.spotify.com/v1/me/player/shuffle?state=${!shuffleState}` },
-      repeat:  { method: 'PUT',  url: `https://api.spotify.com/v1/me/player/repeat?state=${nextRepeat(repeatState)}` },
-    }
-    const { method, url } = endpoints[action]
-    const res = await fetch(url, { method, headers: { Authorization: `Bearer ${getToken()}` } })
-    if (!res.ok) console.warn(`Spotify control(${action}) ${res.status}`)
-
-    // Optimistisch bijwerken
-    if (action === 'shuffle') setShuffleState(p => !p)
-    if (action === 'repeat')  setRepeatState(p => nextRepeat(p))
-
-    if (['play', 'pause', 'next', 'prev'].includes(action)) {
-      setTimeout(fetchPlayback, 500)
-    }
-  }
-
-  useEffect(() => {
-    const handler = () => setIsDesktop(window.innerWidth >= 768)
-    window.addEventListener('resize', handler)
-    return () => window.removeEventListener('resize', handler)
-  }, [])
-
-  // Switch tab away from 'queue' when on desktop
-  useEffect(() => {
-    if (isDesktop && tab === 'queue') setTab('nu')
-  }, [isDesktop, tab])
-
-  // Nu afspelen via queue-positie: skip N keer zodat de wachtrij intact blijft
-  const playFromQueue = async (queueIndex) => {
-    for (let i = 0; i <= queueIndex; i++) {
-      await fetch('https://api.spotify.com/v1/me/player/next', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${getToken()}` },
-      })
-      if (i < queueIndex) await new Promise(r => setTimeout(r, 250))
-    }
-    setTimeout(() => { fetchPlayback(); fetchQueue() }, 700)
-  }
-
-  // Nu afspelen voor recent-tab: via URI (geen wachtrij-context om te bewaren)
-  const playNow = async (trackUri) => {
-    setTrackMenu(null)
-    // Gebruik context_uri+offset voor playlist/album/artist; anders losse URI
-    const isRegularCtx = contextUri && (
-      contextUri.startsWith('spotify:playlist:') ||
-      contextUri.startsWith('spotify:album:') ||
-      contextUri.startsWith('spotify:artist:')
-    )
-    const body = isRegularCtx
-      ? JSON.stringify({ context_uri: contextUri, offset: { uri: trackUri } })
-      : JSON.stringify({ uris: [trackUri] })
-    const res = await fetch('https://api.spotify.com/v1/me/player/play', {
-      method: 'PUT',
-      headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
-      body,
-    })
-    if (!res.ok) console.warn(`Spotify playNow ${res.status}:`, await res.text().catch(() => ''))
-    setTimeout(() => { fetchPlayback(); fetchQueue() }, 600)
-  }
-
-  // Aan queue toevoegen
-  const addToQueue = async (trackUri) => {
-    setTrackMenu(null)
-    await fetch(`https://api.spotify.com/v1/me/player/queue?uri=${encodeURIComponent(trackUri)}`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${getToken()}` },
-    })
-    setTimeout(fetchQueue, 800)
-  }
-
-  // Spoelen (hero)
-  const seekTo = async (ms) => {
-    setSeekDrag(null)
-    setProgressMs(ms)
-    await fetch(`https://api.spotify.com/v1/me/player/seek?position_ms=${Math.round(ms)}`, {
-      method: 'PUT', headers: { Authorization: `Bearer ${getToken()}` },
-    })
-    setTimeout(fetchPlayback, 600)
-  }
-
-  // Volume (hero) — gedebounced zodat slepen niet elke stap een request stuurt
-  const changeVolume = (v) => {
-    setVolume(v)
-    volumeDragRef.current = true
-    clearTimeout(volumeTimer.current)
-    volumeTimer.current = setTimeout(async () => {
-      await fetch(`https://api.spotify.com/v1/me/player/volume?volume_percent=${v}`, {
-        method: 'PUT', headers: { Authorization: `Bearer ${getToken()}` },
-      })
-      volumeDragRef.current = false
-    }, 250)
-  }
-  useEffect(() => () => clearTimeout(volumeTimer.current), [])
-
-  const handleLogout = () => {
-    localStorage.removeItem('spotify_token')
-    localStorage.removeItem('spotify_refresh')
-    localStorage.removeItem('spotify_scopes')
-    setToken(null); setTrack(null)
-  }
-
-  // --- UI: grote dashboard-variant (hoge/brede schermen) ---
-  if (hero) {
-    const ctrl = { background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: '50%', color: 'var(--c-text-2)' }
-    const lastPlayed = recentTracks?.find(it => it.track?.id && it.track.id !== track?.id)?.track || null
-    const shown = track || lastPlayed
-    const cover = shown?.album?.images?.[0]?.url
-    const pos = seekDrag ?? progressMs
-    const canVolume = device && device.supports_volume !== false && volume !== null
-    return (
-      <div className={`card sp-hero ${className}`}>
-        {cover && <div className="sp-hero-bg" style={{ backgroundImage: `url(${cover})` }} aria-hidden="true" />}
-        <div className="sp-hero-head">
-          <Music size={15} style={{ color: '#1DB954' }} aria-hidden="true" />
-          <h3 className="t-card" style={{ margin: 0, flex: 1 }}>{title}</h3>
-          {device?.name && <span className="t-meta" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>op {device.name}</span>}
-          {token && <button onClick={handleLogout} className="sp-link">Ontkoppelen</button>}
-        </div>
-
-        {!token ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 10, padding: '12px 0' }}>
-            <p className="t-meta" style={{ margin: 0 }}>Koppel je Spotify account om hier te zien wat er speelt.</p>
-            <button onClick={handleLogin} className="btn-ghost" style={{ color: '#1DB954', borderColor: 'rgba(29,185,84,0.35)' }}>Inloggen met Spotify</button>
-          </div>
-        ) : authError && !track ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0' }}>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--c-danger)', flex: 1 }}>Spotify account niet geautoriseerd.</p>
-            <button onClick={handleLogout} className="btn-ghost">Ontkoppelen</button>
-          </div>
-        ) : !shown ? (
-          <p className="t-meta" style={{ margin: 0, padding: '12px 0' }}>Niets aan het afspelen...</p>
-        ) : (
-          <>
-            <div className="sp-hero-main">
-              {cover
-                ? <img className="sp-hero-cover" src={cover} alt="" />
-                : <div className="sp-hero-cover" style={{ background: 'var(--c-surface-2)' }} />}
-              <div className="sp-hero-info">
-                <span className="t-overline" style={{ color: track && isPlaying ? '#1DB954' : 'var(--c-text-3)' }}>
-                  {track ? (isPlaying ? 'Nu aan het spelen' : 'Gepauzeerd') : 'Laatst afgespeeld'}
-                </span>
-                <p className="sp-hero-title">{shown.name}</p>
-                <p className="sp-hero-sub">{shown.artists?.map(a => a.name).join(', ')}</p>
-                {shown.album?.name && <p className="sp-hero-sub" style={{ fontSize: 12, color: 'var(--c-text-3)' }}>{shown.album.name}</p>}
-
-                {track ? (
-                  <>
-                    <div className="sp-seek">
-                      <input type="range" min={0} max={durationMs || 1} step={1000} value={Math.min(pos, durationMs || 1)}
-                        aria-label="Positie in nummer"
-                        style={{ '--p': `${durationMs > 0 ? (pos / durationMs) * 100 : 0}%` }}
-                        onChange={e => setSeekDrag(Number(e.target.value))}
-                        onPointerUp={e => seekTo(Number(e.currentTarget.value))}
-                        onKeyUp={e => seekTo(Number(e.currentTarget.value))} />
-                      <div className="sp-times tnum"><span>{formatMs(pos)}</span><span>{formatMs(durationMs)}</span></div>
-                    </div>
-                    <div className="sp-controls">
-                      <button onClick={() => control('shuffle')} style={{ ...ctrl, color: shuffleState ? '#1DB954' : 'var(--c-text-3)' }} aria-label="Shuffle" aria-pressed={shuffleState} title="Shuffle"><Shuffle size={16} /></button>
-                      <button onClick={() => control('prev')} style={ctrl} aria-label="Vorige" title="Vorige"><SkipBack size={20} /></button>
-                      <button onClick={() => control(isPlaying ? 'pause' : 'play')} aria-label={isPlaying ? 'Pauzeren' : 'Afspelen'} title={isPlaying ? 'Pauzeren' : 'Afspelen'}
-                        className="btn-primary" style={{ width: 48, height: 48, padding: 0, borderRadius: '50%' }}>
-                        {isPlaying ? <Pause size={20} /> : <Play size={20} style={{ marginLeft: 2 }} />}
-                      </button>
-                      <button onClick={() => control('next')} style={ctrl} aria-label="Volgende" title="Volgende"><SkipForward size={20} /></button>
-                      <button onClick={() => control('repeat')} style={{ ...ctrl, color: repeatState !== 'off' ? '#1DB954' : 'var(--c-text-3)' }} aria-label={`Herhalen: ${repeatState}`} title="Herhalen">
-                        {repeatState === 'track' ? <Repeat1 size={16} /> : <Repeat size={16} />}
-                      </button>
-                      {canVolume && (
-                        <div className="sp-volume">
-                          <button onClick={() => changeVolume(volume > 0 ? 0 : 50)} style={{ ...ctrl, width: 28, height: 28 }} aria-label={volume > 0 ? 'Dempen' : 'Geluid aan'} title={volume > 0 ? 'Dempen' : 'Geluid aan'}>
-                            {volume > 0 ? <Volume2 size={15} /> : <VolumeX size={15} />}
-                          </button>
-                          <input type="range" min={0} max={100} value={volume} aria-label="Volume"
-                            style={{ '--p': `${volume}%` }} onChange={e => changeVolume(Number(e.target.value))} />
-                        </div>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <div style={{ marginTop: 14 }}>
-                    <button onClick={() => playNow(shown.uri)} className="btn-primary"><Play size={15} /> Afspelen</button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="sp-hero-lists">
-              {track && queueTracks.length > 0 && (
-                <div style={{ minWidth: 0 }}>
-                  <p className="sp-list-title"><ListMusic size={12} aria-hidden="true" /> Wachtrij</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {queueTracks.slice(0, queueLimit).map((t, i) => (
-                      <TrackRow key={i} track={t} onPlayNow={() => playFromQueue(i)} onAddToQueue={() => addToQueue(t.uri)} index={i + 1} />
-                    ))}
-                  </div>
-                </div>
-              )}
-              {track && lastPlayed && (
-                <div style={{ minWidth: 0 }}>
-                  <p className="sp-list-title"><History size={12} aria-hidden="true" /> Laatst afgespeeld</p>
-                  <TrackRow track={lastPlayed} onPlayNow={() => playNow(lastPlayed.uri)} onAddToQueue={() => addToQueue(lastPlayed.uri)} />
-                </div>
-              )}
-              {needsReconnect && (
-                <button onClick={handleLogin} className="sp-link" style={{ alignSelf: 'flex-start' }}>Herverbind voor laatst afgespeeld</button>
-              )}
-            </div>
-          </>
-        )}
-      </div>
-    )
-  }
-
-
-  // --- UI: compacte dashboard-variant (Level 3) — zelfde data & bediening ---
-  if (compact) {
-    const ctrl = { background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 6, borderRadius: 8, color: 'var(--c-text-2)' }
-    return (
-      <div className={`card ${className}`} style={{ padding: 14, height: '100%', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-          <Music size={15} style={{ color: '#1DB954' }} aria-hidden="true" />
-          <h3 className="t-card" style={{ margin: 0, flex: 1 }}>{title}</h3>
-        </div>
-        {!token ? (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 10 }}>
-            <p className="t-meta" style={{ margin: 0 }}>Koppel je Spotify account</p>
-            <button onClick={handleLogin} className="btn-ghost" style={{ color: '#1DB954', borderColor: 'rgba(29,185,84,0.35)' }}>Inloggen met Spotify</button>
-          </div>
-        ) : track ? (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-              {track.album?.images?.[1] || track.album?.images?.[0]
-                ? <img src={(track.album.images[1] || track.album.images[0]).url} alt="" style={{ width: 40, height: 40, borderRadius: 'var(--r-sm)', flexShrink: 0 }} />
-                : <div style={{ width: 40, height: 40, borderRadius: 'var(--r-sm)', background: 'var(--c-surface-2)', flexShrink: 0 }} />}
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--c-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{track.name}</p>
-                <p className="t-meta" style={{ margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{track.artists?.map(a => a.name).join(', ')}</p>
-              </div>
-            </div>
-            <div style={{ height: 3, borderRadius: 2, background: 'var(--c-surface-3)', margin: '12px 0 8px' }}>
-              <div style={{ height: '100%', borderRadius: 2, background: 'var(--c-text-2)', width: `${durationMs > 0 ? (progressMs / durationMs) * 100 : 0}%`, transition: 'width 0.5s linear' }} />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginTop: 'auto' }}>
-              <button onClick={() => control('prev')} style={ctrl} aria-label="Vorige" title="Vorige"><SkipBack size={16} /></button>
-              <button onClick={() => control(isPlaying ? 'pause' : 'play')} aria-label={isPlaying ? 'Pauzeren' : 'Afspelen'} title={isPlaying ? 'Pauzeren' : 'Afspelen'}
-                className="btn-primary" style={{ width: 36, height: 36, padding: 0, borderRadius: '50%' }}>
-                {isPlaying ? <Pause size={16} /> : <Play size={16} style={{ marginLeft: 2 }} />}
-              </button>
-              <button onClick={() => control('next')} style={ctrl} aria-label="Volgende" title="Volgende"><SkipForward size={16} /></button>
-            </div>
-          </>
-        ) : (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 8 }}>
-            {authError ? (
-              <>
-                <p style={{ margin: 0, fontSize: 12, color: 'var(--c-danger)' }}>Spotify account niet geautoriseerd.</p>
-                <button onClick={handleLogout} className="btn-ghost">Ontkoppelen</button>
-              </>
-            ) : (
-              <p className="t-meta" style={{ margin: 0 }}>Niets aan het afspelen...</p>
-            )}
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  // --- UI: niet ingelogd ---
-  if (!token) return (
-    <div className="glass-card p-4 text-center">
-      <Music size={24} color="#1DB954" style={{ margin: '0 auto 8px' }} />
-      <p className="text-xs mb-3" style={{ color: 'var(--c-text-2)' }}>Koppel je Spotify account</p>
-      <button onClick={handleLogin} className="btn-neon w-full" style={{ background: 'rgba(29,185,84,0.15)', borderColor: 'rgba(29,185,84,0.4)', color: '#1DB954' }}>
-        Inloggen met Spotify
+function Controls({ big = true }) {
+  const st = usePlayer()
+  const canVolume = st.device && st.device.supports_volume !== false && st.volume !== null
+  const s = big ? 20 : 16
+  return (
+    <div className="sp-controls">
+      <button onClick={player.toggleShuffle} style={{ ...ctrlStyle, color: st.shuffle ? GREEN : 'var(--c-text-3)' }} aria-label="Shuffle" aria-pressed={st.shuffle} title="Shuffle"><Shuffle size={16} /></button>
+      <button onClick={player.prev} style={ctrlStyle} aria-label="Vorige" title="Vorige"><SkipBack size={s} /></button>
+      <button onClick={player.togglePlay} aria-label={st.isPlaying ? 'Pauzeren' : 'Afspelen'} title={st.isPlaying ? 'Pauzeren' : 'Afspelen'}
+        className="btn-primary" style={{ width: big ? 48 : 40, height: big ? 48 : 40, padding: 0, borderRadius: '50%' }}>
+        {st.isPlaying ? <Pause size={s} /> : <Play size={s} style={{ marginLeft: 2 }} />}
       </button>
+      <button onClick={player.next} style={ctrlStyle} aria-label="Volgende" title="Volgende"><SkipForward size={s} /></button>
+      <button onClick={player.cycleRepeat} style={{ ...ctrlStyle, color: st.repeat !== 'off' ? GREEN : 'var(--c-text-3)' }} aria-label={`Herhalen: ${st.repeat}`} title="Herhalen">
+        {st.repeat === 'track' ? <Repeat1 size={16} /> : <Repeat size={16} />}
+      </button>
+      {canVolume && (
+        <div className="sp-volume">
+          <button onClick={() => player.volume(st.volume > 0 ? 0 : 50)} style={{ ...ctrlStyle, width: 28, height: 28 }} aria-label={st.volume > 0 ? 'Dempen' : 'Geluid aan'} title={st.volume > 0 ? 'Dempen' : 'Geluid aan'}>
+            {st.volume > 0 ? <Volume2 size={15} /> : <VolumeX size={15} />}
+          </button>
+          <input type="range" min={0} max={100} value={st.volume} aria-label="Volume" style={{ '--p': `${st.volume}%` }} onChange={e => player.volume(Number(e.target.value))} />
+        </div>
+      )}
     </div>
   )
+}
 
-  const btnBase = { background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 4 }
-
+function NowView({ queueLimit }) {
+  const st = usePlayer()
+  const { track } = st
+  const lastPlayed = st.recent?.find(it => it.track?.id && it.track.id !== track?.id)?.track || null
+  const shown = track || lastPlayed
+  if (!shown) return <Empty>Niets aan het afspelen… Zoek iets of open je bibliotheek.</Empty>
+  const cover = coverOf(shown, 'lg')
+  const liked = track ? st.liked[track.id] : undefined
+  const recent = (st.recent || []).map(it => it.track).filter((t, i, a) => t && t.id !== track?.id && a.findIndex(x => x?.id === t.id) === i).slice(0, 4)
   return (
-    <div className="glass-card p-4" style={{
-    }}>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <div style={{ width: 24, height: 24, borderRadius: 8, background: 'rgba(29,185,84,0.15)', border: '1px solid rgba(29,185,84,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Music size={12} color="#1DB954" />
-          </div>
-          <span className="t-card">Spotify</span>
-        </div>
-        <button onClick={handleLogout} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text-3)', fontSize: '11px' }}>
-          Uitloggen
-        </button>
-      </div>
-
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
-        {(isDesktop ? ['nu', 'recent'] : ['nu', 'queue', 'recent']).map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{
-            flex: 1, padding: '4px', borderRadius: 6, fontSize: 10, cursor: 'pointer',
-            border: '1px solid',
-            borderColor: tab === t ? 'color-mix(in srgb, var(--accent) 40%, transparent)' : 'rgba(255,255,255,0.08)',
-            background:  tab === t ? 'color-mix(in srgb, var(--accent) 10%, transparent)' : 'transparent',
-            color:       tab === t ? 'var(--accent)' : 'var(--c-text-3)',
-          }}>
-            {t === 'nu' ? 'Nu' : t === 'queue' ? 'Queue' : 'Recent'}
-          </button>
-        ))}
-      </div>
-
-      {/* Tab: Nu */}
-      {tab === 'nu' && (
-        track ? (
-          <>
-            {/* Album + info */}
-            <div className="flex items-center gap-3 mb-3">
-              {track.album?.images?.[0] && (
-                <img src={track.album.images[0].url} alt="album" style={{ width: 44, height: 44, borderRadius: 8 }} />
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium truncate text-white">{track.name}</p>
-                <p className="text-xs truncate" style={{ color: 'var(--c-text-3)' }}>
-                  {track.artists?.map(a => a.name).join(', ')}
-                </p>
-              </div>
-            </div>
-
-            {/* Voortgangsbalk */}
-            <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', margin: '8px 0', cursor: 'pointer' }}>
-              <div style={{
-                height: '100%', borderRadius: 2,
-                background: 'linear-gradient(90deg, #1DB954, #22c55e)',
-                width: `${durationMs > 0 ? (progressMs / durationMs) * 100 : 0}%`,
-                transition: 'width 0.5s linear',
-                boxShadow: '0 0 6px rgba(29,185,84,0.4)',
-              }} />
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ fontSize: 9, color: 'var(--c-text-3)' }}>{formatMs(progressMs)}</span>
-              <span style={{ fontSize: 9, color: 'var(--c-text-3)' }}>{formatMs(durationMs)}</span>
-            </div>
-
-            {/* Controls: shuffle | prev | play/pause | next | repeat */}
-            <div className="flex items-center justify-center gap-3">
-              <button onClick={() => control('shuffle')} style={{ ...btnBase, color: shuffleState ? '#1DB954' : 'var(--c-text-3)' }}>
-                <Shuffle size={14} />
+    <>
+      <div className="sp-hero-main">
+        {cover ? <img className="sp-hero-cover" src={cover} alt="" /> : <div className="sp-hero-cover" style={{ background: 'var(--c-surface-2)' }} />}
+        <div className="sp-hero-info">
+          <span className="t-overline" style={{ color: track && st.isPlaying ? GREEN : 'var(--c-text-3)' }}>
+            {track ? (st.isPlaying ? 'Nu aan het spelen' : 'Gepauzeerd') : 'Laatst afgespeeld'}
+          </span>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, minWidth: 0 }}>
+            <p className="sp-hero-title" style={{ flex: 1 }}>{shown.name}</p>
+            {track && liked !== undefined && (
+              <button type="button" onClick={() => player.toggleLike(track)} className="sp-like" aria-pressed={liked}
+                aria-label={liked ? 'Uit Gelikte nummers halen' : 'Toevoegen aan Gelikte nummers'} title={liked ? 'Geliket' : 'Liken'}>
+                <Heart size={18} fill={liked ? GREEN : 'none'} color={liked ? GREEN : 'currentColor'} />
               </button>
-              <button onClick={() => control('prev')} style={{ ...btnBase, color: 'var(--c-text-2)' }}>
-                <SkipBack size={18} />
-              </button>
-              <button onClick={() => control(isPlaying ? 'pause' : 'play')}
-                style={{ background: 'rgba(29,185,84,0.2)', border: '1px solid rgba(29,185,84,0.4)', borderRadius: '50%', width: 36, height: 36, cursor: 'pointer', color: '#1DB954', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {isPlaying ? <Pause size={16} /> : <Play size={16} />}
-              </button>
-              <button onClick={() => control('next')} style={{ ...btnBase, color: 'var(--c-text-2)' }}>
-                <SkipForward size={18} />
-              </button>
-              <button onClick={() => control('repeat')} style={{ ...btnBase, color: repeatState !== 'off' ? '#1DB954' : 'var(--c-text-3)' }}>
-                {repeatState === 'track' ? <Repeat1 size={14} /> : <Repeat size={14} />}
-              </button>
-            </div>
-
-            {/* Wachtrij inline */}
-            {queueTracks.length > 0 && (
-              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--c-border)' }}>
-                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.22)', letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>Wachtrij</span>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {(isDesktop ? queueTracks : queueTracks.slice(0, 3)).map((t, i) => (
-                    <TrackRow key={i} track={t} onPlayNow={() => playFromQueue(i)} onAddToQueue={() => addToQueue(t.uri)} compact />
-                  ))}
-                </div>
-              </div>
             )}
-          </>
-        ) : authError ? (
-          <div style={{ textAlign: 'center', padding: '14px 8px' }}>
-            <p style={{ fontSize: 12, color: 'rgba(255,100,100,0.85)', marginBottom: 6, lineHeight: 1.5 }}>
-              Spotify account niet geautoriseerd.
-            </p>
-            <p style={{ fontSize: 11, color: 'var(--c-text-3)', marginBottom: 12, lineHeight: 1.4 }}>
-              Vraag de beheerder om je account toe te voegen, of koppel opnieuw.
-            </p>
-            <button onClick={handleLogout}
-              style={{ fontSize: 11, padding: '5px 14px', borderRadius: 8, border: '1px solid rgba(255,100,100,0.3)', background: 'rgba(255,100,100,0.08)', color: 'rgba(255,100,100,0.8)', cursor: 'pointer' }}>
-              Ontkoppelen
-            </button>
           </div>
-        ) : (
-          <p className="text-xs text-center py-2" style={{ color: 'var(--c-text-3)' }}>
-            Niets aan het afspelen...
-          </p>
-        )
-      )}
-
-      {/* Tab: Queue */}
-      {tab === 'queue' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {queueTracks.length === 0 ? (
-            <p className="text-xs text-center py-4" style={{ color: 'var(--c-text-3)' }}>Wachtrij is leeg</p>
-          ) : queueTracks.map((t, i) => (
-            <TrackRow key={i} track={t} onPlayNow={() => playFromQueue(i)} onAddToQueue={() => addToQueue(t.uri)} index={i + 1} />
-          ))}
-        </div>
-      )}
-
-      {/* Tab: Recent */}
-      {tab === 'recent' && (
-        <div>
-          {(recentError || needsReconnect) ? (
-            <div className="text-center py-3">
-              <p className="text-xs mb-3" style={{ color: 'var(--c-text-3)' }}>Herverbind om recent afgespeeld te zien</p>
-              <button onClick={handleLogin} style={{ background: 'rgba(29,185,84,0.15)', border: '1px solid rgba(29,185,84,0.4)', borderRadius: 6, color: '#1DB954', fontSize: 11, cursor: 'pointer', padding: '6px 12px' }}>
-                Herverbind
-              </button>
+          <p className="sp-hero-sub">{artistNames(shown)}</p>
+          {shown.album?.name && <p className="sp-hero-sub" style={{ fontSize: 12, color: 'var(--c-text-3)' }}>{shown.album.name}</p>}
+          {track ? (<><Seek /><Controls /></>) : (
+            <div style={{ marginTop: 14 }}>
+              <button onClick={() => player.playTrack(shown)} className="btn-primary"><Play size={15} /> Afspelen</button>
             </div>
-          ) : recentTracks === null ? (
-            <p className="text-xs text-center py-4" style={{ color: 'var(--c-text-3)' }}>Laden...</p>
-          ) : recentTracks.length === 0 ? (
-            <p className="text-xs text-center py-4" style={{ color: 'var(--c-text-3)' }}>Geen recent afgespeeld</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {recentTracks.map((item, i) => (
-                <TrackRow key={i} track={item.track} onPlayNow={() => playNow(item.track.uri)} onAddToQueue={() => addToQueue(item.track.uri)} />
+          )}
+        </div>
+      </div>
+
+      <div className="sp-hero-lists">
+        {track && st.queue.length > 0 && (
+          <div style={{ minWidth: 0 }}>
+            <p className="sp-list-title"><ListMusic size={12} aria-hidden="true" /> Wachtrij</p>
+            <div className="sp-list">
+              {st.queue.slice(0, queueLimit).map((t, i) => (
+                <TrackRow key={`${t.id}-${i}`} track={t} index={i + 1} onPlay={() => player.playFromQueue(i)} onQueue={() => player.addToQueue(t)} />
               ))}
             </div>
+          </div>
+        )}
+        {recent.length > 0 && (
+          <div style={{ minWidth: 0 }}>
+            <p className="sp-list-title"><History size={12} aria-hidden="true" /> Laatst afgespeeld</p>
+            <div className="sp-list">
+              {recent.map(t => <TrackRow key={t.id} track={t} onPlay={() => player.playTrack(t)} onQueue={() => player.addToQueue(t)} />)}
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
+/** Breedte van een element (voor de keuze songtekst naast de speler of als tab). */
+function useWidth(ref) {
+  const [w, setW] = useState(0)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const ro = new ResizeObserver(([e]) => setW(e.contentRect.width))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [ref])
+  return w
+}
+
+const TABS = [
+  { id: 'nu', label: 'Nu', icon: Disc3 },
+  { id: 'zoeken', label: 'Zoeken', icon: Search },
+  { id: 'bieb', label: 'Bibliotheek', icon: Library },
+  { id: 'tekst', label: 'Songtekst', icon: Mic2 },
+]
+
+function Hero({ title, className, queueLimit, style }) {
+  const st = usePlayer()
+  const ref = useRef(null)
+  const wide = useWidth(ref) >= 760
+  const [tab, setTabState] = useState(() => localStorage.getItem('sp_tab') || 'nu')
+  const setTab = (t) => { setTabState(t); try { localStorage.setItem('sp_tab', t) } catch {} }
+  const shownTab = wide && tab === 'tekst' ? 'nu' : tab
+
+  // Laatst afgespeeld: bij laden en bij elk nieuw nummer
+  const trackId = st.track?.id
+  useEffect(() => { if (st.token) fetchRecent() }, [st.token, trackId])
+
+  const cover = coverOf(st.track || st.recent?.[0]?.track, 'lg')
+  return (
+    <div ref={ref} className={`card sp-hero is-mini ${className}`} style={style}>
+      {cover && <div className="sp-hero-bg" style={{ backgroundImage: `url(${cover})` }} aria-hidden="true" />}
+      <div className="sp-hero-head">
+        <Music size={15} style={{ color: GREEN }} aria-hidden="true" />
+        <h3 className="t-card" style={{ margin: 0 }}>{title}</h3>
+        {st.token && (
+          <div className="sp-tabs" role="tablist" aria-label="Spotify">
+            {TABS.filter(t => !(wide && t.id === 'tekst')).map(t => (
+              <button key={t.id} type="button" role="tab" aria-selected={shownTab === t.id} className={shownTab === t.id ? 'is-on' : ''} onClick={() => setTab(t.id)}>
+                <t.icon size={13} aria-hidden="true" /> <span>{t.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        <span style={{ flex: 1 }} />
+        {st.device?.name && <span className="t-meta sp-device">op {st.device.name}</span>}
+        {st.token && <button onClick={player.logout} className="sp-link">Ontkoppelen</button>}
+      </div>
+
+      {st.notice && <p className="sp-notice" role="status">{st.notice}</p>}
+      {st.token && st.reconnect && (
+        <p className="sp-notice">Nieuw: zoeken in je bibliotheek en liken. <button className="sp-link" style={{ color: GREEN }} onClick={login}>Koppel opnieuw</button></p>
+      )}
+
+      {!st.token ? <LoginPrompt /> : st.authError && !st.track ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0' }}>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--c-danger)', flex: 1 }}>Spotify account niet geautoriseerd.</p>
+          <button onClick={player.logout} className="btn-ghost">Ontkoppelen</button>
+        </div>
+      ) : (
+        <div className={`sp-hero-body${wide ? ' is-wide' : ''}`}>
+          <div className="sp-hero-pane">
+            {shownTab === 'nu' && <NowView queueLimit={queueLimit} />}
+            {shownTab === 'zoeken' && <SearchView />}
+            {shownTab === 'bieb' && <LibraryView />}
+            {shownTab === 'tekst' && <LyricsView />}
+          </div>
+          {wide && (
+            <aside className="sp-hero-side" aria-label="Songtekst">
+              <p className="sp-list-title"><Mic2 size={12} aria-hidden="true" /> Songtekst</p>
+              <LyricsView />
+            </aside>
           )}
         </div>
       )}
     </div>
   )
+}
+
+function Compact({ title, className }) {
+  const st = usePlayer()
+  const pos = useLivePosition(1000)
+  const { track } = st
+  const dur = track?.duration_ms || 0
+  const ctrl = { background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 6, borderRadius: 8, color: 'var(--c-text-2)' }
+  const img = coverOf(track)
+  return (
+    <div className={`card ${className}`} style={{ padding: 14, height: '100%', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <Music size={15} style={{ color: GREEN }} aria-hidden="true" />
+        <h3 className="t-card" style={{ margin: 0, flex: 1 }}>{title}</h3>
+      </div>
+      {st.notice && <p className="sp-notice" role="status" style={{ marginBottom: 8 }}>{st.notice}</p>}
+      {!st.token ? <LoginPrompt text="Koppel je Spotify account" /> : track ? (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+            {img ? <img src={img} alt="" style={{ width: 40, height: 40, borderRadius: 'var(--r-sm)', flexShrink: 0 }} />
+              : <div style={{ width: 40, height: 40, borderRadius: 'var(--r-sm)', background: 'var(--c-surface-2)', flexShrink: 0 }} />}
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--c-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{track.name}</p>
+              <p className="t-meta" style={{ margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{artistNames(track)}</p>
+            </div>
+          </div>
+          <div style={{ height: 3, borderRadius: 2, background: 'var(--c-surface-3)', margin: '12px 0 8px' }}>
+            <div style={{ height: '100%', borderRadius: 2, background: 'var(--c-text-2)', width: `${dur > 0 ? (pos / dur) * 100 : 0}%`, transition: 'width 1s linear' }} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginTop: 'auto' }}>
+            <button onClick={player.prev} style={ctrl} aria-label="Vorige" title="Vorige"><SkipBack size={16} /></button>
+            <button onClick={player.togglePlay} aria-label={st.isPlaying ? 'Pauzeren' : 'Afspelen'} title={st.isPlaying ? 'Pauzeren' : 'Afspelen'}
+              className="btn-primary" style={{ width: 36, height: 36, padding: 0, borderRadius: '50%' }}>
+              {st.isPlaying ? <Pause size={16} /> : <Play size={16} style={{ marginLeft: 2 }} />}
+            </button>
+            <button onClick={player.next} style={ctrl} aria-label="Volgende" title="Volgende"><SkipForward size={16} /></button>
+          </div>
+        </>
+      ) : (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 8 }}>
+          {st.authError ? (
+            <>
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--c-danger)' }}>Spotify account niet geautoriseerd.</p>
+              <button onClick={player.logout} className="btn-ghost">Ontkoppelen</button>
+            </>
+          ) : <p className="t-meta" style={{ margin: 0 }}>Niets aan het afspelen...</p>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default function SpotifyWidget({ variant, compact = false, title = 'Spotify', className = '', queueLimit = 6, style }) {
+  if (variant === 'hero') return <Hero title={title} className={className} queueLimit={queueLimit} style={style} />
+  return <Compact title={title} className={className} />
 }

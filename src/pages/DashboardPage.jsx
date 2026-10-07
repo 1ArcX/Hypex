@@ -46,7 +46,7 @@ export default function DashboardPage({
   useMinuteTick()
   const isDesktop = useIsDesktop()
   const vp = useViewport()
-  // Hoog scherm (bv. verticale monitor): Spotify groot in een eigen rij, langere lijsten
+  // Hoog scherm (bv. verticale monitor): langere lijsten, Spotify-kaart hoger, "Komende dagen"
   const tall = isDesktop && vp.h >= 1100
   const lim = tall
     ? { attention: 6, schedule: 10, tasks: 6, deadlines: 6, unplanned: 8 }
@@ -106,7 +106,7 @@ export default function DashboardPage({
   }, [tall, tasks, calendarEvents, magisterLessons])
 
   const showRain = homeRain && !rainHidden && Math.max(...homeRain.map(d => d.precip)) > 0.1
-  const widgetCount = (pomoActive ? 0 : 1) + (isAdmin ? 1 : 0) + (isDesktop && !tall ? 1 : 0)
+  const widgetCount = (pomoActive ? 0 : 1) + (isAdmin ? 1 : 0) // Spotify staat los (desktop: groot rechts, mobiel: onderaan)
 
   const openItem = (item) => {
     if (!item) return onNavigateToAgenda?.(new Date())
@@ -167,16 +167,22 @@ export default function DashboardPage({
           }}
         />
 
-        {/* Hoog scherm: Spotify als grote kaart in een eigen rij */}
-        {tall && <SpotifyWidget variant="hero" queueLimit={vp.h >= 1600 ? 8 : 5} />}
-
         {/* ── Widgets ── */}
-        {widgetCount > 0 && (
+        {/* Desktop: Pomodoro + Geld gestapeld links, Spotify ("mini Spotify" met songtekst) groot rechts */}
+        {isDesktop ? (
+          <section className={`dash-media${widgetCount ? '' : ' is-solo'}`} aria-label="Widgets">
+            {widgetCount > 0 && (
+              <div className="dash-media__stack">
+                {!pomoActive && <PomodoroMiniWidget st={pomo} userId={userId} onOpen={() => onNavigate('focus')} />}
+                {isAdmin && <GeldMiniWidget userId={userId} onOpen={() => onNavigate('geld')} />}
+              </div>
+            )}
+            <SpotifyWidget variant="hero" queueLimit={vp.h >= 1600 ? 8 : 5} />
+          </section>
+        ) : widgetCount > 0 && (
           <section className="dash-widgets" style={{ '--cols': widgetCount, '--cols-md': Math.min(widgetCount, 3) }} aria-label="Widgets">
             {!pomoActive && <PomodoroMiniWidget st={pomo} userId={userId} onOpen={() => onNavigate('focus')} />}
             {isAdmin && <GeldMiniWidget userId={userId} onOpen={() => onNavigate('geld')} />}
-            {/* Spotify: op desktop in de widgetrij, op mobiel onderaan */}
-            {isDesktop && !tall && <SpotifyWidget compact />}
           </section>
         )}
 
