@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, Folder, FolderPlus, SquarePen, Search, X, MoreHorizontal, Pencil, Trash2, CheckCircle2, Circle, Pin, PinOff, FolderInput, Inbox, Layers, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Folder, FolderPlus, SquarePen, Search, X, MoreHorizontal, Pencil, Trash2, CheckCircle2, Circle, Pin, PinOff, FolderInput, Inbox, Layers, Plus, GripVertical, SeparatorHorizontal } from 'lucide-react'
 import { useIsDesktop } from '../hooks/useIsDesktop'
 import { useNotes } from './useNotes'
 import NoteList from './NoteList'
 import NoteEditor from './NoteEditor'
 import { Menu, PromptAlert, useLongPress, FloatBar } from './parts'
+import { useSortable } from './useSortable'
 import { preview } from './noteFormat'
 import './notes.css'
 
@@ -100,6 +101,12 @@ export default function NotesApp({ userId, syncTrigger, openNoteId, onHome }) {
       { label: 'Verwijder map', icon: Trash2, danger: true, onClick: () => { if (window.confirm(`Map "${f.name}" verwijderen? De notities blijven bewaard onder Notities.`)) { data.deleteFolder(f.id); onDeleted?.() } } },
     ]
   }
+  const divMig = (fn) => (...a) => { if (data.needsDividerMigration) { setToast({ text: 'Draai eerst add_notes_dividers.sql in Supabase.' }); clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToast(null), 4000); return } return fn(...a) }
+  const newDividerItem = { label: 'Nieuwe scheidingslijn', icon: SeparatorHorizontal, onClick: divMig(() => setAlert({ kind: 'newDivider' })) }
+  const dividerMenuItems = (d) => [
+    { label: d.name ? 'Wijzig label' : 'Label toevoegen', icon: Pencil, onClick: () => setAlert({ kind: 'renameDivider', folder: d }) },
+    { label: 'Verwijder scheidingslijn', icon: Trash2, danger: true, onClick: () => data.deleteFolder(d.id) },
+  ]
   const noteMenuItems = (note, key, extra = {}) => [
     { label: note.pinned ? 'Maak los' : 'Zet vast', icon: note.pinned ? PinOff : Pin, onClick: () => pin(note) },
     fh.checkable(note.folder_id) && { label: note.done_at ? 'Markeer als open' : 'Vink af', icon: note.done_at ? Circle : CheckCircle2, onClick: () => done(note) },
@@ -114,6 +121,9 @@ export default function NotesApp({ userId, syncTrigger, openNoteId, onHome }) {
   const finishAlert = async (name) => {
     const a = alert
     setAlert(null)
+    if (name === null) return
+    if (a.kind === 'newDivider') { data.createDivider(name); return }
+    if (a.kind === 'renameDivider') { data.updateFolder(a.folder.id, { name }); return }
     if (!name) return
     if (a.kind === 'new') { const f = await data.createFolder(name); if (f) a.onCreated?.(f) }
     else data.updateFolder(a.folder.id, { name })
@@ -126,8 +136,11 @@ export default function NotesApp({ userId, syncTrigger, openNoteId, onHome }) {
   const overlays = (
     <>
       {menu && <Menu at={menu.at} items={menu.items} onClose={() => setMenu(null)} />}
-      {alert && <PromptAlert title={alert.kind === 'new' ? 'Nieuwe map' : 'Wijzig naam'} message={alert.kind === 'new' ? 'Voer een naam in voor deze map.' : undefined}
-        initial={alert.folder?.name || ''} confirm={alert.kind === 'new' ? 'Bewaar' : 'Bewaar'} onDone={finishAlert} />}
+      {alert && (alert.kind === 'newDivider' || alert.kind === 'renameDivider'
+        ? <PromptAlert title={alert.kind === 'newDivider' ? 'Nieuwe scheidingslijn' : 'Label scheidingslijn'} message="Optioneel: een label, bv. School of Privé."
+            placeholder="Label (optioneel)" allowEmpty initial={alert.folder?.name || ''} confirm={alert.kind === 'newDivider' ? 'Voeg toe' : 'Bewaar'} onDone={finishAlert} />
+        : <PromptAlert title={alert.kind === 'new' ? 'Nieuwe map' : 'Wijzig naam'} message={alert.kind === 'new' ? 'Voer een naam in voor deze map.' : undefined}
+            initial={alert.folder?.name || ''} confirm="Bewaar" onDone={finishAlert} />)}
       {toast && (
         <div className="nx-toast" role="status">
           {toast.note ? <>Notitie verwijderd <button type="button" onClick={undo}>Herstel</button></> : toast.text}
@@ -136,14 +149,14 @@ export default function NotesApp({ userId, syncTrigger, openNoteId, onHome }) {
     </>
   )
 
-  const shared = { data, fh, folders, notes, loaded, needsMigration, pin, done, removeNote, setMenu, setAlert, folderMenuItems, noteMenuItems }
+  const shared = { data, fh, folders, notes, loaded, needsMigration, pin, done, removeNote, setMenu, setAlert, folderMenuItems, noteMenuItems, newDividerItem, dividerMenuItems }
   return isDesktop
     ? <MacNotes {...shared} openNoteId={openNoteId} overlays={overlays} />
     : <PhoneNotes {...shared} openNoteId={openNoteId} onHome={onHome} overlays={overlays} />
 }
 
 // ═══════════════════════════════ Mac ═══════════════════════════════════
-function MacNotes({ data, fh, folders, notes, loaded, needsMigration, pin, done, removeNote, setMenu, setAlert, folderMenuItems, noteMenuItems, openNoteId, overlays }) {
+function MacNotes({ data, fh, folders, notes, loaded, needsMigration, pin, done, removeNote, setMenu, setAlert, folderMenuItems, noteMenuItems, newDividerItem, dividerMenuItems, openNoteId, overlays }) {
   const [folderKey, setFolderKey] = useState(() => localStorage.getItem('notes_folder') || 'all')
   const [selectedId, setSelectedId] = useState(null)
   const [query, setQuery] = useState('')
@@ -175,17 +188,18 @@ function MacNotes({ data, fh, folders, notes, loaded, needsMigration, pin, done,
   }, [openNoteId, loaded]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const choose = (k) => { data.flush(); setFolderKey(k); setQuery(''); try { localStorage.setItem('notes_folder', k) } catch {} }
-  const newNote = async () => {
-    const n = await data.createNote(key === 'all' || key === 'none' ? null : key)
+  const newNote = () => {
+    const n = data.createNote(key === 'all' || key === 'none' ? null : key)
     if (n) { setQuery(''); setSelectedId(n.id) }
   }
+  const sort = useSortable({ ids: data.entries.map(e => e.id), onReorder: data.reorder, disabled: data.needsDividerMigration })
   const newFolderItem = { label: 'Nieuwe map', icon: FolderPlus, onClick: () => setAlert({ kind: 'new', onCreated: f => choose(f.id) }) }
   const folderRow = (k, label, Icon, count) => (
     <button key={k} type="button" className={`nx-mac-folder${key === k ? ' is-on' : ''}`} onClick={() => choose(k)}
       onContextMenu={e => {
         e.preventDefault(); e.stopPropagation()
         const items = folderMenuItems(k, () => choose('all'))
-        setMenu({ at: { x: e.clientX, y: e.clientY }, items: items.length ? [...items, 'sep', newFolderItem] : [newFolderItem] })
+        setMenu({ at: { x: e.clientX, y: e.clientY }, items: items.length ? [...items, 'sep', newFolderItem, newDividerItem] : [newFolderItem, newDividerItem] })
       }}>
       <Icon size={16} /><span>{label}</span><span className="nx-count tnum">{count || ''}</span>
     </button>
@@ -195,12 +209,21 @@ function MacNotes({ data, fh, folders, notes, loaded, needsMigration, pin, done,
     <div className="nx is-mac">
       {/* Rechtsklik in de mappenkolom (ook op lege plek) = menu met "Nieuwe map" */}
       <aside className="nx-mac-side" aria-label="Mappen"
-        onContextMenu={e => { e.preventDefault(); setMenu({ at: { x: e.clientX, y: e.clientY }, items: [newFolderItem] }) }}>
+        onContextMenu={e => { e.preventDefault(); setMenu({ at: { x: e.clientX, y: e.clientY }, items: [newFolderItem, newDividerItem] }) }}>
         <div className="nx-mac-side__head">Hypex</div>
         <div className="nx-mac-side__list">
           {folderRow('all', 'Alle notities', Layers, data.counts.all)}
           {folderRow('none', 'Notities', Folder, data.counts.none)}
-          {folders.map(f => folderRow(f.id, f.name, f.checkable ? CheckCircle2 : Folder, data.counts[f.id]))}
+          {/* Eigen mappen + scheidingslijnen: slepen om de volgorde te wijzigen */}
+          {data.entries.map(en => (
+            <div key={en.id} ref={sort.itemRef(en.id)} {...sort.itemProps(en.id)} className="nx-sortable">
+              {en.kind === 'divider' ? (
+                <div className="nx-mac-divider" onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setMenu({ at: { x: e.clientX, y: e.clientY }, items: [...dividerMenuItems(en), 'sep', newFolderItem, newDividerItem] }) }}>
+                  {en.name ? <span>{en.name}</span> : null}<i />
+                </div>
+              ) : folderRow(en.id, en.name, en.checkable ? CheckCircle2 : Folder, data.counts[en.id])}
+            </div>
+          ))}
         </div>
         <div className="nx-mac-side__foot">
           <button type="button" onClick={() => setAlert({ kind: 'new', onCreated: f => choose(f.id) })}><Plus size={15} /> Nieuwe map</button>
@@ -246,7 +269,10 @@ function MacNotes({ data, fh, folders, notes, loaded, needsMigration, pin, done,
 }
 
 // ═══════════════════════════════ iPhone ════════════════════════════════
-function PhoneNotes({ data, fh, folders, notes, loaded, needsMigration, pin, done, removeNote, setMenu, setAlert, folderMenuItems, noteMenuItems, openNoteId, onHome, overlays }) {
+function PhoneNotes({ data, fh, folders, notes, loaded, needsMigration, pin, done, removeNote, setMenu, setAlert, folderMenuItems, noteMenuItems, newDividerItem, dividerMenuItems, openNoteId, onHome, overlays }) {
+  const [editFolders, setEditFolders] = useState(false) // "Wijzig": mappen slepen, scheidingslijnen
+  const sort = useSortable({ ids: data.entries.map(e => e.id), onReorder: data.reorder, disabled: data.needsDividerMigration })
+  const kbProxy = useRef(null) // onzichtbaar veld: houdt het toetsenbord open tot de nieuwe notitie er is
   const [stack, setStack] = useState([{ type: 'folders', key: 'folders' }])
   const [trans, setTrans] = useState(null) // { kind: 'push' | 'pop', leaving, from }
   const [editing, setEditing] = useState(false)
@@ -273,8 +299,11 @@ function PhoneNotes({ data, fh, folders, notes, loaded, needsMigration, pin, don
     if (n) setStack([{ type: 'folders', key: 'folders' }, { type: 'list', folder: n.folder_id || 'none', key: 'list' }, { type: 'note', id: n.id, key: 'note-' + n.id }])
   }, [openNoteId, loaded]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const newNote = async (folderKey) => {
-    const n = await data.createNote(folderKey && folderKey !== 'all' && folderKey !== 'none' ? folderKey : null)
+  // iOS opent het toetsenbord alleen bij focus binnen dezelfde tik: eerst een verborgen veld focussen,
+  // de editor neemt de focus over zodra hij er is (dan blijft het toetsenbord open).
+  const newNote = (folderKey) => {
+    try { kbProxy.current?.focus({ preventScroll: true }) } catch { /* */ }
+    const n = data.createNote(folderKey && folderKey !== 'all' && folderKey !== 'none' ? folderKey : null)
     if (n) push({ type: 'note', id: n.id, key: 'note-' + n.id })
   }
 
@@ -331,6 +360,9 @@ function PhoneNotes({ data, fh, folders, notes, loaded, needsMigration, pin, don
         onMenu={(at) => { const items = folderMenuItems(k); if (items.length) setMenu({ at, items }) }} />
       return (
         <Screen title="Mappen"
+          right={!term && (data.entries.length > 0 || editFolders) && (
+            <button type="button" className={`nx-text-btn${editFolders ? ' is-bold' : ''}`} onClick={() => setEditFolders(v => !v)}>{editFolders ? 'Gereed' : 'Wijzig'}</button>
+          )}
           toolbar={(
             <FloatBar onHome={onHome}
               left={<button type="button" className="nx-icon-btn" onClick={() => setAlert({ kind: 'new' })} aria-label="Nieuwe map"><FolderPlus size={24} /></button>}
@@ -342,16 +374,52 @@ function PhoneNotes({ data, fh, folders, notes, loaded, needsMigration, pin, don
           {term ? (
             <NoteList notes={filterNotes(notes, 'all', term)} folders={folders} query={term} showFolder
               onOpen={n => push({ type: 'note', id: n.id, key: 'note-' + n.id })} onPin={pin} onDone={done} onDelete={n => removeNote(n)} />
+          ) : editFolders ? (
+            <>
+              {data.needsDividerMigration && <div className="nx-banner">Volgorde en scheidingslijnen staan nog uit. Draai <code>supabase/migrations/add_notes_dividers.sql</code> in Supabase.</div>}
+              <p className="nx-edit-hint">Sleep aan <GripVertical size={14} style={{ display: 'inline-block', verticalAlign: -2 }} /> om de volgorde te wijzigen. Tik op een rij voor opties.</p>
+              <div className="nx-group">
+                {data.entries.map(en => (
+                  <div key={en.id} ref={sort.itemRef(en.id)} className={`nx-cell nx-sortable${en.kind === 'divider' ? ' is-divider' : ''}`}
+                    role="button" tabIndex={0}
+                    onClick={e => { const r = e.currentTarget.getBoundingClientRect(); setMenu({ at: { x: r.right - 16, y: r.bottom, alignRight: true }, items: en.kind === 'divider' ? dividerMenuItems(en) : folderMenuItems(en.id) }) }}>
+                    <span className="nx-cell__icon">{en.kind === 'divider' ? <SeparatorHorizontal size={22} /> : <Folder size={22} />}</span>
+                    <span className="nx-cell__label">{en.kind === 'divider' ? (en.name ? `Scheidingslijn · ${en.name}` : 'Scheidingslijn') : en.name}</span>
+                    <span className="nx-grip" aria-label="Sleep om te verplaatsen" {...sort.handleProps(en.id)} onClick={e => e.stopPropagation()}><GripVertical size={20} /></span>
+                  </div>
+                ))}
+              </div>
+              <div className="nx-group">
+                <button type="button" className="nx-cell" onClick={() => setAlert({ kind: 'new' })}><span className="nx-cell__icon"><FolderPlus size={22} /></span><span className="nx-cell__label" style={{ color: 'var(--nx-yellow)' }}>Nieuwe map</span></button>
+                <button type="button" className="nx-cell" onClick={newDividerItem.onClick}><span className="nx-cell__icon"><SeparatorHorizontal size={22} /></span><span className="nx-cell__label" style={{ color: 'var(--nx-yellow)' }}>Scheidingslijn toevoegen</span></button>
+              </div>
+            </>
           ) : (
             <>
               <div className="nx-group">
                 {cell('all', 'Alle notities', Layers, data.counts.all)}
               </div>
-              <h2 className="nx-section-title">Mappen</h2>
-              <div className="nx-group">
-                {cell('none', 'Notities', Folder, data.counts.none)}
-                {folders.map(f => cell(f.id, f.name, f.checkable ? CheckCircle2 : Folder, data.counts[f.id]))}
-              </div>
+              {/* Scheidingslijnen delen de mappen op in groepen, met het label als kop */}
+              {(() => {
+                const groups = [{ id: 'head', title: 'Mappen', items: [] }]
+                for (const en of data.entries) {
+                  if (en.kind === 'divider') groups.push({ id: en.id, title: en.name, divider: en, items: [] })
+                  else groups[groups.length - 1].items.push(en)
+                }
+                return groups.map((g, gi) => (
+                  <React.Fragment key={g.id}>
+                    {g.divider
+                      ? <DividerTitle d={g.divider} onMenu={at => setMenu({ at, items: dividerMenuItems(g.divider) })} />
+                      : <h2 className="nx-section-title">{g.title}</h2>}
+                    {(gi === 0 || g.items.length > 0) && (
+                      <div className="nx-group">
+                        {gi === 0 && cell('none', 'Notities', Folder, data.counts.none)}
+                        {g.items.map(f => cell(f.id, f.name, f.checkable ? CheckCircle2 : Folder, data.counts[f.id]))}
+                      </div>
+                    )}
+                  </React.Fragment>
+                ))
+              })()}
               {loaded && !folders.length && <p className="nx-empty" style={{ margin: '0 24px' }}>Tik op <FolderPlus size={14} style={{ verticalAlign: -2 }} /> om een map te maken.</p>}
             </>
           )}
@@ -431,8 +499,18 @@ function PhoneNotes({ data, fh, folders, notes, loaded, needsMigration, pin, don
           )
         })}
       </div>
+      <input ref={kbProxy} className="nx-kb-proxy" aria-hidden="true" tabIndex={-1} readOnly={false} />
       {overlays}
     </div>
+  )
+}
+
+function DividerTitle({ d, onMenu }) {
+  const { wasLong, ...lp } = useLongPress(onMenu)
+  return (
+    <h2 className={`nx-section-title nx-divider-title${d.name ? '' : ' is-blank'}`} {...lp}>
+      {d.name || <span aria-label="Scheidingslijn" />}
+    </h2>
   )
 }
 

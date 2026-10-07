@@ -3,6 +3,7 @@ import { ListChecks, Type, Pin, PinOff, Trash2, SquarePen, FolderInput, List, Li
 import { parse, serialize } from './noteFormat'
 import { removeRange, splitAt, backspaceAtStart, deleteAtEnd, insertText, applyShortcut, setLineType } from './docModel'
 import { longDate, Menu, FloatBar } from './parts'
+import { openExternalUrl } from '../utils/openExternal'
 
 // Editor in Apple Notes-stijl: één bewerkbaar document (contentEditable), zodat selecteren met de muis,
 // Ctrl+A, kopiëren en verwijderen over meerdere regels gewoon werkt. Elke regel is een <div class="nx-line">
@@ -27,14 +28,36 @@ function useKeyboardInset(enabled) {
 // ── DOM ⇄ model ─────────────────────────────────────────────────────────
 const lineText = (el) => (el.textContent || '').replace(/\n/g, ' ')
 
+// Links (http(s)://… en www.…) worden <a class="nx-link"> in de regel; klikken opent ze.
+const URL_RE = /\b(?:https?:\/\/|www\.)[^\s<>"]*[^\s<>".,:;!?'")\]}]/gi
+const linksIn = (text) => text.match(URL_RE) || []
+
+/** Tekst in een regel zetten, met links als <a>. */
+function fillLine(d, text) {
+  d.textContent = ''
+  if (!text) { d.appendChild(document.createElement('br')); return }
+  let last = 0
+  for (const m of text.matchAll(URL_RE)) {
+    if (m.index > last) d.appendChild(document.createTextNode(text.slice(last, m.index)))
+    const a = document.createElement('a')
+    a.className = 'nx-link'
+    a.href = /^https?:/i.test(m[0]) ? m[0] : `https://${m[0]}`
+    a.textContent = m[0]
+    a.rel = 'noopener noreferrer'
+    a.target = '_blank'
+    d.appendChild(a)
+    last = m.index + m[0].length
+  }
+  if (last < text.length) d.appendChild(document.createTextNode(text.slice(last)))
+}
+
 function lineEl(l, i, total) {
   const d = document.createElement('div')
   d.className = 'nx-line'
   d.dataset.type = i === 0 ? 'title' : l.type
   if (l.type === 'check') d.dataset.done = l.done ? '1' : '0'
   if (l.mark) d.dataset.mark = l.mark
-  if (l.text) d.textContent = l.text
-  else d.appendChild(document.createElement('br'))
+  fillLine(d, l.text)
   markEmpty(d, i, total)
   return d
 }
@@ -68,8 +91,12 @@ function isCanonical(root) {
     for (const c of n.childNodes) {
       if (c.nodeType === 3) continue
       if (c.nodeType === 1 && c.tagName === 'BR' && n.childNodes.length === 1) continue
+      if (c.nodeType === 1 && c.tagName === 'A' && c.classList.contains('nx-link') && [...c.childNodes].every(x => x.nodeType === 3)) continue
       return false
     }
+    // Links moeten precies overeenkomen met de URL's in de tekst (na typen kan een link groeien/verdwijnen)
+    const want = linksIn(lineText(n)), have = [...n.querySelectorAll('a.nx-link')].map(a => a.textContent)
+    if (want.length !== have.length || want.some((u, i) => u !== have[i])) return false
   }
   return true
 }
@@ -160,11 +187,13 @@ export default function NoteEditor({
   // Eerste keer: notitie inlezen. (Editor krijgt per notitie een eigen key → opnieuw mounten bij wisselen.)
   useLayoutEffect(() => {
     const root = rootRef.current
-    const blocks = parse(note.content).map(({ id, ...b }) => b)
+    // Lege notitie = alleen de titelregel (Enter maakt de eerste tekstregel; geen loze lege regel achteraan)
+    const blocks = note.content ? parse(note.content).map(({ id, ...b }) => b) : []
     const lines = [{ type: 'title', text: note.title || '' }, ...blocks]
     render(root, lines)
     pushHist(lines, { line: 0, off: 0 }, false)
-    if (!note.title && !note.content) { root.focus(); setCaret(root, { line: 0, off: 0 }) }
+    // Nieuwe notitie: meteen typen (op de telefoon neemt dit de focus over van het verborgen veld → toetsenbord blijft open)
+    if (!note.title && !note.content) { root.focus({ preventScroll: true }); setCaret(root, { line: 0, off: 0 }) }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Huidige regel bijhouden (voor de werkbalk)
@@ -261,6 +290,16 @@ export default function NoteEditor({
     if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); step(1) }
   }
 
+  // Link aanklikken = openen (zoals Apple Notes); slepen om te selecteren blijft werken
+  const onClick = (e) => {
+    const a = e.target.closest?.('a.nx-link')
+    if (!a) return
+    e.preventDefault()
+    const sel = window.getSelection()
+    if (sel && !sel.isCollapsed) return
+    openExternalUrl(a.getAttribute('href'))
+  }
+
   // Afvinkrondje is een ::before links in de regel: klik daar = afvinken
   const onPointerDown = (e) => {
     const line = e.target.closest?.('.nx-line')
@@ -335,7 +374,7 @@ export default function NoteEditor({
         <p className="nx-editor__date" contentEditable={false}>{longDate(note.updated_at || note.created_at)}</p>
         <div ref={rootRef} className="nx-doc" contentEditable suppressContentEditableWarning spellCheck
           role="textbox" aria-multiline="true" aria-label="Notitie"
-          onKeyDown={onKeyDown} onPointerDown={onPointerDown} onFocus={focusIn} onBlur={focusOut} />
+          onKeyDown={onKeyDown} onPointerDown={onPointerDown} onClick={onClick} onFocus={focusIn} onBlur={focusOut} />
       </div>
 
       {/* Telefoon: toetsenbord open = werkbalk erboven, anders de zwevende balk met de rode ✕ */}

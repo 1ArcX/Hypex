@@ -110,15 +110,15 @@ export function Menu({ at, items, onClose }) {
 }
 
 /** iOS-alert met tekstveld (nieuwe map, hernoemen). */
-export function PromptAlert({ title, message, initial = '', confirm = 'Bewaar', onDone }) {
+export function PromptAlert({ title, message, initial = '', confirm = 'Bewaar', placeholder = 'Naam', allowEmpty = false, onDone }) {
   const [v, setV] = useState(initial)
-  const ok = v.trim().length > 0
+  const ok = allowEmpty || v.trim().length > 0
   return (
     <div className="nx-alert-backdrop" onClick={() => onDone(null)}>
       <div className="nx-alert" role="dialog" aria-label={title} onClick={e => e.stopPropagation()}>
         <h3>{title}</h3>
         {message && <p>{message}</p>}
-        <input autoFocus value={v} onChange={e => setV(e.target.value)} placeholder="Naam"
+        <input autoFocus value={v} onChange={e => setV(e.target.value)} placeholder={placeholder}
           onKeyDown={e => { if (e.key === 'Enter' && ok) onDone(v.trim()); if (e.key === 'Escape') onDone(null) }} />
         <div className="nx-alert__buttons">
           <button type="button" onClick={() => onDone(null)}>Annuleer</button>

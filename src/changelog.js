@@ -6,6 +6,18 @@
 
 export const RELEASES = [
   {
+    id: 5,
+    date: '2026-10-07',
+    title: 'Notities: links, mappen ordenen en sneller typen',
+    items: [
+      { area: 'notities', text: 'Links in notities zijn klikbaar en openen in je browser.' },
+      { area: 'notities', text: 'Sleep mappen in de volgorde die jij wilt. Op je telefoon via Wijzig bij Mappen.' },
+      { area: 'notities', text: 'Voeg scheidingslijnen tussen mappen toe, eventueel met een label, om ze te groeperen.' },
+      { area: 'notities', text: 'Op je telefoon gaat bij een nieuwe notitie meteen het toetsenbord open.' },
+      { area: 'app', text: 'Hypex AI is uit het menu gehaald.' },
+    ],
+  },
+  {
     id: 4,
     date: '2026-10-07',
     title: 'Focus in Dash-stijl en beter selecteren',
