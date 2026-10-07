@@ -1692,3 +1692,26 @@ select {
     radial-gradient(50% 45% at 100% 100%, color-mix(in srgb, var(--glow) 9%, transparent), transparent 72%);
   border-color: color-mix(in srgb, var(--glow) 20%, var(--c-border));
 }
+
+/* ===== SLEPEN (hooks/usePointerDrag.js) ===== */
+[data-draggable] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+body.is-dragging, body.is-dragging * { cursor: grabbing !important; -webkit-user-select: none !important; user-select: none !important; }
+.drag-ghost {
+  position: fixed; z-index: 10000; pointer-events: none; transform: translate(12px, 10px);
+  display: flex; align-items: center; gap: 7px; max-width: 280px; padding: 6px 10px; border-radius: 10px;
+  background: var(--c-surface-solid); border: 1px solid color-mix(in srgb, var(--ghost) 45%, var(--c-border));
+  box-shadow: 0 10px 28px rgba(0,0,0,0.45), 0 0 0 3px color-mix(in srgb, var(--ghost) 14%, transparent);
+  font-size: 12px; font-weight: 600; color: var(--c-text);
+}
+.drag-ghost__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ghost); flex-shrink: 0; }
+.drag-ghost__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.drag-ghost__hint { flex-shrink: 0; font-weight: 700; color: var(--ghost); font-size: 11px; }
+.is-drag-src { opacity: 0.35 !important; }
+/* Drop-zones in Taken → Overzicht */
+[data-drop] { transition: background-color .12s, box-shadow .12s; }
+.is-dragging [data-drop] { border-radius: var(--r-md); }
+[data-drop].is-drop-over { background-color: color-mix(in srgb, var(--accent) 10%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, transparent); }
+.task-overview__drop-empty {
+  display: flex; align-items: center; min-height: 34px; padding: 0 10px; border-radius: 8px;
+  border: 1px dashed var(--c-border-strong); color: var(--c-text-3); font-size: 12px;
+}

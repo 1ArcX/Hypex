@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react'
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { supabase } from '../supabaseClient'
 import { Plus, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { callMagister } from '../utils/magisterApi'
@@ -6,15 +6,16 @@ import { callSomtoday, ensureSomtodayCreds } from '../utils/somtodayApi'
 import { appliesOn } from '../utils/recurrence'
 import { taskCategory, eventCategory, categoryColor, CATEGORIES, CATEGORY_ORDER } from '../utils/category'
 import { eventDisplay } from '../utils/eventTitle'
-import { loadExternalEvents } from '../utils/externalEvents'
+import { loadExternalEvents, saveOverride } from '../utils/externalEvents'
 import { taskOnDay, isMultiDay } from '../utils/taskStatus'
 import { DAYPARTS } from '../utils/daypart'
 import ExternalEventModal from './agenda/ExternalEventModal'
 import MiniMonth from './agenda/MiniMonth'
 import WeekStrip from './agenda/WeekStrip'
 import ItemModal from './ItemModal'
-import { FilterTabs, IconButton } from './ui'
+import { FilterTabs, IconButton, DragGhost } from './ui'
 import { useViewport } from '../hooks/useViewport'
+import { usePointerDrag } from '../hooks/usePointerDrag'
 
 const WORK = 'var(--cat-werk)' // = categoryColor('werk')
 
@@ -153,7 +154,7 @@ function isAllDayEvent(ev) {
 
 const SOMTODAY_EMAIL = 'jbrugman.prive@gmail.com'
 
-export default function Timeline({ userId, userEmail, tasks, subjects, onEditTask, onViewDetail, defaultView = 'week', initialDate, isMobile = false, hideToolbar = false, onLessonsChange, onEventsChange, onMagisterError, onDateChange, highlightKey }) {
+export default function Timeline({ userId, userEmail, tasks: tasksIn, subjects, onEditTask, onViewDetail, defaultView = 'week', initialDate, isMobile = false, hideToolbar = false, onLessonsChange, onEventsChange, onMagisterError, onDateChange, highlightKey }) {
   const [view, setView] = useState(defaultView)
   const vp = useViewport()
   // Smal maar hoog venster: legenda + mini-maand als strook onder het rooster (zie .agenda-shell in index.css)
@@ -162,6 +163,10 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
   const quarterSlots = HOUR_H >= 96
   const [current, setCurrent] = useState(initialDate || new Date())
   const [events, setEvents] = useState([])
+  // Versleepte taken meteen op hun nieuwe plek tonen; na het verversen van de takenlijst valt dit weg
+  const [taskPatch, setTaskPatch] = useState({})
+  useEffect(() => { setTaskPatch({}) }, [tasksIn])
+  const tasks = useMemo(() => (Object.keys(taskPatch).length ? (tasksIn || []).map(t => taskPatch[t.id] ? { ...t, ...taskPatch[t.id] } : t) : tasksIn), [tasksIn, taskPatch])
   const [modal, setModal] = useState(null)
   const [draft, setDraft] = useState(null) // live preview van ItemModal: { start, end, allDay, color, title, id }
   const draftOnDay = (d) => {
@@ -549,6 +554,117 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
     openModal({ mode: 'edit', event: ev })
   }
 
+  // ─── Slepen: events en taken verplaatsen ─────────────────────────────
+  // Getimede items volgen de pointer in het rooster (per kwartier, ook naar een andere dag).
+  // Hele-dag-/dagdeel-taken wisselen van dag; laat je ze in het rooster los, dan krijgen ze die tijd.
+  // Een taak naar de DAG-strook (of de dagkoppen) = tijd eraf. Routines/herhalende events: alleen de tijd.
+  const gridRef = useRef(null)     // het 24-uursvlak van het getoonde rooster
+  const gridDaysRef = useRef([])   // de dagen van dat rooster
+  const dragRef = useRef(null)
+  const [, bumpDrag] = useState(0)
+  const { drag, bind } = usePointerDrag({
+    onStart: (it, d) => {
+      // Waar in het blok je het pakte, zodat het niet verspringt
+      const r = gridRef.current?.getBoundingClientRect()
+      it.grab = it.mode === 'timed' && r ? Math.max(0, Math.min(it.dur, ((d.y0 - r.top) / HOUR_H) * 60 - it.evStart)) : 15
+    },
+    onDrop: (it, d) => moveItem(it, dropTarget(it, d)),
+  })
+  dragRef.current = drag
+  const dragBind = (desc) => (desc ? bind(desc) : {})
+  const isDragSrc = (key) => drag?.item.key === key
+
+  const dropTarget = (it, d) => {
+    const g = gridRef.current, days = gridDaysRef.current
+    if (!g || !d || !days.length) return null
+    const r = g.getBoundingClientRect()
+    const N = days.length
+    const colW = (r.width - TIME_COL) / N
+    const di = it.lockDay ? it.di : Math.max(0, Math.min(N - 1, Math.floor((d.x - r.left - TIME_COL) / colW)))
+    if (!days[di]) return null
+    const dayStr = toDateStr(days[di])
+    const sr = scrollRef.current?.getBoundingClientRect()
+    const inStrip = !!d.el?.closest?.('[data-tl-strip]') || (sr && d.y < sr.top)
+    const isTask = it.kind === 'task'
+    if (!isTask && it.mode === 'day') return { di, dayStr, allDay: true }
+    if (inStrip) return isTask ? { di, dayStr, allDay: true } : null // een getimed event blijft getimed
+    const minStart = isTask ? 0 : 15 // event om 00:00 zou als hele dag gaan gelden
+    let start = Math.round((((d.y - r.top) / HOUR_H) * 60 - it.grab) / 15) * 15
+    start = Math.max(minStart, Math.min(24 * 60 - it.dur, start))
+    return { di, dayStr, allDay: false, start, end: start + it.dur }
+  }
+
+  const hmStr = (m) => (m >= 24 * 60 ? '23:59' : `${pad(Math.floor(m / 60))}:${pad(m % 60)}`)
+  const shiftDay = (ds, n) => { const x = new Date(ds + 'T00:00:00'); x.setDate(x.getDate() + n); return toDateStr(x) }
+  const moveItem = async (it, t) => {
+    if (!t) return
+    const delta = Math.round((new Date(t.dayStr + 'T00:00:00') - new Date(it.dayStr + 'T00:00:00')) / 86400000)
+    if (it.kind === 'task') {
+      const task = it.data
+      const patch = {}
+      if (!task.recurrence && delta && task.date) {
+        patch.date = shiftDay(task.date, delta)
+        if (task.end_date) patch.end_date = shiftDay(task.end_date, delta)
+      }
+      if (t.allDay) {
+        if (task.start_time || task.time) Object.assign(patch, { time: null, start_time: null, end_time: null })
+      } else {
+        const st = hmStr(t.start), en = hmStr(t.end)
+        if (st !== (task.start_time || task.time || '').slice(0, 5) || en !== (task.end_time || '').slice(0, 5))
+          Object.assign(patch, { time: st, start_time: st, end_time: en })
+        if (it.mode === 'day') {
+          patch.duration_minutes = t.end - t.start
+          if (task.daypart) patch.daypart = null
+        }
+      }
+      if (!Object.keys(patch).length) return
+      setTaskPatch(p => ({ ...p, [task.id]: patch }))
+      const { error } = await supabase.from('tasks').update(patch).eq('id', task.id)
+      if (error) {
+        console.warn('[taak verplaatsen]', error.message)
+        setTaskPatch(p => { const n = { ...p }; delete n[task.id]; return n })
+      }
+      window.dispatchEvent(new Event('refreshTasks'))
+      return
+    }
+    const ev = it.data
+    const s0 = new Date(ev.start_time), e0 = new Date(ev.end_time)
+    let s, e
+    if (it.mode === 'day') {
+      if (!delta) return
+      s = new Date(s0); s.setDate(s.getDate() + delta)
+      e = new Date(e0); e.setDate(e.getDate() + delta)
+    } else {
+      // Herhalend: de reeks houdt haar begindatum, alleen de tijd verandert
+      s = ev.recurrence ? new Date(s0) : new Date(t.dayStr + 'T00:00:00')
+      s.setHours(Math.floor(t.start / 60), t.start % 60, 0, 0)
+      e = new Date(s.getTime() + (e0 - s0))
+    }
+    if (s.getTime() === s0.getTime()) return
+    const patch = { start_time: s.toISOString(), end_time: e.toISOString() }
+    setEvents(list => list.map(x => (x.id === ev.id ? { ...x, ...patch } : x)))
+    const { error } = ev.external
+      ? await saveOverride(ev, { ...patch, all_day: it.mode === 'day' })
+      : await supabase.from('calendar_events').update(patch).eq('id', ev.id)
+    if (error) console.warn('[event verplaatsen]', error.message)
+    if (!ev.external) fetchEvents()
+  }
+
+  // Automatisch scrollen als je met een item bij de boven- of onderrand van het rooster komt
+  useEffect(() => {
+    if (!drag) return
+    const id = setInterval(() => {
+      const el = scrollRef.current, p = dragRef.current
+      if (!el || !p) return
+      const r = el.getBoundingClientRect()
+      const strip = el.querySelector('[data-tl-strip]')
+      const top = strip ? strip.getBoundingClientRect().bottom : r.top
+      const dy = p.y > top && p.y < top + 36 ? -12 : p.y > r.bottom - 36 && p.y < r.bottom + 40 ? 12 : 0
+      if (dy) { el.scrollTop += dy; bumpDrag(n => n + 1) }
+    }, 16)
+    return () => clearInterval(id)
+  }, [!!drag]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const navigate = (dir) => {
     const d = new Date(current)
     if (view === 'day') d.setDate(d.getDate() + dir)
@@ -570,6 +686,14 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
     return `${MONTHS_FULL[current.getMonth()]} ${current.getFullYear()}`
   }
 
+  // Sleepbaar getimed event (niet: over meerdere dagen)
+  const eventDrag = (item, ev, di, d, color, title) => {
+    const s = new Date(ev.start_time), en = new Date(ev.end_time)
+    if (!isSameDay(s, en)) return null
+    return { key: item.key, kind: 'event', mode: 'timed', data: ev, di, dayStr: toDateStr(d), evStart: item.evStart, evEnd: item.evEnd,
+      dur: Math.max(15, Math.round((en - s) / 60000)), lockDay: !!ev.recurrence, title, color }
+  }
+
   // ─── TIME GRID (day + week) ───────────────────────────────────────────
   const TimeGrid = ({ days, hideHeader = false }) => {
     const nowMins = now.getHours() * 60 + now.getMinutes()
@@ -577,6 +701,8 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
     const showNowLine = days.some(d => isSameDay(d, now))
     const isDay = days.length === 1
     const N = days.length
+    gridDaysRef.current = days
+    const tgt = drag ? dropTarget(drag.item, drag) : null
 
     return (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
@@ -646,7 +772,16 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
             const lanes = laneEnds.length
 
             const allDayByDay = days.map(d => {
-              const allDayEvs = getEventsForDay(d).filter(ev => isAllDayEvent(ev) && !spanEvent(ev)).map(ev => ({ kind: 'event', key: ev.id, color: categoryColor(eventCategory(ev)), title: `${ev.hidden ? '🙈 ' : ''}${eventDisplay(ev).title}`, edited: ev.edited, onClick: e => openEditEvent(ev, e) }))
+              const dayStr = toDateStr(d), di = days.indexOf(d)
+              const allDayEvs = getEventsForDay(d).filter(ev => isAllDayEvent(ev) && !spanEvent(ev)).map(ev => {
+                const color = categoryColor(eventCategory(ev))
+                const title = `${ev.hidden ? '🙈 ' : ''}${eventDisplay(ev).title}`
+                return {
+                  kind: 'event', key: ev.id, color, title, edited: ev.edited, onClick: e => openEditEvent(ev, e),
+                  // Eigen hele-dag-item van één dag: naar een andere dag te slepen
+                  drag: !ev.external && !ev.recurrence ? { key: `ad-ev-${ev.id}-${di}`, kind: 'event', mode: 'day', data: ev, di, dayStr, dur: 60, title, color } : null,
+                }
+              })
               const allDayLes = getMagisterLessonsForDay(d).filter(les => {
                 const s = new Date(les.start)
                 return s.getHours() === 0 && s.getMinutes() === 0
@@ -667,6 +802,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                     kind: 'task', key: `task-allday-${t.id}`, color,
                     title: `${t.recurrence ? '🔁 ' : ''}${t.completed ? '✓ ' : ''}${t.title}`,
                     onClick: e => { e.stopPropagation(); onViewDetail ? onViewDetail(t) : onEditTask?.(t) },
+                    drag: !t.recurrence ? { key: `ad-task-${t.id}-${di}`, kind: 'task', mode: 'day', data: t, di, dayStr, dur: t.duration_minutes >= 15 ? t.duration_minutes : 60, title: t.title, color } : null,
                   }
                 })
               const draftItem = draft?.allDay && !draftSpans && draftOnDay(d)
@@ -675,7 +811,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
             })
             if (!spans.length && allDayByDay.every(arr => arr.length === 0)) return null
             return (
-              <div style={{ display: 'grid', gridTemplateColumns: `${TIME_COL}px repeat(${N}, minmax(0, 1fr))`, rowGap: 2, borderBottom: '1px solid var(--c-border)', padding: '4px 0', position: 'sticky', top: 0, zIndex: 15, background: 'var(--c-surface-solid)', maxHeight: 92, overflowY: 'auto' }}>
+              <div data-tl-strip="" style={{ display: 'grid', gridTemplateColumns: `${TIME_COL}px repeat(${N}, minmax(0, 1fr))`, rowGap: 2, borderBottom: '1px solid var(--c-border)', padding: '4px 0', position: 'sticky', top: 0, zIndex: 15, background: 'var(--c-surface-solid)', maxHeight: 92, overflowY: 'auto' }}>
                 <div style={{ gridColumn: 1, gridRow: `1 / span ${lanes + 1}`, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 8 }}>
                   <span style={{ fontSize: 9, color: 'var(--c-text-3)', letterSpacing: '0.06em', textTransform: 'uppercase', userSelect: 'none' }}>dag</span>
                 </div>
@@ -694,7 +830,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                 {allDayByDay.map((items, di) => (
                   <div key={di} style={{ gridColumn: di + 2, gridRow: lanes + 1, padding: '0 2px', display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
                     {items.map(item => (
-                      <div key={item.key} onClick={item.onClick}
+                      <div key={item.key} onClick={item.onClick} {...dragBind(item.drag)} className={item.drag && isDragSrc(item.drag.key) ? 'is-drag-src' : undefined}
                         style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, cursor: item.onClick ? 'pointer' : 'default', background: `color-mix(in srgb, ${item.color} 16%, var(--c-surface-solid))`, borderLeft: `3px solid ${item.color}`, color: `color-mix(in srgb, ${item.color} 60%, white)`, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                           ...(item.kind === 'draft' ? { border: `1px dashed ${item.color}`, borderLeft: `3px solid ${item.color}`, opacity: 0.9 } : {}) }}>
                         {item.title}{item.edited ? ' ✎' : ''}
@@ -706,7 +842,29 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
             )
           })()}
 
-          <div style={{ position: 'relative', height: `${24 * HOUR_H}px` }}>
+          <div ref={gridRef} style={{ position: 'relative', height: `${24 * HOUR_H}px` }}>
+
+            {/* Slepen: waar het item terechtkomt */}
+            {tgt && !tgt.allDay && (
+              <div aria-hidden="true" style={{
+                position: 'absolute', zIndex: 25, pointerEvents: 'none', boxSizing: 'border-box', borderRadius: 8, padding: '4px 6px',
+                top: (tgt.start / 60) * HOUR_H, height: Math.max(22, ((tgt.end - tgt.start) / 60) * HOUR_H - 2),
+                left: `calc(${TIME_COL}px + (100% - ${TIME_COL}px) * ${tgt.di / N} + 2px)`, width: `calc((100% - ${TIME_COL}px) / ${N} - 6px)`,
+                border: `1.5px dashed ${drag.item.color}`, background: `color-mix(in srgb, ${drag.item.color} 24%, var(--c-surface-solid))`,
+                boxShadow: `0 8px 24px rgba(0,0,0,0.35), 0 0 0 3px color-mix(in srgb, ${drag.item.color} 15%, transparent)`,
+                color: `color-mix(in srgb, ${drag.item.color} 60%, white)`, fontSize: 11, fontWeight: 700, overflow: 'hidden',
+              }}>
+                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{drag.item.title}</div>
+                <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.9, fontVariantNumeric: 'tabular-nums' }}>{hmStr(tgt.start)} – {hmStr(tgt.end)}</div>
+              </div>
+            )}
+            {tgt && tgt.allDay && N > 1 && (
+              <div aria-hidden="true" style={{
+                position: 'absolute', top: 0, height: '100%', zIndex: 0, pointerEvents: 'none',
+                left: `calc(${TIME_COL}px + (100% - ${TIME_COL}px) * ${tgt.di / N})`, width: `calc((100% - ${TIME_COL}px) / ${N})`,
+                background: 'color-mix(in srgb, var(--accent) 9%, transparent)', boxShadow: 'inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 40%, transparent)',
+              }} />
+            )}
 
             {/* Today column highlight */}
             {days.map((d, di) => isSameDay(d, now) && N > 1 && (
@@ -743,14 +901,6 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                         if (!quarterSlots) return openNew(d, h)
                         const q = Math.min(3, Math.floor((e.nativeEvent.offsetY / HOUR_H) * 4))
                         openNew(d, h, q * 15)
-                      }}
-                      onDragOver={e => e.preventDefault()}
-                      onDrop={async e => {
-                        e.preventDefault()
-                        const taskId = e.dataTransfer.getData('taskId')
-                        if (!taskId) return
-                        await supabase.from('tasks').update({ time: `${pad(h)}:00`, date: toDateStr(d) }).eq('id', taskId)
-                        window.dispatchEvent(new Event('refreshTasks'))
                       }}
                       style={{ borderLeft: di > 0 ? '1px solid rgba(255,255,255,0.035)' : 'none', cursor: 'pointer', backgroundImage: slotBackground(HOUR_H) }}
                     />
@@ -931,6 +1081,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                       return (
                         <div key={item.key}
                           ref={isHL ? highlightRef : undefined}
+                          {...dragBind(eventDrag(item, ev, di, d, color, disp.title))} className={isDragSrc(item.key) ? 'is-drag-src' : undefined}
                           onClick={e => openEditEvent(ev, e)}
                           {...kbdClick(`${disp.title}, ${fmtTime(s)} tot ${fmtTime(en)}`, e => openEditEvent(ev, e))}
                           title={[disp.title, item.tb ? `${item.tb} min reistijd heen` : '', item.ta ? `${item.ta} min reistijd terug` : ''].filter(Boolean).join(' · ')}
@@ -959,6 +1110,7 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                       return (
                         <div key={item.key}
                           ref={isHL ? highlightRef : undefined}
+                          {...dragBind(eventDrag(item, ev, di, d, color, disp.title))} className={isDragSrc(item.key) ? 'is-drag-src' : undefined}
                           onClick={e => openEditEvent(ev, e)}
                           {...kbdClick(`${disp.title}, ${fmtTime(s)} tot ${fmtTime(en)}`, e => openEditEvent(ev, e))}
                           title={[disp.title, disp.code, ev.location].filter(Boolean).join(' · ')}
@@ -1001,8 +1153,11 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                           </div>
                           {list.map(t => {
                             const c = categoryColor(taskCategory(t))
+                            const dk = `dp-task-${t.id}-${di}`
                             return (
                               <div key={t.id}
+                                {...dragBind(!t.recurrence ? { key: dk, kind: 'task', mode: 'day', data: t, di, dayStr: toDateStr(d), dur: t.duration_minutes >= 15 ? t.duration_minutes : 60, title: t.title, color: c } : null)}
+                                className={isDragSrc(dk) ? 'is-drag-src' : undefined}
                                 onClick={e => { e.stopPropagation(); onViewDetail ? onViewDetail(t) : onEditTask?.(t) }}
                                 {...kbdClick(`Taak ${t.title} (${label?.label})`, e => { e.stopPropagation(); onViewDetail ? onViewDetail(t) : onEditTask?.(t) })}
                                 title={t.title}
@@ -1039,8 +1194,9 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
                         </>
                       )
                       const common = {
-                        ref: isHL ? highlightRef : undefined, draggable: true,
-                        onDragStart: e => e.dataTransfer.setData('taskId', task.id), onClick: open,
+                        ref: isHL ? highlightRef : undefined, onClick: open,
+                        ...dragBind({ key: item.key, kind: 'task', mode: 'timed', data: task, di, dayStr: toDateStr(d), evStart: item.evStart, evEnd: item.evEnd, dur: item.evEnd - item.evStart, lockDay: !!task.recurrence, title: task.title, color }),
+                        className: isDragSrc(item.key) ? 'is-drag-src' : undefined,
                         ...kbdClick(`Taak ${task.title}`, open),
                       }
                       if (!travel) return (
@@ -1314,6 +1470,15 @@ export default function Timeline({ userId, userEmail, tasks, subjects, onEditTas
 
     </div>
     {!isMobile && !hideToolbar && !splitOpen && SideRail()}
+
+      {/* Slepen naar een dag (hele dag) of naar een plek waar het niet kan: label bij de pointer */}
+      {drag && (() => {
+        const t = dropTarget(drag.item, drag)
+        if (t && !t.allDay) return null
+        const day = t && new Date(t.dayStr + 'T00:00:00')
+        return <DragGhost drag={drag} title={drag.item.title} color={drag.item.color}
+          hint={day ? `→ ${DAYS_SHORT[day.getDay()].toLowerCase()} ${day.getDate()}${drag.item.kind === 'task' ? ' · hele dag' : ''}` : 'kan hier niet'} />
+      })()}
 
       {/* Lesson detail popup (fixed, dus positie in de flex-rij maakt niet uit) */}
       {lessonDetail && (

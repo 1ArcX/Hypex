@@ -48,7 +48,7 @@ function useCollapsed() {
 
 // compactHeader: geen eigen titel (de Overzicht-kaart tekent die), wel de voortgang.
 // showDone: eenmalige taken die vandaag al afgerond zijn, doorgestreept onderaan.
-export default function TodayView({ tasks, subjects = [], dateOffset = 0, onToggleRoutine, onToggleTask, onOpen, onNew, compactHeader = false, showDone = false }) {
+export default function TodayView({ tasks, subjects = [], dateOffset = 0, onToggleRoutine, onToggleTask, onOpen, onNew, compactHeader = false, showDone = false, dragBind, rowClass }) {
   const [collapsed, toggleCollapsed] = useCollapsed()
   const today = todayISO()
   const isToday = dateOffset === 0
@@ -136,14 +136,14 @@ export default function TodayView({ tasks, subjects = [], dateOffset = 0, onTogg
 
       {urgentTasks.length > 0 && section('urgent', { icon: Flame, title: 'Urgent', count: urgentTasks.length, tone: 'danger' },
         urgentTasks.map(t => (
-          <TaskRow key={t.id} task={t} today={today} subjectName={subjectName(t)} onToggle={onToggleTask} onOpen={onOpen} />
+          <TaskRow key={t.id} task={t} today={today} subjectName={subjectName(t)} onToggle={onToggleTask} onOpen={onOpen} dragProps={dragBind?.(t)} className={rowClass?.(t)} />
         )))}
 
       {overdueTasks.length > 0 && section('telaat', { icon: AlertTriangle, title: 'Te laat', count: overdueTasks.length, tone: 'danger' },
         overdueTasks.map(t => (
           <TaskRow key={t.id} task={t} today={today} late
             subtitle={[lateLabel(daysLate(t.date, today)), subjectName(t)].filter(Boolean).join(' · ')}
-            onToggle={onToggleTask} onOpen={onOpen} />
+            onToggle={onToggleTask} onOpen={onOpen} dragProps={dragBind?.(t)} className={rowClass?.(t)} />
         )))}
 
       {dayGroups.map(g => section(`dp:${g.id}`, {
@@ -151,7 +151,7 @@ export default function TodayView({ tasks, subjects = [], dateOffset = 0, onTogg
         title: g.id === 'none' ? 'Overig' : daypartLabel(g.id),
         count: g.items.length,
       }, g.items.map(t => (
-        <TaskRow key={t.id} task={t} today={today} subjectName={subjectName(t)} showDate={false} onToggle={onToggleTask} onOpen={onOpen} />
+        <TaskRow key={t.id} task={t} today={today} subjectName={subjectName(t)} showDate={false} onToggle={onToggleTask} onOpen={onOpen} dragProps={dragBind?.(t)} className={rowClass?.(t)} />
       ))))}
 
       {routines.length > 0 && section('routines', {
