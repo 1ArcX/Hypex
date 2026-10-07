@@ -287,7 +287,8 @@ export const player = {
     return queueAction(async () => {
       let radio = []
       try { radio = await buildRadio(track) } catch { radio = [] }
-      await command('/me/player/play', { method: 'PUT', body: { uris: [track.uri, ...radio.map(t => t.uri)] } })
+      // offset = het gezochte nummer eerst (anders kiest Spotify bij shuffle een willekeurig nummer uit de lijst)
+      await command('/me/player/play', { method: 'PUT', body: { uris: [track.uri, ...radio.map(t => t.uri)], offset: { uri: track.uri }, position_ms: 0 } })
       if (radio.length) notice(`Radio op basis van "${track.name}" · ${radio.length} nummers`)
       confirm({ trackId: track.id })
       queueSoon(1200)

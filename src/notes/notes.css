@@ -306,3 +306,6 @@
 
 /* Verborgen veld dat op iOS het toetsenbord opent bij "Nieuwe notitie" */
 .nx-kb-proxy { position: fixed; top: 30%; left: 0; width: 1px; height: 1px; opacity: 0; font-size: 16px; border: 0; padding: 0; pointer-events: none; }
+
+/* Portal-laag in <body> (menu's, alerts): alleen de tokens, geen eigen vlak */
+.nx.nx-portal { position: static; height: 0; overflow: visible; background: none; }

@@ -6,6 +6,15 @@
 
 export const RELEASES = [
   {
+    id: 7,
+    date: '2026-10-08',
+    title: 'Kleine verbeteringen',
+    items: [
+      { area: 'notities', text: 'Het menu bij rechtsklikken verschijnt nu bij je muis in plaats van ergens in het midden.' },
+      { area: 'spotify', text: 'Afspelen vanuit zoeken begint nu altijd met het nummer dat je zocht, ook als shuffle aan staat; daarna volgt de radio.' },
+    ],
+  },
+  {
     id: 6,
     date: '2026-10-07',
     title: 'Spotify: recent gezocht en radio',

@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ListChecks, Type, Pin, PinOff, Trash2, SquarePen, FolderInput, List, ListOrdered, CheckCircle2, Circle, X } from 'lucide-react'
 import { parse, serialize } from './noteFormat'
 import { removeRange, splitAt, backspaceAtStart, deleteAtEnd, insertText, applyShortcut, setLineType } from './docModel'
-import { longDate, Menu, FloatBar } from './parts'
+import { longDate, Menu, FloatBar, NxPortal } from './parts'
 import { openExternalUrl } from '../utils/openExternal'
 
 // Editor in Apple Notes-stijl: één bewerkbaar document (contentEditable), zodat selecteren met de muis,
@@ -383,7 +383,7 @@ export default function NoteEditor({
         : <FloatBar tools={toolbar} onHome={onHome} />)}
 
       {fmt && (
-        <>
+        <NxPortal>
           <div className="nx-menu-backdrop" onClick={() => setFmt(null)} />
           <div className="nx-format" style={{ position: 'fixed', left: fmt.x, ...(fmt.up ? { bottom: window.innerHeight - fmt.y } : { top: fmt.y }) }} onMouseDown={keepFocus}>
             <div className="nx-format__title">Opmaak <button type="button" className="nx-icon-btn" style={{ color: 'var(--nx-text-2)', minWidth: 24, minHeight: 24, padding: 2 }} onClick={() => setFmt(null)} aria-label="Sluiten"><X size={16} /></button></div>
@@ -397,7 +397,7 @@ export default function NoteEditor({
               <button type="button" className={curType === 'check' ? 'is-on' : ''} onClick={() => setType('check')} aria-label="Afvinklijst" title="Afvinklijst"><ListChecks size={18} /></button>
             </div>
           </div>
-        </>
+        </NxPortal>
       )}
 
       {moveAt && (

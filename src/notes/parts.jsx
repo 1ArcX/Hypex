@@ -1,4 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Check, X } from 'lucide-react'
 import { preview } from './noteFormat'
 
@@ -76,6 +77,15 @@ export function CheckCircle({ on, onToggle, label }) {
   )
 }
 
+/**
+ * Zwevende lagen (menu, alert, Aa-menu) direct in <body>: de pagina-wrapper van Dash heeft een
+ * transform-animatie, waardoor position: fixed anders t.o.v. de pagina rekent i.p.v. het scherm
+ * (menu verscheen dan niet bij de muis). De .nx-klasse houdt de Notities-tokens beschikbaar.
+ */
+export function NxPortal({ children }) {
+  return createPortal(<div className="nx nx-portal">{children}</div>, document.body)
+}
+
 /** Contextmenu op een vaste positie ({x, y}), sluit bij klik ernaast of Esc. */
 export function Menu({ at, items, onClose }) {
   const ref = useRef(null)
@@ -95,7 +105,7 @@ export function Menu({ at, items, onClose }) {
     return () => window.removeEventListener('keydown', k)
   }, [onClose])
   return (
-    <>
+    <NxPortal>
       <div className="nx-menu-backdrop" onClick={onClose} onContextMenu={e => { e.preventDefault(); onClose() }} />
       <div ref={ref} className="nx-menu" role="menu" style={pos}>
         {items.filter(Boolean).map((it, i) => it === 'sep' ? <div key={i} className="nx-menu__sep" /> : (
@@ -105,7 +115,7 @@ export function Menu({ at, items, onClose }) {
           </button>
         ))}
       </div>
-    </>
+    </NxPortal>
   )
 }
 
@@ -114,6 +124,7 @@ export function PromptAlert({ title, message, initial = '', confirm = 'Bewaar', 
   const [v, setV] = useState(initial)
   const ok = allowEmpty || v.trim().length > 0
   return (
+    <NxPortal>
     <div className="nx-alert-backdrop" onClick={() => onDone(null)}>
       <div className="nx-alert" role="dialog" aria-label={title} onClick={e => e.stopPropagation()}>
         <h3>{title}</h3>
@@ -126,6 +137,7 @@ export function PromptAlert({ title, message, initial = '', confirm = 'Bewaar', 
         </div>
       </div>
     </div>
+    </NxPortal>
   )
 }
 
