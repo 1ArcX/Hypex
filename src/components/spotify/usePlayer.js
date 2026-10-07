@@ -122,6 +122,39 @@ function confirm(exp) {
   burst = [300, 800, 1600, 3200].map(ms => setTimeout(() => { if (running) fetchPlayback() }, ms))
 }
 
+// ── Radio ───────────────────────────────────────────────────────────────────
+// Spotify's aanbevelingen-API bestaat niet meer voor deze app, en bij afspelen van losse nummers
+// (uris) start Spotify's eigen autoplay niet. Daarom een eigen "radio": nummers van dezelfde artiest(en)
+// + nummers uit hun genres, gemengd. Zoeken geeft max. 10 per verzoek (API feb 2026), dus een paar pagina's.
+const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]] } return a }
+
+async function buildRadio(seed, size = 25) {
+  const artists = (seed.artists || []).filter(a => a?.id).slice(0, 2)
+  const searchTracks = async (q, offset = 0) => ((await sp('/search', { query: { q, type: 'track', limit: 10, offset } })).data?.tracks?.items || []).filter(Boolean)
+  const [infos, ...artistPages] = await Promise.all([
+    Promise.all(artists.map(a => sp(`/artists/${a.id}`).then(r => r.data).catch(() => null))),
+    ...artists.flatMap(a => [searchTracks(`artist:"${a.name}"`), searchTracks(`artist:"${a.name}"`, 10)]),
+  ])
+  const genres = [...new Set(infos.flatMap(i => i?.genres || []))].slice(0, 3)
+  const genrePages = await Promise.all(genres.flatMap(g => [searchTracks(`genre:"${g}"`), searchTracks(`genre:"${g}"`, 10)]))
+
+  const seen = new Set([seed.id, `${seed.name}|${seed.artists?.[0]?.name}`.toLowerCase()])
+  const take = (list) => list.filter(t => {
+    const k = `${t.name}|${t.artists?.[0]?.name}`.toLowerCase()
+    if (!t.uri || seen.has(t.id) || seen.has(k)) return false
+    seen.add(t.id); seen.add(k); return true
+  })
+  const sameArtist = shuffle(take(artistPages.flat())).slice(0, genres.length ? 10 : size)
+  const similar = shuffle(take(genrePages.flat()))
+  // Afwisselen: 1 van de artiest, 2 vergelijkbare — zoals een Spotify-radio aanvoelt
+  const out = []
+  while (out.length < size && (sameArtist.length || similar.length)) {
+    if (sameArtist.length) out.push(sameArtist.shift())
+    for (let i = 0; i < 2 && similar.length; i++) out.push(similar.shift())
+  }
+  return out.slice(0, size)
+}
+
 // ── Acties ──────────────────────────────────────────────────────────────────
 // Acties lopen na elkaar (snel 3× skippen = 3 nette requests, geen race).
 let chain = Promise.resolve()
@@ -241,6 +274,21 @@ export const player = {
       // Zit het nummer niet in de huidige context, dan geeft Spotify een fout → los afspelen
       const r = ctx ? await sp('/me/player/play', { method: 'PUT', body: { context_uri: ctx, offset: { uri: track.uri } } }) : { ok: false }
       if (!r.ok) await command('/me/player/play', { method: 'PUT', body: { uris: [track.uri] } })
+      confirm({ trackId: track.id })
+      queueSoon(1200)
+    })
+  },
+  /**
+   * Nummer uit zoekresultaten afspelen met daarna aanbevolen nummers (eigen radio),
+   * zodat de muziek niet stopt na dit ene nummer — zoals in de Spotify-app.
+   */
+  playRadio(track) {
+    set({ track, progressMs: 0, at: Date.now(), isPlaying: true })
+    return queueAction(async () => {
+      let radio = []
+      try { radio = await buildRadio(track) } catch { radio = [] }
+      await command('/me/player/play', { method: 'PUT', body: { uris: [track.uri, ...radio.map(t => t.uri)] } })
+      if (radio.length) notice(`Radio op basis van "${track.name}" · ${radio.length} nummers`)
       confirm({ trackId: track.id })
       queueSoon(1200)
     })

@@ -6,6 +6,15 @@
 
 export const RELEASES = [
   {
+    id: 6,
+    date: '2026-10-07',
+    title: 'Spotify: recent gezocht en radio',
+    items: [
+      { area: 'spotify', text: 'Onder de zoekbalk zie je wat je eerder zocht: nummers die je afspeelde en artiesten, albums en playlists die je opende. Tik om ze meteen weer te openen of af te spelen.' },
+      { area: 'spotify', text: 'Speel je een nummer af vanuit zoeken, dan gaat de muziek daarna door met aanbevolen nummers: andere nummers van de artiest en vergelijkbare nummers uit hetzelfde genre.' },
+    ],
+  },
+  {
     id: 5,
     date: '2026-10-07',
     title: 'Notities: links, mappen ordenen en sneller typen',

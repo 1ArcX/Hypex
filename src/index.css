@@ -1874,3 +1874,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; -webkit-user
 @media (prefers-reduced-motion: reduce) {
   .wn-backdrop, .wn-sheet, .wn-release, .wn-items li, .wn-badge { animation: none !important; }
 }
+
+/* Spotify: recent gezocht */
+.sp-recent-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.sp-row__img.is-round { border-radius: 50%; }
