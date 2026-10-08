@@ -413,10 +413,11 @@
 }
 .fx-rtime::-webkit-calendar-picker-indicator { display: none; }
 
-/* Telefoon: rode ✕ rechts van de tab-balk, terug naar Home (Dash-onderbalk is hier verborgen) */
+/* Rode ✕ rechts van de tab-balk, terug naar Home: op de telefoon is de Dash-onderbalk hier verborgen,
+   en op de computer is de zijbalk soms ingeklapt (automatisch verbergen) — dus altijd tonen */
 .fx-home {
   pointer-events: auto; flex-shrink: 0; align-self: center; width: 58px; height: 58px; border-radius: 50%; cursor: pointer;
-  display: none; align-items: center; justify-content: center;
+  display: inline-flex; align-items: center; justify-content: center;
   background: var(--fx-glass); border: 1px solid color-mix(in srgb, #FF453A 38%, transparent); color: #FF453A;
   box-shadow: var(--fx-shadow), 0 0 18px rgba(255, 69, 58, 0.22);
   backdrop-filter: blur(24px) saturate(1.4); -webkit-backdrop-filter: blur(24px) saturate(1.4);
@@ -425,7 +426,6 @@
 .fx-home svg { width: 26px; height: 26px; }
 .fx-home:active { transform: scale(0.94); }
 @media (max-width: 767px) {
-  .fx-home { display: inline-flex; }
   .fx-tabbar-wrap { gap: 10px; }
   .fx-tabbar { flex: 1; width: auto; }
 }

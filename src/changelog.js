@@ -6,6 +6,14 @@
 
 export const RELEASES = [
   {
+    id: 9,
+    date: '2026-10-08',
+    title: 'Focus: altijd een weg terug',
+    items: [
+      { area: 'focus', text: 'De rode ✕ naast de onderbalk van Focus staat nu ook op de computer, zodat je altijd terug kunt naar het dashboard (ook met een ingeklapte zijbalk).' },
+    ],
+  },
+  {
     id: 8,
     date: '2026-10-08',
     title: 'Agenda: lessen van vorige dagen blijven echt staan',

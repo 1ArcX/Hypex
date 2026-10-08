@@ -54,7 +54,7 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 - **BottomNav** — [components/BottomNav.jsx](../src/components/BottomNav.jsx)
   - Aliases: "bottom nav", "tab bar", "onderbalk", "onderste menu", "de tabs", "Meer-menu" (the "…"/More sheet)
   - Where: mobile only. Primary tabs (Home/Agenda/Taken/Notities) + a "Meer" bottom sheet for the rest. Swipe between primary tabs.
-  - Hidden in the Focus and Geld sub-apps (their own tab bar has a red ✕ back to Home, `onHome` / `onClose` from App) and on Notities (own floating bar with red ✕).
+  - Hidden in the Focus and Geld sub-apps (their own tab bar has a red ✕ back to Home — in Focus on every screen size, since the desktop sidebar may be auto-hidden — `onHome` / `onClose` from App) and on Notities (own floating bar with red ✕).
   - Related: Sidebar.
 
 - **Mobile header / top bar** — inline in [App.jsx](../src/App.jsx) (the `md:hidden` 52px bar)
