@@ -75,6 +75,7 @@ export function CourseDetail({ courseId, onBack, onEdit, onReminders, onGrades, 
           </div>
         </div>
 
+        <div className="fx-cols"><div className="fx-col">
         {/* Aftellen + tijdlijn */}
         {next ? (
           <div style={{ marginTop: 14 }}>
@@ -141,7 +142,8 @@ export function CourseDetail({ courseId, onBack, onEdit, onReminders, onGrades, 
         </div>
 
         {/* Belangrijke datums */}
-        <div className="fx-section">
+        </div><div className="fx-col">
+        <div className="fx-section fx-section--side">
           <div className="fx-section-head">
             <h2 className="fx-h2">Belangrijke datums</h2>
             <button type="button" className="fx-iconbtn is-solo" onClick={onReminders} aria-label="Herinneringen"><Bell size={20} /></button>
@@ -187,6 +189,7 @@ export function CourseDetail({ courseId, onBack, onEdit, onReminders, onGrades, 
             : <SessionList sessions={allSess ? sessions : sessions.slice(0, 5)} onOpen={onOpenSession}
                 more={sessions.length > 5 ? { label: allSess ? 'Minder tonen' : `Alle ${sessions.length} sessies`, onClick: () => setAllSess(v => !v) } : undefined} />}
         </div>
+        </div></div>
       </div>
     </div>
   )

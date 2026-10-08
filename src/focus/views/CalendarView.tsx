@@ -59,6 +59,7 @@ export function CalendarView({ onOpenSession }: { onOpenSession: (id: string) =>
       <h1 className="fx-h1">Kalender</h1>
       {fc && <div className="fx-muted" style={{ marginTop: -8, marginBottom: 10 }}>Gefilterd op <b style={{ color: fc.color }}>{fc.name}</b></div>}
 
+      <div className="fx-cols"><div className="fx-col">
       <div className="fx-cal-stats">
         <Stat label="Uren" value={fmtDec(ms.mins / 60, ms.mins >= 600 ? 0 : 1)} delta={ms.deltaMins} />
         <Stat label="Sessies" value={String(ms.count)} delta={ms.deltaCount} />
@@ -92,7 +93,8 @@ export function CalendarView({ onOpenSession }: { onOpenSession: (id: string) =>
         })}
       </div>
 
-      <button type="button" className="fx-section-head" onClick={() => setDayOpen(o => !o)} aria-expanded={dayOpen}
+      </div><div className="fx-col">
+      <button type="button" className="fx-section-head fx-day-head" onClick={() => setDayOpen(o => !o)} aria-expanded={dayOpen}
         style={{ width: '100%', border: 'none', background: 'none', cursor: 'pointer', padding: 0, color: 'inherit', marginTop: 22 }}>
         <h2 className="fx-h2">Sessies op {fmtShortDate(selected)} {parseInt(selected.slice(0, 4))}</h2>
         <ChevronRight size={22} style={{ transform: dayOpen ? 'rotate(90deg)' : undefined, transition: 'transform 0.2s' }} />
@@ -109,6 +111,7 @@ export function CalendarView({ onOpenSession }: { onOpenSession: (id: string) =>
         </div>
         <WeekBars days={week.days} />
       </div>
+      </div></div>
     </div>
   )
 }

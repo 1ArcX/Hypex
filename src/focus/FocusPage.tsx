@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { BookOpen, CalendarDays, Home, Sparkles, Timer, X } from 'lucide-react'
 import './focus.css'
 import { useFocusStore } from './store/focusStore'
 import { usePomodoroEngine } from '../components/pomodoro/usePomodoroEngine'
-import { Sheet, useFxTheme } from './components/ui'
+import { Sheet, useFxTheme, FxLayoutContext, FX_DESKTOP, FX_PANEL } from './components/ui'
+import { FocusSidebar } from './components/FocusSidebar'
 import { HomeView } from './views/HomeView'
 import { CoursesView } from './views/CoursesView'
 import { CourseDetail } from './views/CourseDetail'
@@ -51,6 +52,19 @@ export default function FocusPage({ userId, onModeChange, onFocusModeChange, onP
   const [openCourse, setOpenCourse] = useState<string | null>(null)
   const [sheet, setSheet] = useState<SheetState>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  // Breedte van het Focus-vlak → telefoonindeling, desktop (zijbalk + kolommen) of desktop + vast timerpaneel
+  const rootRef = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(0)
+  useLayoutEffect(() => {
+    const el = rootRef.current
+    if (!el) return
+    setWidth(el.getBoundingClientRect().width)
+    const ro = new ResizeObserver(([e]) => setWidth(e.contentRect.width))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const desktop = width >= FX_DESKTOP
+  const panel = width >= FX_PANEL
 
   const engine: any = usePomodoroEngine({ userId, onModeChange, onFocusModeChange, onPomodoroActive, noFocusOverlay: true, seedTask, onSeedConsumed } as any)
   const { state, popup } = engine
@@ -63,14 +77,17 @@ export default function FocusPage({ userId, onModeChange, onFocusModeChange, onP
     document.addEventListener('visibilitychange', on)
     return () => document.removeEventListener('visibilitychange', on)
   }, [userId, load])
-  // "Start focus" vanuit een taak → timer openen
-  useEffect(() => { if (seedTask) setSheet({ kind: 'timer' }) }, [seedTask])
+  // "Start focus" vanuit een taak → timer openen (met vast paneel staat de timer al in beeld)
+  useEffect(() => { if (seedTask && !panel) setSheet({ kind: 'timer' }) }, [seedTask]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Breed genoeg geworden voor het paneel → losse timer dicht
+  useEffect(() => { if (panel) setSheet(s => (s?.kind === 'timer' ? null : s)) }, [panel])
   useEffect(() => { scrollRef.current?.scrollTo({ top: 0 }) }, [tab, openCourse])
   // Sessie of pauze klaar → timerscherm dicht, zodat de afronding (★, beloning, pauze voorbij) zichtbaar is
   useEffect(() => { if (popup) setSheet(s => (s?.kind === 'timer' ? null : s)) }, [popup])
 
   const go = (t: FocusTab) => { setOpenCourse(null); setTab(t) }
-  const studyCourse = (id: string) => { engine.setMeta({ courseId: id, topicId: null }); setSheet({ kind: 'timer' }) }
+  const openTimer = () => { if (!panel) setSheet({ kind: 'timer' }) }
+  const studyCourse = (id: string) => { engine.setMeta({ courseId: id, topicId: null }); openTimer() }
   const openSession = (id: string) => setSheet({ kind: 'session', id })
 
   const started = state.timerKind === 'stopwatch' ? state.seconds > 0 || state.running : state.running || state.seconds < state.workMins * 60 && state.mode === 'work'
@@ -95,7 +112,12 @@ export default function FocusPage({ userId, onModeChange, onFocusModeChange, onP
   }
 
   return (
-    <div className="fx" data-theme={theme}>
+    <FxLayoutContext.Provider value={{ desktop, panel }}>
+    <div ref={rootRef} className={`fx${desktop ? ' is-desktop' : ''}${panel ? ' has-panel' : ''}`} data-theme={theme}>
+      {desktop && (
+        <FocusSidebar tab={tab} inCourse={!!openCourse} onTab={go} engine={engine} started={started}
+          showTimerCard={!panel} onOpenTimer={openTimer} onSettings={() => setSheet({ kind: 'settings' })} onHome={onHome} />
+      )}
       <div className="fx-scroll" ref={scrollRef}>
         {needsMigration && loaded && (
           <div className="fx-page" style={{ paddingBottom: 0 }}>
@@ -107,7 +129,10 @@ export default function FocusPage({ userId, onModeChange, onFocusModeChange, onP
         {view}
       </div>
 
-      <div className="fx-tabbar-wrap">
+      {panel && <TimerSheet engine={engine} variant="panel" />}
+
+      {/* Telefoon / smal venster: zwevende onderbalk, rode ✕ en timerknop */}
+      {!desktop && <div className="fx-tabbar-wrap">
         <nav className="fx-tabbar" aria-label="Focus">
           {TABS.map(t => {
             const active = tab === t.id && (!openCourse || t.id === 'courses')
@@ -129,9 +154,9 @@ export default function FocusPage({ userId, onModeChange, onFocusModeChange, onP
           <Timer strokeWidth={2.4} />
           {started && <span className="tnum">{fmtClock(state.seconds)}</span>}
         </button>
-      </div>
+      </div>}
 
-      {sheet?.kind === 'timer' && <TimerSheet engine={engine} onClose={() => setSheet(null)} />}
+      {sheet?.kind === 'timer' && !panel && <TimerSheet engine={engine} onClose={() => setSheet(null)} />}
       {sheet?.kind === 'settings' && <FocusSettings engine={engine} onClose={() => setSheet(null)} />}
       {sheet?.kind === 'session' && <SessionEditor sessionId={sheet.id} presetCourseId={sheet.courseId || openCourse} onClose={() => setSheet(null)} />}
       {sheet?.kind === 'course' && <CourseEditor courseId={sheet.id} onClose={() => setSheet(null)} onCreated={id => { setTab('courses'); setOpenCourse(id) }} />}
@@ -143,6 +168,7 @@ export default function FocusPage({ userId, onModeChange, onFocusModeChange, onP
             onStartNext={() => { engine.startAfterPopup() }} onClose={() => engine.skipPopup()} />
         : <BreakDone popup={popup as any} onStart={engine.startAfterPopup} onSkip={engine.skipPopup} />)}
     </div>
+    </FxLayoutContext.Provider>
   )
 }
 

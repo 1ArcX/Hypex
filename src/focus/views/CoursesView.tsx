@@ -4,7 +4,7 @@ import { useFocusStore } from '../store/focusStore'
 import { courseTotals } from '../lib/stats'
 import { fmtHours } from '../lib/format'
 import { STATUSES } from '../lib/meta'
-import { ActionMenu } from '../components/ui'
+import { ActionMenu, useFxLayout } from '../components/ui'
 import type { Course, CourseStatus } from '../types'
 
 const LS_FILTER = 'focus_course_filter'
@@ -77,7 +77,8 @@ export function CoursesView({ onOpenCourse, onNewCourse, onAddSession, onShowIns
 
 /** Boekenplank: elk vak een boek in de vakkleur met de code op de rug en de uren onderaan */
 function Bookshelf({ courses, totals, onOpen }: { courses: Course[]; totals: Record<string, number>; onOpen: (id: string) => void }) {
-  const PER_SHELF = 5
+  const { desktop } = useFxLayout()
+  const PER_SHELF = desktop ? 9 : 5
   const max = Math.max(...courses.map(c => totals[c.id] || 0), 1)
   const shelves: Course[][] = []
   for (let i = 0; i < courses.length; i += PER_SHELF) shelves.push(courses.slice(i, i + PER_SHELF))

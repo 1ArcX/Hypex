@@ -21,8 +21,12 @@ export const fmtClock = (secs: number) => {
   return h ? `${h}:${p(m)}:${p(s)}` : `${p(m)}:${p(s)}`
 }
 
-/** Timerscherm: vak/onderwerp/soort, Stopwatch | Pomodoro, grote tijd, bediening, notities, focusgeluid */
-export function TimerSheet({ engine, onClose }: { engine: Engine; onClose: () => void }) {
+/**
+ * Timerscherm: vak/onderwerp/soort, Stopwatch | Pomodoro, grote tijd, bediening, notities, focusgeluid.
+ * variant="panel": dezelfde inhoud als vast paneel rechts (desktop, brede schermen), zonder sluitknop.
+ */
+export function TimerSheet({ engine, onClose, variant = 'sheet' }: { engine: Engine; onClose?: () => void; variant?: 'sheet' | 'panel' }) {
+  const panel = variant === 'panel'
   const { state, toggleRunning, reset, skip, switchMode, stopStopwatch, setTimerKind, setMeta, dispatch, soundType, setSoundType, volume, setVolume } = engine
   const courses = useFocusStore(s => s.courses).filter(c => c.status === 'active')
   const topics = useFocusStore(s => s.topics)
@@ -53,17 +57,23 @@ export function TimerSheet({ engine, onClose }: { engine: Engine; onClose: () =>
     if (note !== lastSent.current) { lastSent.current = note; setMeta({ note }) }
     const res = stopStopwatch()
     if (!res.saved) setTooShort(true)
-    else onClose()
+    else if (!panel) onClose?.()
   }
 
-  return (
-    <Sheet onClose={onClose} full label="Timer">
+  const body = (
       <div className="fx-timer" style={{ '--tc': color } as React.CSSProperties}>
-        <div className="fx-sheet-head">
-          <button type="button" className="fx-iconbtn is-solo" onClick={onClose} aria-label="Sluiten"><ChevronDown size={24} /></button>
-          <h3>{running ? 'Aan het studeren' : started ? 'Gepauzeerd' : 'Nieuwe sessie'}</h3>
-          <div style={{ width: 40 }} />
-        </div>
+        {panel ? (
+          <div className="fx-panel-head">
+            <h3>{running ? 'Aan het studeren' : started ? 'Gepauzeerd' : 'Nieuwe sessie'}</h3>
+            {running && <span className="fx-panel-live" aria-hidden="true" />}
+          </div>
+        ) : (
+          <div className="fx-sheet-head">
+            <button type="button" className="fx-iconbtn is-solo" onClick={onClose} aria-label="Sluiten"><ChevronDown size={24} /></button>
+            <h3>{running ? 'Aan het studeren' : started ? 'Gepauzeerd' : 'Nieuwe sessie'}</h3>
+            <div style={{ width: 40 }} />
+          </div>
+        )}
 
         <div className="fx-seg" style={{ maxWidth: 320, margin: '4px auto 18px' }} role="tablist" aria-label="Timersoort">
           {(['stopwatch', 'pomodoro'] as const).map(k => (
@@ -175,6 +185,8 @@ export function TimerSheet({ engine, onClose }: { engine: Engine; onClose: () =>
           )}
         </div>
       </div>
-    </Sheet>
   )
+
+  if (panel) return <aside className="fx-timerpanel" aria-label="Timer">{body}</aside>
+  return <Sheet onClose={onClose || (() => {})} full label="Timer">{body}</Sheet>
 }

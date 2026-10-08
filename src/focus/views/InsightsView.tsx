@@ -39,6 +39,7 @@ export function InsightsView() {
       <h1 className="fx-h1">Inzichten</h1>
 
       {/* Waar je tijd heen ging */}
+      <div className="fx-cols"><div className="fx-col">
       <section className="fx-section" style={{ marginTop: 8 }}>
         <div className="fx-section-head" style={{ alignItems: 'flex-start', marginBottom: 0 }}>
           <div style={{ minWidth: 0 }}>
@@ -58,7 +59,8 @@ export function InsightsView() {
       </section>
 
       {/* Wanneer je studeert */}
-      <section className="fx-section" style={{ marginTop: 40 }}>
+      </div><div className="fx-col">
+      <section className="fx-section fx-section--side" style={{ marginTop: 40 }}>
         <div className="fx-section-head" style={{ alignItems: 'flex-start', marginBottom: 0 }}>
           <div>
             <InfoLabel text="Wanneer je studeert" onInfo={() => setInfo(info === 'when' ? null : 'when')} />
@@ -72,6 +74,7 @@ export function InsightsView() {
       </section>
 
       {/* Piekdagen en -uren (op basis van ★) */}
+      </div></div>
       <section className="fx-section" style={{ marginTop: 34 }}>
         <h2 className="fx-h2" style={{ marginBottom: 12 }}>Wanneer je het best focust</h2>
         {rating.rated < 3 ? (

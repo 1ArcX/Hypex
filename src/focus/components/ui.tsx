@@ -1,9 +1,18 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import ReactDOM from 'react-dom'
 import { ChevronDown, Star } from 'lucide-react'
 import { useFocusStore } from '../store/focusStore'
 import { KIND_BY_ID } from '../lib/meta'
 import type { SessionKind } from '../types'
+
+/**
+ * Indeling van de Focus-tab, op basis van de breedte van het Focus-vlak (niet het venster — de Dash-zijbalk telt mee):
+ * desktop (≥ 1024px) = zijbalk + kolommen, panel (≥ 1360px) = ook een vast timerpaneel rechts.
+ */
+export const FX_DESKTOP = 1024
+export const FX_PANEL = 1360
+export const FxLayoutContext = createContext({ desktop: false, panel: false })
+export const useFxLayout = () => useContext(FxLayoutContext)
 
 /** Thema van de Focus-tab: 'auto' volgt het systeem */
 export function useFxTheme() {

@@ -6,6 +6,17 @@
 
 export const RELEASES = [
   {
+    id: 10,
+    date: '2026-10-08',
+    title: 'Focus op de computer',
+    items: [
+      { area: 'focus', text: 'Focus heeft op de computer een eigen indeling: een zijbalk met Overzicht, Vakken, Kalender en Inzichten, en "Terug naar Dash" onderaan.' },
+      { area: 'focus', text: 'Pagina's gebruiken de breedte: bijvoorbeeld de grafiek links en je recente sessies rechts, of de kalender naast het weekoverzicht.' },
+      { area: 'focus', text: 'Op brede schermen staat de timer vast rechts in beeld; op kleinere schermen start en pauzeer je hem vanuit de zijbalk.' },
+      { area: 'focus', text: 'Op je telefoon blijft Focus zoals het was.' },
+    ],
+  },
+  {
     id: 9,
     date: '2026-10-08',
     title: 'Focus: altijd een weg terug',

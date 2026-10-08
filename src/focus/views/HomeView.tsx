@@ -44,6 +44,8 @@ export function HomeView({ userId, onSettings, onAddSession, onNewCourse, onOpen
 
       <h1 className="fx-h1">Overzicht</h1>
 
+      <div className="fx-cols"><div className="fx-col">
+
       <div className="fx-hero">
         <div>
           <div className="fx-label">Huidige streak</div>
@@ -82,7 +84,8 @@ export function HomeView({ userId, onSettings, onAddSession, onNewCourse, onOpen
         <VolumeArea points={vol.points} />
       </div>
 
-      <div className="fx-section">
+      </div><div className="fx-col">
+      <div className="fx-section fx-section--side">
         <button type="button" className="fx-section-head" onClick={() => setRecentOpen(o => !o)}
           style={{ width: '100%', border: 'none', background: 'none', cursor: 'pointer', padding: 0, color: 'inherit' }} aria-expanded={recentOpen}>
           <h2 className="fx-h2">Recente sessies</h2>
@@ -95,6 +98,7 @@ export function HomeView({ userId, onSettings, onAddSession, onNewCourse, onOpen
                 more={sessions.length > 5 ? { label: showAll ? 'Minder tonen' : `Toon meer (${Math.min(50, sessions.length) - 5})`, onClick: () => setShowAll(v => !v) } : undefined} />
         )}
       </div>
+      </div></div>
     </div>
   )
 }
