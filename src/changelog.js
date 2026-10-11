@@ -6,6 +6,14 @@
 
 export const RELEASES = [
   {
+    id: 11,
+    date: '2026-10-11',
+    title: 'Agenda: routines verbergen',
+    items: [
+      { area: 'agenda', text: "Met de knop Routines bovenin de agenda verberg of toon je al je routines, zodat je de rest van je dag beter ziet. Werkt in elke weergave en wordt per apparaat onthouden." },
+    ],
+  },
+  {
     id: 10,
     date: '2026-10-08',
     title: 'Focus op de computer',

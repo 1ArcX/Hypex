@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { supabase } from '../supabaseClient'
-import { Plus, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight, X, Repeat } from 'lucide-react'
 import { callMagister } from '../utils/magisterApi'
 import { callSomtoday, ensureSomtodayCreds } from '../utils/somtodayApi'
 import { appliesOn } from '../utils/recurrence'
@@ -154,7 +154,7 @@ function isAllDayEvent(ev) {
 
 const SOMTODAY_EMAIL = 'jbrugman.prive@gmail.com'
 
-export default function Timeline({ userId, userEmail, tasks: tasksIn, subjects, onEditTask, onViewDetail, defaultView = 'week', initialDate, isMobile = false, hideToolbar = false, onLessonsChange, onEventsChange, onMagisterError, onDateChange, highlightKey }) {
+export default function Timeline({ userId, userEmail, tasks: tasksIn, subjects, onEditTask, onViewDetail, defaultView = 'week', initialDate, isMobile = false, hideToolbar = false, onLessonsChange, onEventsChange, onMagisterError, onDateChange, highlightKey, routines }) {
   const [view, setView] = useState(defaultView)
   const vp = useViewport()
   // Smal maar hoog venster: legenda + mini-maand als strook onder het rooster (zie .agenda-shell in index.css)
@@ -1405,6 +1405,14 @@ export default function Timeline({ userId, userEmail, tasks: tasksIn, subjects, 
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* Routines verbergen/tonen (zie hooks/useHideRoutines.js); AgendaPage filtert de taken */}
+          {routines && routines.count > 0 && (
+            <button type="button" onClick={routines.onToggle} aria-pressed={!routines.hidden}
+              className={`routine-toggle${routines.hidden ? ' is-off' : ''}`}
+              title={routines.hidden ? 'Routines tonen' : 'Routines verbergen'}>
+              <Repeat size={14} aria-hidden="true" /> {routines.hidden ? `Routines verborgen (${routines.count})` : 'Routines'}
+            </button>
+          )}
           <FilterTabs variant="segmented" label="Weergave" value={view} onChange={setView}
             items={(isMobile ? [['week','Week'], ['month','Maand']] : [['day','Dag'], ['week','Week'], ['month','Maand']]).map(([value, label]) => ({ value, label }))} />
           <button onClick={openFresh} className="btn-primary" title="Nieuw (spatie)">

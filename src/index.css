@@ -1878,3 +1878,14 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; -webkit-user
 /* Spotify: recent gezocht */
 .sp-recent-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 .sp-row__img.is-round { border-radius: 50%; }
+
+/* Agenda: routines verbergen/tonen (Timeline-werkbalk + mobiele balk) */
+.routine-toggle {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+  font: inherit; font-size: 12px; font-weight: 600; color: var(--cat-routine, #34D399);
+  background: color-mix(in srgb, var(--cat-routine, #34D399) 12%, transparent); border: 1px solid color-mix(in srgb, var(--cat-routine, #34D399) 35%, transparent);
+  transition: background var(--t-fast, 0.15s) ease, color var(--t-fast, 0.15s) ease;
+}
+.routine-toggle:hover { background: color-mix(in srgb, var(--cat-routine, #34D399) 20%, transparent); }
+.routine-toggle.is-off { color: var(--c-text-3); background: var(--c-surface); border-color: var(--c-border); border-style: dashed; }
+.md\:hidden .routine-toggle { height: 28px; padding: 0 9px; }

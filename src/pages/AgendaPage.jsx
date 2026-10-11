@@ -5,6 +5,8 @@ import WeekStrip from '../components/agenda/WeekStrip'
 import MonthGrid from '../components/agenda/MonthGrid'
 import { useIsDesktop } from '../hooks/useIsDesktop'
 import { loadExternalEvents } from '../utils/externalEvents'
+import { Repeat } from 'lucide-react'
+import { useHideRoutines, isRoutineTask } from '../hooks/useHideRoutines'
 
 const GLASS_BAR = 'rgba(255,255,255,0.03)'
 
@@ -18,6 +20,10 @@ export default function AgendaPage({
 }) {
   const isDesktop = useIsDesktop()
   const today = new Date()
+  // Routines verbergen (knop in de werkbalk): geldt voor alle agenda-weergaven
+  const [hideRoutines, setHideRoutines] = useHideRoutines()
+  const routineCount = useMemo(() => (tasks || []).filter(isRoutineTask).length, [tasks])
+  const agendaTasks = useMemo(() => (hideRoutines ? (tasks || []).filter(t => !isRoutineTask(t)) : tasks), [tasks, hideRoutines])
   const [mobileView, setMobileView] = useState('dag')          // 'dag' | 'maand'
   const [selectedDay, setSelectedDay] = useState(today)
   const [highlightKey, setHighlightKey] = useState(null)
@@ -67,12 +73,13 @@ export default function AgendaPage({
           <div style={{ flex: 1, overflow: 'hidden' }}>
             {isDesktop && (
               <Timeline
-                userId={userId} userEmail={userEmail} tasks={tasks} subjects={subjects}
+                userId={userId} userEmail={userEmail} tasks={agendaTasks} subjects={subjects}
                 onToggleTask={onToggleTask} onEditTask={onEditTask} onViewDetail={onViewDetail} isAdmin={isAdmin}
                 onLessonsChange={onLessonsChange} onEventsChange={onEventsChange}
                 onMagisterError={onMagisterError}
                 highlightKey={highlightKey}
                 initialDate={jumpTo?.date}
+                routines={{ hidden: hideRoutines, count: routineCount, onToggle: () => setHideRoutines(!hideRoutines) }}
               />
             )}
           </div>
@@ -84,7 +91,7 @@ export default function AgendaPage({
 
         {/* Toggle Dag | Lijst | Maand — compact, geen dubbele titel (globale header toont al "Agenda") */}
         <div style={{
-          flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
           padding: '6px 12px', background: GLASS_BAR, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderBottom: '1px solid var(--border)',
         }}>
           <div style={{ display: 'flex', gap: 2, background: 'rgba(255,255,255,0.05)', borderRadius: 20, padding: 2, border: '1px solid var(--border)' }}>
@@ -92,6 +99,13 @@ export default function AgendaPage({
             <button style={tabStyle(mobileView === 'lijst')} onClick={() => setMobileView('lijst')}>Lijst</button>
             <button style={tabStyle(mobileView === 'maand')} onClick={() => setMobileView('maand')}>Maand</button>
           </div>
+          {routineCount > 0 && (
+            <button type="button" onClick={() => setHideRoutines(!hideRoutines)} aria-pressed={!hideRoutines}
+              className={`routine-toggle${hideRoutines ? ' is-off' : ''}`} style={{ position: 'absolute', right: 12 }}
+              title={hideRoutines ? 'Routines tonen' : 'Routines verbergen'} aria-label={hideRoutines ? `Routines tonen (${routineCount})` : 'Routines verbergen'}>
+              <Repeat size={13} aria-hidden="true" /> {hideRoutines ? routineCount : ''}
+            </button>
+          )}
         </div>
 
         {/* ── Dag view ── */}
@@ -102,14 +116,14 @@ export default function AgendaPage({
               onSelectDay={handleSelectDay}
               onPrevWeek={prevWeek}
               onNextWeek={nextWeek}
-              tasks={tasks}
+              tasks={agendaTasks}
               calendarEvents={mobileEvents}
               magisterLessons={magisterLessons}
             />
             <div style={{ flex: 1, overflow: 'hidden' }}>
               <Timeline
                 key={selectedDay.toDateString()}
-                userId={userId} userEmail={userEmail} tasks={tasks} subjects={subjects}
+                userId={userId} userEmail={userEmail} tasks={agendaTasks} subjects={subjects}
                 onToggleTask={onToggleTask} onEditTask={onEditTask} onViewDetail={onViewDetail} isAdmin={isAdmin}
                 onLessonsChange={onLessonsChange} onEventsChange={onEventsChange}
                 onMagisterError={onMagisterError}
@@ -128,7 +142,7 @@ export default function AgendaPage({
         {mobileView === 'lijst' && (
           <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
             <AgendaList
-              tasks={tasks}
+              tasks={agendaTasks}
               subjects={subjects}
               calendarEvents={mobileEvents}
               magisterLessons={magisterLessons}
@@ -145,7 +159,7 @@ export default function AgendaPage({
             <MonthGrid
               selectedDay={selectedDay}
               onSelectDay={handleSelectDay}
-              tasks={tasks}
+              tasks={agendaTasks}
               calendarEvents={mobileEvents}
               magisterLessons={magisterLessons}
             />
