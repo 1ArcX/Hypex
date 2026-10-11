@@ -1254,6 +1254,63 @@ body.is-col-resizing { cursor: col-resize; user-select: none; }
 .taken-body { flex: 1; overflow-y: auto; }
 .taken-body > * { max-width: 920px; margin: 0 auto; padding: 14px 28px 100px; box-sizing: border-box; }
 .taken-body > .task-overview { max-width: 1200px; }
+.taken-body > .done-view { max-width: 1000px; }
+
+/* Taken → Gedaan: afgeronde taken per dag + voortgang */
+.done-view { display: flex; flex-direction: column; gap: 18px; }
+.done-stats { padding: 16px; border-radius: var(--r-lg); background: var(--c-surface); border: 1px solid var(--c-border); }
+.done-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
+.done-kpi { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.done-kpi__v { display: inline-flex; align-items: center; gap: 4px; font-size: 24px; font-weight: 700; color: var(--c-text); line-height: 1.1; }
+.done-kpi__l { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--c-text-3); }
+.done-delta { display: inline-flex; align-items: center; gap: 2px; font-weight: 700; font-size: 11px; }
+.done-delta.is-up { color: var(--c-success); }
+.done-delta.is-down { color: var(--c-text-3); }
+.done-bars { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 6px; height: 120px; }
+.done-bar { display: flex; flex-direction: column; align-items: stretch; gap: 4px; min-width: 0; padding: 0; background: none; border: none; cursor: pointer; color: var(--c-text-3); }
+.done-bar:disabled { cursor: default; }
+.done-bar__n { font-size: 10px; font-weight: 600; height: 12px; text-align: center; }
+.done-bar__track { flex: 1; position: relative; border-radius: 6px; background: color-mix(in srgb, var(--c-text) 5%, transparent); overflow: hidden; }
+.done-bar__fill { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; justify-content: flex-start; border-radius: 6px; background: color-mix(in srgb, var(--accent) 70%, transparent); transition: height 0.4s var(--ease-out, ease); }
+.done-bar__routine { width: 100%; background: color-mix(in srgb, var(--accent) 28%, transparent); }
+.done-bar.is-today .done-bar__fill { background: var(--accent); box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 45%, transparent); }
+.done-bar.is-today .done-bar__d { color: var(--accent); font-weight: 700; }
+.done-bar:not(:disabled):hover .done-bar__track { background: color-mix(in srgb, var(--c-text) 9%, transparent); }
+.done-bar__d { font-size: 10px; text-align: center; text-transform: lowercase; }
+.done-legend { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; font-size: 11px; color: var(--c-text-3); }
+.done-legend span { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
+.done-legend__t { background: color-mix(in srgb, var(--accent) 70%, transparent); }
+.done-legend__r { background: color-mix(in srgb, var(--accent) 28%, transparent); margin-left: 8px; }
+
+.done-days { display: flex; flex-direction: column; gap: 18px; }
+.done-day { scroll-margin-top: 12px; }
+.done-day__head { display: flex; align-items: baseline; gap: 8px; padding: 0 2px 6px; border-bottom: 1px solid var(--c-border); margin-bottom: 4px; }
+.done-day__title { font-size: 15px; font-weight: 700; color: var(--c-text); }
+.done-day.is-today .done-day__title { color: var(--accent); }
+.done-day__sub { font-size: 12px; color: var(--c-text-3); }
+.done-day__count { margin-left: auto; font-size: 12px; color: var(--c-text-3); }
+.done-row { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-radius: var(--r-sm); cursor: default; }
+.done-row[role="button"] { cursor: pointer; }
+.done-row[role="button"]:hover { background: color-mix(in srgb, var(--c-text) 4%, transparent); }
+.done-row__check { flex-shrink: 0; }
+.done-row__main { flex: 1; min-width: 0; }
+.done-row__title { margin: 0; font-size: 13px; font-weight: 500; color: var(--c-text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.done-row__meta { margin: 1px 0 0; }
+.done-restore { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; height: 28px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--c-border); background: none; color: var(--c-text-2); font-size: 12px; font-weight: 600; cursor: pointer; }
+.done-restore:hover { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.done-restore:disabled { opacity: 0.5; }
+.done-routines { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 6px 2px; }
+.done-routines__label { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--c-text-3); margin-right: 2px; }
+.done-chip { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 4px 0 10px; border-radius: 999px; font-size: 12px; color: var(--c-text-2); background: color-mix(in srgb, var(--c-success) 10%, transparent); border: 1px solid color-mix(in srgb, var(--c-success) 25%, transparent); }
+.done-chip button { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; border: none; background: none; color: var(--c-text-3); cursor: pointer; }
+.done-chip button:hover { color: var(--accent); background: color-mix(in srgb, var(--c-text) 8%, transparent); }
+.done-more { align-self: center; }
+@media (max-width: 640px) {
+  .done-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .done-bars { gap: 3px; height: 100px; }
+  .done-restore span { display: none; }
+  .done-restore { width: 32px; padding: 0; justify-content: center; }
+}
 .taken-head--wide { max-width: 1200px; }
 
 /* Taken → Overzicht: Vandaag gemarkeerd + tijdlijn van de komende dagen (twee kolommen als er ruimte is) */

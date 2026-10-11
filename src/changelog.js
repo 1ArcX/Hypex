@@ -6,6 +6,17 @@
 
 export const RELEASES = [
   {
+    id: 13,
+    date: '2026-10-11',
+    title: 'Afgeronde taken blijven bewaard',
+    items: [
+      { area: 'taken', text: "Nieuw filter Gedaan: per dag zie je wat je hebt afgerond (ook routines), met je voortgang van de laatste 14 dagen, deze week tegenover vorige week en je reeks dagen op rij." },
+      { area: 'taken', text: "Per taak de knop Terugzetten: hij staat dan weer open op de dag waar hij gepland stond, ook als je hem dagen geleden afrondde." },
+      { area: 'taken', text: "Een taak die je te laat of juist eerder afrondt, wordt bewaard bij de dag waarop je hem deed." },
+      { area: 'agenda', text: "Afgeronde taken blijven in de agenda staan (doorgestreept) in plaats van te verdwijnen." },
+    ],
+  },
+  {
     id: 12,
     date: '2026-10-11',
     title: 'Notities inplannen als taak',

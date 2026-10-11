@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom'
 import TasksWidget from '../components/TasksWidget'
 import TodayView from '../components/TodayView'
 import TaskOverview from '../components/tasks/TaskOverview'
+import DoneView from '../components/tasks/DoneView'
 import { useIsDesktop } from '../hooks/useIsDesktop'
 import { Plus, CheckCircle2 } from 'lucide-react'
 import { isDueToday, isDoneToday, appliesOn, todayISO, toISO } from '../utils/recurrence'
@@ -38,6 +39,7 @@ const FILTERS = [
   { id: 'telaat',    label: 'Te laat',  tone: 'danger' },
   { id: 'urgent',    label: 'Urgent',   tone: 'danger' },
   { id: 'ongepland', label: 'Ongepland' },
+  { id: 'gedaan',    label: 'Gedaan' },
 ]
 
 // Lokale datums (toISOString is UTC en gaf tussen 00:00–02:00 de datum van gisteren)
@@ -54,7 +56,7 @@ function weekEndStr() {
 const SWIPE_HINT_KEY = 'swipe_hint_seen_v1'
 
 export default function TakenPage({
-  tasks, subjects,
+  tasks, subjects, userId, onRestoreCompletion,
   onAdd, onEdit, onDelete, onToggle, onViewDetail, onNew, onMoveToGroup, onReorder, onReorderGroups, groupOrder,
   highlightFilter, onClearHighlight, hideFab,
 }) {
@@ -160,7 +162,7 @@ export default function TakenPage({
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Kop + filters */}
-      <div className={filter === 'overzicht' ? 'taken-head taken-head--wide' : 'taken-head'}>
+      <div className={filter === 'overzicht' || filter === 'gedaan' ? 'taken-head taken-head--wide' : 'taken-head'}>
         {isDesktop && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
             <h1 className="t-page" style={{ margin: 0 }}>Taken</h1>
@@ -181,7 +183,9 @@ export default function TakenPage({
 
       {/* Task list */}
       <div className="taken-body">
-        {filter === 'overzicht' ? (
+        {filter === 'gedaan' ? (
+          <DoneView userId={userId} tasks={tasks} onRestore={onRestoreCompletion} onOpen={onViewDetail || onEdit} />
+        ) : filter === 'overzicht' ? (
           <TaskOverview
             tasks={tasks}
             subjects={subjects}

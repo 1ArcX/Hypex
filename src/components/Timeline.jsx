@@ -796,11 +796,10 @@ export default function Timeline({ userId, userEmail, tasks: tasksIn, subjects, 
               // Taken zonder tijd (hele dag / dagdeel) + routines op deze dag
               const allDayTasks = getTasksForDay(d)
                 .filter(t => !t.start_time && !t.time && !spanTask(t) && !t.daypart)
-                .filter(t => t.recurrence || !t.completed)
                 .map(t => {
                   const color = categoryColor(taskCategory(t))
                   return {
-                    kind: 'task', key: `task-allday-${t.id}`, color,
+                    kind: 'task', key: `task-allday-${t.id}`, color, done: !t.recurrence && t.completed,
                     title: `${t.recurrence ? '🔁 ' : ''}${t.completed ? '✓ ' : ''}${t.title}`,
                     onClick: e => { e.stopPropagation(); onViewDetail ? onViewDetail(t) : onEditTask?.(t) },
                     drag: !t.recurrence ? { key: `ad-task-${t.id}-${di}`, kind: 'task', mode: 'day', data: t, di, dayStr, dur: t.duration_minutes >= 15 ? t.duration_minutes : 60, title: t.title, color } : null,
@@ -833,6 +832,7 @@ export default function Timeline({ userId, userEmail, tasks: tasksIn, subjects, 
                     {items.map(item => (
                       <div key={item.key} onClick={item.onClick} {...dragBind(item.drag)} className={item.drag && isDragSrc(item.drag.key) ? 'is-drag-src' : undefined}
                         style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, cursor: item.onClick ? 'pointer' : 'default', background: `color-mix(in srgb, ${item.color} 16%, var(--c-surface-solid))`, borderLeft: `3px solid ${item.color}`, color: `color-mix(in srgb, ${item.color} 60%, white)`, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          ...(item.done ? { opacity: 0.55, textDecoration: 'line-through' } : {}),
                           ...(item.kind === 'draft' ? { border: `1px dashed ${item.color}`, borderLeft: `3px solid ${item.color}`, opacity: 0.9 } : {}) }}>
                         {item.title}{item.edited ? ' ✎' : ''}
                       </div>
@@ -971,7 +971,7 @@ export default function Timeline({ userId, userEmail, tasks: tasksIn, subjects, 
                 }),
                 // Taken met een dagdeel (zonder tijd): één compact blok per dagdeel (zie plaatsing hieronder)
                 ...Object.entries(colTasks
-                  .filter(t => !t.start_time && !t.time && t.daypart && DAYPART_RANGE[t.daypart] && !(isMultiDay(t)) && (t.recurrence || !t.completed))
+                  .filter(t => !t.start_time && !t.time && t.daypart && DAYPART_RANGE[t.daypart] && !(isMultiDay(t)))
                   .reduce((g, t) => { (g[t.daypart] ||= []).push(t); return g }, {}))
                   .map(([dp, list]) => ({ type: 'daypart', key: `dp-${di}-${dp}`, startMins: DAYPART_RANGE[dp][0], endMins: DAYPART_RANGE[dp][1], data: { dp, list } })),
                 ...colTasks.filter(task => task.start_time || task.time).map(task => {

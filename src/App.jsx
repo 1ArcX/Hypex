@@ -16,7 +16,8 @@ import { callMagister } from './utils/magisterApi'
 import { ensureSomtodayCreds } from './utils/somtodayApi'
 import { awardXP, XP_TASK } from './utils/xp'
 import { advanceOnComplete, revertOnUncomplete, isDoneToday, todayISO } from './utils/recurrence'
-import { isOverdue } from './utils/taskStatus'
+import { isOverdue, isMultiDay } from './utils/taskStatus'
+import { logCompletion, removeCompletion, lastPlannedDate } from './utils/taskCompletions'
 import { fetchLatestVersion } from './utils/version'
 import { autoSyncCalendars } from './utils/calendarSync'
 import { loadItemTypes, useItemTypes } from './hooks/useItemTypes'
@@ -678,12 +679,14 @@ export default function App() {
         const upd = revertOnUncomplete(task, today)
         navigator.vibrate?.(20)
         await supabase.from('tasks').update({ ...upd, updated_at: new Date().toISOString() }).eq('id', task.id)
+        removeCompletion(task.id, { day: today })
         awardXP(user?.id, -XP_TASK)
       } else {
         const upd = advanceOnComplete(task, today)
         if (!upd) return
         navigator.vibrate?.(40)
         await supabase.from('tasks').update({ ...upd, updated_at: new Date().toISOString() }).eq('id', task.id)
+        logCompletion(task, { day: today })
         // Gekoppelde notitie (bv. wekelijkse boodschappen): vinkjes weer uit voor de volgende keer
         if (task.note_id) resetLinkedNote(task.note_id)
         awardXP(user?.id, XP_TASK)
@@ -695,14 +698,36 @@ export default function App() {
 
     const completing = !task.completed
     navigator.vibrate?.(completing ? 40 : 20)
-    await supabase.from('tasks').update({ completed: completing, updated_at: new Date().toISOString() }).eq('id', task.id)
+    const today = todayISO()
+    const patch = { completed: completing, updated_at: new Date().toISOString() }
     if (completing) {
+      // Afgerond = bewaard bij de dag waarop je hem deed (te laat, vooruit gewerkt of zonder datum → vandaag);
+      // de geplande datum staat in het logboek, zodat terugzetten hem daar weer neerzet.
+      if (!isMultiDay(task) && task.date !== today) patch.date = today
+    } else if (!isMultiDay(task)) {
+      const planned = await lastPlannedDate(task.id)
+      if (planned !== undefined) patch.date = planned
+    }
+    await supabase.from('tasks').update(patch).eq('id', task.id)
+    if (completing) {
+      logCompletion(task, { day: today, plannedDate: task.date || null })
       awardXP(user?.id, XP_TASK)
       setXpToast({ xp: XP_TASK, icon: '✓' })
     } else {
+      removeCompletion(task.id)
       awardXP(user?.id, -XP_TASK)
     }
     fetchTasks()
+  }
+
+  // Taken → Gedaan: een afgeronde taak terugzetten (ook van een eerdere dag)
+  const handleRestoreCompletion = async (entry) => {
+    const task = tasks.find(t => t.id === entry.task_id)
+    if (task && !task.recurrence && task.completed) return handleToggleTask(task)
+    if (task?.recurrence && entry.day === todayISO() && isDoneToday(task, entry.day)) return handleToggleTask(task)
+    // Routine van een eerdere dag (of verwijderde taak): alleen uit het logboek
+    await removeCompletion(entry.task_id, { id: entry.id })
+    if (task) awardXP(user?.id, -XP_TASK)
   }
 
   const openNewTask = (time) => {
@@ -978,6 +1003,8 @@ export default function App() {
                 onEdit={openEditTask}
                 onDelete={handleDeleteTask}
                 onToggle={handleToggleTask}
+                onRestoreCompletion={handleRestoreCompletion}
+                userId={user.id}
                 onViewDetail={setDetailTask}
                 onNew={() => openNewTask()}
                 onMoveToGroup={handleMoveToGroup}
