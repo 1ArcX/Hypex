@@ -1,5 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ListChecks, Type, Pin, PinOff, Trash2, SquarePen, FolderInput, List, ListOrdered, CheckCircle2, Circle, X } from 'lucide-react'
+import { ListChecks, Type, Pin, PinOff, Trash2, SquarePen, FolderInput, List, ListOrdered, CheckCircle2, Circle, X, CalendarPlus, CalendarCheck } from 'lucide-react'
+import { PlanPopover, PlannedStrip } from './PlanNote'
 import { parse, serialize } from './noteFormat'
 import { removeRange, splitAt, backspaceAtStart, deleteAtEnd, insertText, applyShortcut, setLineType } from './docModel'
 import { longDate, Menu, FloatBar, NxPortal } from './parts'
@@ -150,7 +151,9 @@ function setCaret(root, c) {
 export default function NoteEditor({
   note, mac, saveState, checkable, folders,
   onEdit, onPin, onToggleDone, onDelete, onNew, onMove, onEditingChange, onHome,
+  planned, onPlannedChange,
 }) {
+  const [planAt, setPlanAt] = useState(null)
   const rootRef = useRef(null)
   const lastCaret = useRef(null)
   const hist = useRef({ list: [], i: -1, at: 0 })
@@ -173,15 +176,16 @@ export default function NoteEditor({
   }
 
   /** Structuurwijziging toepassen: model → DOM, caret terug, opslaan. */
-  const apply = (res, { history = true } = {}) => {
+  const apply = (res, { history = true, silent = false } = {}) => {
     if (!res) return
     const root = rootRef.current
+    const focused = document.activeElement === root
     render(root, res.lines)
-    setCaret(root, res.caret)
+    if (!silent || focused) setCaret(root, res.caret)
     lastCaret.current = res.caret
     setCurType(res.lines[res.caret.line]?.type || null)
     if (history) pushHist(res.lines, res.caret, false)
-    emit(res.lines)
+    if (!silent) emit(res.lines)
   }
 
   // Eerste keer: notitie inlezen. (Editor krijgt per notitie een eigen key → opnieuw mounten bij wisselen.)
@@ -275,6 +279,29 @@ export default function NoteEditor({
     return () => { root.removeEventListener('beforeinput', before); root.removeEventListener('input', input); root.removeEventListener('paste', paste) }
   }) // elke render opnieuw koppelen: handlers gebruiken de nieuwste props (onEdit)
 
+  // Alle afvinkpunten weer open (opnieuw ingepland)
+  const resetChecks = () => {
+    const root = rootRef.current
+    const lines = readLines(root)
+    if (!lines.some(l => l.type === 'check' && l.done)) return
+    apply({ lines: lines.map(l => l.type === 'check' ? { ...l, done: false } : l), caret: lastCaret.current || { line: 0, off: 0 } })
+  }
+
+  // Afgevinkt/gereset vanuit een taak terwijl deze notitie open staat → document bijwerken
+  useEffect(() => {
+    const on = (e) => {
+      const d = e.detail || {}
+      if (d.id !== note.id || !('content' in d)) return
+      const root = rootRef.current
+      const lines = readLines(root)
+      if (serialize(lines.slice(1)) === d.content) return // eigen wijziging
+      const blocks = d.content ? parse(d.content).map(({ id, ...b }) => b) : []
+      apply({ lines: [lines[0], ...blocks], caret: lastCaret.current || { line: 0, off: 0 } }, { history: true, silent: true })
+    }
+    window.addEventListener('notesChanged', on)
+    return () => window.removeEventListener('notesChanged', on)
+  }) // eslint-disable-line react-hooks/exhaustive-deps
+
   const step = (dir) => {
     const h = hist.current
     const j = h.i + dir
@@ -354,6 +381,11 @@ export default function NoteEditor({
           {done ? <CheckCircle2 size={ic} /> : <Circle size={ic} />}
         </button>
       )}
+      <button type="button" className={`nx-icon-btn${planned ? ' is-on' : ''}`} onMouseDown={keepFocus}
+        onClick={e => { const r = e.currentTarget.getBoundingClientRect(); setPlanAt({ x: Math.max(8, Math.min(r.left + r.width / 2 - 150, window.innerWidth - 316)), y: mac ? r.bottom + 6 : r.top - 8, up: !mac }) }}
+        aria-label={planned ? 'Ingepland — verplaatsen' : 'Plan in als taak'} title={planned ? 'Ingepland als taak' : 'Plan in als taak (bv. boodschappen op zaterdag)'}>
+        {planned ? <CalendarCheck size={ic} /> : <CalendarPlus size={ic} />}
+      </button>
       {mac && <button type="button" className="nx-icon-btn" onClick={e => { const r = e.currentTarget.getBoundingClientRect(); setMoveAt({ x: r.left, y: r.bottom + 6 }) }} aria-label="Verplaats naar map" title="Verplaats naar map"><FolderInput size={17} /></button>}
       {mac && <button type="button" className="nx-icon-btn" onClick={onDelete} aria-label="Verwijder notitie" title="Verwijder"><Trash2 size={17} /></button>}
       <button type="button" className="nx-icon-btn" onMouseDown={keepFocus} onClick={onNew} aria-label="Nieuwe notitie" title="Nieuwe notitie"><SquarePen size={ic} /></button>
@@ -372,6 +404,8 @@ export default function NoteEditor({
       <div className="nx-editor" onMouseDown={e => { if (e.target === e.currentTarget) e.preventDefault() }} onClick={clickBelow}
         style={!mac ? { paddingBottom: 120 + kb } : undefined}>
         <p className="nx-editor__date" contentEditable={false}>{longDate(note.updated_at || note.created_at)}</p>
+        <PlannedStrip task={planned} onUnplan={onPlannedChange}
+          onMove={() => setPlanAt({ x: Math.max(8, window.innerWidth / 2 - 150), y: 120, up: false })} />
         <div ref={rootRef} className="nx-doc" contentEditable suppressContentEditableWarning spellCheck
           role="textbox" aria-multiline="true" aria-label="Notitie"
           onKeyDown={onKeyDown} onPointerDown={onPointerDown} onClick={onClick} onFocus={focusIn} onBlur={focusOut} />
@@ -399,6 +433,8 @@ export default function NoteEditor({
           </div>
         </NxPortal>
       )}
+
+      {planAt && <PlanPopover note={note} task={planned} at={planAt} onClose={() => setPlanAt(null)} onResetChecks={resetChecks} onDone={onPlannedChange} />}
 
       {moveAt && (
         <Menu at={moveAt} onClose={() => setMoveAt(null)} items={[

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Pin, PinOff, Trash2, Folder } from 'lucide-react'
+import { Pin, PinOff, Trash2, Folder, CalendarCheck } from 'lucide-react'
 import { checklistProgress } from './noteFormat'
 import { CheckCircle, noteTitle, notePreview, rowTime, sectionize } from './parts'
 
@@ -9,7 +9,7 @@ const ACTIONS_W = 152 // twee knoppen van 76px
  * Notitierij. Telefoon: naar links vegen = Vastzetten / Verwijder (helemaal doorvegen = verwijderen).
  * Desktop: rechtsklik = menu (via onContext).
  */
-function Row({ note, mac, selected, checkable, showFolder, folderName, onOpen, onPin, onDone, onDelete, onContext }) {
+function Row({ note, mac, selected, checkable, showFolder, folderName, onOpen, onPin, onDone, onDelete, onContext, isPlanned }) {
   const wrapRef = useRef(null), rowRef = useRef(null)
   const g = useRef({ sx: 0, sy: 0, base: 0, dragging: false, moved: false, id: null })
   const [offset, setOffset] = useState(0)
@@ -97,6 +97,7 @@ function Row({ note, mac, selected, checkable, showFolder, folderName, onOpen, o
           <div className="nx-row__title">
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{noteTitle(note)}</span>
             {progress && <span className="nx-row__progress tnum">{progress.done}/{progress.total}</span>}
+            {isPlanned && <CalendarCheck size={13} aria-label="Ingepland als taak" style={{ color: 'var(--nx-yellow)' }} />}
           </div>
           <div className="nx-row__sub"><b>{rowTime(note.updated_at || note.created_at)}</b>{notePreview(note)}</div>
           {showFolder && <div className="nx-row__folder"><Folder size={12} /> {folderName || 'Notities'}</div>}
@@ -106,7 +107,7 @@ function Row({ note, mac, selected, checkable, showFolder, folderName, onOpen, o
   )
 }
 
-export default function NoteList({ notes, mac, selectedId, checkable, showFolder, folders, query, onOpen, onPin, onDone, onDelete, onContext, emptyText }) {
+export default function NoteList({ notes, mac, selectedId, checkable, showFolder, folders, query, onOpen, onPin, onDone, onDelete, onContext, emptyText, planned }) {
   const folderName = (id) => folders.find(f => f.id === id)?.name
   if (!notes.length) {
     return (
@@ -123,7 +124,7 @@ export default function NoteList({ notes, mac, selectedId, checkable, showFolder
       <div className="nx-group">
         {sec.notes.map(n => (
           <Row key={n.id} note={n} mac={mac} selected={n.id === selectedId} checkable={checkable}
-            showFolder={showFolder} folderName={folderName(n.folder_id)}
+            showFolder={showFolder} folderName={folderName(n.folder_id)} isPlanned={!!planned?.has(n.id)}
             onOpen={onOpen} onPin={onPin} onDone={onDone} onDelete={onDelete} onContext={onContext} />
         ))}
       </div>

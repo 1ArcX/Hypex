@@ -6,6 +6,16 @@
 
 export const RELEASES = [
   {
+    id: 12,
+    date: '2026-10-11',
+    title: 'Notities inplannen als taak',
+    items: [
+      { area: 'notities', text: "Plan een notitie in op een dag (bv. Boodschappen op zaterdag middag, eventueel elke week) met de kalenderknop in de notitie. Je ziet dan bovenaan: Gepland, met Verplaats en Uit planning." },
+      { area: 'taken', text: "De taak staat in Taken, de agenda en op je dashboard met de voortgang van de lijst (bv. 2/7). Open de taak om de lijst meteen af te vinken; de vinkjes gaan ook in de notitie." },
+      { area: 'taken', text: "Alles afgevinkt? Dan is de taak automatisch klaar. Bij een wekelijkse taak of opnieuw inplannen staan de vinkjes daarna weer uit." },
+    ],
+  },
+  {
     id: 11,
     date: '2026-10-11',
     title: 'Agenda: routines verbergen',

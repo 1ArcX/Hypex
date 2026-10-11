@@ -64,3 +64,26 @@ export function checklistProgress(content) {
   }
   return total ? { done, total } : null
 }
+
+/** Alle afvinkpunten weer open (notitie opnieuw ingepland / herhalende taak afgerond). */
+export function resetChecklist(content) {
+  return String(content ?? '').split('\n').map(l => l.replace(/^- \[[xX]\]/, '- [ ]')).join('\n')
+}
+
+/** Heeft de notitie een afvinklijst en is alles afgevinkt? */
+export function checklistComplete(content) {
+  const p = checklistProgress(content)
+  return !!p && p.done === p.total
+}
+
+/** Afvinkpunt nummer `index` (0-based, alleen checklist-regels geteld) omzetten. */
+export function toggleChecklistItem(content, index) {
+  let n = -1
+  return String(content ?? '').split('\n').map(l => {
+    const m = l.match(/^- \[( |x|X)\]/)
+    if (!m) return l
+    n++
+    if (n !== index) return l
+    return (m[1] === ' ' ? '- [x]' : '- [ ]') + l.slice(5)
+  }).join('\n')
+}

@@ -26,6 +26,7 @@ import { VAPID_PUBLIC, urlBase64ToUint8Array } from './utils/push'
 import XPToast from './components/XPToast'
 import WhatsNew from './components/WhatsNew'
 import { unseenReleases, markReleasesSeen } from './changelog'
+import { resetLinkedNote } from './utils/linkedNotes'
 import BottomNav from './components/BottomNav'
 import DashboardPage from './pages/DashboardPage'
 import PomodoroPage from './pages/PomodoroPage'
@@ -335,6 +336,20 @@ export default function App() {
     const done = localStorage.getItem(`onboarding_done_${user.id}`)
     if (!done) setShowOnboarding(true)
   }, [user])
+
+  // Gekoppelde notitie helemaal afgevinkt (vanuit Notities of de taak) → open taak afronden
+  const toggleRef = useRef(null)
+  toggleRef.current = { tasks, handleToggleTask: (t) => handleToggleTask(t) }
+  useEffect(() => {
+    const on = (e) => {
+      const { tasks: list, handleToggleTask: toggle } = toggleRef.current
+      const id = e.detail?.noteId
+      const t = (list || []).find(x => x.note_id === id && (x.recurrence ? !isDoneToday(x, todayISO()) : !x.completed))
+      if (t) toggle(t)
+    }
+    window.addEventListener('noteChecklistComplete', on)
+    return () => window.removeEventListener('noteChecklistComplete', on)
+  }, [])
 
   // Update-log: na een update (of een paar gemiste) één popup met alles wat nieuw is, per apparaat
   useEffect(() => {
@@ -669,6 +684,8 @@ export default function App() {
         if (!upd) return
         navigator.vibrate?.(40)
         await supabase.from('tasks').update({ ...upd, updated_at: new Date().toISOString() }).eq('id', task.id)
+        // Gekoppelde notitie (bv. wekelijkse boodschappen): vinkjes weer uit voor de volgende keer
+        if (task.note_id) resetLinkedNote(task.note_id)
         awardXP(user?.id, XP_TASK)
         setXpToast({ xp: XP_TASK, icon: upd.streak > 1 ? '🔥' : '✓' })
       }
@@ -1080,6 +1097,7 @@ export default function App() {
           onDelete={(id) => { setDetailTask(null); handleDeleteTask(id) }}
           onClose={() => setDetailTask(null)}
           onStartPomodoro={() => { setPomodoroSeedTask(detailTask); setDetailTask(null); setActivePage('focus') }}
+          onOpenNote={(id) => { setDetailTask(null); setNoteJump(id); handleSetActivePage('notities') }}
           onSaveDescription={async (id, description) => {
             await supabase.from('tasks').update({ description }).eq('id', id)
             fetchTasks()

@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { X, Pencil, Trash2, BookOpen, Clock, Calendar, Tag, FileText, Link } from 'lucide-react'
+import { LinkedChecklist } from '../utils/linkedNotes'
 
 const DAYS_NL    = ['zondag','maandag','dinsdag','woensdag','donderdag','vrijdag','zaterdag']
 const MONTHS_NL  = ['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december']
@@ -15,7 +16,7 @@ function fmtDate(dateStr) {
   return `${DAYS_NL[d.getDay()]} ${d.getDate()} ${MONTHS_NL[d.getMonth()]}`
 }
 
-export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onEdit, onDelete, onClose, onStartPomodoro, onSaveDescription }) {
+export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onEdit, onDelete, onClose, onStartPomodoro, onSaveDescription, onOpenNote }) {
   const [closing, setClosing] = useState(false)
   const handleClose = () => {
     setClosing(true)
@@ -123,6 +124,9 @@ export default function TaskDetailModal({ task, subjects, subjectLinks = {}, onE
             </span>
           </div>
         )}
+
+        {/* Gekoppelde notitie (bv. boodschappenlijst): afvinken schrijft in de notitie */}
+        {task.note_id && <LinkedChecklist noteId={task.note_id} onOpenNote={onOpenNote} />}
 
         {/* Description — editable */}
         <div style={{ marginBottom:16,padding:'10px 12px',background:'rgba(255,255,255,0.04)',borderRadius:10,border:'1px solid var(--c-border)' }}>

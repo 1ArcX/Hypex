@@ -309,3 +309,21 @@
 
 /* Portal-laag in <body> (menu's, alerts): alleen de tokens, geen eigen vlak */
 .nx.nx-portal { position: static; height: 0; overflow: visible; background: none; }
+
+/* Notitie inplannen als taak */
+.nx-plan { width: 300px; }
+.nx-plan__days, .nx-plan__parts { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.nx-plan__days button, .nx-plan__parts button, .nx-plan__date {
+  height: 30px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--nx-sep); background: rgba(118, 118, 128, 0.18);
+  color: var(--nx-text); font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; text-transform: capitalize;
+}
+.nx-plan__days button.is-on, .nx-plan__parts button.is-on, .nx-plan__date.is-on { background: var(--nx-yellow); color: var(--nx-on-accent); border-color: transparent; }
+.nx-plan__date input { background: none; border: none; color: inherit; font: inherit; font-size: 12px; color-scheme: dark; width: 112px; }
+.nx-plan__weekly { display: flex; align-items: center; gap: 8px; font-size: 14px; margin: 2px 0 12px; cursor: pointer; }
+.nx-plan__weekly input { accent-color: var(--nx-yellow); width: 16px; height: 16px; }
+.nx-plan__err { margin: 0 0 10px; font-size: 12px; color: var(--nx-red); }
+.nx-plan__save { width: 100%; height: 38px; border-radius: 10px; border: none; background: var(--nx-yellow); color: var(--nx-on-accent); font-weight: 700; font-size: 15px; cursor: pointer; }
+.nx-plan__save:disabled { opacity: 0.6; cursor: default; }
+.nx-planned { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: -4px 0 14px; padding: 8px 12px; border-radius: 10px; background: var(--nx-yellow-soft); color: var(--nx-yellow); font-size: 13px; }
+.nx-planned__text { flex: 1; min-width: 0; color: var(--nx-text); }
+.nx-planned button { background: none; border: none; color: var(--nx-yellow); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; padding: 2px 4px; }

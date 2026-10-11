@@ -4,6 +4,7 @@ import { Pill, CheckButton } from '../ui'
 import { taskCategory, categoryColor } from '../../utils/category'
 import { shortDate, isMultiDay, spanLabel, taskOnDay } from '../../utils/taskStatus'
 import { recurrenceLabel } from '../../utils/recurrence'
+import { NoteProgress } from '../../utils/linkedNotes'
 
 // Compacte taakrij (Hypex v2, mockup paneel 3): Wat? — Wanneer? — Status? — Actie?
 //   [grip] ● Titel                         [pill] [⚑] [🗑] [☐]
@@ -58,6 +59,7 @@ export default function TaskRow({
         )}
       </div>
 
+      {task.note_id && <NoteProgress noteId={task.note_id} />}
       {task.recurrence && (task.streak || 0) > 0 && (
         <Pill tone={streakActive ? 'warning' : 'neutral'} title={`Streak: ${task.streak} dagen`}>
           <Flame size={11} aria-hidden="true" /> {task.streak}

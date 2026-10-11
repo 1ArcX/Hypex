@@ -1889,3 +1889,18 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; -webkit-user
 .routine-toggle:hover { background: color-mix(in srgb, var(--cat-routine, #34D399) 20%, transparent); }
 .routine-toggle.is-off { color: var(--c-text-3); background: var(--c-surface); border-color: var(--c-border); border-style: dashed; }
 .md\:hidden .routine-toggle { height: 28px; padding: 0 9px; }
+
+/* Taak gekoppeld aan een notitie: icoon + voortgang van de afvinklijst (utils/linkedNotes.jsx) */
+.note-progress { display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; color: #FFD60A; background: rgba(255, 214, 10, 0.12); border: 1px solid rgba(255, 214, 10, 0.25); line-height: 1.4; }
+.note-progress.is-done { color: var(--c-success); background: color-mix(in srgb, var(--c-success) 12%, transparent); border-color: color-mix(in srgb, var(--c-success) 30%, transparent); }
+.linked-list { margin-bottom: 16px; padding: 10px 12px; border-radius: 10px; background: rgba(255, 214, 10, 0.05); border: 1px solid rgba(255, 214, 10, 0.2); }
+.linked-list__head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: #FFD60A; }
+.linked-list__head > span:first-of-type { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.linked-list__count { color: var(--c-text-2); }
+.linked-list__open { margin-left: auto; background: none; border: none; cursor: pointer; font: inherit; font-size: 11px; text-transform: none; letter-spacing: 0; color: var(--accent); }
+.linked-list ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; max-height: 260px; overflow-y: auto; }
+.linked-list__item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 2px; background: none; border: none; cursor: pointer; text-align: left; font: inherit; font-size: 13px; color: var(--c-text); border-radius: 6px; }
+.linked-list__item:hover { background: rgba(255, 255, 255, 0.04); }
+.linked-list__item.is-done { color: var(--c-text-3); text-decoration: line-through; }
+.linked-list__box { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--c-text-3); display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: var(--on-accent); flex-shrink: 0; transition: background 0.15s ease; }
+.linked-list__item.is-done .linked-list__box { background: var(--accent); border-color: var(--accent); }

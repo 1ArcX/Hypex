@@ -16,6 +16,7 @@ import ItemModal from './ItemModal'
 import { FilterTabs, IconButton, DragGhost } from './ui'
 import { useViewport } from '../hooks/useViewport'
 import { usePointerDrag } from '../hooks/usePointerDrag'
+import { NoteProgress } from '../utils/linkedNotes'
 
 const WORK = 'var(--cat-werk)' // = categoryColor('werk')
 
@@ -1165,6 +1166,7 @@ export default function Timeline({ userId, userEmail, tasks: tasksIn, subjects, 
                                   background: `color-mix(in srgb, ${c} 16%, var(--c-surface-solid))`, borderLeft: `3px solid ${c}`, color: `color-mix(in srgb, ${c} 60%, white)`,
                                   whiteSpace: 'nowrap', overflow: 'hidden', opacity: t.completed ? 0.55 : 1, textDecoration: t.completed ? 'line-through' : 'none' }}>
                                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.recurrence ? '🔁 ' : ''}{t.title}</span>
+                                {t.note_id && <NoteProgress noteId={t.note_id} style={{ marginLeft: 'auto', flexShrink: 0 }} />}
                               </div>
                             )
                           })}
@@ -1185,6 +1187,7 @@ export default function Timeline({ userId, userEmail, tasks: tasksIn, subjects, 
                         <>
                           <div style={blockTitle(color, { textDecoration: task.completed ? 'line-through' : 'none' })}>
                             {task.completed ? '✓ ' : ''}{task.title}
+                            {task.note_id && <NoteProgress noteId={task.note_id} style={{ marginLeft: 6 }} />}
                           </div>
                           {ownH >= 36 && (
                             <div style={blockMeta(color)}>

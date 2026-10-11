@@ -8,6 +8,7 @@ import { daysLate, taskOnDay } from '../../utils/taskStatus'
 import { isDueToday, isDoneToday } from '../../utils/recurrence'
 import { DAYPARTS } from '../../utils/daypart'
 import { countdownLabel } from '../../utils/upcoming'
+import { NoteProgress } from '../../utils/linkedNotes'
 
 // Bovenaan het dashboard: links "Vandaag" (eerst dit → schema → dagdelen → routines, met voortgang),
 // rechts "Volgende" (aftellen, reistijd → vertrektijd). Elk met een eigen gekleurde gloed.
@@ -61,6 +62,7 @@ function TodayPanel({ tasks, subjects, today, todayItems, attention, overdueIds,
         <button type="button" className="dash-row__main" onClick={() => onOpenTask?.(t)}>
           <span className="dash-row__dot" style={{ background: categoryColor(taskCategory(t)) }} aria-hidden="true" />
           <span className="dash-row__title">{t.title}</span>
+          {t.note_id && <NoteProgress noteId={t.note_id} />}
           {sub && <span className="dash-row__sub">{sub}</span>}
         </button>
       </div>

@@ -245,7 +245,7 @@ function MacNotes({ data, fh, folders, notes, loaded, needsMigration, pin, done,
         {needsMigration && <MigrationBanner />}
         <div className="nx-scroll">
           {!loaded ? <div className="nx-empty">Laden…</div> : (
-            <NoteList notes={list} mac selectedId={selected?.id} checkable={fh.checkable(key)} showFolder={key === 'all'} folders={folders} query={query}
+            <NoteList planned={data.planned} notes={list} mac selectedId={selected?.id} checkable={fh.checkable(key)} showFolder={key === 'all'} folders={folders} query={query}
               emptyText="Maak een notitie met het potloodje rechtsboven."
               onOpen={n => { data.flush(); setSelectedId(n.id) }} onPin={pin} onDone={done}
               onDelete={n => removeNote(n)}
@@ -258,7 +258,8 @@ function MacNotes({ data, fh, folders, notes, loaded, needsMigration, pin, done,
         {selected ? (
           <NoteEditor key={selected.id} note={selected} mac saveState={data.saveState} checkable={fh.checkable(selected.folder_id)} folders={folders}
             onEdit={f => data.editNote(selected.id, f)} onPin={() => pin(selected)} onToggleDone={() => done(selected)}
-            onDelete={() => removeNote(selected)} onNew={newNote} onMove={fid => data.moveNote(selected, fid)} />
+            onDelete={() => removeNote(selected)} onNew={newNote} onMove={fid => data.moveNote(selected, fid)}
+            planned={data.planned.get(selected.id)} onPlannedChange={data.reloadPlanned} />
         ) : (
           <div className="nx-empty" style={{ marginTop: '30vh' }}><b>Geen notitie</b>Kies een notitie of maak een nieuwe.</div>
         )}
@@ -372,7 +373,7 @@ function PhoneNotes({ data, fh, folders, notes, loaded, needsMigration, pin, don
           <SearchField value={term} onChange={setQ('folders')} />
           {needsMigration && <MigrationBanner />}
           {term ? (
-            <NoteList notes={filterNotes(notes, 'all', term)} folders={folders} query={term} showFolder
+            <NoteList planned={data.planned} notes={filterNotes(notes, 'all', term)} folders={folders} query={term} showFolder
               onOpen={n => push({ type: 'note', id: n.id, key: 'note-' + n.id })} onPin={pin} onDone={done} onDelete={n => removeNote(n)} />
           ) : editFolders ? (
             <>
@@ -441,7 +442,7 @@ function PhoneNotes({ data, fh, folders, notes, loaded, needsMigration, pin, don
           )}>
           <SearchField value={term} onChange={setQ('list')} />
           {!loaded ? <div className="nx-empty">Laden…</div> : (
-            <NoteList notes={list} folders={folders} query={term} checkable={fh.checkable(key)} showFolder={key === 'all'}
+            <NoteList planned={data.planned} notes={list} folders={folders} query={term} checkable={fh.checkable(key)} showFolder={key === 'all'}
               emptyText="Tik op het potloodje om een notitie te maken."
               onOpen={n => push({ type: 'note', id: n.id, key: 'note-' + n.id })} onPin={pin} onDone={done} onDelete={n => removeNote(n)} />
           )}
@@ -464,7 +465,8 @@ function PhoneNotes({ data, fh, folders, notes, loaded, needsMigration, pin, don
           <NoteEditor key={note.id} note={note} saveState={data.saveState} checkable={fh.checkable(note.folder_id)} folders={folders}
             onEdit={f => data.editNote(note.id, f)} onPin={() => pin(note)} onToggleDone={() => done(note)}
             onDelete={() => { pop(); removeNote(note) }} onNew={() => newNote(note.folder_id || 'none')} onMove={fid => data.moveNote(note, fid)}
-            onEditingChange={setEditing} onHome={onHome} />
+            onEditingChange={setEditing} onHome={onHome}
+            planned={data.planned.get(note.id)} onPlannedChange={data.reloadPlanned} />
         ) : <div className="nx-empty">Notitie niet gevonden.</div>}
       </Screen>
     )

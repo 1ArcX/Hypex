@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../supabaseClient'
+import { checklistComplete } from './noteFormat'
 
 // Data voor de Notities-app: mappen + notities, optimistisch bijwerken, typen gebundeld opslaan.
 // Vastzetten / afvinken / afvinkbare mappen vragen de migratie add_notes_apple.sql;
@@ -19,6 +20,9 @@ export function useNotes(userId, syncTrigger = 0) {
   const inserting = useRef(new Map()) // noteId → insert-belofte (nieuwe notitie staat al lokaal)
   const [saveState, setSaveState] = useState('idle') // idle | saving | saved
   const pending = useRef(new Map()) // noteId → velden die nog weg moeten
+  const notesRef = useRef([])
+  notesRef.current = notes
+  const [planned, setPlanned] = useState(() => new Map()) // noteId → open gekoppelde taak (datum/dagdeel/herhaling)
   const timer = useRef(null)
   const savedTimer = useRef(null)
 
@@ -48,6 +52,34 @@ export function useNotes(userId, syncTrigger = 0) {
   }, [userId])
 
   useEffect(() => { load() }, [load])
+
+  // Welke notities zijn ingepland als (open) taak? Kolom note_id komt uit add_task_note_link.sql.
+  const [needsPlanMigration, setNeedsPlanMigration] = useState(false)
+  const loadPlanned = useCallback(async () => {
+    if (!userId) return
+    const { data, error } = await supabase.from('tasks').select('id,note_id,date,daypart,recurrence,completed,title')
+      .eq('user_id', userId).not('note_id', 'is', null)
+    if (error) { setNeedsPlanMigration(true); return }
+    setNeedsPlanMigration(false)
+    const m = new Map()
+    for (const t of data || []) if (!t.completed || t.recurrence) m.set(t.note_id, t)
+    setPlanned(m)
+  }, [userId])
+  useEffect(() => {
+    loadPlanned()
+    window.addEventListener('refreshTasks', loadPlanned)
+    return () => window.removeEventListener('refreshTasks', loadPlanned)
+  }, [loadPlanned])
+  // Afgevinkt vanuit een taak → lijst/voortgang hier ook bijwerken
+  useEffect(() => {
+    const on = (e) => {
+      const { id, ...fields } = e.detail || {}
+      if (!id || pending.current.has(id)) return
+      setNotes(prev => prev.map(n => n.id === id ? { ...n, ...fields } : n))
+    }
+    window.addEventListener('notesChanged', on)
+    return () => window.removeEventListener('notesChanged', on)
+  }, [])
   useEffect(() => { if (syncTrigger) load() }, [syncTrigger]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const flush = useCallback(async () => {
@@ -60,6 +92,10 @@ export function useNotes(userId, syncTrigger = 0) {
       await inserting.current.get(id) // eerst de nieuwe rij laten bestaan
       return supabase.from('notes').update(fields).eq('id', id)
     }))
+    // Rest van de app (taken met deze notitie) bijwerken
+    for (const [id, fields] of batch) {
+      if ('content' in fields || 'title' in fields) window.dispatchEvent(new CustomEvent('notesChanged', { detail: { id, ...('title' in fields ? { title: fields.title } : {}), ...('content' in fields ? { content: fields.content } : {}) } }))
+    }
     setSaveState('saved')
     clearTimeout(savedTimer.current)
     savedTimer.current = setTimeout(() => setSaveState('idle'), 1500)
@@ -77,6 +113,13 @@ export function useNotes(userId, syncTrigger = 0) {
 
   /** Typen: lokaal meteen, opslaan gebundeld na 600ms stilte. */
   const editNote = useCallback((id, fields) => {
+    // Laatste afvinkpunt afgevinkt → gekoppelde taak afronden (App luistert)
+    if ('content' in fields) {
+      const prev = notesRef.current.find(n => n.id === id)
+      if (prev && !checklistComplete(prev.content) && checklistComplete(fields.content)) {
+        setTimeout(() => window.dispatchEvent(new CustomEvent('noteChecklistComplete', { detail: { noteId: id } })), 0)
+      }
+    }
     const stamped = { ...fields, updated_at: new Date().toISOString() }
     patchLocal(id, stamped)
     pending.current.set(id, { ...(pending.current.get(id) || {}), ...stamped })
@@ -177,6 +220,7 @@ export function useNotes(userId, syncTrigger = 0) {
 
   return {
     folders: realFolders, entries, notes, loaded, dbError, needsMigration, needsDividerMigration, saveState, counts,
+    planned, needsPlanMigration, reloadPlanned: loadPlanned,
     editNote, setNoteNow, createNote, deleteNote, restoreNote, togglePin, toggleDone, moveNote,
     createFolder, createDivider, reorder, updateFolder, deleteFolder, flush, reload: load,
   }
