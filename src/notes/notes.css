@@ -192,7 +192,7 @@
 .nx-keybar .nx-icon-btn.is-on { background: var(--nx-yellow-soft); }
 
 /* Aa-menu */
-.nx-format { position: absolute; z-index: 40; width: 280px; padding: 12px; border-radius: 14px; background: color-mix(in srgb, #fff 6%, var(--nx-bg-2)); backdrop-filter: blur(20px); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55); animation: nxMenuIn 0.22s var(--nx-ease); }
+.nx-format { position: absolute; z-index: 62; width: 280px; padding: 12px; border-radius: 14px; background: color-mix(in srgb, #fff 6%, var(--nx-bg-2)); backdrop-filter: blur(20px); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55); animation: nxMenuIn 0.22s var(--nx-ease); }
 @keyframes nxMenuIn { from { opacity: 0; transform: translateY(8px) scale(0.96); } to { opacity: 1; transform: none; } }
 .nx-format__title { display: flex; justify-content: space-between; align-items: center; font-size: 15px; font-weight: 600; margin-bottom: 10px; }
 .nx-format__styles { display: flex; gap: 6px; margin-bottom: 8px; }
