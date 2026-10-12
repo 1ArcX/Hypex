@@ -570,7 +570,7 @@ export default function App() {
     setSyncing(false)
     setSyncFlash(true)
     setTimeout(() => setSyncFlash(false), 2000)
-    // Gekoppelde agenda's (Google/MijnX) bij de bron bijwerken — hooguit elke 5 min, op de achtergrond
+    // Gekoppelde agenda's (Google/MijnX) bij de bron bijwerken — hooguit elke 15 min, op de achtergrond
     autoSyncCalendars().then(ran => {
       if (!ran) return
       fetchExternalEvents()

@@ -20,11 +20,12 @@ export const connectMyxCalendar = (feedUrl, name) => request('connect_myx', { fe
 // Handmatig vernieuwen (Instellingen): force, dus altijd opnieuw ophalen bij de bron
 export const syncCalendars = (connectionId) => request('sync', { ...(connectionId ? { connectionId } : {}), force: true })
 
-// Automatisch bijwerken terwijl de app open is: hooguit elke 5 min per apparaat. De server slaat
+// Automatisch bijwerken terwijl de app open is: hooguit elke 15 min per apparaat (elke ronde is een
+// Netlify-aanroep; de geplande sync via pg_cron draait ook elk kwartier). De server slaat
 // koppelingen over die net al (bv. door de geplande sync) zijn bijgewerkt. Fouten zijn stil.
 // Geeft true terug als er een ronde is gedaan (dan de ingelezen afspraken opnieuw laden).
 const AUTO_KEY = 'calendar_autosync_at'
-const AUTO_INTERVAL = 5 * 60 * 1000
+const AUTO_INTERVAL = 15 * 60 * 1000
 export async function autoSyncCalendars() {
   let last = 0
   try { last = Number(localStorage.getItem(AUTO_KEY) || 0) } catch { /* ignore */ }

@@ -154,14 +154,15 @@ homework, study guides), **Gewoontes** (habits with reminders) and **Gym** (work
 | **Magister / SOMtoday** | School lessons (and grades/homework on the inactive School page) | Netlify functions `magister`, `somtoday` |
 | **Google Calendar / MyX** | Imported calendars | Netlify function `calendar` (OAuth for Google, ICS feed for MyX) |
 | **PMT** | Jumbo work shifts | Netlify function `pmt` |
-| **Simacan** | Freight arrival times | Netlify functions `simacan`, `simacan-check` (scheduled) |
+| **Simacan** | Freight arrival times | Netlify function `simacan` (push notifications removed Oct 2026) |
 | **Open-Meteo / Buienalarm** | Weather, 2-hour rain radar, rain alerts | Direct API + `buienalarm` proxy, `rain-check` (scheduled) |
 | **Spotify** | Now playing, playback controls, queue, recently played | OAuth (PKCE) in the browser |
 | **Google Gemini** | Hypex AI | Netlify function `ai-chat` |
-| **Web Push** | Timer end, rain, habits, freight arrivals | `pomodoro-cron`, `pomodoro-notify`, `habit-reminder`, `rain-check`, `simacan-check` |
+| **Web Push** | Timer end, rain, Focus exam reminders | `pomodoro-cron`, `pomodoro-notify`, `rain-check`, `focus-reminders` |
 
-**Scheduled functions** (see `netlify.toml`): `pomodoro-cron` and `simacan-check` every minute,
-`rain-check` every 15 minutes, `habit-reminder` every hour.
+**Scheduled jobs**: run by Supabase pg_cron (`supabase/migrations/add_cron_scheduler.sql`), which calls
+`pomodoro-cron` (only when a timer expired), `rain-check`, `calendar-sync` and `focus-reminders` only when there is work —
+Netlify schedules counted every run against the 125K/month free limit.
 
 Some per-device state lives in the browser: Pomodoro timer state, theme, cached school schedules and work
 shifts, dashboard filters and collapsed sections.

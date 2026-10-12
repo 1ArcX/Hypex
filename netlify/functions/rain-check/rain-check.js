@@ -1,4 +1,3 @@
-const { schedule } = require('@netlify/functions')
 const webpush = require('web-push')
 const { createClient } = require('@supabase/supabase-js')
 
@@ -15,27 +14,17 @@ const supabase = createClient(
 )
 
 async function getBuienalarm(lat, lon) {
+  // Direct bij buienalarm (niet via onze eigen buienalarm-functie: die telde als extra Netlify-aanroep)
   try {
-    // Eerst via eigen proxy proberen (omzeilt eventuele blokkade)
-    const proxyUrl = `${process.env.URL}/.netlify/functions/buienalarm?lat=${lat}&lon=${lon}`
-    const res = await fetch(proxyUrl)
-    if (!res.ok) throw new Error(`proxy ${res.status}`)
+    const res = await fetch(
+      `https://cdn-secure.buienalarm.nl/api/3.4/forecast.php?lat=${lat}&lon=${lon}&region=nl&unit=mm/u`
+    )
+    if (!res.ok) return []
     const json = await res.json()
     if (!json?.precip?.length) return []
     return json.precip.map(v => isNaN(v) ? 0 : v)
   } catch {
-    // Fallback: direct buienalarm
-    try {
-      const res = await fetch(
-        `https://cdn-secure.buienalarm.nl/api/3.4/forecast.php?lat=${lat}&lon=${lon}&region=nl&unit=mm/u`
-      )
-      if (!res.ok) return []
-      const json = await res.json()
-      if (!json?.precip?.length) return []
-      return json.precip.map(v => isNaN(v) ? 0 : v)
-    } catch {
-      return []
-    }
+    return []
   }
 }
 
@@ -111,4 +100,9 @@ async function rainCheckHandler() {
   return { statusCode: 200 }
 }
 
-exports.handler = schedule('*/15 * * * *', rainCheckHandler)
+// Aangeroepen door Supabase pg_cron (supabase/migrations/add_cron_scheduler.sql), niet door een
+// Netlify-schema: elke Netlify-run telt mee voor de limiet, pg_cron roept alleen aan als er werk is.
+exports.handler = async (event) => {
+  if (!process.env.CRON_SECRET || event.headers['x-cron-secret'] !== process.env.CRON_SECRET) return { statusCode: 401 }
+  return rainCheckHandler()
+}

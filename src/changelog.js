@@ -6,6 +6,16 @@
 
 export const RELEASES = [
   {
+    id: 14,
+    date: '2026-10-12',
+    title: 'Zuiniger met de server',
+    items: [
+      { area: 'app', text: "Achtergrondtaken (pomodoro-, regen- en toetsherinneringen) draaien nu alleen als er echt iets te melden is, zodat Hypex niet meer tegen de serverlimiet aanloopt en offline gaat." },
+      { area: 'agenda', text: "Gekoppelde agenda's (Google/MijnX) worden elk kwartier bijgewerkt. Meteen nodig? Gebruik de vernieuwknop bij Agenda's koppelen." },
+      { area: 'app', text: "Vrachttijden: de pushmeldingen bij vertraging of aankomst zijn uitgezet. De vrachttijden zelf zie je nog gewoon in de Jumbo-tab." },
+    ],
+  },
+  {
     id: 13,
     date: '2026-10-11',
     title: 'Afgeronde taken blijven bewaard',

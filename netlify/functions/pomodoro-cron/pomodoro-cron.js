@@ -1,4 +1,3 @@
-const { schedule } = require('@netlify/functions')
 const webpush = require('web-push')
 const { createClient } = require('@supabase/supabase-js')
 
@@ -67,4 +66,9 @@ async function pomodoroCheckHandler() {
   return { statusCode: 200 }
 }
 
-exports.handler = schedule('* * * * *', pomodoroCheckHandler)
+// Aangeroepen door Supabase pg_cron (supabase/migrations/add_cron_scheduler.sql), niet door een
+// Netlify-schema: elke Netlify-run telt mee voor de limiet, pg_cron roept alleen aan als er werk is.
+exports.handler = async (event) => {
+  if (!process.env.CRON_SECRET || event.headers['x-cron-secret'] !== process.env.CRON_SECRET) return { statusCode: 401 }
+  return pomodoroCheckHandler()
+}

@@ -1,7 +1,6 @@
 // Herinneringen voor toetsdatums uit de Focus-tab (focus_course_dates).
-// Draait elk kwartier. Offsets: "1d"/"2d"/"1w"/"2w" = dagen/weken ervoor op reminder_time,
+// Draait elk kwartier (via pg_cron). Offsets: "1d"/"2d"/"1w"/"2w" = dagen/weken ervoor op reminder_time,
 // "2h" = uren vóór reminder_time op de dag zelf. Zelfde regels als src/focus/lib/reminders.ts.
-const { schedule } = require('@netlify/functions')
 const webpush = require('web-push')
 const { createClient } = require('@supabase/supabase-js')
 
@@ -93,4 +92,9 @@ async function handler() {
   return { statusCode: 200 }
 }
 
-exports.handler = schedule('*/15 * * * *', handler)
+// Aangeroepen door Supabase pg_cron (supabase/migrations/add_cron_scheduler.sql), niet door een
+// Netlify-schema: elke Netlify-run telt mee voor de limiet, pg_cron roept alleen aan als er werk is.
+exports.handler = async (event) => {
+  if (!process.env.CRON_SECRET || event.headers['x-cron-secret'] !== process.env.CRON_SECRET) return { statusCode: 401 }
+  return handler()
+}

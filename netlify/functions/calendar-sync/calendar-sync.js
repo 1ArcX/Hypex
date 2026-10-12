@@ -1,8 +1,10 @@
 // Geplande sync van gekoppelde agenda's (Google / MijnX-feed), ook als niemand de app open heeft.
-// Schema in netlify.toml. De logica staat in ../calendar/calendar.js (syncAll).
+// Elk kwartier aangeroepen door Supabase pg_cron (supabase/migrations/add_cron_scheduler.sql).
+// De logica staat in ../calendar/calendar.js (syncAll).
 const { syncAll } = require('../calendar/calendar')
 
-exports.handler = async () => {
+exports.handler = async (event) => {
+  if (!process.env.CRON_SECRET || event.headers['x-cron-secret'] !== process.env.CRON_SECRET) return { statusCode: 401 }
   try {
     const results = await syncAll()
     const synced = results.filter(r => r.count !== null && !r.error).length

@@ -135,7 +135,7 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 
 ### Jumbo (work — admin/`werk_tab`)
 - **WorkWidget** — [components/WorkWidget.jsx](../src/components/WorkWidget.jsx) — PMT/Jumbo work shifts. Aliases: "werk", "diensten", "rooster werk", "PMT". Data: `/.netlify/functions/pmt`, `pmt_work_shifts` in localStorage.
-- **VrachttijdenWidget** — [components/VrachttijdenWidget.jsx](../src/components/VrachttijdenWidget.jsx) — freight/truck arrival times with a maplibre route map. Aliases: "vrachttijden", "vrachtwagen", "route map", "truck times".
+- **VrachttijdenWidget** — [components/VrachttijdenWidget.jsx](../src/components/VrachttijdenWidget.jsx) — freight/truck arrival times with a maplibre route map; polls `simacan` every 60s only while the tab is visible. Push notifications (bell per stop + `simacan-check` cron) were removed in Oct 2026 to save Netlify invocations. Aliases: "vrachttijden", "vrachtwagen", "route map", "truck times".
 
 ### Hypex AI
 - **DagbriefingStrip** — [components/ai/DagbriefingStrip.jsx](../src/components/ai/DagbriefingStrip.jsx) — structured briefing tiles (Urgent, Te laat, Volgende afspraak, Dagbudget) from real data above the AI text. Aliases: "dagbriefing", "briefing".
@@ -146,7 +146,7 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
 - **CalendarConnections** — [components/CalendarConnections.jsx](../src/components/CalendarConnections.jsx) — "Agenda's koppelen" (Google / MyX). Opened from ThemeSettings. Per connection a tag button opens
   [agenda/FeedTypeSettings.jsx](../src/components/agenda/FeedTypeSettings.jsx): standaardtype + titelregels ("titel bevat ___ → type"), stored on `calendar_connections.default_type_id` / `type_rules`.
   The sync **diffs** instead of delete+insert (`diffEvents`), and logs added/changed/removed items to `external_calendar_changes` (not on a feed's first sync). Items that have already started are never removed by a sync (MijnX only sends from today on; the old "before today" check used UTC and wiped yesterday every night between 00:00–02:00 NL), so history is kept; `restoreRemovedPast` puts back past items that were removed earlier, from the `before` snapshots in `external_calendar_changes`; `loadExternalEvents` pages through >1000 rows.
-  Sync: scheduled Netlify function `calendar-sync` (every 15 min, all users, via `syncAll` in `netlify/functions/calendar/calendar.js`) + `autoSyncCalendars()` in App `doSync` (max every 5 min per device, then `refreshExternalCalendarEvents`). Auto syncs skip a connection synced < 4 min ago; the refresh button forces. Aliases: "agenda koppelen", "calendar connections", "externe agenda's".
+  Sync: Netlify function `calendar-sync` (every 15 min, all users, via `syncAll` in `netlify/functions/calendar/calendar.js`; triggered by Supabase pg_cron, see **Scheduled jobs**) + `autoSyncCalendars()` in App `doSync` (max every 15 min per device, then `refreshExternalCalendarEvents`). Auto syncs skip a connection synced < 4 min ago; the refresh button forces. Aliases: "agenda koppelen", "calendar connections", "externe agenda's".
 - **AdminPanel** — [components/AdminPanel.jsx](../src/components/AdminPanel.jsx) — "Admin Paneel": user management, push test, `werk_tab` toggle. Aliases: "admin", "admin paneel", "gebruikersbeheer".
 - **OnboardingModal** — [components/OnboardingModal.jsx](../src/components/OnboardingModal.jsx) — first-login flow ("Welkom bij Dash", location, Magister, notifications). Aliases: "onboarding", "welkom scherm", "intro".
 - **ProfileSetup** — [components/ProfileSetup.jsx](../src/components/ProfileSetup.jsx) — "Welkom! 👋" profile setup. **Appears unused (?)** — not rendered anywhere. Aliases: "profiel instellen".
@@ -168,7 +168,7 @@ Rebuild of the iOS app **EstudyLog** ("Make your hard work visible"): study trac
 - **Sheets** (`src/focus/sheets/`): [SessionDone](../src/focus/sheets/SessionDone.tsx) (★ + notitie → RewardScreen in orange), [SessionEditor](../src/focus/sheets/SessionEditor.tsx) (add manually / edit / delete), [CourseEditor](../src/focus/sheets/CourseEditor.tsx) (naam, code, kleur, status, start, eindtoets, onderwerpen + doeluren), [RemindersSheet](../src/focus/sheets/RemindersSheet.tsx) ("Herinner me" chips 1 dag/1 week…, om 09:00, volgende herinnering preview, datums tijdlijn), [GradeCalculator](../src/focus/sheets/GradeCalculator.tsx) (weging %, cijfers, T = tentamen → benodigd cijfer), [FocusSettings](../src/focus/sheets/FocusSettings.tsx).
 - **Data** — [store/focusStore.ts](../src/focus/store/focusStore.ts) (courses, dates, topics, gradeParts, sessions of the last 400 days; CRUD; `needsMigration`). Tables `focus_courses`, `focus_course_dates`, `focus_topics`, `focus_grade_parts` + extra columns on `pomodoro_sessions` (`started_at, course_id, topic_id, kind, rating, note, task_id, timer_kind`) — migration [add_focus_app.sql](../supabase/migrations/add_focus_app.sql). Logic in `src/focus/lib/` (`stats.ts`, `grade.ts`, `reminders.ts`, `format.ts`, `meta.ts` = session kinds Lezen/Opdracht/Oefenen/Herhalen + course colours). Charts in `src/focus/charts/` (Recharts + own SVG `TopicRing`, `RadialClock`).
 - **Timer engine** — [components/pomodoro/usePomodoroEngine.js](../src/components/pomodoro/usePomodoroEngine.js): all timer logic (formerly inside PomodoroTimer): pomodoro cycles **and** `timerKind: 'stopwatch'` (`swAccum`/`swStart`), session `meta` (course/topic/kind/note/taskId), cross-device sync, `pomodoro_v3`, `finishFocusSession` (insert with Focus fields, XP, `recordFocusSession`). Dashboard banner/widget/Clock show stopwatch time too.
-- **Reminders** — scheduled Netlify function `focus-reminders` (every 15 min, Europe/Amsterdam, web-push, `sent_offsets` per date).
+- **Reminders** — Netlify function `focus-reminders` (every 15 min via Supabase pg_cron, Europe/Amsterdam, web-push, `sent_offsets` per date).
 
 ## Geld sub-app (`src/geld/`, admin only)
 
@@ -234,6 +234,15 @@ Self-contained money/budget app, mounted via [pages/GeldPage.jsx](../src/pages/G
 - App hooks: [hooks/useIsDesktop.js](../src/hooks/useIsDesktop.js), [hooks/useViewport.js](../src/hooks/useViewport.js) (`{ w, h, tall, portrait }`, for JS-driven sizes), [hooks/useNavLayout.js](../src/hooks/useNavLayout.js) (nav position/auto-hide), [hooks/usePointerDrag.js](../src/hooks/usePointerDrag.js) (slepen met muis/touch: `bind(item)`, drop-zones via `data-drop`, `dropKeyAt`; touch = eerst vasthouden), [hooks/useItemTypes.js](../src/hooks/useItemTypes.js) (types store), [hooks/useAmbientSound.js](../src/hooks/useAmbientSound.js).
 - Utils (`src/utils/`): `magisterApi`, `somtodayApi` (school), `push` (web-push), `xp` (XP/level-up events),
   `recurrence` (recurring tasks), `calendarSync`, `daypart`, `alleVakken`, `openBook`, `openExternal`, `supabaseProfiles`.
+
+## Scheduled jobs (Supabase pg_cron → Netlify)
+
+Netlify Free allows 125K function invocations/month and **every scheduled run counts**, even when it does nothing
+(per-minute crons alone were ~89K/month). So there are **no schedules in netlify.toml**: Supabase pg_cron
+([add_cron_scheduler.sql](../supabase/migrations/add_cron_scheduler.sql)) checks in SQL whether there is work and only then
+calls the function via `public.call_netlify(fn)` (pg_net, header `x-cron-secret` from Vault `cron_secret` = Netlify env `CRON_SECRET`; functions return 401 without it).
+Jobs: `pomodoro-due` (every min, only when a `timer_sessions` row expired → `pomodoro-cron`), `rain-check`, `calendar-sync`, `focus-reminders` (every 15 min, each gated).
+Keep client polling of Netlify functions rare and paused when the tab is hidden. Aliases: "cron", "geplande taken", "netlify limiet", "function usage".
 
 ## Desktop app (`desktop/`, Windows .exe)
 

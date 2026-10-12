@@ -11,26 +11,12 @@
 [functions]
   directory = "netlify/functions"
 
+# Geplande taken (pomodoro-cron, rain-check, calendar-sync, focus-reminders) worden aangeroepen door
+# Supabase pg_cron (supabase/migrations/add_cron_scheduler.sql) i.p.v. Netlify-schema's: die telden
+# elke run mee voor de function-limiet, ook als er niets te doen was.
+
 [functions."magister/magister"]
   timeout = 26
-
-[functions."rain-check/rain-check"]
-  schedule = "*/15 * * * *"
-
-[functions."pomodoro-cron/pomodoro-cron"]
-  schedule = "* * * * *"
-
-[functions."habit-reminder/habit-reminder"]
-  schedule = "0 * * * *"
-
-[functions."simacan-check/simacan-check"]
-  schedule = "* * * * *"
-
-[functions."calendar-sync/calendar-sync"]
-  schedule = "*/15 * * * *"
-
-[functions."focus-reminders/focus-reminders"]
-  schedule = "*/15 * * * *"
 
 [[headers]]
   for = "/simacan-arrival.html"

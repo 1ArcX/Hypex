@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Truck, RefreshCw, AlertCircle, ChevronDown, ChevronUp, LogIn, Map as MapIcon, Bell, BellOff } from 'lucide-react'
+import { Truck, RefreshCw, AlertCircle, ChevronDown, ChevronUp, LogIn, Map as MapIcon } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { toISO } from '../utils/recurrence'
 
@@ -15,49 +15,6 @@ import { toISO } from '../utils/recurrence'
   create policy "Authenticated users can read" on simacan_config for select using (auth.uid() is not null);
   create policy "Authenticated users can write" on simacan_config for all using (auth.uid() is not null);
 */
-
-const VAPID_PUBLIC = 'BCsu1QaHUead0cgQ23qUKIu3_MnSi0s21LaD_c9wBcqdP43A9ojEx-nWZ4_xUDYLVMQn0CqzqdhSuLQr6eOQqh4'
-
-function urlBase64ToUint8Array(b64) {
-  const pad = '='.repeat((4 - b64.length % 4) % 4)
-  const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'))
-  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)))
-}
-
-async function sendVrachtPush(userId, title, body, tag = 'vracht') {
-  if (!userId) return
-  try {
-    await fetch('/.netlify/functions/pomodoro-notify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, title, body, tag }),
-    })
-  } catch (e) { console.error('Vracht push failed:', e) }
-}
-
-async function registerVrachtSubscription(userId) {
-  if (!userId || !('serviceWorker' in navigator) || !('PushManager' in window)) return
-  try {
-    const reg = await navigator.serviceWorker.ready
-    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC) })
-    const { data: existing } = await supabase.from('push_subscriptions').select('id').eq('user_id', userId).maybeSingle()
-    if (existing) {
-      await supabase.from('push_subscriptions').update({ subscription: sub.toJSON(), vracht_enabled: true }).eq('user_id', userId)
-    } else {
-      await supabase.from('push_subscriptions').insert({ user_id: userId, subscription: sub.toJSON(), vracht_enabled: true })
-    }
-  } catch (e) { console.error('Vracht subscribe failed:', e) }
-}
-
-async function saveVrachtNotifyStops(userId, stopIds) {
-  if (!userId) return
-  await supabase.from('push_subscriptions').update({ vracht_notify_stops: stopIds }).eq('user_id', userId)
-}
-
-async function saveSimacanState(userId, stopStates) {
-  if (!userId) return
-  await supabase.from('simacan_state').upsert({ user_id: userId, stop_states: stopStates, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
-}
 
 // Jumbo 7044 — Dronten
 const STORE_LAT = 52.5222
@@ -329,15 +286,6 @@ const PALLET_LABELS = { DIEPVRIES:'❄ Diepvries', AMBIENT:'Ambient', VERS:'Vers
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function VrachttijdenWidget() {
-  const [userId, setUserId] = useState(null)
-  const userIdRef = useRef(null)
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUserId(user?.id || null)
-      userIdRef.current = user?.id || null
-    })
-  }, [])
-
   const [tokens,      setTokens]      = useState(() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) } catch { return null } })
   const [stops,       setStops]       = useState(null)
   const [loading,     setLoading]     = useState(false)
@@ -348,18 +296,11 @@ export default function VrachttijdenWidget() {
   const [selectedDate,setSelectedDate]= useState(() => toISO(new Date()))
   const [routeData,    setRouteData]   = useState({})
   const [showMap,      setShowMap]     = useState({})
-  const [notifyStops,  setNotifyStops] = useState(() => { try { return new Set(JSON.parse(localStorage.getItem('simacan_notify') || '[]')) } catch { return new Set() } })
 
   const tokensRef        = useRef(tokens)
   const selectedDateRef  = useRef(selectedDate)
-  const notifyStopsRef   = useRef(notifyStops)
-  const prevStopStates   = useRef(new Map()) // stopId → { delay, activity, eta }
 
   useEffect(() => { selectedDateRef.current = selectedDate }, [selectedDate])
-  useEffect(() => {
-    notifyStopsRef.current = notifyStops
-    localStorage.setItem('simacan_notify', JSON.stringify([...notifyStops]))
-  }, [notifyStops])
 
   const accentBg     = p => `color-mix(in srgb, var(--accent) ${p}%, transparent)`
   const accentBorder = p => `1px solid color-mix(in srgb, var(--accent) ${p}%, transparent)`
@@ -395,16 +336,6 @@ export default function VrachttijdenWidget() {
       setStops(arr)
       setLastUpdate(new Date())
 
-      // ── Staat bijhouden (push wordt uitsluitend door de cron verstuurd) ────
-      for (const stop of arr) {
-        const eta = stop.actualStartTime || stop.eta || stop.plannedStartTime
-        prevStopStates.current.set(stop.id, { delay: stop.delay, activity: stop.tripStatus?.activity, eta })
-      }
-
-      // Sla huidige staat op zodat de achtergrond-cron geen dubbele meldingen stuurt
-      const stateSnapshot = {}
-      for (const stop of arr) stateSnapshot[stop.id] = { delay: stop.delay, activity: stop.tripStatus?.activity, eta: stop.actualStartTime || stop.eta || stop.plannedStartTime }
-      saveSimacanState(userIdRef.current, stateSnapshot)
     } catch (e) { setError(e instanceof TypeError ? 'Geen verbinding met de server. Probeer het opnieuw.' : e.message) }
     setLoading(false)
   }, [saveTokens])
@@ -439,25 +370,6 @@ export default function VrachttijdenWidget() {
       setRouteData(p => ({ ...p, [stopId]: { stops: [], loading: false, error: e.message } }))
     }
   }, [saveTokens])
-
-  const toggleNotify = useCallback(async (stopId) => {
-    if (notifyStopsRef.current.has(stopId)) {
-      const updated = new Set([...notifyStopsRef.current].filter(id => id !== stopId))
-      setNotifyStops(updated)
-      saveVrachtNotifyStops(userIdRef.current, [...updated])
-    } else {
-      if (typeof Notification === 'undefined') return
-      if (Notification.permission !== 'granted') {
-        const perm = await Notification.requestPermission()
-        if (perm !== 'granted') return
-      }
-      await registerVrachtSubscription(userIdRef.current)
-      const updated = new Set([...notifyStopsRef.current, stopId])
-      setNotifyStops(updated)
-      saveVrachtNotifyStops(userIdRef.current, [...updated])
-      sendVrachtPush(userIdRef.current, '🔔 Vrachttijden', 'Je krijgt een melding bij vertraging of aankomst.', 'vracht-enabled')
-    }
-  }, [])
 
   const toggleMap = useCallback((stop) => {
     const id = stop.id
@@ -494,7 +406,7 @@ export default function VrachttijdenWidget() {
 
   useEffect(() => {
     if (!tokens || selectedDate !== toISO(new Date())) return
-    const t = setInterval(() => fetchStops(), 60000)
+    const t = setInterval(() => { if (!document.hidden) fetchStops() }, 60000)
     return () => clearInterval(t)
   }, [!!tokens, selectedDate, fetchStops])
 
@@ -698,7 +610,6 @@ export default function VrachttijdenWidget() {
                     const palletStr = Object.entries(pallets).map(([t,n]) => `${n}× ${PALLET_LABELS[t]||t}`).join('  ')
                     const rd        = routeData[stop.id]
                     const mapShown  = showMap[stop.id]
-                    const notifyOn  = notifyStops.has(stop.id)
 
                     return (
                       <div key={stop.id || i} onClick={() => { setSelectedStop(isSel ? null : stop) }}
@@ -718,12 +629,6 @@ export default function VrachttijdenWidget() {
                           <div style={{ display:'flex', alignItems:'center', gap:'6px', flexShrink:0 }}>
                             {badge && <span style={{ fontSize:'10px', color:badge.color, fontWeight:600 }}>{badge.text}</span>}
                             <span style={{ fontSize:'13px', color:'var(--accent)', fontWeight:700 }}>{fmt(arrival)}</span>
-                            <button
-                              onClick={e => { e.stopPropagation(); toggleNotify(stop.id) }}
-                              title={notifyOn ? 'Meldingen uitschakelen' : 'Meldingen inschakelen'}
-                              style={{ background:'none', border:'none', cursor:'pointer', padding:'2px', display:'flex', color: notifyOn ? 'var(--accent)' : 'rgba(255,255,255,0.2)' }}>
-                              {notifyOn ? <Bell size={12} /> : <BellOff size={12} />}
-                            </button>
                             {isSel ? <ChevronUp size={11} style={{ color:'var(--accent)' }} /> : <ChevronDown size={11} style={{ color:'rgba(255,255,255,0.2)' }} />}
                           </div>
                         </div>
