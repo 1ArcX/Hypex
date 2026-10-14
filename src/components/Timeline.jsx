@@ -8,6 +8,7 @@ import { taskCategory, eventCategory, categoryColor, CATEGORIES, CATEGORY_ORDER 
 import { eventDisplay } from '../utils/eventTitle'
 import { loadExternalEvents, saveOverride } from '../utils/externalEvents'
 import { taskOnDay, isMultiDay } from '../utils/taskStatus'
+import { minutesOnDay, lastDay, crossesMidnight } from '../utils/timeRange'
 import { DAYPARTS } from '../utils/daypart'
 import ExternalEventModal from './agenda/ExternalEventModal'
 import MiniMonth from './agenda/MiniMonth'
@@ -278,7 +279,7 @@ export default function Timeline({ userId, userEmail, tasks: tasksIn, subjects, 
         minMins = Math.min(minMins, s.getHours() * 60 + s.getMinutes())
       }
       for (const sh of getWorkShiftsForDay(d)) {
-        const m = timeStrToMins(sh.start); if (m > 0) minMins = Math.min(minMins, m)
+        const m = sh._tail ? 0 : timeStrToMins(sh.start); if (m > 0) minMins = Math.min(minMins, m)
       }
       for (const ev of getEventsForDay(d)) {
         const s = new Date(ev.start_time)
@@ -455,7 +456,12 @@ export default function Timeline({ userId, userEmail, tasks: tasksIn, subjects, 
   const getWorkShiftsForDay = (date) => {
     try {
       const ds = toDateStr(date)
-      return (JSON.parse(localStorage.getItem('pmt_work_shifts')) || []).filter(s => s.date?.slice(0, 10) === ds)
+      const prev = new Date(date.getFullYear(), date.getMonth(), date.getDate() - 1)
+      const ps = toDateStr(prev)
+      const all = JSON.parse(localStorage.getItem('pmt_work_shifts')) || []
+      // Dienst tot na middernacht (bv. 15:30–01:00): het staartje staat ook op de volgende dag
+      const tails = all.filter(s => s.date?.slice(0, 10) === ps && crossesMidnight(s.start, s.end) && s.end > '00:00').map(s => ({ ...s, _tail: true }))
+      return [...all.filter(s => s.date?.slice(0, 10) === ds), ...tails]
     } catch { return [] }
   }
 
@@ -466,7 +472,7 @@ export default function Timeline({ userId, userEmail, tasks: tasksIn, subjects, 
 
   const getEventsForDay = (date) => events.filter(ev => !ev.description?.startsWith('pmt:') && (showHidden || !ev.hidden)).filter(ev => {
     const start = new Date(ev.start_time)
-    const end = new Date(ev.end_time)
+    const end = lastDay(start, new Date(ev.end_time))
     const startD = new Date(start.getFullYear(), start.getMonth(), start.getDate())
     const endD = new Date(end.getFullYear(), end.getMonth(), end.getDate())
     const checkD = new Date(date.getFullYear(), date.getMonth(), date.getDate())
@@ -948,8 +954,10 @@ export default function Timeline({ userId, userEmail, tasks: tasksIn, subjects, 
               // Build unified item list for overlap computation
               const allItems = [
                 ...colWorkShifts.map((sh, si) => {
-                  const startMins = timeStrToMins(sh.start)
-                  const endMins = Math.max(startMins + 30, timeStrToMins(sh.end))
+                  // Over middernacht: op de begindag tot 24:00, op de volgende dag (staartje) vanaf 00:00
+                  const night = crossesMidnight(sh.start, sh.end)
+                  const startMins = sh._tail ? 0 : timeStrToMins(sh.start)
+                  const endMins = sh._tail ? timeStrToMins(sh.end) : night ? 24 * 60 : Math.max(startMins + 30, timeStrToMins(sh.end))
                   return { type: 'work', key: `work-${di}-${si}`, startMins, endMins, data: sh }
                 }),
                 ...colLessons.filter(les => {
@@ -962,13 +970,21 @@ export default function Timeline({ userId, userEmail, tasks: tasksIn, subjects, 
                   return { type: 'lesson', key: `les-${di}-${li}`, startMins, endMins, data: les }
                 }),
                 ...colEvents.filter(ev => !isAllDayEvent(ev)).map(ev => {
-                  const s = new Date(ev.start_time), en = new Date(ev.end_time)
-                  const evStart = s.getHours()*60 + s.getMinutes()
-                  const evEnd = Math.max(evStart + 30, en.getHours()*60 + en.getMinutes())
-                  // Reistijd hoort bij het blok: neemt ook ruimte in naast andere items
-                  const tb = Math.min(evStart, ev.travel_before || 0), ta = Math.min(24 * 60 - evEnd, ev.travel_after || 0)
-                  return { type: 'event', key: `ev-${ev.id}`, startMins: evStart - tb, endMins: evEnd + ta, tb, ta, evStart, evEnd, data: ev }
-                }),
+                  // Alleen het deel dat op deze dag valt (bv. 15:30–01:00: vandaag 15:30–24:00, morgen 00:00–01:00).
+                  // Herhalend: dezelfde tijden, verplaatst naar deze dag.
+                  let s = new Date(ev.start_time), en = new Date(ev.end_time)
+                  if (ev.recurrence && !minutesOnDay(s, en, d)) {
+                    const s2 = new Date(d.getFullYear(), d.getMonth(), d.getDate(), s.getHours(), s.getMinutes())
+                    en = new Date(s2.getTime() + (en - s)); s = s2
+                  }
+                  const part = minutesOnDay(s, en, d)
+                  if (!part) return null
+                  const evStart = Math.min(part.start, 24 * 60 - 30)
+                  const evEnd = Math.min(24 * 60, Math.max(evStart + 30, part.end))
+                  // Reistijd hoort bij het blok: neemt ook ruimte in naast andere items (heen alleen op de begindag, terug op de einddag)
+                  const tb = part.fromPrev ? 0 : Math.min(evStart, ev.travel_before || 0), ta = part.toNext ? 0 : Math.min(24 * 60 - evEnd, ev.travel_after || 0)
+                  return { type: 'event', key: `ev-${ev.id}`, startMins: evStart - tb, endMins: evEnd + ta, tb, ta, evStart, evEnd, fromPrev: part.fromPrev, toNext: part.toNext, data: ev }
+                }).filter(Boolean),
                 // Taken met een dagdeel (zonder tijd): één compact blok per dagdeel (zie plaatsing hieronder)
                 ...Object.entries(colTasks
                   .filter(t => !t.start_time && !t.time && t.daypart && DAYPART_RANGE[t.daypart] && !(isMultiDay(t)))
@@ -977,7 +993,8 @@ export default function Timeline({ userId, userEmail, tasks: tasksIn, subjects, 
                 ...colTasks.filter(task => task.start_time || task.time).map(task => {
                   const timeStr = task.start_time || task.time
                   const startMins = timeStrToMins(timeStr)
-                  const endMins = task.end_time ? timeStrToMins(task.end_time) : startMins + 60
+                  // Eindtijd vóór de begintijd = loopt door na middernacht: hier tot 24:00
+                  const endMins = task.end_time ? (crossesMidnight(timeStr.slice(0, 5), task.end_time.slice(0, 5)) ? 24 * 60 : timeStrToMins(task.end_time)) : Math.min(24 * 60, startMins + 60)
                   // Reistijd hoort bij het blok (zoals bij events)
                   const tb = Math.min(startMins, task.travel_before || 0), ta = Math.min(24 * 60 - endMins, task.travel_after || 0)
                   return { type: 'task', key: `task-${task.id}`, startMins: startMins - tb, endMins: endMins + ta, tb, ta, evStart: startMins, evEnd: endMins, data: task }

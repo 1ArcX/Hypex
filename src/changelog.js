@@ -6,6 +6,16 @@
 
 export const RELEASES = [
   {
+    id: 15,
+    date: '2026-10-14',
+    title: 'Tijden tot na middernacht',
+    items: [
+      { area: 'agenda', text: "Items die tot na middernacht lopen (bv. 15:30–01:00) staan nu goed in de agenda: op de eerste dag tot 24:00 en op de volgende dag van 00:00 tot de eindtijd. Dat geldt ook voor gekoppelde agenda's en werkdiensten." },
+      { area: 'agenda', text: "Bij een nieuw event of taak kun je gewoon 15:30–01:00 invullen: de eindtijd telt dan als de volgende dag (je ziet '+1 dag'). Eerder werd dat stilletjes 15:30–16:30." },
+      { area: 'agenda', text: "In de maandweergave staat zo'n avond-item op de begindag in plaats van als balk over twee dagen, en in de lijst staat het op de volgende dag als 'tot 01:00'." },
+    ],
+  },
+  {
     id: 14,
     date: '2026-10-12',
     title: 'Zuiniger met de server',

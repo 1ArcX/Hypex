@@ -4,6 +4,7 @@ import { appliesOn } from '../utils/recurrence'
 import { taskDaypart, daypartLabel } from '../utils/daypart'
 import { taskCategory, eventCategory, categoryColor } from '../utils/category'
 import { eventDisplay } from '../utils/eventTitle'
+import { lastDay } from '../utils/timeRange'
 
 // Chronologische lijst-weergave (iOS "Lijst"): komende dagen met al hun items
 // — events, lessen, werk, taken en routines — gegroepeerd per dag op tijd.
@@ -27,7 +28,7 @@ function fmtTime(d) { return `${pad2(d.getHours())}:${pad2(d.getMinutes())}` }
 // Replica van de event-matching uit Timeline (incl. herhaling)
 function eventMatchesDay(ev, date) {
   const start = new Date(ev.start_time)
-  const end = new Date(ev.end_time)
+  const end = lastDay(start, new Date(ev.end_time)) // einde om 00:00 is geen extra dag
   const startD = new Date(start.getFullYear(), start.getMonth(), start.getDate())
   const endD = new Date(end.getFullYear(), end.getMonth(), end.getDate())
   const checkD = new Date(date.getFullYear(), date.getMonth(), date.getDate())
@@ -58,7 +59,9 @@ function buildDayItems(date, { tasks, subjects, calendarEvents, magisterLessons 
     if (!eventMatchesDay(ev, date)) continue
     const s = new Date(ev.start_time), e = new Date(ev.end_time)
     const allDay = s.getHours() === 0 && s.getMinutes() === 0 && e.getHours() === 23 && e.getMinutes() === 59
-    items.push({ kind: 'event', allDay, mins: allDay ? -1 : s.getHours() * 60 + s.getMinutes(), timeLabel: allDay ? 'hele dag' : fmtTime(s), title: eventDisplay(ev).title, sub: [eventDisplay(ev).code, ev.location].filter(Boolean).join(' · '), color: categoryColor(eventCategory(ev)) })
+    // Begon op een eerdere dag (bv. 15:30–01:00): bovenaan, "tot 01:00"
+    const carried = !allDay && !ev.recurrence && toDateStr(s) < ds
+    items.push({ kind: 'event', allDay, mins: allDay ? -1 : carried ? 0 : s.getHours() * 60 + s.getMinutes(), timeLabel: allDay ? 'hele dag' : carried ? `tot ${fmtTime(e)}` : fmtTime(s), title: eventDisplay(ev).title, sub: [eventDisplay(ev).code, ev.location].filter(Boolean).join(' · '), color: categoryColor(eventCategory(ev)) })
   }
   // Lessen
   for (const les of (magisterLessons || [])) {

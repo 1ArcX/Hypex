@@ -6,6 +6,7 @@ import { DAYPARTS } from '../utils/daypart'
 import { taskCategory, eventCategory, typeIdOf, categoryHex, categoryColor, CATEGORIES, CATEGORY_ORDER } from '../utils/category'
 import { parseQuickAdd, removeToken } from '../utils/quickAdd'
 import { saveTask, deleteTask, saveEvent, deleteEvent } from '../utils/itemSave'
+import { rollEnd, spanMinutes, crossesMidnight } from '../utils/timeRange'
 import { getFreeSlots, suggestFreeSlots, getConflicts, formatDutchDate, timeStrToMins, minsToTimeStr } from './tasks/slotPlanning'
 import { TypeSelect } from './ui'
 import { useIsDesktop } from '../hooks/useIsDesktop'
@@ -80,9 +81,11 @@ function formFromEvent(ev) {
   const s = new Date(ev.start_time), e = new Date(ev.end_time)
   const allDay = s.getHours() === 0 && s.getMinutes() === 0 && e.getHours() === 23 && e.getMinutes() === 59
   const sd = toISO(s), ed = toISO(e)
+  // Korter dan een dag en over middernacht (bv. 15:30–01:00): geen einddatum, dat volgt uit de tijden
+  const overnight = !allDay && ed !== sd && e - s < 86400000
   return {
     ...f, title: ev.title || '', description: ev.description || '', cat: eventCategory(ev),
-    date: sd, endDate: ed !== sd ? ed : '', allDay,
+    date: sd, endDate: ed !== sd && !overnight ? ed : '', allDay,
     startTime: allDay ? '09:00' : `${pad(s.getHours())}:${pad(s.getMinutes())}`,
     endTime: allDay ? '10:00' : `${pad(e.getHours())}:${pad(e.getMinutes())}`,
     evRecurrence: ev.recurrence || '', evRecurrenceDays: ev.recurrence_days || [],
@@ -95,8 +98,8 @@ function formRange(f) {
   const endDs = f.endDate || f.date
   if (f.allDay) return { start: new Date(`${f.date}T00:00`), end: new Date(`${endDs}T23:59`) }
   const start = new Date(`${f.date}T${f.startTime}`)
-  let end = new Date(`${endDs}T${f.endTime}`)
-  if (end <= start) end = new Date(start.getTime() + 3600000)
+  // Eindtijd vóór de begintijd (bv. 15:30–01:00) = eindigt de volgende dag
+  const end = rollEnd(start, new Date(`${endDs}T${f.endTime}`))
   return { start, end }
 }
 
@@ -141,7 +144,8 @@ export default function ItemModal({
   const set = (patch) => setF(prev => ({ ...prev, ...patch }))
   const isTask = kind === 'task'
   const isRecurring = isTask && !!f.recurrence
-  const duration = Math.max(15, timeStrToMins(f.endTime) - timeStrToMins(f.startTime))
+  const duration = Math.max(15, spanMinutes(f.startTime, f.endTime))
+  const endsNextDay = !f.allDay && !f.endDate && crossesMidnight(f.startTime, f.endTime)
 
   const close = () => {
     onDraftChange?.(null)
@@ -191,7 +195,7 @@ export default function ItemModal({
     }
     // Duur zonder begintijd ("gym 1.5u"): eindtijd = huidige begintijd + duur, en een tijdslot
     if (now.duration && 'duration' in patch && !now.startTime) {
-      Object.assign(patch, { allDay: false, endTime: minsToTimeStr(timeStrToMins(f.startTime) + now.duration) })
+      Object.assign(patch, { allDay: false, endTime: endAfter(f.startTime, now.duration) })
     }
     if (was.duration && !now.duration && !now.startTime) Object.assign(patch, { allDay: b.allDay, endTime: b.endTime })
     delete patch.duration
@@ -213,7 +217,7 @@ export default function ItemModal({
   const daySuggestions = useMemo(() => (isTask && f.noDate) ? suggestFreeSlots(duration, tasks, calendarEvents) : [],
     [isTask, f.noDate, duration, tasks, calendarEvents])
   const conflicts = useMemo(() => (f.noDate || f.allDay || !f.date) ? [] :
-    getConflicts(f.date, timeStrToMins(f.startTime), timeStrToMins(f.endTime), tasks, calendarEvents, editing?.id),
+    getConflicts(f.date, timeStrToMins(f.startTime), endsNextDay ? 24 * 60 : timeStrToMins(f.endTime), tasks, calendarEvents, editing?.id),
     [f.date, f.startTime, f.endTime, f.noDate, f.allDay, tasks, calendarEvents, editing?.id])
 
   // ── Live preview in de agenda ──
@@ -318,7 +322,9 @@ export default function ItemModal({
     { label: 'Volgende week', active: !f.noDate && f.date === nextMonday && !f.endDate, apply: { date: nextMonday, endDate: '', noDate: false } },
     ...(isTask && !isRecurring ? [{ label: 'Geen datum', active: f.noDate, apply: { noDate: true, endDate: '' }, tone: 'var(--cat-school)' }] : []),
   ]
-  const setStart = (v) => set({ startTime: v, endTime: minsToTimeStr(timeStrToMins(v) + duration) })
+  // Eindtijd = begin + duur; voorbij middernacht loopt hij door naar de volgende dag (bv. 23:00 + 2u = 01:00)
+  const endAfter = (start, mins) => minsToTimeStr((timeStrToMins(start) + mins) % (24 * 60))
+  const setStart = (v) => set({ startTime: v, endTime: endAfter(v, duration) })
 
   // ── Stijl ──
   const chip = (active, tone) => ({
@@ -473,10 +479,11 @@ export default function ItemModal({
                     <span style={{ color: 'var(--c-text-3)', fontSize: 13 }}>–</span>
                     <input type="time" className="glass-input" aria-label="Eindtijd" value={f.endTime} style={{ colorScheme: 'dark', flex: 1, minWidth: 0 }}
                       onChange={e => set({ endTime: e.target.value })} />
+                    {endsNextDay && <span title="Eindigt na middernacht, de volgende dag" style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', whiteSpace: 'nowrap' }}>+1 dag</span>}
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                     {DURATION_CHIPS.map(d => (
-                      <button key={d} type="button" onClick={() => set({ endTime: minsToTimeStr(timeStrToMins(f.startTime) + d) })}
+                      <button key={d} type="button" onClick={() => set({ endTime: endAfter(f.startTime, d) })}
                         style={{ ...chip(duration === d), padding: '4px 9px', fontSize: 11 }}>{fmtDur(d)}</button>
                     ))}
                     {!DURATION_CHIPS.includes(duration) && <span style={{ fontSize: 11, color: 'var(--c-text-3)' }}>{fmtDur(duration)}</span>}

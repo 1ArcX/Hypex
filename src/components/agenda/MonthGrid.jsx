@@ -62,7 +62,8 @@ function buildIndex({ from, to, tasks, calendarEvents, magisterLessons }) {
     const allDay = !!ev.all_day || isAllDay(s, e)
     const base = { key: `ev-${ev.id}`, title, color, time: allDay ? null : hhmm(s), sort: allDay ? -1 : s.getHours() * 60 + s.getMinutes() }
     const sd = new Date(s.getFullYear(), s.getMonth(), s.getDate()), ed = new Date(e.getFullYear(), e.getMonth(), e.getDate())
-    if (!ev.recurrence && ed > sd) {
+    // Meerdaagse balk alleen voor echte meerdaagse items; een avond tot na middernacht (bv. 15:30–01:00) blijft op de begindag
+    if (!ev.recurrence && ed > sd && (allDay || e - s >= 86400000)) {
       if (ed >= from && sd <= to) spans.push({ ...base, from: sd, to: ed })
       continue
     }

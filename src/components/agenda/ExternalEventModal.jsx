@@ -6,6 +6,7 @@ import { eventCategory, typeIdOf } from '../../utils/category'
 import { saveOverrides, resetOverrides } from '../../utils/externalEvents'
 import { TypeSelect } from '../ui'
 import TravelTimeField from './TravelTimeField'
+import { rollEnd } from '../../utils/timeRange'
 
 const pad = n => String(n).padStart(2, '0')
 const dateStr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
@@ -25,7 +26,8 @@ function formFrom(ev) {
   const allDay = isAllDay(ev.all_day, s, e)
   return {
     title: ev.title, note: ev.note || '', allDay,
-    date: dateStr(s), endDate: dateStr(e) !== dateStr(s) ? dateStr(e) : '',
+    // Korter dan een dag en over middernacht (bv. 15:30–01:00): geen einddatum, dat volgt uit de tijden
+    date: dateStr(s), endDate: dateStr(e) !== dateStr(s) && (allDay || e - s >= 86400000) ? dateStr(e) : '',
     startTime: allDay ? '09:00' : timeStr(s), endTime: allDay ? '10:00' : timeStr(e),
     cat: eventCategory(ev),
     travelBefore: ev.travel_before || 0, travelAfter: ev.travel_after || 0,
@@ -70,8 +72,8 @@ export default function ExternalEventModal({ ev, siblings = [], onClose }) {
   function save() {
     const endDs = form.endDate || form.date
     const start = form.allDay ? new Date(`${form.date}T00:00`) : new Date(`${form.date}T${form.startTime}`)
-    let end = form.allDay ? new Date(`${endDs}T23:59`) : new Date(`${endDs}T${form.endTime}`)
-    if (end <= start) end = new Date(start.getTime() + 3600000)
+    // Eindtijd vóór de begintijd (bv. 15:30–01:00) = eindigt de volgende dag
+    const end = form.allDay ? new Date(`${endDs}T23:59`) : rollEnd(start, new Date(`${endDs}T${form.endTime}`))
     // Alleen opslaan wat echt afwijkt van de feed, zodat latere feed-wijzigingen nog doorkomen.
     const os = new Date(orig.start_time), oe = new Date(orig.end_time)
     const origAllDay = isAllDay(orig.all_day, os, oe)
@@ -92,9 +94,8 @@ export default function ExternalEventModal({ ev, siblings = [], onClose }) {
       const ss = new Date(so.start_time), se = new Date(so.end_time)
       const sStart = form.allDay ? new Date(ss.getFullYear(), ss.getMonth(), ss.getDate(), 0, 0)
         : new Date(`${dateStr(ss)}T${form.startTime}`)
-      let sEnd = form.allDay ? new Date(se.getFullYear(), se.getMonth(), se.getDate(), 23, 59)
-        : new Date(`${dateStr(se)}T${form.endTime}`)
-      if (sEnd <= sStart) sEnd = new Date(sStart.getTime() + 3600000)
+      const sEnd = form.allDay ? new Date(se.getFullYear(), se.getMonth(), se.getDate(), 23, 59)
+        : rollEnd(sStart, new Date(`${dateStr(se)}T${form.endTime}`))
       const changed = form.allDay !== isAllDay(so.all_day, ss, se) || sStart.getTime() !== ss.getTime() || sEnd.getTime() !== se.getTime()
       const keepOwnTime = !timeChanged // alleen titel/type/notitie aangepast → tijden van dat item laten staan
       items.push({ ev: sib, patch: { ...shared,
