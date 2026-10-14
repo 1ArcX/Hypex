@@ -33,5 +33,8 @@ export function minutesOnDay(start, end, day) {
   const d1 = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1)
   const s = Math.max(+start, +d0), e = Math.min(+end, +d1)
   if (e < s || (e === s && +start !== s)) return null
-  return { start: Math.round((s - d0) / 60000), end: Math.round((e - d0) / 60000), fromPrev: +start < +d0, toNext: +end > +d1 }
+  // Kloktijd, niet milliseconden vanaf 00:00: op de dag van de zomer-/wintertijd is een dag 23 of 25 uur
+  const fromPrev = +start < +d0, toNext = +end > +d1
+  const wall = t => t.getHours() * 60 + t.getMinutes()
+  return { start: fromPrev ? 0 : wall(start), end: toNext || +end === +d1 ? 24 * 60 : wall(end), fromPrev, toNext }
 }

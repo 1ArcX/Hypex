@@ -6,6 +6,14 @@
 
 export const RELEASES = [
   {
+    id: 16,
+    date: '2026-10-14',
+    title: 'Agenda: tijden rond de wintertijd',
+    items: [
+      { area: 'agenda', text: "Op zondag 25 oktober (de klok gaat een uur terug) stonden items een uur te laat in de agenda, bv. 07:00–17:00 als 08:00–18:00. Ze staan nu weer op de juiste tijd." },
+    ],
+  },
+  {
     id: 15,
     date: '2026-10-14',
     title: 'Tijden tot na middernacht',
