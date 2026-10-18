@@ -2,9 +2,20 @@
 // Na elke update die de gebruiker merkt een nieuw item bovenaan toevoegen (id + 1);
 // de app toont bij de eerstvolgende keer openen een popup met alle nog niet geziene updates.
 //
-// area: 'dashboard' | 'agenda' | 'taken' | 'spotify' | 'notities' | 'focus' | 'geld' | 'app'
+// area: 'dashboard' | 'agenda' | 'taken' | 'spotify' | 'notities' | 'focus' | 'recap' | 'geld' | 'app'
 
 export const RELEASES = [
+  {
+    id: 17,
+    date: '2026-10-18',
+    title: 'Nieuw: Recap',
+    items: [
+      { area: 'recap', text: "Nieuwe tab Recap: sluit je dag af met scores voor energie, focus en stemming, wat ging goed, wat kan beter, je hoogtepunt en je top 3 doelen voor morgen." },
+      { area: 'recap', text: "Bovenaan zie je automatisch wat je die dag gedaan hebt (taken, focustijd, routines) en de doelen die je gisteren voor vandaag koos, om af te vinken. Gisteren vergeten? Dan kun je die eerst nog invullen." },
+      { area: 'recap', text: "Op zondag de weekrecap: gemiddelde scores, gehaalde doelen, focustijd en taken vergeleken met vorige week, plus je grootste winst, lessen en 3 doelen voor volgende week." },
+      { area: 'recap', text: "Geschiedenis: kalender met je dagscores en een grafiek van energie, focus en stemming. Na 20:00 zie je een stip bij Recap als je hem nog niet hebt ingevuld." },
+    ],
+  },
   {
     id: 16,
     date: '2026-10-14',

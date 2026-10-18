@@ -1,5 +1,5 @@
 import React from 'react'
-import { Home, Timer, Calendar, GraduationCap, CheckSquare, Flame, FileText, Briefcase, Settings, Shield, LogOut, RefreshCw, BarChart2, Dumbbell, Wallet, Search } from 'lucide-react'
+import { Home, Timer, Calendar, GraduationCap, CheckSquare, Flame, FileText, Briefcase, Settings, Shield, LogOut, RefreshCw, BarChart2, Dumbbell, Wallet, Search, NotebookPen } from 'lucide-react'
 import VersionChecker from './VersionChecker'
 import { CountBadge, Pill } from './ui'
 
@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { id: 'agenda',       Icon: Calendar,       label: 'Agenda'       },
   { id: 'taken',        Icon: CheckSquare,    label: 'Taken'        },
   { id: 'focus',        Icon: Timer,          label: 'Focus'        },
+  { id: 'recap',        Icon: NotebookPen,    label: 'Recap'        },
   // { id: 'school', Icon: GraduationCap, label: 'School' },  // INACTIVE
   // { id: 'gewoontes', Icon: Flame, label: 'Gewoontes' },  // INACTIVE
   // { id: 'gym', Icon: Dumbbell, label: 'Gym' },  // INACTIVE
@@ -24,7 +25,7 @@ export default function Sidebar({
   activePage, setActivePage,
   isAdmin, showJumbo, user,
   onShowSettings, onShowAdmin, onLogout, onOpenSearch,
-  syncing, syncFlash, updateAvailable, hasLevelUp, hasActiveGymWorkout, hasActivePomo,
+  syncing, syncFlash, updateAvailable, hasLevelUp, hasActiveGymWorkout, hasActivePomo, recapDue,
   overdueCount = 0,
   orientation = 'vertical',
 }) {
@@ -65,6 +66,7 @@ export default function Sidebar({
     const gymActive = id === 'gym' && hasActiveGymWorkout && !active
     const pomoActive = id === 'focus' && hasActivePomo && !active
     const badge = id === 'taken' && overdueCount > 0 && !active
+    const recapOpen = id === 'recap' && recapDue && !active
     const button = (
       <button
         key={id}
@@ -77,6 +79,7 @@ export default function Sidebar({
         <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
         {badge && <CountBadge count={overdueCount} label={`${overdueCount} te laat`} />}
         {pomoActive && <Pill tone="accent">Actief</Pill>}
+        {recapOpen && <Pill tone="accent">Invullen</Pill>}
         {gymActive && <Pill tone="warning">Actief</Pill>}
         {levelUp && <Pill tone="school">Level up</Pill>}
       </button>

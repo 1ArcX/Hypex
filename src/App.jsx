@@ -36,6 +36,7 @@ import TakenPage from './pages/TakenPage'
 import NotitiesPage from './pages/NotitiesPage'
 import CommandPalette from './components/CommandPalette'
 import PomodoroBanner, { usePomodoroState } from './components/dashboard/PomodoroBanner'
+import { useRecapDue } from './recap/useRecapDue'
 
 // Minder gebruikte / zware pagina's (Geld → recharts, Jumbo → maplibre) pas laden bij openen
 const SchoolPage = lazy(() => import('./pages/SchoolPage'))
@@ -46,16 +47,17 @@ const StatsPage = lazy(() => import('./pages/StatsPage'))
 const GeldPage = lazy(() => import('./pages/GeldPage'))
 const HypexAIPage = lazy(() => import('./pages/HypexAIPage'))
 const FocusPage = lazy(() => import('./focus/FocusPage'))
+const RecapPage = lazy(() => import('./recap/RecapPage'))
 
 const ADMIN_EMAIL = 'zhafirfachri@gmail.com'
 
 const PAGE_NAMES = {
   dashboard: 'Home', agenda: 'Agenda', taken: 'Taken',
-  focus: 'Focus', pomodoro: 'Pomodoro', school: 'School',
+  focus: 'Focus', recap: 'Recap', pomodoro: 'Pomodoro', school: 'School',
   gewoontes: 'Gewoontes', gym: 'Gym', notities: 'Notities', statistieken: 'Statistieken', jumbo: 'Jumbo', geld: 'Geld', hypexai: 'Hypex AI',
 }
 
-const PAGE_ORDER = ['dashboard', 'agenda', 'taken', 'focus', 'school', 'gewoontes', 'notities', 'statistieken']
+const PAGE_ORDER = ['dashboard', 'agenda', 'taken', 'focus', 'recap', 'school', 'gewoontes', 'notities', 'statistieken']
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -298,6 +300,7 @@ export default function App() {
 
   const user = useMemo(() => session?.user || null, [session])
   const isAdmin = user?.email === ADMIN_EMAIL
+  const recapDue = useRecapDue(user?.id) && activePage !== 'recap'
 
   const fetchProfiles = async () => {
     const { data, error } = await supabase.from('profiles').select('*')
@@ -848,6 +851,7 @@ export default function App() {
             hasLevelUp={hasLevelUp}
             hasActiveGymWorkout={hasActiveGymWorkout}
             hasActivePomo={hasActivePomo}
+            recapDue={recapDue}
           />
         </div>
 
@@ -1017,6 +1021,10 @@ export default function App() {
               />
             )}
 
+            {activePage === 'recap' && (
+              <RecapPage userId={user.id} tasks={tasks} isAdmin={isAdmin} />
+            )}
+
             {activePage === 'gewoontes' && (
               <GewoontesPage userId={user.id} syncTrigger={syncTrigger} />
             )}
@@ -1066,6 +1074,7 @@ export default function App() {
               hasLevelUp={hasLevelUp}
               hasActiveGymWorkout={hasActiveGymWorkout}
               hasActivePomo={hasActivePomo}
+              recapDue={recapDue}
               onSheetChange={setMeerOpen}
             />
           </div>}

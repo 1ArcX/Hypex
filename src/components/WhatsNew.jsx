@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Sparkles, ChevronDown, X, LayoutDashboard, CalendarDays, CheckSquare, Music, StickyNote, Timer, Wallet, Wand2 } from 'lucide-react'
+import { Sparkles, ChevronDown, X, LayoutDashboard, CalendarDays, CheckSquare, Music, StickyNote, Timer, Wallet, Wand2, NotebookPen } from 'lucide-react'
 import { RELEASES } from '../changelog'
 
 // "Wat is er nieuw": popup na een update. Meerdere gemiste updates stapelen als tijdlijn
@@ -13,6 +13,7 @@ const AREAS = {
   spotify: { label: 'Spotify', icon: Music, color: '#1DB954' },
   notities: { label: 'Notities', icon: StickyNote, color: '#FFD60A' },
   focus: { label: 'Focus', icon: Timer, color: 'var(--c-warning)' },
+  recap: { label: 'Recap', icon: NotebookPen, color: 'var(--accent)' },
   geld: { label: 'Geld', icon: Wallet, color: 'var(--c-success)' },
   app: { label: 'Hypex', icon: Wand2, color: 'var(--cat-persoonlijk)' },
 }

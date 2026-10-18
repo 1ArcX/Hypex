@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Home, Calendar, CheckSquare, Timer, MoreHorizontal, GraduationCap, Flame, FileText, Briefcase, BarChart2, Dumbbell, Wallet } from 'lucide-react'
+import { Home, Calendar, CheckSquare, Timer, MoreHorizontal, GraduationCap, Flame, FileText, Briefcase, BarChart2, Dumbbell, Wallet, NotebookPen } from 'lucide-react'
 
 const PRIMARY_TABS = [
   { id: 'dashboard', Icon: Home,          label: 'Home'      },
@@ -12,13 +12,14 @@ const PRIMARY_TABS = [
 const SHEET_BASE = [
   // { id: 'school', Icon: GraduationCap, label: 'School' },  // INACTIVE
   { id: 'focus',        Icon: Timer,         label: 'Focus' },
+  { id: 'recap',        Icon: NotebookPen,   label: 'Recap' },
   { id: 'statistieken', Icon: BarChart2,     label: 'Stats'    },
   // { id: 'gym', Icon: Dumbbell, label: 'Gym' },  // INACTIVE
 ]
 
 const PRIMARY_SWIPE_ORDER = ['dashboard', 'agenda', 'taken', 'notities']  // gewoontes INACTIVE
 
-export default function BottomNav({ activePage, setActivePage, isAdmin, showJumbo, hasLevelUp, hasActiveGymWorkout, hasActivePomo, onSheetChange }) {
+export default function BottomNav({ activePage, setActivePage, isAdmin, showJumbo, hasLevelUp, hasActiveGymWorkout, hasActivePomo, recapDue, onSheetChange }) {
   const [showSheet, setShowSheet] = useState(false)
   useEffect(() => { onSheetChange?.(showSheet) }, [showSheet, onSheetChange])
   const sheetRef = useRef(null)
@@ -142,6 +143,9 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
                   >
                     <Icon size={22} strokeWidth={active || glowing ? 2.2 : 1.7} />
                     <span style={{ fontSize: 11, fontWeight: active || glowing ? 600 : 400 }}>{label}</span>
+                    {id === 'recap' && recapDue && !active && (
+                      <span aria-label="Recap nog invullen" style={{ position: 'absolute', top: 6, right: 6, width: 7, height: 7, borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 6px var(--accent)' }} />
+                    )}
                     {glowing && (
                       <span style={{
                         position: 'absolute', top: 6, right: 6,
@@ -206,6 +210,9 @@ export default function BottomNav({ activePage, setActivePage, isAdmin, showJumb
                   background: 'color-mix(in srgb, var(--accent) 12%, transparent)',
                   animation: 'pillIn 0.22s ease',
                 }} />
+              )}
+              {recapDue && !showSheet && activePage !== 'recap' && (
+                <span aria-hidden="true" style={{ position: 'absolute', top: 8, left: 'calc(50% + 8px)', width: 7, height: 7, borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 6px var(--accent)' }} />
               )}
               {activeMeerItem && !showSheet
                 ? <activeMeerItem.Icon size={20} strokeWidth={2.2} style={{ position: 'relative' }} />

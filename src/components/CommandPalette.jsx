@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
-import { Search, Home, Calendar, CheckSquare, Timer, FileText, BarChart2, Briefcase, Wallet, Plus, CornerDownLeft, StickyNote } from 'lucide-react'
+import { Search, Home, Calendar, CheckSquare, Timer, FileText, BarChart2, Briefcase, Wallet, Plus, CornerDownLeft, StickyNote, NotebookPen } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { taskCategory, eventCategory, categoryColor } from '../utils/category'
 import { eventDisplay } from '../utils/eventTitle'
@@ -12,6 +12,7 @@ const PAGES = [
   { id: 'agenda',       label: 'Agenda',       Icon: Calendar },
   { id: 'taken',        label: 'Taken',        Icon: CheckSquare },
   { id: 'focus',        label: 'Focus',        Icon: Timer },
+  { id: 'recap',        label: 'Recap',        Icon: NotebookPen },
   { id: 'notities',     label: 'Notities',     Icon: FileText },
   { id: 'statistieken', label: 'Statistieken', Icon: BarChart2 },
   { id: 'jumbo',        label: 'Jumbo',        Icon: Briefcase, access: 'jumbo' },
