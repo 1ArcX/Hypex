@@ -99,11 +99,16 @@ export async function sp(path, { method = 'GET', query, body } = {}) {
 
   const url = new URL(path.startsWith('http') ? path : API + path)
   if (query) for (const [k, v] of Object.entries(query)) if (v != null) url.searchParams.set(k, v)
-  const send = (tok) => fetch(url, {
-    method,
-    headers: { Authorization: `Bearer ${tok}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
-    body: body ? JSON.stringify(body) : undefined,
-  })
+  // Met een time-out: een verzoek dat blijft hangen zou anders alle volgende knoppen blokkeren
+  const send = (tok) => {
+    const ctrl = new AbortController()
+    const t = setTimeout(() => ctrl.abort(), 8000)
+    return fetch(url, {
+      method, signal: ctrl.signal,
+      headers: { Authorization: `Bearer ${tok}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+    }).finally(() => clearTimeout(t))
+  }
 
   try {
     let res = await send(token)

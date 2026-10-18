@@ -37,7 +37,8 @@ function schedule(ms) {
 }
 function nextDelay() {
   if (document.hidden) return null
-  if (!state.isPlaying) return 10000
+  // Gepauzeerd of op een ander apparaat bezig: vaak genoeg kijken dat Dash bijblijft met wat je daar doet
+  if (!state.isPlaying) return state.track ? 5000 : 10000
   const left = (state.track?.duration_ms || 0) - livePosition()
   return left > 0 && left < 3000 ? left + 400 : 3000 // vlak na het einde van het nummer meteen kijken
 }
@@ -62,6 +63,10 @@ function stop() {
   window.removeEventListener('focus', onVisible)
 }
 
+// Laatst gebruikte apparaat onthouden: is Spotify daar even "inactief", dan spelen we daar weer af
+let lastDeviceId = (() => { try { return localStorage.getItem('sp_last_device') } catch { return null } })()
+let lastFetchAt = 0
+
 async function fetchPlayback() {
   if (!getToken()) { if (state.token) set({ token: null, track: null }); return }
   const r = await sp('/me/player', { query: { additional_types: 'episode' } })
@@ -69,11 +74,19 @@ async function fetchPlayback() {
   if (r.status === 403) { set({ authError: true }); return }
   if (!r.ok) return
   const d = r.data
+  const now = Date.now()
+  lastFetchAt = now
   if (!d?.item) {
-    if (r.status === 204 && state.track && !expect) set({ track: null, isPlaying: false, device: null })
+    // Niets actief (204): Dash mag dan niet blijven zeggen dat er iets speelt
+    if (expect && now < expect.until) return
+    expect = null
+    if (state.track || state.isPlaying) set({ track: r.status === 204 ? null : state.track, isPlaying: false, device: d?.device || null })
     return
   }
-  const now = Date.now()
+  if (d.device?.id && d.device.id !== lastDeviceId) {
+    lastDeviceId = d.device.id
+    try { localStorage.setItem('sp_last_device', d.device.id) } catch { /* privémodus */ }
+  }
   if (expect && now < expect.until) {
     const trackOk = !expect.trackId || d.item.id === expect.trackId
     const playOk = expect.playing == null || d.is_playing === expect.playing
@@ -119,7 +132,17 @@ let burst = []
 function confirm(exp) {
   expect = exp ? { ...exp, until: Date.now() + 3000 } : null
   burst.forEach(clearTimeout) // nieuwe actie vervangt de vorige burst (3× skippen ≠ 15 polls)
-  burst = [300, 800, 1600, 3200].map(ms => setTimeout(() => { if (running) fetchPlayback() }, ms))
+  burst = [300, 800, 1600].map(ms => setTimeout(() => { if (running) fetchPlayback() }, ms))
+  // Laatste controle: zei Spotify "ok" maar speelt er toch niets, dan dat ook laten zien
+  burst.push(setTimeout(async () => {
+    if (!running) return
+    await fetchPlayback()
+    if (exp?.playing && !state.isPlaying) {
+      notice(state.device?.name
+        ? `${state.device.name} speelt niet af. Open Spotify op dat apparaat en probeer het opnieuw.`
+        : 'Er speelt niets af. Open Spotify op het apparaat waarop je wilt luisteren.')
+    }
+  }, 3400))
 }
 
 // ── Radio ───────────────────────────────────────────────────────────────────
@@ -171,11 +194,13 @@ function notice(text) {
 async function activateDevice() {
   const r = await sp('/me/player/devices')
   const devices = (r.data?.devices || []).filter(d => !d.is_restricted)
-  const target = devices.find(d => d.is_active) || devices[0]
-  if (!target) { notice('Open Spotify op een apparaat om af te spelen.'); return null }
+  // Voorkeur: het apparaat waarop je net luisterde, niet zomaar het eerste uit de lijst
+  const target = devices.find(d => d.is_active) || devices.find(d => d.id === lastDeviceId) || devices[0]
+  if (!target) { notice('Geen Spotify-apparaat gevonden. Open Spotify op je telefoon of computer en probeer het opnieuw.'); return null }
   const t = await sp('/me/player', { method: 'PUT', body: { device_ids: [target.id], play: false } })
-  if (!t.ok) return null
-  await new Promise(res => setTimeout(res, 400))
+  if (!t.ok) { notice(`Kon ${target.name} niet bereiken.`); return null }
+  await new Promise(res => setTimeout(res, 500))
+  if (lastDeviceId && target.id !== lastDeviceId) notice(`Speelt af op ${target.name}`)
   return target.id
 }
 
@@ -198,10 +223,17 @@ async function command(path, opts = {}) {
 export const player = {
   togglePlay() {
     const playing = !state.isPlaying
+    const stale = Date.now() - lastFetchAt > 2000
     set({ isPlaying: playing, progressMs: livePosition(), at: Date.now() })
     return queueAction(async () => {
+      // Op een ander apparaat kan intussen gepauzeerd/gestart zijn: eerst de echte stand ophalen.
+      // Is het daar al zoals je wilt, dan niets sturen (anders lijkt de knop niets te doen).
+      if (stale) {
+        const cur = await sp('/me/player')
+        if (cur.ok && cur.data?.item && cur.data.is_playing === playing) { expect = null; await fetchPlayback(); return }
+      }
       const r = await command(playing ? '/me/player/play' : '/me/player/pause', { method: 'PUT' })
-      if (!r.ok) set({ isPlaying: !playing })
+      if (!r.ok) { set({ isPlaying: !playing }); expect = null; return }
       confirm({ playing })
     })
   },
@@ -209,8 +241,8 @@ export const player = {
     const [up, ...rest] = state.queue
     if (up) set({ track: up, queue: rest, progressMs: 0, at: Date.now(), isPlaying: true })
     return queueAction(async () => {
-      await command('/me/player/next', { method: 'POST' })
-      confirm(up ? { trackId: up.id } : null)
+      const r = await command('/me/player/next', { method: 'POST' })
+      confirm(r.ok && up ? { trackId: up.id } : null)
       queueSoon(900)
     })
   },
@@ -250,9 +282,10 @@ export const player = {
     return queueAction(async () => {
       if (shuffle != null && shuffle !== state.shuffle) { await command('/me/player/shuffle', { method: 'PUT', query: { state: shuffle } }); set({ shuffle }) }
       const body = { context_uri: contextUri, ...(offsetUri ? { offset: { uri: offsetUri } } : {}) }
-      await command('/me/player/play', { method: 'PUT', body })
+      const r = await command('/me/player/play', { method: 'PUT', body })
+      if (!r.ok) return
       set({ isPlaying: true })
-      confirm(null)
+      confirm({ playing: true })
       queueSoon(1200)
     })
   },
@@ -260,9 +293,10 @@ export const player = {
   playUris(uris, offsetUri) {
     return queueAction(async () => {
       const body = { uris: uris.slice(0, 100), ...(offsetUri ? { offset: { uri: offsetUri } } : {}) }
-      await command('/me/player/play', { method: 'PUT', body })
+      const r = await command('/me/player/play', { method: 'PUT', body })
+      if (!r.ok) return
       set({ isPlaying: true })
-      confirm(null)
+      confirm({ playing: true })
       queueSoon(1200)
     })
   },
@@ -273,8 +307,8 @@ export const player = {
     return queueAction(async () => {
       // Zit het nummer niet in de huidige context, dan geeft Spotify een fout → los afspelen
       const r = ctx ? await sp('/me/player/play', { method: 'PUT', body: { context_uri: ctx, offset: { uri: track.uri } } }) : { ok: false }
-      if (!r.ok) await command('/me/player/play', { method: 'PUT', body: { uris: [track.uri] } })
-      confirm({ trackId: track.id })
+      const r2 = r.ok ? r : await command('/me/player/play', { method: 'PUT', body: { uris: [track.uri] } })
+      confirm(r2.ok ? { trackId: track.id, playing: true } : null)
       queueSoon(1200)
     })
   },
@@ -288,9 +322,9 @@ export const player = {
       let radio = []
       try { radio = await buildRadio(track) } catch { radio = [] }
       // offset = het gezochte nummer eerst (anders kiest Spotify bij shuffle een willekeurig nummer uit de lijst)
-      await command('/me/player/play', { method: 'PUT', body: { uris: [track.uri, ...radio.map(t => t.uri)], offset: { uri: track.uri }, position_ms: 0 } })
-      if (radio.length) notice(`Radio op basis van "${track.name}" · ${radio.length} nummers`)
-      confirm({ trackId: track.id })
+      const r = await command('/me/player/play', { method: 'PUT', body: { uris: [track.uri, ...radio.map(t => t.uri)], offset: { uri: track.uri }, position_ms: 0 } })
+      if (r.ok && radio.length) notice(`Radio op basis van "${track.name}" · ${radio.length} nummers`)
+      confirm(r.ok ? { trackId: track.id, playing: true } : null)
       queueSoon(1200)
     })
   },

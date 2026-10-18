@@ -6,6 +6,17 @@
 
 export const RELEASES = [
   {
+    id: 18,
+    date: '2026-10-19',
+    title: 'Spotify betrouwbaarder op meerdere apparaten',
+    items: [
+      { area: 'spotify', text: "Luister je op een ander apparaat (bv. je telefoon), dan haalt Dash eerst de echte stand op voordat play/pauze iets stuurt, zodat de knop niet meer het omgekeerde doet." },
+      { area: 'spotify', text: "Dash laat niet meer zien dat er iets speelt als er niets afspeelt, en meldt het als het apparaat niet reageert." },
+      { area: 'spotify', text: "Was je apparaat even inactief, dan speelt Dash weer af op het apparaat waarop je luisterde in plaats van op een willekeurig ander apparaat." },
+      { area: 'spotify', text: "Een vastgelopen verzoek blokkeert de knoppen niet meer, en wat je op een ander apparaat verandert zie je sneller in Dash." },
+    ],
+  },
+  {
     id: 17,
     date: '2026-10-18',
     title: 'Nieuw: Recap',
