@@ -15,6 +15,7 @@ create table if not exists recaps (
   went_well text,   -- week: grootste winst
   improve text,     -- week: lessen
   highlight text,   -- dag: hoogtepunt / dankbaar voor
+  note_next text,   -- bericht aan jezelf voor de volgende dag/week (motivatie)
   goals jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),

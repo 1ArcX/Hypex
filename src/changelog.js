@@ -6,6 +6,15 @@
 
 export const RELEASES = [
   {
+    id: 19,
+    date: '2026-10-20',
+    title: 'Recap: bericht aan jezelf',
+    items: [
+      { area: 'recap', text: "In je dagrecap kun je nu een bericht voor morgen schrijven, als motivatie voor jezelf. De volgende dag staat het bovenaan Recap, boven je doelen." },
+      { area: 'recap', text: "In de weekrecap kan dat ook: je bericht voor volgende week staat dan bovenaan de Week-weergave." },
+    ],
+  },
+  {
     id: 18,
     date: '2026-10-19',
     title: 'Spotify betrouwbaarder op meerdere apparaten',

@@ -1,6 +1,6 @@
 import { useEffect, type CSSProperties, type ReactNode } from 'react'
 import ReactDOM from 'react-dom'
-import { Check, X } from 'lucide-react'
+import { Check, Quote, X } from 'lucide-react'
 import { DAYS_LONG, MONTHS, parseDay } from '../../focus/lib/format'
 import { SCORES, goalProgress, type ScoreKey } from '../lib/recapStats'
 import type { Goal, Recap } from '../types'
@@ -108,11 +108,12 @@ export function Modal({ title, onClose, children }: { title: ReactNode; onClose:
 }
 
 /** Leesweergave van een (dag- of week)recap */
-export function RecapRead({ recap, labels }: { recap: Recap; labels: { went_well: string; improve: string; highlight?: string; goals: string } }) {
+export function RecapRead({ recap, labels }: { recap: Recap; labels: { went_well: string; improve: string; highlight?: string; note_next?: string; goals: string } }) {
   const rows: [string, string | null][] = [
     [labels.went_well, recap.went_well],
     [labels.improve, recap.improve],
     ...(labels.highlight ? [[labels.highlight, recap.highlight] as [string, string | null]] : []),
+    ...(labels.note_next ? [[labels.note_next, recap.note_next] as [string, string | null]] : []),
   ]
   const goals = recap.goals.filter(g => g.text.trim())
   return (
@@ -135,4 +136,17 @@ export function Delta({ value }: { value: number | null }) {
   if (value == null || !Number.isFinite(value)) return null
   const up = value >= 0
   return <span className={up ? 'rc-up' : 'rc-down'} title="t.o.v. vorige week">{up ? '↑' : '↓'} {Math.abs(Math.round(value))}% vs vorige</span>
+}
+
+/** Bericht dat je jezelf de vorige dag/week hebt meegegeven */
+export function NoteCard({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="rc-note">
+      <Quote size={18} className="rc-note-icon" aria-hidden="true" />
+      <div style={{ minWidth: 0 }}>
+        <span className="rc-note-title">{title}</span>
+        <p className="rc-note-text">{text}</p>
+      </div>
+    </div>
+  )
 }

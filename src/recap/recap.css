@@ -95,3 +95,14 @@
 .rc-up { color: var(--c-success); font-weight: 600; }
 .rc-down { color: var(--c-text-3); font-weight: 600; }
 .rc-cal-day.is-future { opacity: 0.45; }
+
+/* Bericht aan jezelf (bovenaan de volgende dag/week) */
+.rc-note {
+  display: flex; gap: 12px; padding: 16px 18px; border-radius: var(--r-lg);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 16%, var(--c-surface)), var(--c-surface));
+  border: 1px solid var(--accent-border);
+}
+.rc-note-icon { color: var(--accent); flex-shrink: 0; margin-top: 2px; }
+.rc-note-title { display: block; font-size: 12px; font-weight: 700; color: var(--accent); letter-spacing: 0.02em; }
+.rc-note-text { margin: 4px 0 0; font-size: 16px; line-height: 1.45; font-weight: 600; color: var(--c-text); white-space: pre-wrap; overflow-wrap: anywhere; }
+.rc-field-warn { display: block; margin-top: 4px; font-size: 11px; color: var(--c-warning); }

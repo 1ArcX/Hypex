@@ -9,8 +9,8 @@ import type { Recap } from '../types'
 import { GoalSummary, Modal, RecapRead, ScoreChips, cap, longDate } from '../components/parts'
 
 const DOW = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo']
-const DAY_LABELS = { went_well: 'Wat ging goed', improve: 'Wat kan beter', highlight: 'Hoogtepunt', goals: 'Doelen voor de volgende dag' }
-const WEEK_LABELS = { went_well: 'Grootste winst', improve: 'Lessen', highlight: 'Verder nog', goals: 'Doelen voor volgende week' }
+const DAY_LABELS = { went_well: 'Wat ging goed', improve: 'Wat kan beter', highlight: 'Hoogtepunt', note_next: 'Bericht voor de volgende dag', goals: 'Doelen voor de volgende dag' }
+const WEEK_LABELS = { went_well: 'Grootste winst', improve: 'Lessen', highlight: 'Verder nog', note_next: 'Bericht voor volgende week', goals: 'Doelen voor volgende week' }
 
 export default function HistoryView() {
   const byKey = useRecapStore(s => s.byKey)

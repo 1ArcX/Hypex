@@ -7,23 +7,24 @@ import { recapKey, useRecapStore } from '../store/recapStore'
 import { SCORES, goalProgress, recapStreak, bestStreak } from '../lib/recapStats'
 import type { Activity } from '../hooks/useActivity'
 import type { Goal, Recap, RecapInput } from '../types'
-import { GoalChecklist, GoalInputs, GoalSummary, RecapRead, ScoreChips, ScoreInput, TextField, cap, longDate } from '../components/parts'
+import { GoalChecklist, GoalInputs, GoalSummary, NoteCard, RecapRead, ScoreChips, ScoreInput, TextField, cap, longDate } from '../components/parts'
 
 interface Task { id: string; recurrence?: string | null; completed?: boolean; last_completed_date?: string | null }
 
 const blank = (day: string): RecapInput => ({
-  kind: 'day', day, energy: null, focus: null, mood: null, went_well: '', improve: '', highlight: '', goals: [],
+  kind: 'day', day, energy: null, focus: null, mood: null, went_well: '', improve: '', highlight: '', note_next: '', goals: [],
 })
 const toDraft = (r: Recap | undefined, day: string): RecapInput => (r
-  ? { kind: 'day', day, energy: r.energy, focus: r.focus, mood: r.mood, went_well: r.went_well || '', improve: r.improve || '', highlight: r.highlight || '', goals: r.goals }
+  ? { kind: 'day', day, energy: r.energy, focus: r.focus, mood: r.mood, went_well: r.went_well || '', improve: r.improve || '', highlight: r.highlight || '', note_next: r.note_next || '', goals: r.goals }
   : blank(day))
 
-const DAY_LABELS = { went_well: 'Wat ging goed', improve: 'Wat kan beter', highlight: 'Hoogtepunt / dankbaar voor', goals: 'Doelen voor de volgende dag' }
+const DAY_LABELS = { went_well: 'Wat ging goed', improve: 'Wat kan beter', highlight: 'Hoogtepunt / dankbaar voor', note_next: 'Bericht voor de volgende dag', goals: 'Doelen voor de volgende dag' }
 
 export default function TodayView({ tasks, activity }: { tasks: Task[]; activity: Activity }) {
   const byKey = useRecapStore(s => s.byKey)
   const recaps = useRecapStore(s => s.recaps)
   const save = useRecapStore(s => s.save)
+  const noteMissing = useRecapStore(s => s.noteMissing)
   const setGoals = useRecapStore(s => s.setGoals)
 
   const today = todayISO()
@@ -60,7 +61,7 @@ export default function TodayView({ tasks, activity }: { tasks: Task[]; activity
   const onSave = async () => {
     setSaving(true)
     const goals: Goal[] = draft.goals.filter(g => g.text.trim()).map(g => ({ text: g.text.trim(), done: g.done }))
-    const row = await save({ ...draft, goals, went_well: draft.went_well?.trim() || null, improve: draft.improve?.trim() || null, highlight: draft.highlight?.trim() || null })
+    const row = await save({ ...draft, goals, went_well: draft.went_well?.trim() || null, improve: draft.improve?.trim() || null, highlight: draft.highlight?.trim() || null, note_next: draft.note_next?.trim() || null })
     setSaving(false)
     // Gisteren ingevuld → door naar vandaag
     if (row) { if (target !== today) setTarget(today); else setEditing(false) }
@@ -74,6 +75,10 @@ export default function TodayView({ tasks, activity }: { tasks: Task[]; activity
         {yesterdayMissing && (
           <FilterTabs variant="segmented" label="Welke dag" value={target} onChange={(v: string) => setTarget(v)}
             items={[{ value: today, label: 'Vandaag' }, { value: yesterday, label: 'Gisteren (nog open)' }]} style={{ alignSelf: 'flex-start' }} />
+        )}
+
+        {goalSource?.note_next?.trim() && (
+          <NoteCard title={isToday ? 'Van jezelf, gisteren' : 'Van jezelf, eergisteren'} text={goalSource.note_next} />
         )}
 
         <Card>
@@ -129,6 +134,9 @@ export default function TodayView({ tasks, activity }: { tasks: Task[]; activity
                 <span className="rc-label">Top 3 doelen voor {isToday ? 'morgen' : 'vandaag'}</span>
                 <GoalInputs goals={draft.goals} onChange={goals => patch({ goals })} placeholder={['Belangrijkste doel', 'Tweede doel', 'Derde doel']} />
               </div>
+              <TextField label={`Bericht voor ${isToday ? 'morgen' : 'vandaag'}`} hint="motivatie voor jezelf, staat er bovenaan"
+                value={draft.note_next || ''} onChange={v => patch({ note_next: v })} placeholder="Bijv. Begin met het moeilijkste, je kunt dit!" />
+              {noteMissing && <span className="rc-field-warn">Wordt nog niet opgeslagen: draai add_recap_note.sql in Supabase.</span>}
               <div className="rc-actions">
                 {existing && <button type="button" className="btn-ghost" onClick={() => { setDraft(toDraft(existing, target)); setEditing(false) }}>Annuleren</button>}
                 <button type="button" className="btn-primary" onClick={onSave} disabled={saving}>{saving ? 'Opslaan…' : 'Recap opslaan'}</button>

@@ -18,6 +18,8 @@ export interface Recap {
   improve: string | null
   /** dag: hoogtepunt / dankbaar voor */
   highlight: string | null
+  /** Bericht aan jezelf voor de volgende dag/week, bovenaan die recap getoond */
+  note_next: string | null
   goals: Goal[]
   updated_at: string
 }

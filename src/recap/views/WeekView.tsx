@@ -6,16 +6,16 @@ import { recapKey, useRecapStore } from '../store/recapStore'
 import { dayScore, fmtScore, goalProgress, isSunday, mondayOf, pctDelta, weekDays, weekNumber, weekStats } from '../lib/recapStats'
 import type { Activity } from '../hooks/useActivity'
 import type { Goal, Recap, RecapInput } from '../types'
-import { Delta, GoalChecklist, GoalInputs, GoalSummary, RecapRead, TextField } from '../components/parts'
+import { Delta, GoalChecklist, GoalInputs, GoalSummary, NoteCard, RecapRead, TextField } from '../components/parts'
 
 const blank = (day: string): RecapInput => ({
-  kind: 'week', day, energy: null, focus: null, mood: null, went_well: '', improve: '', highlight: '', goals: [],
+  kind: 'week', day, energy: null, focus: null, mood: null, went_well: '', improve: '', highlight: '', note_next: '', goals: [],
 })
 const toDraft = (r: Recap | undefined, day: string): RecapInput => (r
-  ? { ...blank(day), went_well: r.went_well || '', improve: r.improve || '', highlight: r.highlight || '', goals: r.goals }
+  ? { ...blank(day), went_well: r.went_well || '', improve: r.improve || '', highlight: r.highlight || '', note_next: r.note_next || '', goals: r.goals }
   : blank(day))
 
-const WEEK_LABELS = { went_well: 'Grootste winst', improve: 'Lessen / wat doe je anders', highlight: 'Overig', goals: 'Doelen voor volgende week' }
+const WEEK_LABELS = { went_well: 'Grootste winst', improve: 'Lessen / wat doe je anders', highlight: 'Overig', note_next: 'Bericht voor volgende week', goals: 'Doelen voor volgende week' }
 
 const rangeLabel = (monday: string) => {
   const a = parseDay(monday), b = parseDay(addDays(monday, 6))
@@ -35,6 +35,7 @@ export function defaultWeek(byKey: Record<string, Recap>, today = todayISO()) {
 export default function WeekView({ activity }: { activity: Activity }) {
   const byKey = useRecapStore(s => s.byKey)
   const save = useRecapStore(s => s.save)
+  const noteMissing = useRecapStore(s => s.noteMissing)
   const setGoals = useRecapStore(s => s.setGoals)
 
   const today = todayISO()
@@ -64,7 +65,7 @@ export default function WeekView({ activity }: { activity: Activity }) {
   const onSave = async () => {
     setSaving(true)
     const goals: Goal[] = draft.goals.filter(g => g.text.trim()).map(g => ({ text: g.text.trim(), done: g.done }))
-    const row = await save({ ...draft, goals, went_well: draft.went_well?.trim() || null, improve: draft.improve?.trim() || null, highlight: draft.highlight?.trim() || null })
+    const row = await save({ ...draft, goals, went_well: draft.went_well?.trim() || null, improve: draft.improve?.trim() || null, highlight: draft.highlight?.trim() || null, note_next: draft.note_next?.trim() || null })
     setSaving(false)
     if (row) setEditing(false)
   }
@@ -84,6 +85,8 @@ export default function WeekView({ activity }: { activity: Activity }) {
 
       <div className="rc-cols">
         <div className="rc-col">
+          {goalSource?.note_next?.trim() && <NoteCard title="Van jezelf, vorige week" text={goalSource.note_next} />}
+
           <Card>
             <CardHeader icon={Target} title="Weekdoelen" action={<GoalSummary goals={weekGoals} />} />
             {weekGoals.length
@@ -139,6 +142,9 @@ export default function WeekView({ activity }: { activity: Activity }) {
                   <span className="rc-label">Top 3 doelen voor volgende week</span>
                   <GoalInputs goals={draft.goals} onChange={goals => patch({ goals })} placeholder={['Belangrijkste weekdoel', 'Tweede weekdoel', 'Derde weekdoel']} />
                 </div>
+                <TextField label="Bericht voor volgende week" hint="motivatie voor jezelf, staat er bovenaan"
+                  value={draft.note_next || ''} onChange={v => patch({ note_next: v })} placeholder="Bijv. Nieuwe week, nieuwe kansen. Pak die toets aan!" />
+                {noteMissing && <span className="rc-field-warn">Wordt nog niet opgeslagen: draai add_recap_note.sql in Supabase.</span>}
                 <div className="rc-actions">
                   {existing && <button type="button" className="btn-ghost" onClick={() => { setDraft(toDraft(existing, monday)); setEditing(false) }}>Annuleren</button>}
                   <button type="button" className="btn-primary" onClick={onSave} disabled={saving}>{saving ? 'Opslaan…' : 'Weekrecap opslaan'}</button>
