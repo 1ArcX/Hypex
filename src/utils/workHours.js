@@ -4,6 +4,8 @@ import { eventCategory } from './category'
 
 /** Eerste dag van een periode. Loopt de periode anders, dan alleen dit getal aanpassen. */
 export const PERIOD_START_DAY = 25
+/** Eerste werkdag bij WDK: eerdere diensten (bv. oude Jumbo/PMT-diensten) tellen niet mee. */
+export const WORK_SINCE = new Date(2026, 9, 12)
 
 const MONTHS = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
 const DAY = 86400000
@@ -52,8 +54,9 @@ export function workShifts(events, source = 'type') {
     if (ev.hidden || !ev.start_time || !ev.end_time) continue
     if (source === 'type' ? eventCategory(ev) !== 'werk' : ev.connection_id !== source) continue
     const start = new Date(ev.start_time), end = new Date(ev.end_time)
-    if (Number.isNaN(+start) || end <= start || isAllDay(ev, start, end)) continue
-    out.push({ start, end, title: ev.title || 'Werk' })
+    if (Number.isNaN(+start) || end <= start || start < WORK_SINCE || isAllDay(ev, start, end)) continue
+    const from = ev.connection?.name || (ev.description?.startsWith('pmt:') ? 'PMT (Jumbo)' : 'Eigen agenda')
+    out.push({ start, end, title: ev.title || 'Werk', from })
   }
   return out
 }
@@ -61,7 +64,7 @@ export function workShifts(events, source = 'type') {
 /**
  * Uren tussen `from` en `to` (dagen, t/m). Een dienst telt mee op zijn begindag, ook als hij na
  * middernacht doorloopt. Dubbele/overlappende diensten (bv. zelfde dienst uit twee bronnen) tellen één keer.
- * → { totalMin, workedMin, plannedMin, count, days: [{ date, min, workedMin }] }
+ * → { totalMin, workedMin, plannedMin, count, days: [{ date, min, workedMin, shifts }] }
  */
 export function sumHours(shifts, from, to, now = new Date()) {
   const first = startOfDay(from), last = startOfDay(to)
@@ -78,9 +81,10 @@ export function sumHours(shifts, from, to, now = new Date()) {
     const merged = []
     for (const s of day.list.sort((a, b) => a.start - b.start)) {
       const top = merged[merged.length - 1]
-      if (top && s.start <= top.end) { if (s.end > top.end) top.end = s.end }
-      else merged.push({ start: s.start, end: s.end })
+      if (top && s.start <= top.end) { if (s.end > top.end) top.end = s.end; top.dup = true }
+      else merged.push({ start: s.start, end: s.end, title: s.title, from: s.from })
     }
+    day.shifts = merged
     count += merged.length
     for (const m of merged) {
       const min = Math.round((m.end - m.start) / 60000)

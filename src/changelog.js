@@ -6,6 +6,15 @@
 
 export const RELEASES = [
   {
+    id: 21,
+    date: '2026-10-21',
+    title: 'Werkuren: vanaf je start bij WDK',
+    items: [
+      { area: 'dashboard', text: "Werkuren telt nu pas vanaf 12 oktober (je eerste dag bij WDK); oude Jumbo-diensten tellen niet meer mee in de week- en periodetotalen." },
+      { area: 'dashboard', text: "De kaart pakt automatisch je WDK-feed als rooster. Onder 'Bekijk diensten' zie je precies welke diensten meetellen, met de bron, en kun je de bron wijzigen." },
+    ],
+  },
+  {
     id: 20,
     date: '2026-10-21',
     title: 'Werkuren op het dashboard',

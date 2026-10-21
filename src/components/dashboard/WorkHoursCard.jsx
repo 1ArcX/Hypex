@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Briefcase, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { Briefcase, ChevronLeft, ChevronRight, ChevronDown, X } from 'lucide-react'
 import { Card, CardHeader, FilterTabs, IconButton, Pill } from '../ui'
 import { supabase } from '../../supabaseClient'
 import { loadExternalEvents } from '../../utils/externalEvents'
-import { periodOf, shiftPeriod, weekOf, shiftWeek, isoWeek, workShifts, sumHours, fmtHours } from '../../utils/workHours'
+import { periodOf, shiftPeriod, weekOf, shiftWeek, isoWeek, workShifts, sumHours, fmtHours, WORK_SINCE } from '../../utils/workHours'
 
 // Dashboard-kaart "Werkuren": uren per week (ma–zo) en per periode (25e t/m 24e, zie utils/workHours.js).
 // Diensten komen uit de agenda: alles van het type Werk (bv. de WDK-feed met standaardtype Werk),
@@ -14,12 +14,13 @@ const DAYS = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo']
 const read = (k, d) => { try { return localStorage.getItem(k) ?? d } catch { return d } }
 const write = (k, v) => { try { localStorage.setItem(k, v) } catch { /* privémodus */ } }
 const iso = (d) => d.toISOString()
+const fmtClock = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 const isSameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 
 /** Data + bediening van de kaart; DashboardPage gebruikt `visible` om de kaart wel/niet te tonen. */
 export function useWorkHours(userId) {
   const [view, setViewState] = useState(() => read('work_hours_view', 'week'))
-  const [source, setSourceState] = useState(() => read('work_hours_source', 'type'))
+  const [chosen, setChosen] = useState(() => read('work_hours_source', null))
   const [dismissed, setDismissed] = useState(() => read('work_hours_hint_hidden', '') === '1')
   const [anchor, setAnchor] = useState(() => new Date())
   const [win, setWin] = useState(null) // { from, to, events }
@@ -60,12 +61,15 @@ export function useWorkHours(userId) {
     }
   }, [load])
 
-  const shifts = useMemo(() => workShifts(win?.events, source), [win, source])
   const feeds = useMemo(() => {
     const m = new Map()
     for (const ev of win?.events || []) if (ev.connection?.id) m.set(ev.connection.id, ev.connection)
     return [...m.values()]
   }, [win])
+  // Geen eigen keuze: de feed met "WDK" in de naam, anders alles van het type Werk
+  const autoFeed = feeds.find(f => /wdk/i.test(f.name || ''))
+  const source = chosen && (chosen === 'type' || feeds.some(f => f.id === chosen)) ? chosen : autoFeed?.id || 'type'
+  const shifts = useMemo(() => workShifts(win?.events, source), [win, source])
   const now = new Date()
   const cur = useMemo(() => sumHours(shifts, range.from, range.to, now), [shifts, +range.from, view]) // eslint-disable-line react-hooks/exhaustive-deps
   const before = useMemo(() => sumHours(shifts, prev.from, prev.to, now), [shifts, +prev.from, view]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -75,7 +79,8 @@ export function useWorkHours(userId) {
     ready: !!win, visible: !!win && (hasWork || (!dismissed && feeds.length > 0)), hasWork,
     view, range, cur, before, source, feeds,
     setView: (v) => { setViewState(v); write('work_hours_view', v) },
-    setSource: (v) => { setSourceState(v); write('work_hours_source', v) },
+    setSource: (v) => { setChosen(v); write('work_hours_source', v) },
+    canBack: range.from > WORK_SINCE,
     step: (n) => setAnchor(view === 'week' ? shiftWeek(range, n).from : shiftPeriod(range, n).from),
     toToday: () => setAnchor(new Date()),
     dismiss: () => { setDismissed(true); write('work_hours_hint_hidden', '1') },
@@ -84,6 +89,10 @@ export function useWorkHours(userId) {
 
 export default function WorkHoursCard({ work, onOpenAgenda }) {
   const { view, range, cur, before, hasWork, feeds, source } = work
+  const [open, setOpen] = useState(false)
+  const partial = range.from < WORK_SINCE // eerste week/periode: telt pas vanaf je eerste werkdag
+  const sourceName = source === 'type' ? 'alles van het type Werk' : feeds.find(f => f.id === source)?.name || 'gekozen feed'
+  const listed = cur.days.filter(d => d.shifts?.length)
   const isWeek = view === 'week'
   const today = new Date()
   const isCurrent = today >= range.from && today < new Date(range.to.getFullYear(), range.to.getMonth(), range.to.getDate() + 1)
@@ -112,10 +121,10 @@ export default function WorkHoursCard({ work, onOpenAgenda }) {
 
       {/* Navigatie */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8 }}>
-        <IconButton icon={ChevronLeft} label={isWeek ? 'Vorige week' : 'Vorige periode'} size={26} onClick={() => work.step(-1)} />
+        <IconButton icon={ChevronLeft} label={isWeek ? 'Vorige week' : 'Vorige periode'} size={26} onClick={() => work.step(-1)} disabled={!work.canBack} />
         <button type="button" onClick={work.toToday} title="Naar vandaag" className="t-meta tnum"
           style={{ flex: 1, minWidth: 0, background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: isCurrent ? 'var(--c-text)' : 'var(--c-text-2)', fontWeight: 600, fontSize: 12, textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {range.label}{isCurrent ? '' : ' · naar nu'}
+          {range.label}{partial ? ` · vanaf ${WORK_SINCE.getDate()} okt` : ''}{isCurrent ? '' : ' · naar nu'}
         </button>
         <IconButton icon={ChevronRight} label={isWeek ? 'Volgende week' : 'Volgende periode'} size={26} onClick={() => work.step(1)} />
       </div>
@@ -139,7 +148,7 @@ export default function WorkHoursCard({ work, onOpenAgenda }) {
         <>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
             <span className="t-kpi tnum" style={{ color: 'var(--c-text)' }}>{fmtHours(cur.totalMin)}</span>
-            {(cur.totalMin || before.totalMin) ? (
+            {(cur.totalMin || before.totalMin) && work.canBack ? (
               <Pill tone={delta > 0 ? 'success' : delta < 0 ? 'warning' : 'neutral'}
                 title={`${isWeek ? 'Vorige week' : 'Vorige periode'}: ${fmtHours(before.totalMin)}`}>
                 {delta === 0 ? 'gelijk' : `${delta > 0 ? '↑' : '↓'} ${fmtHours(delta)}`} t.o.v. vorige {isWeek ? 'week' : 'periode'}
@@ -174,6 +183,37 @@ export default function WorkHoursCard({ work, onOpenAgenda }) {
               )
             })}
           </div>
+
+          {/* Welke diensten tellen mee (om de totalen te kunnen controleren) + bron */}
+          <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open}
+            style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--c-text-3)', fontSize: 11, fontWeight: 600 }}>
+            <ChevronDown size={13} aria-hidden="true" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+            {open ? 'Verberg diensten' : `Bekijk diensten (${cur.count})`} · bron: {sourceName}
+          </button>
+          {open && (
+            <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {listed.length === 0 && <p className="t-meta" style={{ margin: 0, fontSize: 12 }}>Geen diensten in deze {isWeek ? 'week' : 'periode'}.</p>}
+              {listed.map(d => d.shifts.map((sh, i) => (
+                <div key={`${+d.date}-${i}`} className="tnum" style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: 12 }}>
+                  <span style={{ width: 74, flexShrink: 0, color: 'var(--c-text-2)', fontWeight: 600 }}>
+                    {i === 0 ? d.date.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' }) : ''}
+                  </span>
+                  <span style={{ color: 'var(--c-text)' }}>{fmtClock(sh.start)}–{fmtClock(sh.end)}</span>
+                  <span style={{ color: 'var(--cat-werk)', fontWeight: 600 }}>{fmtHours((sh.end - sh.start) / 60000)}</span>
+                  <span className="t-meta" style={{ marginLeft: 'auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11 }}
+                    title={sh.title}>{sh.from}{sh.dup ? ' · dubbel, 1× geteld' : ''}</span>
+                </div>
+              )))}
+              <label style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 6, fontSize: 11, color: 'var(--c-text-3)' }}>
+                Bron
+                <select className="glass-input" value={source} onChange={e => work.setSource(e.target.value)}
+                  style={{ flex: 1, minWidth: 0, fontSize: 12, padding: '5px 8px', colorScheme: 'dark' }}>
+                  <option value="type">Alles van het type Werk</option>
+                  {feeds.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                </select>
+              </label>
+            </div>
+          )}
         </>
       )}
     </Card>
