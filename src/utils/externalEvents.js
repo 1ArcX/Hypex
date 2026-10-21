@@ -55,10 +55,12 @@ export function applyOverride(rawEv, ov) {
  * Laadt geïmporteerde items met aanpassingen. `since` (ISO) beperkt tot items die nog niet
  * voorbij zijn. Verborgen items zitten erin met `hidden: true`; filter zelf.
  */
-export async function loadExternalEvents({ since, limit } = {}) {
+export async function loadExternalEvents({ since, until, limit } = {}) {
   const query = () => {
     let q = supabase.from('external_calendar_events').select('*').order('start_time').order('id')
-    return since ? q.gte('end_time', since) : q
+    if (since) q = q.gte('end_time', since)
+    if (until) q = q.lte('start_time', until)
+    return q
   }
   // Supabase geeft max. 1000 rijen per verzoek; de historie groeit, dus zonder limit in pagina's ophalen.
   const loadEvents = async () => {

@@ -6,6 +6,16 @@
 
 export const RELEASES = [
   {
+    id: 20,
+    date: '2026-10-21',
+    title: 'Werkuren op het dashboard',
+    items: [
+      { area: 'dashboard', text: "Nieuwe kaart Werkuren: zie hoeveel uur je werkt per week (ma–zo) en per periode van de 25e t/m de 24e, met wat al gewerkt is en wat nog gepland staat." },
+      { area: 'dashboard', text: "Vergelijk met de vorige week of periode, blader met ‹ › en tik op een staafje om die dag of week in de agenda te openen." },
+      { area: 'dashboard', text: "De uren komen uit je rooster in de agenda (alles van het type Werk, bv. je WDK-feed). Staat er niets? Zet het standaardtype van die feed op Werk of kies de feed in de kaart." },
+    ],
+  },
+  {
     id: 19,
     date: '2026-10-20',
     title: 'Recap: bericht aan jezelf',

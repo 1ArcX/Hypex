@@ -10,6 +10,7 @@ import GeldMiniWidget from '../components/dashboard/GeldMiniWidget'
 import PomodoroMiniWidget from '../components/dashboard/PomodoroMiniWidget'
 import { usePomodoroState } from '../components/dashboard/PomodoroBanner'
 import TodayFocusCard from '../components/dashboard/TodayFocusCard'
+import WorkHoursCard, { useWorkHours } from '../components/dashboard/WorkHoursCard'
 import { useTodayItems, useNextEvent, useCurrentItem, useMinuteTick } from '../components/dashboard/useToday'
 import { Card, CardHeader, CardLink, ListRow, Pill, IconButton } from '../components/ui'
 import { taskCategory, categoryColor } from '../utils/category'
@@ -56,6 +57,7 @@ export default function DashboardPage({
   const setFilter = (f) => { setNextEventFilter(f); setSkip(0); localStorage.setItem('nextEventFilter', f) }
   const { item: ev, hasMore } = useNextEvent({ tasks, calendarEvents, magisterLessons, skip, typeFilter: nextEventFilter })
   const todayItems = useTodayItems(tasks, magisterLessons, calendarEvents)
+  const work = useWorkHours(userId)
   const current = useCurrentItem(todayItems)
   const pomo = usePomodoroState()
   const pomoActive = pomo.running || pomo.paused
@@ -188,8 +190,9 @@ export default function DashboardPage({
         )}
 
         {/* ── Deadlines, ongepland, regen ── */}
-        {(deadlines.length > 0 || unplanned.length > 0 || showRain) && (
+        {(deadlines.length > 0 || unplanned.length > 0 || showRain || work.visible) && (
           <section className="dash-extra">
+            {work.visible && <WorkHoursCard work={work} onOpenAgenda={d => onNavigateToAgenda?.(d)} />}
             {deadlines.length > 0 && (
               <Card pad={14} glow="danger" style={{ minWidth: 0 }}>
                 <CardHeader icon={Flame} title="Deadlines" count={deadlines.length} tone="danger" />
