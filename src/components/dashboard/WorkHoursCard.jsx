@@ -5,7 +5,7 @@ import { supabase } from '../../supabaseClient'
 import { loadExternalEvents } from '../../utils/externalEvents'
 import { periodOf, shiftPeriod, weekOf, shiftWeek, isoWeek, workShifts, sumHours, fmtHours, WORK_SINCE } from '../../utils/workHours'
 
-// Dashboard-kaart "Werkuren": uren per week (ma–zo) en per periode (25e t/m 24e, zie utils/workHours.js).
+// Dashboard-kaart "Werkuren": uren per week (ma–zo) en per periode (kalendermaand, zie utils/workHours.js).
 // Diensten komen uit de agenda: alles van het type Werk (bv. de WDK-feed met standaardtype Werk),
 // of één gekozen feed. Laadt zelf de items van de vorige periode t/m de getoonde, want het dashboard
 // heeft alleen items vanaf gisteren.

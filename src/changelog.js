@@ -6,6 +6,14 @@
 
 export const RELEASES = [
   {
+    id: 22,
+    date: '2026-11-02',
+    title: 'Werkuren per kalendermaand',
+    items: [
+      { area: 'dashboard', text: "De periode bij Werkuren loopt nu van de 1e t/m de laatste dag van de maand, in plaats van de 25e t/m de 24e." },
+    ],
+  },
+  {
     id: 21,
     date: '2026-10-21',
     title: 'Werkuren: vanaf je start bij WDK',

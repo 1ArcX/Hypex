@@ -1,12 +1,11 @@
-// Werkuren per week en per looncyclus (de 25e t/m de 24e van de volgende maand).
+// Werkuren per week en per periode (kalendermaand: de 1e t/m de laatste dag).
 // Uren = begin- tot eindtijd van de dienst, zonder pauze-aftrek (pauze is doorbetaald).
 import { eventCategory } from './category'
 
-/** Eerste dag van een periode. Loopt de periode anders, dan alleen dit getal aanpassen. */
-export const PERIOD_START_DAY = 25
 /** Eerste werkdag bij WDK: eerdere diensten (bv. oude Jumbo/PMT-diensten) tellen niet mee. */
 export const WORK_SINCE = new Date(2026, 9, 12)
 
+const MONTHS_FULL = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december']
 const MONTHS = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
 const DAY = 86400000
 const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
@@ -15,14 +14,11 @@ const fmtDay = (d) => `${d.getDate()} ${MONTHS[d.getMonth()]}`
 
 /** Periode waar `date` in valt: { from, to (laatste dag), label }. */
 export function periodOf(date) {
-  const d = startOfDay(date)
-  const from = d.getDate() >= PERIOD_START_DAY
-    ? new Date(d.getFullYear(), d.getMonth(), PERIOD_START_DAY)
-    : new Date(d.getFullYear(), d.getMonth() - 1, PERIOD_START_DAY)
-  const to = new Date(from.getFullYear(), from.getMonth() + 1, PERIOD_START_DAY - 1)
-  return { kind: 'period', from, to, label: `${fmtDay(from)} – ${fmtDay(to)}` }
+  const from = new Date(date.getFullYear(), date.getMonth(), 1)
+  const to = new Date(date.getFullYear(), date.getMonth() + 1, 0)
+  return { kind: 'period', from, to, label: `${MONTHS_FULL[from.getMonth()]} ${from.getFullYear()}` }
 }
-export const shiftPeriod = (p, n) => periodOf(new Date(p.from.getFullYear(), p.from.getMonth() + n, PERIOD_START_DAY))
+export const shiftPeriod = (p, n) => periodOf(new Date(p.from.getFullYear(), p.from.getMonth() + n, 1))
 
 /** ISO-weeknummer. */
 export function isoWeek(date) {
