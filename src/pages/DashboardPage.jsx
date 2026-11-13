@@ -138,7 +138,7 @@ export default function DashboardPage({
         {/* ── Kop: begroeting + KPI-chips, zoeken, tijd, weer ── */}
         <header className="dash-header">
           <div style={{ minWidth: 0 }}>
-            <h1 className="t-page" style={{ margin: 0, fontSize: 18, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <h1 className="t-page" style={{ margin: 0, fontSize: 26, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {greeting()}{displayName ? `, ${displayName}` : ''}
             </h1>
             <p className="t-meta" style={{ margin: '2px 0 0', fontSize: 12 }}>{longDate()}</p>

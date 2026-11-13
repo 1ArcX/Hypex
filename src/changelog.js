@@ -6,6 +6,16 @@
 
 export const RELEASES = [
   {
+    id: 25,
+    date: '2026-11-13',
+    title: 'Nieuw uiterlijk',
+    items: [
+      { area: 'app', text: "Dash heeft een rustiger, warmer uiterlijk in de stijl van Claude en Zen browser: warme grijstinten en effen kaarten in plaats van zwart met neon." },
+      { area: 'app', text: "Op de computer loopt de zijbalk over in de achtergrond en staat de pagina als één afgerond paneel ernaast. Grote titels en de klok staan in een serif-letter." },
+      { area: 'app', text: "Kies bij Instellingen → Stijl tussen Claude (warm oranje), Eigen kleur (je eigen accentkleur) en Zen (neutraal wit/grijs)." },
+    ],
+  },
+  {
     id: 24,
     date: '2026-11-13',
     title: 'Dashboard: compactere kaarten naast Spotify',

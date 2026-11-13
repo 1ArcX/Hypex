@@ -7,38 +7,45 @@
   50% { opacity: 0.6; }
 }
 
-/* ===== DESIGN TOKENS — Hypex v2 (sept 2026) =====
+/* ===== DESIGN TOKENS — Hypex v3 "warm" (nov 2026, Claude/Zen-stijl) =====
+   Warme donkergrijze lagen: venster/zijbalk (--c-bg) → paginapaneel (--c-panel) → kaarten (--c-surface).
+   Het accent komt uit de gekozen stijl (utils/themeStyles.js: Claude / Eigen kleur / Zen).
+   (oorspronkelijk Hypex v2, sept 2026)
    Eén bron voor kleur, radius, typografie en spacing. Alles wat accent-afhankelijk is
    leidt af van --accent (gezet door App.jsx vanuit het gekozen thema) via color-mix,
    zodat Neon Cyan / Purple Dream / Sunset / … overal doorwerken.
    Zie docs/redesign/phase1-analysis.md §4. */
 :root {
   /* — Oppervlakken — */
-  --c-bg:            #08090c;
-  --c-surface:       rgba(255, 255, 255, 0.035);
-  --c-surface-2:     rgba(255, 255, 255, 0.06);
-  --c-surface-3:     rgba(255, 255, 255, 0.09);
-  --c-surface-solid: #121419;
-  --c-border:        rgba(255, 255, 255, 0.07);
-  --c-border-strong: rgba(255, 255, 255, 0.12);
+  --c-bg:            #1b1a18; /* venster + zijbalk */
+  --c-panel:         #232220; /* paginapaneel (desktop) */
+  --c-surface:       #2a2927;
+  --c-surface-2:     #32312e;
+  --c-surface-3:     #3b3a36;
+  --c-surface-solid: #2c2b28;
+  --c-border:        rgba(255, 250, 240, 0.08);
+  --c-border-strong: rgba(255, 250, 240, 0.13);
 
   /* — Tekst — */
-  --c-text:   rgba(255, 255, 255, 0.92);
-  --c-text-2: rgba(255, 255, 255, 0.66);
-  --c-text-3: rgba(255, 255, 255, 0.50);
+  --c-text:   #F3F1EA;
+  --c-text-2: #BEBBB2;
+  --c-text-3: #8C897F;
+
+  /* — Lettertypes — */
+  --font-serif: 'Source Serif 4', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
 
   /* — Accent (thema) — */
-  --accent:        #00FFD1;
+  --accent:        #D97757;
   --accent-soft:   color-mix(in srgb, var(--accent) 12%, transparent);
   --accent-border: color-mix(in srgb, var(--accent) 40%, transparent);
-  --accent-glow:   0 0 16px color-mix(in srgb, var(--accent) 35%, transparent);
-  --on-accent:     #000;
+  --accent-glow:   0 0 12px color-mix(in srgb, var(--accent) 22%, transparent);
+  --on-accent:     #fff;
 
   /* — Semantisch — */
-  --c-success: #34D399;
-  --c-warning: #FF9F43;
-  --c-danger:  #FF5A64;
-  --c-info:    #60A5FA;
+  --c-success: #5FBF8F;
+  --c-warning: #E8A04E;
+  --c-danger:  #E5636B;
+  --c-info:    #6EA8E8;
 
   /* — Categorieën (consistent over alle modules) — */
   --cat-school:      #FACC15;
@@ -78,12 +85,10 @@
   --shadow-float: 0 24px 64px rgba(0, 0, 0, 0.5);
 
   /* — Afgeleide / legacy aliassen (bestaande code blijft werken) — */
-  --bg-base:    radial-gradient(1100px 500px at 80% -10%, color-mix(in srgb, var(--accent) 4%, transparent), transparent 60%),
-                radial-gradient(900px 500px at -10% 100%, color-mix(in srgb, var(--accent) 3%, transparent), transparent 55%),
-                var(--c-bg);
+  --bg-base:    var(--c-bg);
   --bg-card:    var(--c-surface);
   --bg-card-2:  var(--c-surface-2);
-  --bg-sidebar: rgba(255, 255, 255, 0.02);
+  --bg-sidebar: transparent;
   --border:     var(--c-border);
   --accent-dim: var(--accent-soft);
   --text-1:     var(--c-text);
@@ -92,7 +97,7 @@
   --radius:     var(--r-lg);
 
   --bg1: var(--c-bg);
-  --bg2: #101015;
+  --bg2: var(--c-surface-solid);
   --glass-bg: var(--c-surface);
   --glass-border: var(--c-border);
   --text-primary: var(--c-text);
@@ -100,7 +105,7 @@
   --text-muted: var(--c-text-3);
   --input-bg: var(--c-surface-2);
   --input-border: var(--c-border-strong);
-  --hover-bg: rgba(255, 255, 255, 0.05);
+  --hover-bg: var(--c-surface-2);
   --card-shadow: none;
 }
 
@@ -201,8 +206,8 @@ button:not([style*="translate"]):active {
 }
 
 .glass-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--c-border-strong));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 /* ===== BUTTONS ===== */
@@ -229,14 +234,14 @@ button:not([style*="translate"]):active {
   background: var(--accent);
   color: var(--on-accent);
   border: none;
-  border-radius: var(--r-sm);
+  border-radius: var(--r-md);
   padding: 7px 14px;
   font-size: var(--fs-body);
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
   transition: box-shadow var(--t-fast) ease, filter var(--t-fast) ease;
 }
-.btn-primary:hover { box-shadow: var(--accent-glow); filter: brightness(1.05); }
+.btn-primary:hover { filter: brightness(1.08); }
 .btn-primary:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
 
 /* Secundaire / ghost knop */
@@ -257,7 +262,7 @@ button:not([style*="translate"]):active {
 /* ===== TYPOGRAFIE-ROLLEN ===== */
 .t-display  { font-size: var(--fs-display); font-weight: 700; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .t-kpi      { font-size: var(--fs-kpi); font-weight: 700; line-height: 1.1; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
-.t-page     { font-size: var(--fs-page); font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; color: var(--c-text); }
+.t-page     { font-family: var(--font-serif); font-size: calc(var(--fs-page) + 3px); font-weight: 500; line-height: 1.2; letter-spacing: -0.01em; color: var(--c-text); }
 .t-section  { font-size: var(--fs-section); font-weight: 600; line-height: 1.3; color: var(--c-text); }
 .t-card     { font-size: var(--fs-card); font-weight: 600; line-height: 1.3; color: var(--c-text); }
 .t-body     { font-size: var(--fs-body); font-weight: 400; line-height: 1.5; }
@@ -467,8 +472,8 @@ html, body, #root {
 
 /* ===== NEON CLOCK ===== */
 .neon-clock {
-  text-shadow: 0 0 24px color-mix(in srgb, var(--accent) 45%, transparent);
-  color: var(--accent);
+  color: var(--c-text);
+  font-family: var(--font-serif); font-weight: 500;
 }
 
 .neon-clock-orange {
@@ -766,11 +771,13 @@ select {
 }
 .hx-nav-item:hover { background: var(--c-surface-2); color: var(--c-text); }
 .hx-nav-item.is-active {
-  background: var(--accent-soft);
-  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
-  color: var(--accent);
+  background: var(--c-surface-2);
+  border-color: transparent;
+  color: var(--c-text);
   font-weight: 600;
 }
+.hx-nav-item.is-active svg { color: var(--accent); }
+:root[data-theme-style='zen'] .hx-nav-item.is-active svg { color: var(--c-text); }
 .hx-nav-item { position: relative; }
 .hx-avatar {
   width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
@@ -782,14 +789,14 @@ select {
 .hx-sidebar--v {
   width: 208px; flex-shrink: 0; height: 100vh; position: sticky; top: 0; overflow-y: auto;
   display: flex; flex-direction: column;
-  background: rgba(255, 255, 255, 0.02); border-right: 1px solid var(--c-border);
+  background: transparent; border-right: none;
 }
 
 /* Balk bovenaan — navknoppen 45° schuin, uiteinde rechtsonder ("licht": alleen de actieve pagina is een pill).
    Elke knop zit in een vaste slot en draait om zijn linkerbovenhoek. */
 .hx-topbar {
   width: 100%; height: 100px; flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.02); border-bottom: 1px solid var(--c-border);
+  background: transparent; border-bottom: none;
 }
 .hx-topbar-inner { height: 100%; display: flex; align-items: center; gap: 16px; padding: 0 14px; box-sizing: border-box; }
 .hx-topbar-side { display: flex; align-items: center; gap: 8px; flex-shrink: 0; height: 34px; }
@@ -809,7 +816,7 @@ select {
 }
 .hx-topbar .hx-tilt-slot .hx-nav-item:hover { background: var(--c-surface-2); color: var(--c-text); }
 .hx-topbar .hx-tilt-slot .hx-nav-item.is-active {
-  background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 35%, transparent); color: var(--accent);
+  background: var(--c-surface-2); border-color: transparent; color: var(--c-text);
 }
 
 /* Automatisch verbergen: nav schuift over de inhoud, verschijnt via een hot-zone aan de rand */
@@ -1778,7 +1785,7 @@ body.is-col-resizing { cursor: col-resize; user-select: none; }
 
 .reward-start {
   width: 100%; margin-top: 18px; padding: 14px; border-radius: 14px; cursor: pointer; font-size: 15px; font-weight: 800;
-  color: #06101f; background: var(--accent); border: none; box-shadow: 0 6px 24px color-mix(in srgb, var(--accent) 35%, transparent);
+  color: var(--on-accent); background: var(--accent); border: none; box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 .reward-start:focus-visible { outline: 2px solid white; outline-offset: 3px; }
 .reward-skip { margin-top: 6px; padding: 6px; background: none; border: none; cursor: pointer; color: var(--c-text-3); font-size: 13px; }
@@ -1964,3 +1971,19 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; -webkit-user
 .linked-list__item.is-done { color: var(--c-text-3); text-decoration: line-through; }
 .linked-list__box { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--c-text-3); display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: var(--on-accent); flex-shrink: 0; transition: background 0.15s ease; }
 .linked-list__item.is-done .linked-list__box { background: var(--accent); border-color: var(--accent); }
+
+/* ===== ZEN-PANEEL (desktop) =====
+   Zijbalk en venster in --c-bg, de pagina als afgerond paneel ernaast. Binnen het paneel is --c-bg
+   de paneelkleur, zodat pagina's met een eigen achtergrond (Focus, Notities, Geld) naadloos aansluiten. */
+@media (min-width: 768px) {
+  .app-main {
+    --c-bg: var(--c-panel); --bg-base: var(--c-panel); --bg1: var(--c-panel);
+    margin: 8px 8px 8px 0; border-radius: 14px;
+    background: var(--c-panel); border: 1px solid var(--c-border);
+    box-shadow: 0 1px 0 rgba(255, 250, 240, 0.03) inset, 0 8px 30px rgba(0, 0, 0, 0.25);
+  }
+  .app-main.is-navtop { margin: 0 8px 8px 8px; }
+  .app-main.is-autohide { margin: 8px; }
+}
+/* Accentknop met een lichte accentkleur (Zen / eigen lichte kleur) */
+.btn-neon { box-shadow: none; }

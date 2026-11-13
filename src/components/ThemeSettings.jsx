@@ -6,6 +6,7 @@ import { useIsDesktop } from '../hooks/useIsDesktop'
 import { pushSupported, requestAndSubscribe } from '../utils/push'
 import CalendarConnections from './CalendarConnections'
 import TypesManager from './TypesManager'
+import { THEME_STYLES, applyTheme } from '../utils/themeStyles'
 
 // Download van de Windows-app (desktop/); niet tonen binnen de app zelf.
 const DESKTOP_DOWNLOAD = '/downloads/Hypex-Setup.exe'
@@ -40,24 +41,21 @@ export default function ThemeSettings({ onClose, theme, setTheme, onLogout, user
     try { localStorage.setItem('somtoday_lesson_color', color) } catch {}
   }
 
+  const style = theme.style || 'claude'
+  const update = (next) => { setTheme(next); applyTheme(next) }
+  const applyStyle = (id) => update({ ...theme, style: id })
   const applyPreset = (preset) => {
-    setTheme({ ...theme, ...preset })
     setCustomAccent(preset.accent)
-    document.documentElement.style.setProperty('--accent', preset.accent)
-    document.documentElement.style.setProperty('--bg1', preset.bg1)
-    document.documentElement.style.setProperty('--bg2', preset.bg2)
+    update({ ...theme, style: 'custom', accent: preset.accent })
   }
 
   const applyCustomAccent = (color) => {
     setCustomAccent(color)
-    setTheme({ ...theme, accent: color })
-    document.documentElement.style.setProperty('--accent', color)
+    update({ ...theme, style: 'custom', accent: color })
   }
 
-  const resetTheme = () => {
-    const def = PRESETS[0]
-    applyPreset(def)
-  }
+  // Terug naar de standaard: Claude-stijl (je eigen kleur blijft bewaard voor "Eigen kleur")
+  const resetTheme = () => applyStyle('claude')
 
   const label = { fontSize: 12, fontWeight: 600, color: 'var(--c-text-2)', margin: '0 0 8px' }
 
@@ -73,7 +71,44 @@ export default function ThemeSettings({ onClose, theme, setTheme, onLogout, user
           <IconButton icon={X} label="Sluiten" onClick={onClose} />
         </div>
 
-        {/* Kleur presets */}
+        {/* Stijl: Claude / Eigen kleur / Zen (warme basis is altijd hetzelfde) */}
+        <div style={{ marginBottom: 18 }}>
+          <p style={label}>Stijl</p>
+          <div role="radiogroup" aria-label="Stijl" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+            {THEME_STYLES.map(st => {
+              const active = style === st.id
+              const sw = st.accent || theme.accent || customAccent
+              return (
+                <button key={st.id} type="button" role="radio" aria-checked={active} onClick={() => applyStyle(st.id)}
+                  style={{ display: 'flex', flexDirection: 'column', gap: 7, padding: 8, borderRadius: 'var(--r-md)', cursor: 'pointer', textAlign: 'left', minWidth: 0,
+                    background: active ? 'var(--c-surface-2)' : 'transparent',
+                    border: `1px solid ${active ? 'color-mix(in srgb, var(--accent) 55%, var(--c-border-strong))' : 'var(--c-border)'}`, color: 'var(--c-text)' }}>
+                  {/* Mini-voorbeeld: venster, paneel, kaart met accentstreep */}
+                  <span aria-hidden="true" style={{ display: 'flex', gap: 4, height: 42, padding: 4, borderRadius: 8, background: '#1b1a18' }}>
+                    <span style={{ width: 12, display: 'flex', flexDirection: 'column', gap: 3, paddingTop: 2 }}>
+                      <span style={{ height: 3, borderRadius: 2, background: sw }} />
+                      <span style={{ height: 3, borderRadius: 2, background: '#3b3a36' }} />
+                      <span style={{ height: 3, borderRadius: 2, background: '#3b3a36' }} />
+                    </span>
+                    <span style={{ flex: 1, borderRadius: 5, background: '#232220', border: '1px solid rgba(255,250,240,0.08)', padding: 4, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      <span style={{ width: '60%', height: 4, borderRadius: 2, background: '#BEBBB2' }} />
+                      <span style={{ flex: 1, borderRadius: 3, background: '#2a2927', display: 'flex', alignItems: 'flex-end', padding: 3 }}>
+                        <span style={{ width: '45%', height: 4, borderRadius: 2, background: sw }} />
+                      </span>
+                    </span>
+                  </span>
+                  <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700 }}>{st.label}</span>
+                    <span style={{ fontSize: 10, color: 'var(--c-text-3)' }}>{st.hint}</span>
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Kleur presets (alleen bij "Eigen kleur") */}
+        {style === 'custom' && <>
         <div style={{ marginBottom: 18 }}>
           <p style={label}>Accentkleur</p>
           <div role="radiogroup" aria-label="Accentkleur" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
@@ -87,7 +122,6 @@ export default function ThemeSettings({ onClose, theme, setTheme, onLogout, user
                     background: active ? `color-mix(in srgb, ${preset.accent} 14%, transparent)` : 'var(--c-surface-2)',
                     border: `1px solid ${active ? `color-mix(in srgb, ${preset.accent} 50%, transparent)` : 'var(--c-border)'}`,
                     color: active ? preset.accent : 'var(--c-text-2)',
-                    boxShadow: active ? `0 0 12px color-mix(in srgb, ${preset.accent} 25%, transparent)` : 'none',
                   }}>
                   <span aria-hidden="true" style={{ width: 10, height: 10, borderRadius: '50%', background: preset.accent, flexShrink: 0 }} />
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{preset.name}</span>
@@ -106,6 +140,7 @@ export default function ThemeSettings({ onClose, theme, setTheme, onLogout, user
             <span className="tnum" style={{ fontSize: 13, fontFamily: 'ui-monospace, monospace', color: 'var(--c-text-2)' }}>{customAccent.toUpperCase()}</span>
           </div>
         </div>
+        </>}
 
         {/* Live preview — alles hieronder gebruikt var(--accent), dus verandert direct mee */}
         <div style={{ marginBottom: 18 }}>

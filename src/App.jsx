@@ -22,6 +22,7 @@ import { fetchLatestVersion } from './utils/version'
 import { autoSyncCalendars } from './utils/calendarSync'
 import { loadItemTypes, useItemTypes } from './hooks/useItemTypes'
 import { loadExternalEvents, loadUnseenChanges, markChangesSeen } from './utils/externalEvents'
+import { applyTheme, DEFAULT_THEME } from './utils/themeStyles'
 import { FeedChangesToast, FeedChangesSheet } from './components/FeedChanges'
 import { VAPID_PUBLIC, urlBase64ToUint8Array } from './utils/push'
 import XPToast from './components/XPToast'
@@ -77,7 +78,7 @@ export default function App() {
       const saved = JSON.parse(localStorage.getItem('app_theme'))
       if (saved?.accent) return saved
     } catch {}
-    return { accent: '#00FFD1', bg1: '#0f0f0f', bg2: '#171717' }
+    return DEFAULT_THEME
   })
   const [focusMode, setFocusMode] = useState(false)
   const [meerOpen, setMeerOpen] = useState(false) // mobiele "Meer"-sheet open → Taken-FAB verbergen
@@ -534,11 +535,9 @@ export default function App() {
 
   // Effect voor accent kleur + persistentie
   useEffect(() => {
-    document.documentElement.style.setProperty('--accent', theme.accent)
-    if (theme.bg1) document.documentElement.style.setProperty('--bg1', theme.bg1)
-    if (theme.bg2) document.documentElement.style.setProperty('--bg2', theme.bg2)
+    applyTheme(theme)
     try { localStorage.setItem('app_theme', JSON.stringify(theme)) } catch {}
-  }, [theme.accent, theme.bg1, theme.bg2])
+  }, [theme.accent, theme.style])
 
   useEffect(() => {
     const handler = () => { if (user?.id) fetchTasks() }
@@ -857,7 +856,9 @@ export default function App() {
 
         {/* Main area — position:relative zodat de zwevende navbar hieraan ankert
             (zelfde --app-height-referentie als de inhoud, geen verspringende band) */}
-        <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+        {/* Desktop: afgerond paneel naast de zijbalk (Zen-indeling, .app-main in index.css) */}
+        <div className={`app-main${navTop ? ' is-navtop' : ''}${navLayout.autoHide ? ' is-autohide' : ''}`}
+          style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
 
           {/* Mobile header — iOS navigation bar: titel gecentreerd.
               Statusbalk is 'black-translucent' (viewport-fit=cover): de app loopt door onder klok/notch/
