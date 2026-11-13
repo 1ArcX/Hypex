@@ -6,6 +6,14 @@
 
 export const RELEASES = [
   {
+    id: 23,
+    date: '2026-11-13',
+    title: 'Geld: tekort-aftrek telt vanaf september',
+    items: [
+      { area: 'geld', text: "Overschrijdingen van vóór september 2026 worden niet meer van je budget afgetrokken; vanaf september telt alleen wat je vanaf dan te veel uitgeeft." },
+    ],
+  },
+  {
     id: 22,
     date: '2026-11-02',
     title: 'Werkuren per kalendermaand',
