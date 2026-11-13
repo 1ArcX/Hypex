@@ -69,8 +69,8 @@ mobile labels from [BottomNav.jsx](../src/components/BottomNav.jsx) (can differ 
   1. (PomodoroBanner sits above the page, rendered by App.jsx — see below.)
   2. Header: greeting + date + KPI chips (`.dash-chip`: urgent / te laat / open → Taken), search ("Zoek in Hypex…", CommandPalette), inline `Clock`, compact `WeatherWidget`.
   3. **TodayFocusCard** (Vandaag + Volgende).
-  4. Desktop: `.dash-media` row — left a stack of PomodoroMiniWidget (hidden while the timer banner shows) + GeldMiniWidget (admin), right `SpotifyWidget variant="hero"` (≈⅔ width, fixed height, scrolls inside). Portrait windows (`vp.portrait`, `.dash-media.is-column`): Pomodoro + Geld side by side, Spotify full width below. Mobile: `.dash-widgets` (Pomodoro, Geld) and `SpotifyWidget compact` at the bottom.
-  5. Extras: **WorkHoursCard** ("Werkuren"), "Deadlines", "Nog in te plannen", `RainCard` (regen grafiek).
+  4. Desktop: `.dash-media` row — left a stack of compact cards (natural height, not stretched to Spotify): PomodoroMiniWidget (hidden while the timer banner shows) + GeldMiniWidget (admin) + on landscape screens WorkHoursCard (`workInStack`; `.work-hours-card` fills the remaining height, bars grow with it), right `SpotifyWidget variant="hero"` (≈⅔ width, fixed height, scrolls inside). Portrait windows (`vp.portrait`, `.dash-media.is-column`): Pomodoro + Geld side by side, Spotify full width below. Mobile: `.dash-widgets` (Pomodoro, Geld) and `SpotifyWidget compact` at the bottom.
+  5. Extras: **WorkHoursCard** ("Werkuren"; only here on portrait/mobile), "Deadlines", "Nog in te plannen", `RainCard` (regen grafiek).
   6. Tall: "Komende dagen" (next 6 days, `.dash-week`, 🚗 departure time).
   Cards use `Card glow` (Spotify-style colour glow, `.glow-card`). Aliases: "KPI's", "chips", "deadlines kaart", "regen grafiek", "komende dagen", "nog in te plannen".
 - **Dashboard components** — `src/components/dashboard/`:

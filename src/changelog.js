@@ -6,6 +6,15 @@
 
 export const RELEASES = [
   {
+    id: 24,
+    date: '2026-11-13',
+    title: 'Dashboard: compactere kaarten naast Spotify',
+    items: [
+      { area: 'dashboard', text: "Op een liggend scherm zijn de Pomodoro- en Geld-kaart niet meer uitgerekt tot de hoogte van Spotify, maar zo hoog als hun inhoud." },
+      { area: 'dashboard', text: "Werkuren staat nu in dezelfde kolom eronder en vult de rest van de ruimte; de staafjes groeien mee." },
+    ],
+  },
+  {
     id: 23,
     date: '2026-11-13',
     title: 'Geld: tekort-aftrek telt vanaf september',

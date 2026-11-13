@@ -109,6 +109,9 @@ export default function DashboardPage({
 
   const showRain = homeRain && !rainHidden && Math.max(...homeRain.map(d => d.precip)) > 0.1
   const widgetCount = (pomoActive ? 0 : 1) + (isAdmin ? 1 : 0) // Spotify staat los (desktop: groot rechts, mobiel: onderaan)
+  // Desktop liggend: Werkuren in de kolom links naast Spotify (vult de ruimte onder Pomodoro + Geld)
+  const workInStack = isDesktop && !vp.portrait && work.visible
+  const stackCount = widgetCount + (workInStack ? 1 : 0)
 
   const openItem = (item) => {
     if (!item) return onNavigateToAgenda?.(new Date())
@@ -170,14 +173,15 @@ export default function DashboardPage({
         />
 
         {/* ── Widgets ── */}
-        {/* Desktop: Pomodoro + Geld gestapeld links, Spotify ("mini Spotify" met songtekst) groot rechts.
-            Verticaal scherm: Pomodoro + Geld naast elkaar, Spotify over de volle breedte eronder. */}
+        {/* Desktop: links een kolom met compacte kaarten (Pomodoro, Geld, Werkuren), Spotify ("mini Spotify"
+            met songtekst) groot rechts. Verticaal scherm: de kaarten naast elkaar, Spotify over de volle breedte eronder. */}
         {isDesktop ? (
-          <section className={`dash-media${widgetCount ? '' : ' is-solo'}${vp.portrait ? ' is-column' : ''}`} aria-label="Widgets">
-            {widgetCount > 0 && (
+          <section className={`dash-media${stackCount ? '' : ' is-solo'}${vp.portrait ? ' is-column' : ''}`} aria-label="Widgets">
+            {stackCount > 0 && (
               <div className="dash-media__stack">
                 {!pomoActive && <PomodoroMiniWidget st={pomo} userId={userId} onOpen={() => onNavigate('focus')} />}
                 {isAdmin && <GeldMiniWidget userId={userId} onOpen={() => onNavigate('geld')} />}
+                {workInStack && <WorkHoursCard work={work} onOpenAgenda={d => onNavigateToAgenda?.(d)} />}
               </div>
             )}
             <SpotifyWidget variant="hero" queueLimit={vp.h >= 1600 ? 8 : 5} />
@@ -190,9 +194,9 @@ export default function DashboardPage({
         )}
 
         {/* ── Deadlines, ongepland, regen ── */}
-        {(deadlines.length > 0 || unplanned.length > 0 || showRain || work.visible) && (
+        {(deadlines.length > 0 || unplanned.length > 0 || showRain || (work.visible && !workInStack)) && (
           <section className="dash-extra">
-            {work.visible && <WorkHoursCard work={work} onOpenAgenda={d => onNavigateToAgenda?.(d)} />}
+            {work.visible && !workInStack && <WorkHoursCard work={work} onOpenAgenda={d => onNavigateToAgenda?.(d)} />}
             {deadlines.length > 0 && (
               <Card pad={14} glow="danger" style={{ minWidth: 0 }}>
                 <CardHeader icon={Flame} title="Deadlines" count={deadlines.length} tone="danger" />

@@ -1200,6 +1200,9 @@ body.is-col-resizing { cursor: col-resize; user-select: none; }
 .dash-media.is-column { grid-template-columns: minmax(0, 1fr); }
 .dash-media.is-column .dash-media__stack { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 .dash-media__stack { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+/* Kaarten in de kolom zo hoog als hun inhoud (niet uitgerekt tot de hoogte van Spotify); de laatste vult de rest */
+.dash-media:not(.is-column) .dash-media__stack > * { flex: 0 0 auto; height: auto !important; }
+.dash-media:not(.is-column) .dash-media__stack > .work-hours-card { flex: 1 1 auto; }
 .dash-media .sp-hero { height: clamp(460px, calc(100vh - 520px), 820px); }
 .dash.is-tall .dash-media .sp-hero { height: clamp(560px, calc(100vh - 820px), 900px); }
 /* Tab "Nu": kaart groeit mee met de inhoud (geen mini-scrollbalk), hoogte hierboven is dan het minimum.

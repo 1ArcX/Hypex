@@ -114,7 +114,8 @@ export default function WorkHoursCard({ work, onOpenAgenda }) {
   const max = Math.max(60, ...bars.map(b => b.min))
 
   return (
-    <Card pad={14} glow="var(--cat-werk)" style={{ minWidth: 0 }}>
+    // flex-kolom: in de dashboardkolom naast Spotify vult de kaart de resterende hoogte en groeien de staafjes mee
+    <Card pad={14} glow="var(--cat-werk)" className="work-hours-card" style={{ minWidth: 0, display: 'flex', flexDirection: 'column' }}>
       <CardHeader icon={Briefcase} title="Werkuren" tone="var(--cat-werk)"
         action={<FilterTabs variant="segmented" label="Weergave werkuren" value={view} onChange={work.setView}
           items={[{ value: 'week', label: 'Week' }, { value: 'period', label: 'Periode' }]} />} />
@@ -162,21 +163,22 @@ export default function WorkHoursCard({ work, onOpenAgenda }) {
 
           {/* Staven: gewerkt = vol, nog gepland = licht */}
           <div role="list" aria-label={isWeek ? 'Uren per dag' : 'Uren per week'}
-            style={{ display: 'grid', gridTemplateColumns: `repeat(${bars.length}, minmax(0, 1fr))`, gap: 6, alignItems: 'end', height: 96 }}>
+            style={{ display: 'grid', gridTemplateColumns: `repeat(${bars.length}, minmax(0, 1fr))`, gap: 6, alignItems: 'stretch', flex: '1 1 auto', minHeight: 96, maxHeight: 260 }}>
             {bars.map(b => {
-              const h = (b.min / max) * 64
-              const workedH = b.min ? (b.worked / b.min) * h : 0
+              const h = (b.min / max) * 100 // % van de beschikbare hoogte
+              const workedH = b.min ? (b.worked / b.min) * 100 : 0
               return (
                 <button key={b.key} type="button" role="listitem" onClick={() => onOpenAgenda?.(b.date)}
                   title={`${isWeek ? b.date.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'short' }) : `Week ${b.week}`}: ${b.min ? fmtHours(b.min) : 'vrij'}`}
-                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: 3, height: '100%', minWidth: 0, background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
-                  <span className="tnum" style={{ fontSize: 10, fontWeight: 600, color: b.min ? 'var(--c-text-2)' : 'transparent', whiteSpace: 'nowrap' }}>
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, minHeight: 0, minWidth: 0, background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
+                  <span className="tnum" style={{ fontSize: 10, fontWeight: 600, color: b.min ? 'var(--c-text-2)' : 'transparent', whiteSpace: 'nowrap', marginTop: 'auto' }}>
                     {b.min ? fmtHours(b.min).replace(/ 00m$/, '') : '·'}
                   </span>
-                  <span aria-hidden="true" style={{ position: 'relative', width: '100%', maxWidth: 30, height: Math.max(3, h), borderRadius: 5, overflow: 'hidden',
+                  {/* Staafvak: neemt de vrije hoogte, de staaf is een percentage daarvan */}
+                  <span aria-hidden="true" style={{ flex: `0 1 ${Math.max(4, h * 0.72)}%`, minHeight: 3, position: 'relative', width: '100%', maxWidth: 30, borderRadius: 5, overflow: 'hidden',
                     background: b.min ? 'color-mix(in srgb, var(--cat-werk) 28%, transparent)' : 'var(--c-surface-3)',
                     outline: b.today ? '1.5px solid color-mix(in srgb, var(--cat-werk) 70%, white)' : 'none', outlineOffset: 1 }}>
-                    <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: workedH, background: 'var(--cat-werk)' }} />
+                    <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${workedH}%`, background: 'var(--cat-werk)' }} />
                   </span>
                   <span style={{ fontSize: 10, fontWeight: b.today ? 700 : 500, color: b.today ? 'var(--cat-werk)' : 'var(--c-text-3)', whiteSpace: 'nowrap' }}>{b.label}</span>
                 </button>
