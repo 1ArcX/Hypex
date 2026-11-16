@@ -23,6 +23,7 @@ import { autoSyncCalendars } from './utils/calendarSync'
 import { loadItemTypes, useItemTypes } from './hooks/useItemTypes'
 import { loadExternalEvents, loadUnseenChanges, markChangesSeen } from './utils/externalEvents'
 import { applyTheme, DEFAULT_THEME } from './utils/themeStyles'
+import { captureBankCallback } from './utils/bankCallback'
 import { FeedChangesToast, FeedChangesSheet } from './components/FeedChanges'
 import { VAPID_PUBLIC, urlBase64ToUint8Array } from './utils/push'
 import XPToast from './components/XPToast'
@@ -84,7 +85,8 @@ export default function App() {
   const [meerOpen, setMeerOpen] = useState(false) // mobiele "Meer"-sheet open → Taken-FAB verbergen
   const [profiles, setProfiles] = useState([])
   const [showAdmin, setShowAdmin] = useState(false)
-  const [activePage, setActivePage] = useState(() => { const p = localStorage.getItem('activePage') || 'dashboard'; return p === 'pomodoro' ? 'focus' : p === 'hypexai' ? 'dashboard' : p })
+  // Terug uit de bank-autorisatie (ING koppelen) → meteen naar Geld
+  const [activePage, setActivePage] = useState(() => { if (captureBankCallback()) return 'geld'; const p = localStorage.getItem('activePage') || 'dashboard'; return p === 'pomodoro' ? 'focus' : p === 'hypexai' ? 'dashboard' : p })
   const [taskHighlight, setTaskHighlight] = useState(null)
   const [agendaJump, setAgendaJump] = useState(null)
   const [paletteOpen, setPaletteOpen] = useState(false) // "Zoek in Hypex" (Ctrl/⌘K)

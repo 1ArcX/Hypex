@@ -7,11 +7,15 @@ import { MonthHeader } from '../components/MonthHeader'
 import type { BudgetStats } from '../hooks/useBudgetStats'
 import type { Expense } from '../types'
 import { fmt, fmtShort } from '../lib/format'
+import { BankCard } from '../components/BankCard'
+import type { BankState } from '../hooks/useBank'
 
 // Home: hero-saldo, dag- en weekbudget, alerts en recente transacties.
 // Detail (analyse, inkomsten, alle uitgaven) zit achter sheets.
-export function HomeView({ stats, isCurrentMonth, remainingLoan, openLoansCount, onOpenBudget, onOpenAnalyse, onOpenInkomsten, onOpenUitgaven, onEdit, onDelete }: {
+export function HomeView({ stats, isCurrentMonth, remainingLoan, openLoansCount, onOpenBudget, onOpenAnalyse, onOpenInkomsten, onOpenUitgaven, onEdit, onDelete, bank, onOpenBankInbox }: {
   stats: BudgetStats
+  bank?: BankState
+  onOpenBankInbox?: () => void
   isCurrentMonth: boolean
   remainingLoan: number
   openLoansCount: number
@@ -106,6 +110,8 @@ export function HomeView({ stats, isCurrentMonth, remainingLoan, openLoansCount,
           </div>
         )
       })()}
+      {/* Rekeningen (ING via Enable Banking): saldo's + inbox met nieuwe banktransacties */}
+      {bank && isCurrentMonth && <BankCard bank={bank} onOpenInbox={() => onOpenBankInbox?.()} />}
 
       {/* Level 2: vandaag · deze week · inkomsten */}
       <div className={`grid ${isCurrentMonth ? 'grid-cols-3' : 'grid-cols-2'} gap-2 mb-2`}>

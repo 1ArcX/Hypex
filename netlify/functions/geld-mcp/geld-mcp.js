@@ -8,6 +8,7 @@
 // carryover-reset per september 2026 en maand-aanpassingen.
 
 const { createClient } = require('@supabase/supabase-js')
+const { processTransaction } = require('../bank/bankCore')
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 const TOKEN = process.env.GELD_MCP_TOKEN
@@ -59,6 +60,25 @@ async function getConfig(uid) {
 const allCategories = (cfg) => [...CATEGORIES, ...((cfg.custom_categories || []).map(c => ({ id: c.id, label: c.label })))]
 const slim = (e) => ({ id: e.id, date: e.date, amount: Number(e.amount), category: e.category, description: e.description || '', type: kindOf(e),
   ...(e.savings_type ? { savings_type: e.savings_type } : {}), ...(e.repaid ? { repaid: true } : {}) })
+
+// ── bank (ING via Enable Banking, zie netlify/functions/bank) ────────────────
+async function bankBalances(uid) {
+  const [conn, accs, inbox] = await Promise.all([
+    supabase.from('bank_connections').select('status, valid_until, last_synced_at, last_error').eq('user_id', uid).maybeSingle(),
+    supabase.from('bank_accounts').select('uid, name, iban, kind, balance, currency, balance_at, hidden').eq('user_id', uid),
+    supabase.from('bank_transactions').select('id', { count: 'exact', head: true }).eq('user_id', uid).eq('status', 'new'),
+  ])
+  if (conn.error && /bank_connections|does not exist/i.test(conn.error.message)) return { connected: false, note: 'Bankkoppeling nog niet ingesteld (migratie add_bank_sync.sql)' }
+  const accounts = (accs.data || []).filter(a => !a.hidden).map(a => ({ name: a.name, iban: a.iban, kind: a.kind, balance: a.balance == null ? null : Number(a.balance), as_of: a.balance_at }))
+  return {
+    connected: !!conn.data && conn.data.status !== 'disconnected', status: conn.data?.status || 'none',
+    consent_valid_until: conn.data?.valid_until || null, last_synced_at: conn.data?.last_synced_at || null,
+    accounts,
+    checking_total: r2(accounts.filter(a => a.kind === 'betaal').reduce((n, a) => n + (a.balance || 0), 0)),
+    savings_total: r2(accounts.filter(a => a.kind === 'spaar').reduce((n, a) => n + (a.balance || 0), 0)),
+    inbox_new: inbox.count || 0,
+  }
+}
 
 // ── overzicht (spiegelt useBudgetStats) ─────────────────────────────────────
 async function overview(uid, month) {
@@ -133,6 +153,7 @@ async function overview(uid, month) {
     savings_goal: cfg.savings_goal || 0,
     per_category: perCategory,
     count: exp.length,
+    ...(isCurrent ? { bank: await bankBalances(uid).catch(() => null) } : {}),
     note: 'Vaste lasten (abonnementen) tellen niet mee in het vrije budget. remaining = spendable_budget − spent_against_budget.',
   }
 }
@@ -169,6 +190,18 @@ const TOOLS = [
     inputSchema: { type: 'object', properties: { id: { type: 'string' }, ...expenseProps }, required: ['id'] } },
   { name: 'delete_expense', description: 'Een transactie definitief verwijderen. Vraag de gebruiker eerst om bevestiging.',
     inputSchema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] }, annotations: { destructiveHint: true } },
+  { name: 'get_bank_balances', description: 'Actuele saldo\'s van de gekoppelde bankrekeningen (ING, alleen-lezen): betaal- en spaarrekeningen, totaal spaargeld, wanneer bijgewerkt, hoe lang de toestemming nog geldt en hoeveel banktransacties nog in de inbox staan.',
+    inputSchema: { type: 'object', properties: {} }, annotations: { readOnlyHint: true } },
+  { name: 'list_bank_transactions', description: 'Transacties zoals ze van de bank binnenkwamen. status: new = nog te verwerken (inbox), added = als uitgave/inkomen toegevoegd, ignored, matched = stond er al. amount: + bij, − af. Met voorgestelde soort/categorie.',
+    inputSchema: { type: 'object', properties: {
+      status: { type: 'string', enum: ['new', 'added', 'ignored', 'matched', 'alle'], description: 'Standaard new' },
+      from: { type: 'string', description: 'Vanaf YYYY-MM-DD' }, to: { type: 'string', description: 'T/m YYYY-MM-DD' },
+      limit: { type: 'number', description: 'Max. aantal (standaard 50, max 300)' } } }, annotations: { readOnlyHint: true } },
+  { name: 'process_bank_transaction', description: 'Een banktransactie uit de inbox verwerken: add = toevoegen als uitgave/inkomen/spaaractie (met optioneel een andere soort of categorie; een afwijkende categorie wordt onthouden voor die tegenpartij), ignore = negeren. Vraag eerst bevestiging.',
+    inputSchema: { type: 'object', properties: {
+      id: { type: 'string' }, action: { type: 'string', enum: ['add', 'ignore'] },
+      kind: { type: 'string', enum: ['uitgave', 'inkomen', 'spaarstorting', 'spaaropname'] },
+      category: { type: 'string', description: 'Categorie-id (zie get_budget_config)' } }, required: ['id', 'action'] } },
   { name: 'update_budget_config', description: 'Budgetinstellingen aanpassen. category_budgets en month_adjustments worden samengevoegd met de bestaande waarden (zet een maand op 0 om de aanpassing te wissen).',
     inputSchema: { type: 'object', properties: {
       monthly_budget: { type: 'number' }, savings_goal: { type: 'number' }, min_balance: { type: 'number' },
@@ -249,6 +282,27 @@ async function callTool(name, args = {}) {
     if (!data) throw new Error('Transactie niet gevonden')
     return { deleted: slim(data) }
   }
+  if (name === 'get_bank_balances') return bankBalances(uid)
+  if (name === 'list_bank_transactions') {
+    const status = args.status || 'new'
+    let q = supabase.from('bank_transactions').select('id, booking_date, amount, counterparty, description, status, suggested_kind, suggested_category, expense_id, account_uid').eq('user_id', uid)
+    if (status !== 'alle') q = q.eq('status', status)
+    if (args.from) { if (!isDate(args.from)) throw new Error('from moet YYYY-MM-DD zijn'); q = q.gte('booking_date', args.from) }
+    if (args.to) { if (!isDate(args.to)) throw new Error('to moet YYYY-MM-DD zijn'); q = q.lte('booking_date', args.to) }
+    const limit = Math.min(300, Math.max(1, Number(args.limit) || 50))
+    const { data, error } = await q.order('booking_date', { ascending: false }).limit(limit)
+    if (error) throw new Error(error.message)
+    return { count: (data || []).length, items: (data || []).map(t => ({ ...t, amount: Number(t.amount) })) }
+  }
+  if (name === 'process_bank_transaction') {
+    if (!args.id || !args.action) throw new Error('id en action zijn verplicht')
+    if (args.category) {
+      const cfg = await getConfig(uid)
+      const ok = INCOME_CATEGORIES.includes(args.category) || allCategories(cfg).some(c => c.id === args.category)
+      if (!ok) throw new Error(`Onbekende categorie "${args.category}"`)
+    }
+    return processTransaction(supabase, uid, args.id, { action: args.action, category: args.category, kind: args.kind })
+  }
   if (name === 'update_budget_config') {
     const cfg = await getConfig(uid)
     const patch = {}
@@ -286,7 +340,8 @@ async function callTool(name, args = {}) {
 // ── JSON-RPC / MCP ──────────────────────────────────────────────────────────
 const INSTRUCTIONS = 'Geld-app van Fachri (Hypex Dash). Bedragen in euro. Gebruik get_overview voor de stand van een maand, ' +
   'list_expenses om transacties te vinden (ids nodig voor wijzigen/verwijderen) en get_budget_config voor categorieën en instellingen. ' +
-  'Vraag bevestiging voordat je transacties verwijdert of budgetten wijzigt.'
+  'Bankkoppeling (ING, alleen-lezen): get_bank_balances voor saldo\'s en spaargeld, list_bank_transactions voor de inbox, process_bank_transaction om die te verwerken. ' +
+  'Vraag bevestiging voordat je transacties verwijdert, budgetten wijzigt of banktransacties verwerkt.'
 
 async function handleMessage(msg) {
   const { id, method, params } = msg || {}
@@ -301,7 +356,7 @@ async function handleMessage(msg) {
       return ok({
         protocolVersion: PROTOCOL_VERSIONS.includes(asked) ? asked : PROTOCOL_VERSIONS[0],
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: 'hypex-geld', version: '1.0.0' },
+        serverInfo: { name: 'hypex-geld', version: '1.1.0' },
         instructions: INSTRUCTIONS,
       })
     }

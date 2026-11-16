@@ -19,6 +19,8 @@ import { AnalyseSheet } from './sheets/AnalyseSheet'
 import { InkomstenSheet } from './sheets/InkomstenSheet'
 import { UitgavenSheet } from './sheets/UitgavenSheet'
 import { EnvelopeSheet } from './sheets/EnvelopeSheet'
+import { BankInboxSheet } from './sheets/BankInboxSheet'
+import { useBank } from './hooks/useBank'
 import { ExpenseModal } from './modals/ExpenseModal'
 import { SavingsModal } from './modals/SavingsModal'
 import { BudgetModal } from './modals/BudgetModal'
@@ -55,6 +57,8 @@ export default function GeldPage({ userId, onClose }: { userId: string; onClose?
   const [showUitgaven, setShowUitgaven] = useState(false)
   const [uitgavenDay, setUitgavenDay] = useState<string | null>(null)
   const [envelopeCat, setEnvelopeCat] = useState<string | null>(null)
+  const [showBankInbox, setShowBankInbox] = useState(false)
+  const bank = useBank(userId)
   const [addCategory, setAddCategory] = useState<string | undefined>(undefined)
   const [editing, setEditing] = useState<Expense | null>(null)
   const [editingSavings, setEditingSavings] = useState<Expense | null>(null)
@@ -131,7 +135,8 @@ export default function GeldPage({ userId, onClose }: { userId: string; onClose?
               onOpenAnalyse={() => setShowAnalyse(true)}
               onOpenInkomsten={() => setShowInkomsten(true)}
               onOpenUitgaven={() => setShowUitgaven(true)}
-              onEdit={openEdit} onDelete={deleteExpense} />
+              onEdit={openEdit} onDelete={deleteExpense}
+              bank={bank} onOpenBankInbox={() => setShowBankInbox(true)} />
           )}
           {activeTab === 'enveloppen' && (
             <EnveloppenView stats={stats} onOpenBudget={() => setShowBudget(true)} onOpenCategory={setEnvelopeCat} />
@@ -146,6 +151,7 @@ export default function GeldPage({ userId, onClose }: { userId: string; onClose?
 
       {/* Sheets */}
       {actionOpen && <ActionSheet onClose={() => setActionOpen(false)} onAction={handleAction} />}
+      {showBankInbox && <BankInboxSheet bank={bank} categories={stats.allCategories} onClose={() => setShowBankInbox(false)} />}
       {searchOpen && (
         <SearchSheet userId={userId} allCategories={stats.allCategories}
           onClose={() => setSearchOpen(false)} onEdit={openEdit} onDelete={deleteExpense} />
@@ -190,7 +196,7 @@ export default function GeldPage({ userId, onClose }: { userId: string; onClose?
           defaultDate={isCurrentMonth ? todayStr() : monthEndOf(selYear, selMonth)}
           adjustedBase={minBalance} savingsGoal={stats.savingsGoal}
           alreadySavedThisMonth={savings.alreadySavedThisMonth} totalLoanRemaining={savings.remainingLoan}
-          userId={userId}
+          userId={userId} bankBalance={bank.checkingBalance}
           onLater={() => setShowIncome(false)}
           onDone={() => { setShowIncome(false); refresh() }} />
       )}
@@ -222,7 +228,7 @@ export default function GeldPage({ userId, onClose }: { userId: string; onClose?
         <IncomeDayModal source={showEarlyIncome} defaultDate={todayStr()}
           adjustedBase={minBalance} savingsGoal={stats.savingsGoal}
           alreadySavedThisMonth={savings.alreadySavedThisMonth} totalLoanRemaining={savings.remainingLoan}
-          userId={userId}
+          userId={userId} bankBalance={bank.checkingBalance}
           onLater={() => setShowEarlyIncome(null)}
           onDone={() => { setShowEarlyIncome(null); refresh() }} />
       )}
@@ -230,7 +236,7 @@ export default function GeldPage({ userId, onClose }: { userId: string; onClose?
         <IncomeDayModal source={pendingIncomeSource}
           adjustedBase={minBalance} savingsGoal={stats.savingsGoal}
           alreadySavedThisMonth={savings.alreadySavedThisMonth} totalLoanRemaining={savings.remainingLoan}
-          userId={userId}
+          userId={userId} bankBalance={bank.checkingBalance}
           onLater={postponeIncome}
           onDone={async () => {
             setIncomeDone(true)

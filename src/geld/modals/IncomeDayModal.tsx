@@ -12,7 +12,7 @@ import { calcSavingsAdvice } from '../lib/savings'
 // Betaaldag-modal (en handmatige eenmalige inkomsten via source=null):
 // inkomen loggen + adviesverdeling naar spaarrekening en leningaflossing.
 // Schrijft zelf naar Supabase (meerdere inserts in één actie).
-export function IncomeDayModal({ source, defaultDate, adjustedBase, savingsGoal, alreadySavedThisMonth, totalLoanRemaining, userId, onLater, onDone }: {
+export function IncomeDayModal({ source, defaultDate, adjustedBase, savingsGoal, alreadySavedThisMonth, totalLoanRemaining, userId, onLater, onDone, bankBalance }: {
   source: RecurringSource | null
   defaultDate?: string
   adjustedBase: number // min. saldo dat op de hoofdrekening blijft
@@ -22,9 +22,10 @@ export function IncomeDayModal({ source, defaultDate, adjustedBase, savingsGoal,
   userId: string
   onLater: () => void
   onDone: () => void
+  bankBalance?: number | null // actueel saldo betaalrekening (bankkoppeling) — vult het saldoveld vooraf in
 }) {
   const [received, setReceived] = useState('')
-  const [balance, setBalance] = useState('')
+  const [balance, setBalance] = useState(() => bankBalance != null ? String(bankBalance.toFixed(2)).replace('.', ',') : '')
   const [desc, setDesc] = useState('')
   const [catId, setCatId] = useState('salaris')
   const [date, setDate] = useState(defaultDate || todayStr())

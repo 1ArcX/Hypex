@@ -6,6 +6,16 @@
 
 export const RELEASES = [
   {
+    id: 27,
+    date: '2026-11-17',
+    title: 'Geld: ING automatisch gekoppeld',
+    items: [
+      { area: 'geld', text: "Koppel je ING-rekeningen (alleen-lezen) in Geld: je ziet het saldo van je betaal- en spaarrekeningen en hoeveel je in totaal hebt gespaard. Bijwerken gebeurt bij openen en elke ochtend." },
+      { area: 'geld', text: "Nieuwe banktransacties komen in een inbox met een voorgestelde categorie: tik Toevoegen of Negeren. Kies je een andere categorie, dan onthoudt Hypex dat voor die winkel. Wat je al zelf had ingevoerd, wordt herkend." },
+      { area: 'geld', text: "Bij inkomstendag staat je saldo al ingevuld, en Claude kan via de connector ook je saldo's en de inbox bekijken." },
+    ],
+  },
+  {
     id: 26,
     date: '2026-11-17',
     title: 'Geld: praat met Claude over je financiën',
