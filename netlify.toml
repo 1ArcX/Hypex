@@ -29,6 +29,13 @@
   status = 200
   force = false
 
+# MCP-server voor de Geld-app (Claude-connector): /mcp/geld/<GELD_MCP_TOKEN>
+[[redirects]]
+  from = "/mcp/geld/*"
+  to = "/.netlify/functions/geld-mcp/:splat"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

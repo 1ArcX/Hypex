@@ -6,6 +6,14 @@
 
 export const RELEASES = [
   {
+    id: 26,
+    date: '2026-11-17',
+    title: 'Geld: praat met Claude over je financiën',
+    items: [
+      { area: 'geld', text: "Je Geld-app is nu als connector aan Claude te koppelen: Claude kan je budget en uitgaven bekijken, feedback geven en transacties of budgetten voor je toevoegen, aanpassen of verwijderen." },
+    ],
+  },
+  {
     id: 25,
     date: '2026-11-13',
     title: 'Nieuw uiterlijk',
