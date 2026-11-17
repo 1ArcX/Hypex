@@ -1,8 +1,10 @@
 // Bankkoppeling (alleen-lezen, PSD2) via Enable Banking: ING-saldo's en -transacties ophalen.
 // Docs: https://enablebanking.com/docs/api/reference/
 //
-// Env: ENABLEBANKING_APP_ID, ENABLEBANKING_PRIVATE_KEY (PEM), optioneel ENABLEBANKING_ASPSP (standaard "ING"),
+// Env: ENABLEBANKING_APP_ID, optioneel ENABLEBANKING_ASPSP (standaard "ING"),
 //      SITE_URL (standaard https://hypexdash.netlify.app), SUPABASE_URL, SUPABASE_SERVICE_KEY, CRON_SECRET.
+// De private key (PEM) staat in de Supabase Vault als `enablebanking_private_key` (zie add_app_secrets.sql),
+// omdat Netlify/Lambda maar 4 KB aan omgevingsvariabelen toestaat; ENABLEBANKING_PRIVATE_KEY in env werkt ook.
 //
 // Aanroepen:
 //  - App (POST, Authorization: Bearer <Supabase access token>): { action: 'start' | 'callback' | 'sync' | 'status' | 'disconnect', ... }
@@ -15,7 +17,15 @@ const { suggest } = require('./bankCore')
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 const API = 'https://api.enablebanking.com'
 const APP_ID = process.env.ENABLEBANKING_APP_ID
-const PRIVATE_KEY = (process.env.ENABLEBANKING_PRIVATE_KEY || '').replace(/\\n/g, '\n')
+const normPem = (v) => String(v || '').replace(/\\n/g, '\n').trim()
+let privateKeyCache = normPem(process.env.ENABLEBANKING_PRIVATE_KEY) || null
+async function privateKey() {
+  if (privateKeyCache) return privateKeyCache
+  const { data, error } = await supabase.rpc('get_app_secret', { secret_name: 'enablebanking_private_key' })
+  if (error) throw new Error(`Sleutel ophalen uit Supabase Vault mislukt: ${error.message}`)
+  if (!data || !String(data).includes('PRIVATE KEY')) throw new Error('Geen Enable Banking-sleutel gevonden (Supabase Vault: enablebanking_private_key)')
+  return (privateKeyCache = normPem(data))
+}
 const ASPSP = process.env.ENABLEBANKING_ASPSP || 'ING'
 const SITE = (process.env.SITE_URL || 'https://hypexdash.netlify.app').replace(/\/$/, '')
 const REDIRECT = `${SITE}/geld/bank-callback`
@@ -27,11 +37,11 @@ const SYNC_MIN_GAP = 60 * 60 * 1000 // bij openen max. één keer per uur
 // 4 achtergrond-verzoeken per dag niet. Wordt per request gezet in de handler.
 let psuHeaders = {}
 const b64url = (buf) => Buffer.from(buf).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_')
-function jwt() {
+function jwt(key) {
   const now = Math.floor(Date.now() / 1000)
   const head = b64url(JSON.stringify({ typ: 'JWT', alg: 'RS256', kid: APP_ID }))
   const body = b64url(JSON.stringify({ iss: 'enablebanking.com', aud: 'api.enablebanking.com', iat: now, exp: now + 3600 }))
-  const sig = crypto.createSign('RSA-SHA256').update(`${head}.${body}`).sign(PRIVATE_KEY)
+  const sig = crypto.createSign('RSA-SHA256').update(`${head}.${body}`).sign(key)
   return `${head}.${body}.${b64url(sig)}`
 }
 async function eb(path, { method = 'GET', body, query } = {}) {
@@ -42,7 +52,7 @@ async function eb(path, { method = 'GET', body, query } = {}) {
   try {
     const res = await fetch(url, {
       method, signal: ctrl.signal,
-      headers: { Authorization: `Bearer ${jwt()}`, 'Content-Type': 'application/json', ...psuHeaders },
+      headers: { Authorization: `Bearer ${jwt(await privateKey())}`, 'Content-Type': 'application/json', ...psuHeaders },
       body: body ? JSON.stringify(body) : undefined,
     })
     const text = await res.text()
@@ -266,7 +276,7 @@ exports.handler = async (event) => {
   }
 
   if (event.httpMethod !== 'POST') return json(405, { error: 'Alleen POST' })
-  if (!APP_ID || !PRIVATE_KEY.includes('PRIVATE KEY')) return json(500, { error: 'Bankkoppeling nog niet ingesteld (ENABLEBANKING_APP_ID / ENABLEBANKING_PRIVATE_KEY)' })
+  if (!APP_ID) return json(500, { error: 'Bankkoppeling nog niet ingesteld (ENABLEBANKING_APP_ID ontbreekt in Netlify)' })
   const user = await userFromEvent(event)
   if (!user) return json(401, { error: 'Niet ingelogd' })
   const ip = event.headers['x-nf-client-connection-ip'] || (event.headers['x-forwarded-for'] || '').split(',')[0].trim()
