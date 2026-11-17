@@ -29,7 +29,7 @@ interface GeldStore {
 
 export interface BankDetail {
   id: string; booking_date: string; amount: number; counterparty: string | null
-  counterparty_iban: string | null; description: string | null; account_name?: string | null
+  counterparty_iban: string | null; description: string | null; account_name?: string | null; status?: string
 }
 
 const now = new Date()

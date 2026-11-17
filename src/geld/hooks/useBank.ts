@@ -118,7 +118,7 @@ export function useBank(userId: string) {
       supabase.from('bank_transactions').select('*').eq('user_id', userId).eq('status', 'new').order('booking_date', { ascending: false }).limit(200),
       supabase.from('bank_transactions').select('*').eq('user_id', userId).eq('status', 'matched').order('booking_date', { ascending: false }).limit(20),
       // Banktransacties die aan een uitgave hangen → ING-gegevens in de transactierijen
-      supabase.from('bank_transactions').select('id, booking_date, amount, counterparty, counterparty_iban, description, expense_id, account_uid')
+      supabase.from('bank_transactions').select('id, booking_date, amount, counterparty, counterparty_iban, description, expense_id, account_uid, status')
         .eq('user_id', userId).not('expense_id', 'is', null).gte('booking_date', since).limit(2000),
       supabase.from('bank_transactions').select('*').eq('user_id', userId).eq('status', 'pending').order('booking_date', { ascending: false }).limit(50),
     ])
@@ -270,7 +270,7 @@ export function useBank(userId: string) {
         .gte('booking_date', from).lte('booking_date', to).order('booking_date'),
       supabase.from('expenses').select('*').eq('user_id', userId).gte('date', from).lte('date', to),
       // Uitgaven die al van ING komen ("added") blijven gewoon staan
-      supabase.from('bank_transactions').select('expense_id').eq('user_id', userId).eq('status', 'added').not('expense_id', 'is', null),
+      supabase.from('bank_transactions').select('expense_id').eq('user_id', userId).in('status', ['added', 'pending']).not('expense_id', 'is', null),
     ])
     const fromBank = new Set(((addedRes.data || []) as { expense_id: string }[]).map(x => x.expense_id))
     const checked = reviewedLocal()

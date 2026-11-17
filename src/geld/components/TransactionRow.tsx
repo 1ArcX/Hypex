@@ -44,9 +44,13 @@ export function TransactionRow({ exp, allCategories, onEdit, onDelete }: {
         <p className="text-[13px] font-semibold text-white/85 m-0 truncate">{exp.description || cat.label}</p>
         <p className="text-[11px] text-white/30 m-0 flex items-center gap-1">
           {fmtDay(exp.date)}{isInc ? ' · inkomsten' : ''}
-          {bankTxs?.length ? <span className="inline-flex items-center gap-0.5" style={{ color: '#FF6200' }} title="Van ING — tik voor details">
-            · <Landmark size={10} /> {bankTxs.length > 1 ? `${bankTxs.length} betalingen` : 'ING'}
-          </span> : null}
+          {bankTxs?.some(t => t.status === 'pending')
+            ? <span className="inline-flex items-center gap-0.5" style={{ color: 'var(--c-warning)' }} title="Nog in verwerking bij ING — telt al mee in je budget">
+                · <Landmark size={10} /> Reservering
+              </span>
+            : bankTxs?.length ? <span className="inline-flex items-center gap-0.5" style={{ color: '#FF6200' }} title="Van ING — tik voor details">
+                · <Landmark size={10} /> {bankTxs.length > 1 ? `${bankTxs.length} betalingen` : 'ING'}
+              </span> : null}
         </p>
       </div>
       <div className="flex flex-col items-end gap-0.5 shrink-0">

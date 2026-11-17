@@ -6,6 +6,14 @@
 
 export const RELEASES = [
   {
+    id: 39,
+    date: '2026-11-17',
+    title: 'Reserveringen tellen mee in je budget',
+    items: [
+      { area: 'geld', text: "Reserveringen bij ING staan nu meteen als uitgave in je budget, met het label 'Reservering'. Zodra ING ze boekt wordt het dezelfde uitgave met het definitieve bedrag en de datum; vervalt een reservering, dan verdwijnt de uitgave." },
+    ],
+  },
+  {
     id: 38,
     date: '2026-11-17',
     title: 'Bank: reserveringen zien',

@@ -12,7 +12,7 @@
 
 const crypto = require('crypto')
 const { createClient } = require('@supabase/supabase-js')
-const { suggest, manualBalance } = require('./bankCore')
+const { suggest, manualBalance, toExpense, paidDate, normalizeCounterparty } = require('./bankCore')
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 const API = 'https://api.enablebanking.com'
@@ -185,14 +185,24 @@ async function syncConnection(conn, { from } = {}) {
         key = res?.continuation_key || null
       } while (key && ++pages < 40)
 
-      // Reserveringen verversen: oude weg, huidige erin (geboekte komen als normale transactie binnen)
-      await supabase.from('bank_transactions').delete().eq('account_uid', acc.uid).eq('status', 'pending')
-      if (pendingRows.length) {
-        const uniq = [...new Map(pendingRows.map(r => [r.ext_id, r])).values()]
-        const { error: pe } = await supabase.from('bank_transactions').insert(uniq)
-        if (pe) console.warn('[bank] reserveringen', pe.message)
+      // Reserveringen: nieuwe meteen als uitgave (telt mee in je budget, label "Reservering"); verdwenen
+      // reserveringen worden hieronder aan de geboekte transactie gekoppeld of, als die er niet is, opgeruimd.
+      const { data: oldPending } = await supabase.from('bank_transactions').select('*').eq('account_uid', acc.uid).eq('status', 'pending')
+      const currentIds = new Set(pendingRows.map(r => r.ext_id))
+      const vanished = (oldPending || []).filter(p => !currentIds.has(p.ext_id))
+      const known = new Set((oldPending || []).map(p => p.ext_id))
+      for (const r of [...new Map(pendingRows.map(r => [r.ext_id, r])).values()]) {
+        if (known.has(r.ext_id)) continue
+        let expenseId = null
+        if (r.suggested_kind === 'uitgave' && r.amount < 0) {
+          const { data: exp } = await supabase.from('expenses').insert(toExpense(r, 'uitgave', r.suggested_category, uid)).select('id').single()
+          expenseId = exp?.id || null
+        }
+        const { error: pe } = await supabase.from('bank_transactions').insert({ ...r, expense_id: expenseId })
+        if (pe) console.warn('[bank] reservering', pe.message)
       }
 
+      let insertedBooked = []
       if (rows.length) {
         // Bestaande (zelfde rekening + ext_id) blijven zoals ze zijn
         let { data: inserted, error } = await supabase.from('bank_transactions')
@@ -212,8 +222,34 @@ async function syncConnection(conn, { from } = {}) {
           await supabase.from('bank_transactions').update({ paid_date: r.paid_date }).eq('account_uid', r.account_uid).eq('ext_id', r.ext_id).is('paid_date', null)
         }
         added += (inserted || []).length
-        await matchExisting(uid, (inserted || []).filter(r => r.status === 'new' && r.suggested_kind === 'uitgave'))
+        insertedBooked = inserted || []
       }
+
+      // Verdwenen reserveringen: geboekte tegenhanger zoeken (zelfde winkel of bedrag, 0–7 dagen later) en die aan
+      // dezelfde uitgave koppelen (bedrag/datum/omschrijving bijwerken). Niets gevonden = vervallen → uitgave weg.
+      const claimed = new Set()
+      for (const p of vanished) {
+        if (p.expense_id) {
+          const pDay = Date.parse(p.booking_date)
+          const cands = insertedBooked.filter(b => !claimed.has(b.id) && b.amount < 0 && b.status === 'new'
+            && (Date.parse(b.booking_date) - pDay) / DAY >= -1 && (Date.parse(b.booking_date) - pDay) / DAY <= 7
+            && (normalizeCounterparty(b.counterparty) === normalizeCounterparty(p.counterparty) || Math.abs(b.amount - p.amount) < 0.005))
+            .sort((a, b) => Math.abs(a.amount - p.amount) - Math.abs(b.amount - p.amount))
+          const hit = cands[0]
+          if (hit) {
+            claimed.add(hit.id)
+            const fresh = toExpense(hit, 'uitgave', p.suggested_category, uid)
+            await supabase.from('expenses').update({ amount: fresh.amount, date: paidDate(hit), ...(fresh.description ? { description: fresh.description } : {}) }).eq('id', p.expense_id)
+            await supabase.from('bank_transactions').update({ status: 'added', expense_id: p.expense_id }).eq('id', hit.id)
+            hit.status = 'added'
+          } else {
+            await supabase.from('expenses').delete().eq('id', p.expense_id).eq('user_id', uid)
+          }
+        }
+        await supabase.from('bank_transactions').delete().eq('id', p.id)
+      }
+
+      await matchExisting(uid, insertedBooked.filter(r => r.status === 'new' && r.suggested_kind === 'uitgave'))
     }
     await updateManualSavings(uid, allAccounts || [])
     await supabase.from('bank_connections').update({ status: 'active', last_synced_at: new Date().toISOString(), last_error: null, updated_at: new Date().toISOString() }).eq('id', conn.id)

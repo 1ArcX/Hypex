@@ -93,7 +93,7 @@ export function BankInboxSheet({ bank, categories, onClose }: { bank: BankState;
                 <span className="tnum shrink-0">{signed(t.amount)}</span>
               </div>
             ))}
-            <p className="m-0 mt-1 text-[11px] text-white/35">Tellen nog niet mee. Zodra ING ze boekt, komen ze hieronder als gewone transactie binnen.</p>
+            <p className="m-0 mt-1 text-[11px] text-white/35">Staan al als uitgave in je budget (label "Reservering"). Zodra ING ze boekt, wordt dat dezelfde uitgave met de definitieve gegevens; vervalt een reservering, dan verdwijnt hij.</p>
           </div>
         </div>
       )}
