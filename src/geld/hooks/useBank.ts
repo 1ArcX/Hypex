@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../supabaseClient'
 import { useGeldStore, type BankDetail } from '../store/geldStore'
+import type { Expense } from '../types'
+import { suggestGroups, type GroupMatch } from '../lib/bankMatch'
 
 // Bankkoppeling (ING via Enable Banking, alleen-lezen). Saldo's en de inbox komen rechtstreeks uit
 // Supabase; koppelen en synchroniseren gaan via de Netlify-functie `bank` (netlify/functions/bank/bank.js).
@@ -38,6 +40,10 @@ function manualBalance(a: BankAccount, txs: MatchRow[]) {
   for (const t of txs) if (a.base_date && t.booking_date > a.base_date && matchesAccount(t, a)) bal -= Number(t.amount)
   return Math.round(bal * 100) / 100
 }
+
+const REVIEW_KEY = 'bank_reviewed_expenses'
+const reviewedLocal = (): Set<string> => { try { return new Set(JSON.parse(localStorage.getItem(REVIEW_KEY) || '[]')) } catch { return new Set() } }
+const saveReviewedLocal = (s: Set<string>) => { try { localStorage.setItem(REVIEW_KEY, JSON.stringify([...s].slice(-500))) } catch { /* privémodus */ } }
 
 // Zie src/utils/bankCallback.js (App.jsx bewaart de code bij terugkeer uit de bank)
 const CALLBACK_KEY = 'bank_callback'
@@ -77,6 +83,9 @@ export function useBank(userId: string) {
   const [accounts, setAccounts] = useState<BankAccount[]>([])
   const [inbox, setInbox] = useState<BankTx[]>([])
   const [matched, setMatched] = useState<BankTx[]>([])
+  // Slim vergelijken: eigen invoer (expenses) die nog aan geen banktransactie hangt
+  const [ownOpen, setOwnOpen] = useState<Expense[]>([])
+  const [firstBankDate, setFirstBankDate] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -109,6 +118,20 @@ export function useBank(userId: string) {
     setAccounts(accs)
     setInbox((t.data as BankTx[]) || [])
     setMatched((m.data as BankTx[]) || [])
+    const inboxRows = (t.data as BankTx[]) || []
+    const monthStart = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01` })()
+    const minInbox = inboxRows.map(x => x.booking_date).sort()[0]
+    const from = new Date(Date.parse((minInbox && minInbox < monthStart ? minInbox : monthStart)) - 4 * 86400000).toISOString().slice(0, 10)
+    const [own, link, first] = await Promise.all([
+      supabase.from('expenses').select('*').eq('user_id', userId).gte('date', from).order('date', { ascending: false }).limit(1000),
+      supabase.from('bank_transactions').select('expense_id').eq('user_id', userId).not('expense_id', 'is', null).gte('booking_date', from),
+      supabase.from('bank_transactions').select('booking_date').eq('user_id', userId).order('booking_date', { ascending: true }).limit(1),
+    ])
+    const linkedIds = new Set(((link.data || []) as { expense_id: string }[]).map(x => x.expense_id))
+    const checked = reviewedLocal()
+    setOwnOpen(((own.data || []) as (Expense & { bank_checked?: boolean })[])
+      .filter(e => !e.is_planned && !linkedIds.has(e.id) && !e.bank_checked && !checked.has(e.id)))
+    setFirstBankDate(((first.data || []) as { booking_date: string }[])[0]?.booking_date || null)
     const names = new Map(((a.data as BankAccount[]) || []).map(x => [x.uid, x.name]))
     const byExp: Record<string, BankDetail[]> = {}
     for (const r of (linked.data || []) as (BankDetail & { expense_id: string; account_uid: string })[]) {
@@ -154,7 +177,7 @@ export function useBank(userId: string) {
   const refresh = () => run(() => callBank('sync', { force: true }))
   const disconnect = () => run(() => callBank('disconnect'))
 
-  const add = (tx: BankTx, category?: string, kind?: string) => run(async () => {
+  const addTx = async (tx: BankTx, category?: string, kind?: string) => {
     const useKind = kind || tx.suggested_kind || (tx.amount > 0 ? 'inkomen' : 'uitgave')
     const useCat = category || tx.suggested_category || 'overig'
     const { data: exp, error: e1 } = await supabase.from('expenses').insert(toExpense(tx, useKind, useCat, userId)).select().single()
@@ -167,6 +190,43 @@ export function useBank(userId: string) {
       const { data: cfg } = await supabase.from('budget_config').select('bank_rules').eq('user_id', userId).maybeSingle()
       if (cfg) await supabase.from('budget_config').update({ bank_rules: { ...((cfg as { bank_rules?: Record<string, string> }).bank_rules || {}), [key]: category } }).eq('user_id', userId)
     }
+  }
+  const add = (tx: BankTx, category?: string, kind?: string) => run(async () => { await addTx(tx, category, kind); refreshGeld() })
+
+  // ── Slim vergelijken met je eigen invoer ──
+  /** Klopt: deze banktransacties horen bij je eigen invoer (die blijft staan). */
+  const linkTxs = (expense: Expense, txs: BankTx[]) => run(async () => {
+    const { error: e } = await supabase.from('bank_transactions').update({ status: 'matched', expense_id: expense.id }).in('id', txs.map(x => x.id))
+    if (e) throw new Error(e.message)
+  })
+  /** Gebruik ING: je eigen invoer verwijderen en de banktransacties los toevoegen (met hun voorgestelde categorie). */
+  const replaceWithBank = (expense: Expense, txs: BankTx[]) => run(async () => {
+    const { error: e } = await supabase.from('expenses').delete().eq('id', expense.id).eq('user_id', userId)
+    if (e) throw new Error(e.message)
+    for (const t of txs) await addTx(t)
+    refreshGeld()
+  })
+  /** Eigen invoer die niet op het afschrift staat maar klopt (bv. contant): niet meer tonen. */
+  const markChecked = (expense: Expense) => run(async () => {
+    const { error: e } = await supabase.from('expenses').update({ bank_checked: true }).eq('id', expense.id)
+    if (e) { const s = reviewedLocal(); s.add(expense.id); saveReviewedLocal(s) } // migratie nog niet gedraaid → op dit apparaat onthouden
+  })
+  const deleteOwn = (expense: Expense) => run(async () => {
+    const { error: e } = await supabase.from('expenses').delete().eq('id', expense.id).eq('user_id', userId)
+    if (e) throw new Error(e.message)
+    refreshGeld()
+  })
+  /**
+   * Alleen ING voor een periode: je losse eigen invoer in [from, to] verwijderen en alle open banktransacties
+   * in die periode toevoegen. (Gekoppelde invoer, geplande uitgaven en wat je als "klopt" markeerde blijven staan.)
+   */
+  const onlyBank = (from: string, to: string) => run(async () => {
+    const del = ownOpen.filter(e => e.date >= from && e.date <= to)
+    if (del.length) {
+      const { error: e } = await supabase.from('expenses').delete().in('id', del.map(x => x.id)).eq('user_id', userId)
+      if (e) throw new Error(e.message)
+    }
+    for (const t of inbox.filter(x => x.booking_date >= from && x.booking_date <= to)) await addTx(t)
     refreshGeld()
   })
   const ignore = (tx: BankTx) => run(async () => {
@@ -222,6 +282,15 @@ export function useBank(userId: string) {
     await supabase.from('bank_accounts').update({ kind }).eq('uid', acc.uid)
   })
 
+  // Voorstellen en "niet op afschrift" (eigen invoer van deze maand, ouder dan 3 dagen, zonder bijpassende transactie)
+  const groups: GroupMatch<BankTx>[] = suggestGroups(ownOpen, inbox)
+  const inGroup = new Set(groups.map(g => g.expense.id))
+  const today = new Date()
+  const monthStartStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`
+  const threeDaysAgo = new Date(today.getTime() - 3 * 86400000).toLocaleDateString('en-CA')
+  const notOnStatement = ownOpen.filter(e => !inGroup.has(e.id) && e.date >= monthStartStr && e.date <= threeDaysAgo
+    && (!firstBankDate || e.date >= firstBankDate) && !e.is_savings_withdrawal)
+
   const visible = accounts.filter(a => !a.hidden)
   const savingsTotal = visible.filter(a => a.kind === 'spaar').reduce((s, a) => s + Number(a.balance || 0), 0)
   const checking = visible.filter(a => a.kind === 'betaal')
@@ -233,6 +302,7 @@ export function useBank(userId: string) {
     connected: conn.status === 'active' || conn.status === 'expired' || conn.status === 'error',
     connect, refresh, disconnect, add, ignore, ignoreBefore, unmatch, setKind,
     saveManualSavings, removeManualSavings, savingsCandidates,
+    ownOpen, groups, notOnStatement, linkTxs, replaceWithBank, markChecked, deleteOwn, onlyBank,
   }
 }
 export type BankState = ReturnType<typeof useBank>

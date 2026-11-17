@@ -6,6 +6,16 @@
 
 export const RELEASES = [
   {
+    id: 30,
+    date: '2026-11-17',
+    title: 'Bank-inbox: slim vergelijken met je eigen invoer',
+    items: [
+      { area: 'geld', text: "De inbox vergelijkt je eigen invoer met je ING-afschrift, ook als je meerdere betalingen onder één kopje zette (bv. 'Eten €15,70' = twee pinbetalingen min een Tikkie). Kies Klopt om te koppelen of Gebruik ING om je invoer te vervangen door de losse transacties." },
+      { area: 'geld', text: "Per dag zie je je eigen invoer naast de transacties en kun je een transactie zelf koppelen. Eigen invoer zonder bijpassende transactie staat onder 'Niet op je afschrift' (Klopt of Verwijderen)." },
+      { area: 'geld', text: "Nieuw: 'Alleen ING' — vervang je losse eigen invoer van deze maand in één keer door de transacties van ING (je ziet eerst wat er verwijderd wordt)." },
+    ],
+  },
+  {
     id: 29,
     date: '2026-11-17',
     title: 'Geld: spaarrekeningen en ING-details',
