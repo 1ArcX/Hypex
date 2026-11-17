@@ -116,7 +116,7 @@ export function BankInboxSheet({ bank, categories, onClose }: { bank: BankState;
               <div className="flex items-center gap-2">
                 <button type="button" className="btn-ghost" style={{ padding: '5px 10px', fontSize: 11 }} disabled={bank.busy}
                   onClick={() => { const d = new Date(); d.setMonth(d.getMonth() - 12); d.setDate(1); bank.fetchHistory(d.toLocaleDateString('en-CA')) }}>
-                  Oudere maanden ophalen
+                  {bank.busy ? 'Bezig met ophalen…' : 'Oudere maanden ophalen'}
                 </button>
                 {bank.historyNote && <span className="text-[11px] text-white/55 flex-1">{bank.historyNote}</span>}
                 {bank.historyNote?.startsWith('ING gaf') && <button type="button" className="btn-ghost" style={{ padding: '5px 10px', fontSize: 11 }} onClick={bank.connect}>Opnieuw koppelen</button>}
@@ -126,7 +126,7 @@ export function BankInboxSheet({ bank, categories, onClose }: { bank: BankState;
                 {onlyDel.length
                   ? <>Je <b>{onlyDel.length}</b> losse eigen {onlyDel.length === 1 ? 'invoer wordt' : 'invoeren worden'} verwijderd ({fmt(onlyDel.reduce((n, e) => n + Number(e.amount), 0))}) en </>
                   : 'Er wordt niets van je eigen invoer verwijderd; '}
-                de <b>{onlyAdd.length}</b> transacties van ING worden toegevoegd met hun voorgestelde categorie (aanpassen kan daarna met één tik op het icoontje). Wat al gekoppeld is, geplande uitgaven en wat je als "klopt" markeerde blijven staan.
+                de <b>{onlyAdd.length}</b> transacties van ING komen ervoor in de plaats, met de omschrijving van ING. Bij invoer die al gekoppeld was blijven jouw categorie en "van spaargeld" behouden; de rest krijgt de voorgestelde categorie (aanpassen met één tik op het icoontje). Spaaropnames, stortingen, leningen, geplande uitgaven en wat je als "klopt" markeerde blijven staan.
               </p>
               {onlyDel.length > 0 && (
                 <div className="max-h-32 overflow-y-auto rounded-lg p-2 text-[11px] text-white/55 flex flex-col gap-0.5" style={{ background: 'var(--c-surface-3)' }}>

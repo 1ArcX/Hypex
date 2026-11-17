@@ -187,10 +187,16 @@ export function useBank(userId: string) {
   })
   const disconnect = () => run(() => callBank('disconnect'))
 
-  const addTx = async (tx: BankTx, category?: string, kind?: string) => {
+  const addTx = async (tx: BankTx, category?: string, kind?: string, keep?: Partial<Expense>) => {
     const useKind = kind || tx.suggested_kind || (tx.amount > 0 ? 'inkomen' : 'uitgave')
     const useCat = category || tx.suggested_category || 'overig'
-    const { data: exp, error: e1 } = await supabase.from('expenses').insert(toExpense(tx, useKind, useCat, userId)).select().single()
+    const row = toExpense(tx, useKind, useCat, userId) as Record<string, unknown>
+    if (keep) {
+      // Vervangen eigen invoer: jouw "van spaargeld"-vlag houden, en je omschrijving als ING er geen heeft
+      if (keep.paid_from_savings) row.paid_from_savings = true
+      if (!row.description && keep.description) row.description = keep.description
+    }
+    const { data: exp, error: e1 } = await supabase.from('expenses').insert(row).select().single()
     if (e1) throw new Error(e1.message)
     const { error: e2 } = await supabase.from('bank_transactions').update({ status: 'added', expense_id: exp.id }).eq('id', tx.id)
     if (e2) throw new Error(e2.message)
@@ -234,27 +240,39 @@ export function useBank(userId: string) {
   const previewMonth = async (ym: string) => {
     const [y, m] = ym.split('-').map(Number)
     const from = `${ym}-01`, to = `${ym}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`
-    const [txRes, ownRes, linkRes] = await Promise.all([
-      // Ook eerder genegeerde transacties (bv. "alles vóór 1 nov negeren"); interne overboekingen niet
-      supabase.from('bank_transactions').select('*').eq('user_id', userId).in('status', ['new', 'ignored'])
+    const [txRes, ownRes, addedRes] = await Promise.all([
+      // Open, eerder genegeerde én aan je eigen invoer gekoppelde transacties (die worden ook vervangen)
+      supabase.from('bank_transactions').select('*').eq('user_id', userId).in('status', ['new', 'ignored', 'matched'])
         .gte('booking_date', from).lte('booking_date', to).order('booking_date'),
       supabase.from('expenses').select('*').eq('user_id', userId).gte('date', from).lte('date', to),
-      supabase.from('bank_transactions').select('expense_id').eq('user_id', userId).not('expense_id', 'is', null),
+      // Uitgaven die al van ING komen ("added") blijven gewoon staan
+      supabase.from('bank_transactions').select('expense_id').eq('user_id', userId).eq('status', 'added').not('expense_id', 'is', null),
     ])
-    const linked = new Set(((linkRes.data || []) as { expense_id: string }[]).map(x => x.expense_id))
+    const fromBank = new Set(((addedRes.data || []) as { expense_id: string }[]).map(x => x.expense_id))
     const checked = reviewedLocal()
-    const add = ((txRes.data || []) as BankTx[]).filter(t => t.suggested_kind !== 'intern')
+    // Spaaracties (opname, storting, aflossing) blijven van jou: daar zit je leningadministratie in, die ING niet kent
+    const isSavingsMove = (x: { suggested_kind?: string | null }) => x.suggested_kind === 'spaarstorting' || x.suggested_kind === 'spaaropname'
+    const add = ((txRes.data || []) as BankTx[]).filter(t => t.suggested_kind !== 'intern' && !isSavingsMove(t))
     const del = ((ownRes.data || []) as (Expense & { bank_checked?: boolean })[])
-      .filter(e => !e.is_planned && !linked.has(e.id) && !e.bank_checked && !checked.has(e.id))
+      .filter(e => !e.is_planned && !fromBank.has(e.id) && !e.bank_checked && !checked.has(e.id)
+        && !e.is_savings_withdrawal && !e.is_savings_contribution && !e.is_loan_repayment)
     return { from, to, add, del }
   }
   const onlyBankMonth = (ym: string) => run(async () => {
     const { add: txs, del } = await previewMonth(ym)
+    const own = new Map(del.map(e => [e.id, e]))
+    // Eerst de ING-versies toevoegen (met jouw categorie/vlag bij gekoppelde invoer), dan je eigen invoer weg:
+    // gaat er halverwege iets mis, dan mis je geen uitgaven (hooguit even dubbel).
+    for (const t of txs) {
+      const prev = t.expense_id ? own.get(t.expense_id) : undefined
+      if (prev && !prev.is_income) await addTx(t, prev.category, t.amount > 0 ? 'inkomen' : 'uitgave', prev)
+      else if (prev) await addTx(t, prev.category, 'inkomen', prev)
+      else await addTx(t)
+    }
     if (del.length) {
       const { error: e } = await supabase.from('expenses').delete().in('id', del.map(x => x.id)).eq('user_id', userId)
       if (e) throw new Error(e.message)
     }
-    for (const t of txs) await addTx(t)
     refreshGeld()
   })
   /** Maanden waarvan de bank gegevens heeft (eerste boeking t/m nu), nieuwste eerst. */

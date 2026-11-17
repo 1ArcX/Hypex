@@ -6,6 +6,15 @@
 
 export const RELEASES = [
   {
+    id: 33,
+    date: '2026-11-17',
+    title: 'Alleen ING vervangt nu echt alles',
+    items: [
+      { area: 'geld', text: "'Alleen ING' vervangt nu ook je invoer die al aan een ING-transactie gekoppeld was, zodat je overal de omschrijving van ING ziet. Je categorie en 'van spaargeld' blijven daarbij behouden; spaaropnames, stortingen en leningen blijven van jou." },
+      { area: 'geld', text: "De knop 'Oudere maanden ophalen' laat zien dat hij bezig is." },
+    ],
+  },
+  {
     id: 32,
     date: '2026-11-17',
     title: 'Bank: oudere maanden ophalen',

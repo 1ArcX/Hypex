@@ -18,6 +18,10 @@
 [functions."magister/magister"]
   timeout = 26
 
+# Bank: geschiedenis ophalen (tot 12 maanden) kan langer duren dan de standaard 10 s
+[functions."bank"]
+  timeout = 26
+
 [[headers]]
   for = "/simacan-arrival.html"
   [headers.values]
