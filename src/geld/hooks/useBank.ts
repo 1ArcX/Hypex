@@ -88,6 +88,8 @@ export function useBank(userId: string) {
   // Slim vergelijken: eigen invoer (expenses) die nog aan geen banktransactie hangt
   const [ownOpen, setOwnOpen] = useState<Expense[]>([])
   const [firstBankDate, setFirstBankDate] = useState<string | null>(null)
+  // Overboekingen met spaarrekeningen (staan niet in je uitgaven; wel per spaarrekening te zien)
+  const [savingsTx, setSavingsTx] = useState<MatchRow[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -134,6 +136,9 @@ export function useBank(userId: string) {
     setOwnOpen(((own.data || []) as (Expense & { bank_checked?: boolean })[])
       .filter(e => !e.is_planned && !linkedIds.has(e.id) && !e.bank_checked && !checked.has(e.id)))
     setFirstBankDate(((first.data || []) as { booking_date: string }[])[0]?.booking_date || null)
+    const sv = await supabase.from('bank_transactions').select('booking_date, amount, counterparty, counterparty_iban, account_uid')
+      .eq('user_id', userId).or('counterparty.ilike.%spaarrekening%,suggested_kind.eq.intern').order('booking_date', { ascending: false }).limit(600)
+    setSavingsTx(((sv.data || []) as MatchRow[]).filter(t => !accs.some(a => a.uid === t.account_uid && a.kind === 'spaar')))
     const names = new Map(((a.data as BankAccount[]) || []).map(x => [x.uid, x.name]))
     const byExp: Record<string, BankDetail[]> = {}
     for (const r of (linked.data || []) as (BankDetail & { expense_id: string; account_uid: string })[]) {
@@ -400,6 +405,27 @@ export function useBank(userId: string) {
     return [...seen.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([k]) => k)
   }
 
+  /** Overboekingen van/naar deze (zelf toegevoegde) spaarrekening, nieuwste eerst; + = naar de spaarrekening. */
+  const transfersFor = (acc: BankAccount) => savingsTx.filter(t => matchesAccount(t, acc)).map(t => ({ ...t, toSavings: -Number(t.amount) }))
+  /** Spaarnummers op je afschrift ("Oranje spaarrekening F12156498" → F12156498) die nog aan geen spaarrekening hangen. */
+  const unassignedCodes = (() => {
+    const map = new Map<string, { code: string; label: string; count: number; last: string }>()
+    for (const t of savingsTx) {
+      if (accounts.some(a => a.manual && matchesAccount(t, a))) continue
+      const code = (String(t.counterparty || '').match(/\b([A-Z]\d{6,})\b/i) || [])[1]?.toUpperCase()
+      if (!code) continue
+      const g = map.get(code) || { code, label: t.counterparty || code, count: 0, last: t.booking_date }
+      g.count++; if (t.booking_date > g.last) g.last = t.booking_date
+      map.set(code, g)
+    }
+    return [...map.values()].sort((a, b) => b.last.localeCompare(a.last))
+  })()
+  /** Spaarrekening koppelen aan een spaarnummer (saldo en startdatum blijven). */
+  const setMatch = (acc: BankAccount, match: string) => run(async () => {
+    const { error: e } = await supabase.from('bank_accounts').update({ match }).eq('uid', acc.uid)
+    if (e) throw new Error(e.message)
+  })
+
   const setKind = (acc: BankAccount, kind: 'betaal' | 'spaar') => run(async () => {
     await supabase.from('bank_accounts').update({ kind }).eq('uid', acc.uid)
   })
@@ -426,6 +452,7 @@ export function useBank(userId: string) {
     saveManualSavings, removeManualSavings, savingsCandidates,
     ownOpen, groups, notOnStatement, linkTxs, replaceWithBank, markChecked, deleteOwn, onlyBank,
     previewMonth, onlyBankMonth, bankMonths, firstBankDate, previewCleanup, cleanup,
+    transfersFor, unassignedCodes, setMatch,
   }
 }
 export type BankState = ReturnType<typeof useBank>

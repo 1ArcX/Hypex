@@ -6,6 +6,14 @@
 
 export const RELEASES = [
   {
+    id: 35,
+    date: '2026-11-17',
+    title: 'Spaarrekeningen: overboekingen zien',
+    items: [
+      { area: 'geld', text: "Tik bij Rekeningen op een spaarrekening om de overboekingen erheen en ervandaan te zien. Nog niet gekoppeld? Kies dan met één tik het spaarnummer (bv. F12156498) dat erbij hoort; vanaf dan loopt het saldo mee." },
+    ],
+  },
+  {
     id: 34,
     date: '2026-11-17',
     title: 'Bank: spaaroverboekingen en Tikkies goed geteld',

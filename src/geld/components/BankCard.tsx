@@ -48,6 +48,7 @@ function ManualSavingsForm({ bank, acc, onDone }: { bank: BankState; acc?: BankA
 // en de knop naar de inbox met nieuwe banktransacties.
 export function BankCard({ bank, onOpenInbox }: { bank: BankState; onOpenInbox: () => void }) {
   const [editing, setEditing] = useState<BankAccount | 'new' | null>(null)
+  const [openAcc, setOpenAcc] = useState<string | null>(null)
   if (bank.missing || bank.loading) return null
   const synced = bank.conn.last_synced_at
     ? new Date(bank.conn.last_synced_at).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
@@ -98,7 +99,9 @@ export function BankCard({ bank, onOpenInbox }: { bank: BankState; onOpenInbox: 
 
       <div className="flex flex-col gap-1.5">
         {bank.accounts.map(a => (
-          <div key={a.uid} className="flex items-center gap-2.5">
+          <div key={a.uid}>
+          <div className="flex items-center gap-2.5" onClick={a.manual ? () => setOpenAcc(o => o === a.uid ? null : a.uid) : undefined}
+            style={a.manual ? { cursor: 'pointer' } : undefined} title={a.manual ? 'Tik voor de overboekingen' : undefined}>
             {a.kind === 'spaar' ? <PiggyBank size={14} className="text-white/40 shrink-0" /> : <Wallet size={14} className="text-white/40 shrink-0" />}
             <div className="flex-1 min-w-0">
               <p className="m-0 text-[13px] text-white/85 truncate">{a.name || (a.kind === 'spaar' ? 'Spaarrekening' : 'Betaalrekening')}</p>
@@ -117,11 +120,43 @@ export function BankCard({ bank, onOpenInbox }: { bank: BankState; onOpenInbox: 
               {a.balance == null ? '—' : `${a.manual ? '≈ ' : ''}${fmt(Number(a.balance))}`}
             </span>
             {a.manual && (
-              <button type="button" onClick={() => setEditing(a)} aria-label={`${a.name} aanpassen`} title="Saldo of naam aanpassen"
+              <button type="button" onClick={e => { e.stopPropagation(); setEditing(a) }} aria-label={`${a.name} aanpassen`} title="Saldo of naam aanpassen"
                 className="text-white/35 hover:text-white/70" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}>
                 <Pencil size={12} />
               </button>
             )}
+          </div>
+          {/* Overboekingen van/naar deze spaarrekening (tellen niet mee in je uitgaven) */}
+          {openAcc === a.uid && (() => {
+            const list = bank.transfersFor(a).slice(0, 15)
+            return (
+              <div className="ml-6 mt-1.5 mb-1 flex flex-col gap-1">
+                {!a.match && (
+                  <div className="text-[11px] text-white/55">
+                    <p className="m-0 mb-1">Welk spaarnummer hoort bij {a.name}?</p>
+                    <div className="flex gap-1 flex-wrap">
+                      {bank.unassignedCodes.map(c => (
+                        <button key={c.code} type="button" onClick={() => bank.setMatch(a, c.code)} disabled={bank.busy}
+                          className="rounded-full px-2 py-0.5" title={`${c.label} · ${c.count}× · laatst ${c.last}`}
+                          style={{ cursor: 'pointer', border: '1px solid var(--c-border)', background: 'var(--c-surface-2)', color: 'var(--c-text-2)', fontSize: 11 }}>
+                          {c.code} · {c.count}×
+                        </button>
+                      ))}
+                      {!bank.unassignedCodes.length && <span className="text-white/40">Geen spaaroverboekingen gevonden.</span>}
+                    </div>
+                  </div>
+                )}
+                {a.match && !list.length && <p className="m-0 text-[11px] text-white/40">Nog geen overboekingen met {a.match}.</p>}
+                {list.map((t, i) => (
+                  <div key={i} className="flex items-center gap-2 text-[11px]">
+                    <span className="w-14 shrink-0 text-white/40 tnum">{new Date(t.booking_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}</span>
+                    <span className="flex-1 min-w-0 truncate text-white/55">{t.toSavings > 0 ? 'Naar spaar' : 'Van spaar'}</span>
+                    <span className="tnum font-semibold" style={{ color: t.toSavings > 0 ? 'var(--c-success)' : 'var(--c-text-2)' }}>{t.toSavings > 0 ? '+' : '−'}{fmt(Math.abs(t.toSavings))}</span>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
           </div>
         ))}
         {!editing && (
