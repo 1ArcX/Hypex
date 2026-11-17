@@ -6,6 +6,15 @@
 
 export const RELEASES = [
   {
+    id: 36,
+    date: '2026-11-17',
+    title: 'Bank: echte betaaldatum (ook voor je vakantie)',
+    items: [
+      { area: 'geld', text: "Uitgaven van ING krijgen nu de dag waarop je betaalde in plaats van de boekdatum (die is vaak 1–3 dagen later, zeker in het buitenland). Zo vallen vakantie-uitgaven in je vakantieperiode en uitgaven aan het eind van de maand in de juiste maand." },
+      { area: 'geld', text: "'Opschonen' in de bank-inbox zet de datum van eerder toegevoegde ING-uitgaven ook goed." },
+    ],
+  },
+  {
     id: 35,
     date: '2026-11-17',
     title: 'Spaarrekeningen: overboekingen zien',

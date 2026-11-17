@@ -16,7 +16,7 @@ export interface BankAccount {
 }
 export interface BankTx {
   id: string; account_uid: string; booking_date: string; amount: number
-  counterparty: string | null; description: string | null
+  counterparty: string | null; description: string | null; paid_date?: string | null
   status: 'new' | 'added' | 'ignored' | 'matched'
   suggested_kind: 'uitgave' | 'inkomen' | 'spaarstorting' | 'spaaropname' | 'terugbetaling' | 'intern' | null
   suggested_category: string | null; expense_id: string | null
@@ -63,12 +63,26 @@ async function callBank(action: string, extra: Record<string, unknown> = {}) {
   return json
 }
 
+/**
+ * Echte betaaldatum: ING boekt pinbetalingen vaak 1–3 dagen later (buitenland, weekend). Gebruik de
+ * transactiedatum van de bank, of de datum in de omschrijving ("Datum: 02-10-2026", "02-10-2026 15:56"),
+ * mits die 0–10 dagen vóór de boekdatum ligt.
+ */
+export function paidDate(tx: { booking_date: string; paid_date?: string | null; description?: string | null }) {
+  const book = tx.booking_date
+  const ok = (d?: string | null) => d && d <= book && (Date.parse(book) - Date.parse(d)) / 86400000 <= 10
+  if (ok(tx.paid_date)) return tx.paid_date
+  const m = String(tx.description || '').match(/(?:datum:?\s*)?\b(\d{2})-(\d{2})-(\d{4})\b(?=\s*(?:tijd|\d{2}:\d{2}|$|\s))/i)
+  if (m) { const d = `${m[3]}-${m[2]}-${m[1]}`; if (ok(d)) return d }
+  return book
+}
+
 /** Banktransactie → rij voor `expenses` (zelfde regels als bankCore.toExpense op de server). */
 function toExpense(tx: BankTx, kind: string, category: string, userId: string) {
   const amount = Math.round(Math.abs(Number(tx.amount)) * 100) / 100
   const who = (tx.counterparty || '').trim(), what = (tx.description || '').trim()
   const description = (who && what && !what.toLowerCase().includes(who.toLowerCase()) ? `${who} · ${what}` : who || what).slice(0, 120)
-  const base = { user_id: userId, amount, date: tx.booking_date, is_income: false, is_savings_withdrawal: false }
+  const base = { user_id: userId, amount, date: paidDate(tx), is_income: false, is_savings_withdrawal: false }
   if (kind === 'inkomen') return { ...base, is_income: true, category: category || 'overig', description: description || 'Inkomen' }
   if (kind === 'spaarstorting') return { ...base, is_savings_contribution: true, category: 'overig', description: '🏦 Spaarstorting' }
   if (kind === 'spaaropname') return { ...base, is_savings_withdrawal: true, savings_type: 'saved', category: 'overig', description: description || 'Spaaropname' }
@@ -308,10 +322,15 @@ export function useBank(userId: string) {
       (t.status === 'added' && t.expense_id && byId.get(t.expense_id)?.is_income && byId.get(t.expense_id)?.category === 'overig')))
       .map(t => ({ tx: t, expense: t.expense_id ? byId.get(t.expense_id) : undefined, category: repaymentCategory(t, exps) }))
     const savingsExp = savings.filter(t => t.status === 'added').map(t => byId.get(t.expense_id!)!)
-    return { savings, savingsExp, repay }
+    // 3) Uitgaven van ING die nog op de boekdatum staan terwijl de betaling eerder was (belangrijk voor vakanties)
+    const redate = txs.filter(t => t.status === 'added' && t.expense_id && byId.has(t.expense_id) && !isSavingsTransfer(t))
+      .map(t => ({ expense: byId.get(t.expense_id!)!, date: paidDate(t) }))
+      .filter(r => r.date !== r.expense.date && r.expense.date === txs.find(t => t.expense_id === r.expense.id)?.booking_date)
+    return { savings, savingsExp, repay, redate }
   }
   const cleanup = () => run(async () => {
-    const { savings, savingsExp, repay } = await previewCleanup()
+    const { savings, savingsExp, repay, redate } = await previewCleanup()
+    for (const r of redate) await supabase.from('expenses').update({ date: r.date }).eq('id', r.expense.id)
     if (savingsExp.length) {
       const { error: e } = await supabase.from('expenses').delete().in('id', savingsExp.map(x => x.id)).eq('user_id', userId)
       if (e) throw new Error(e.message)

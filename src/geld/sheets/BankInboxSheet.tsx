@@ -86,7 +86,7 @@ export function BankInboxSheet({ bank, categories, onClose }: { bank: BankState;
       )}
 
       {/* 0. Eerder verkeerd geïmporteerd: spaaroverboekingen als uitgave/inkomen, Tikkies als inkomen */}
-      {clean && (clean.savings.length > 0 || clean.repay.length > 0) && (
+      {clean && (clean.savings.length > 0 || clean.repay.length > 0 || clean.redate.length > 0) && (
         <div className="rounded-2xl p-3 mb-3" style={{ background: 'color-mix(in srgb, var(--accent) 8%, transparent)', border: '1px solid var(--accent-border)' }}>
           <p className="m-0 text-[12px] font-semibold text-white/85 mb-1">Opschonen</p>
           <ul className="m-0 mb-2 pl-4 text-[12px] text-white/70">
@@ -94,6 +94,7 @@ export function BankInboxSheet({ bank, categories, onClose }: { bank: BankState;
             {clean.savings.length - clean.savingsExp.length > 0 && <li>{clean.savings.length - clean.savingsExp.length} spaaroverboekingen in de inbox worden genegeerd.</li>}
             {clean.repay.filter(r => r.expense).length > 0 && <li>{clean.repay.filter(r => r.expense).length} Tikkies/terugbetalingen staan als inkomen ({fmt(clean.repay.filter(r => r.expense).reduce((n, r) => n + Math.abs(Number(r.expense!.amount)), 0))}) — die verlagen voortaan de uitgave waarvoor je voorschoot.</li>}
             {clean.repay.filter(r => !r.expense).length > 0 && <li>{clean.repay.filter(r => !r.expense).length} Tikkies in de inbox krijgen het voorstel "Terugbetaling".</li>}
+            {clean.redate.length > 0 && <li>{clean.redate.length} uitgaven van ING staan op de boekdatum i.p.v. de dag dat je betaalde — die krijgen de echte betaaldatum (belangrijk voor je vakantie).</li>}
           </ul>
           <button type="button" onClick={async () => { await bank.cleanup(); setClean(await bank.previewCleanup()) }} disabled={bank.busy} className="btn-primary w-full" style={{ padding: '7px 12px', fontSize: 12 }}>
             {bank.busy ? 'Bezig…' : 'Rechtzetten'}

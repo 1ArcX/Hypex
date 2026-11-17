@@ -94,7 +94,8 @@ function mapTransaction(t) {
   const counterparty = (party?.name || '').trim() || null
   const ext = t.entry_reference || t.transaction_id
     || crypto.createHash('sha1').update(`${booking}|${amount}|${counterparty}|${description}`).digest('hex')
-  return { ext_id: String(ext), booking_date: booking, amount, counterparty, counterparty_iban: partyAcc?.iban || null, description: description || null, status: t.status }
+  const paid = t.transaction_date && t.transaction_date !== booking ? t.transaction_date : null
+  return { ext_id: String(ext), booking_date: booking, paid_date: paid, amount, counterparty, counterparty_iban: partyAcc?.iban || null, description: description || null, status: t.status }
 }
 
 async function userFromEvent(event) {
@@ -127,7 +128,7 @@ async function syncConnection(conn, { from } = {}) {
     const since = from ? new Date(`${from}T00:00:00`)
       : conn.last_synced_at ? new Date(new Date(conn.last_synced_at).getTime() - 14 * DAY) : new Date(Date.now() - 365 * DAY)
     const fallback = new Date(Date.now() - 89 * DAY)
-    let added = 0, historyLimited = false
+    let added = 0, historyLimited = false, hasPaidDate = true
 
     for (const acc of accounts || []) {
       // Saldo
@@ -165,6 +166,7 @@ async function syncConnection(conn, { from } = {}) {
           const s = suggest({ ...m, account_kind: acc.kind }, ctx)
           rows.push({
             user_id: uid, account_uid: acc.uid, ext_id: m.ext_id, booking_date: m.booking_date, amount: m.amount,
+            ...(hasPaidDate && m.paid_date ? { paid_date: m.paid_date } : {}),
             counterparty: m.counterparty, counterparty_iban: m.counterparty_iban, description: m.description,
             suggested_kind: s.kind, suggested_category: s.category, status: s.autoIgnore ? 'ignored' : 'new',
           })
@@ -174,9 +176,22 @@ async function syncConnection(conn, { from } = {}) {
 
       if (rows.length) {
         // Bestaande (zelfde rekening + ext_id) blijven zoals ze zijn
-        const { data: inserted, error } = await supabase.from('bank_transactions')
+        let { data: inserted, error } = await supabase.from('bank_transactions')
           .upsert(rows, { onConflict: 'account_uid,ext_id', ignoreDuplicates: true }).select()
+        if (error && /paid_date/.test(error.message)) {
+          // Migratie add_bank_paid_date.sql nog niet gedraaid → zonder betaaldatum
+          hasPaidDate = false
+          rows.forEach(r => { delete r.paid_date })
+          ;({ data: inserted, error } = await supabase.from('bank_transactions')
+            .upsert(rows, { onConflict: 'account_uid,ext_id', ignoreDuplicates: true }).select())
+        }
         if (error) throw new Error(error.message)
+        // Bestaande transacties alsnog de betaaldatum geven (bv. na "oudere maanden ophalen")
+        const known = new Set((inserted || []).map(r => r.ext_id))
+        for (const r of rows) {
+          if (!hasPaidDate || !r.paid_date || known.has(r.ext_id)) continue
+          await supabase.from('bank_transactions').update({ paid_date: r.paid_date }).eq('account_uid', r.account_uid).eq('ext_id', r.ext_id).is('paid_date', null)
+        }
         added += (inserted || []).length
         await matchExisting(uid, (inserted || []).filter(r => r.status === 'new' && r.suggested_kind === 'uitgave'))
       }
