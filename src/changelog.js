@@ -6,6 +6,16 @@
 
 export const RELEASES = [
   {
+    id: 29,
+    date: '2026-11-17',
+    title: 'Geld: spaarrekeningen en ING-details',
+    items: [
+      { area: 'geld', text: "ING deelt spaarrekeningen niet met apps, dus je voegt ze zelf toe bij Rekeningen (saldo + optioneel doel met voortgangsbalk). Hypex werkt het saldo daarna bij met elke overboeking van of naar die rekening." },
+      { area: 'geld', text: "Bij uitgaven die van de bank komen zie je een ING-label; tik erop voor de tegenpartij, omschrijving, boekdatum en IBAN zoals op je afschrift." },
+      { area: 'geld', text: "Je Geldcoach in Claude kan nu je afschriften doorzoeken (bv. alles bij de PLUS) en totalen per winkel maken, en ziet je spaarrekeningen met doelen." },
+    ],
+  },
+  {
     id: 28,
     date: '2026-11-17',
     title: 'Bank-inbox: oude transacties in één keer negeren',

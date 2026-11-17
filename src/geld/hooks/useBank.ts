@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../supabaseClient'
-import { useGeldStore } from '../store/geldStore'
+import { useGeldStore, type BankDetail } from '../store/geldStore'
 
 // Bankkoppeling (ING via Enable Banking, alleen-lezen). Saldo's en de inbox komen rechtstreeks uit
 // Supabase; koppelen en synchroniseren gaan via de Netlify-functie `bank` (netlify/functions/bank/bank.js).
@@ -9,6 +9,7 @@ import { useGeldStore } from '../store/geldStore'
 export interface BankAccount {
   uid: string; name: string | null; iban: string | null; kind: 'betaal' | 'spaar'
   balance: number | null; currency: string | null; balance_at: string | null; hidden: boolean
+  manual?: boolean; base_balance?: number | null; base_date?: string | null; match?: string | null; goal?: number | null
 }
 export interface BankTx {
   id: string; account_uid: string; booking_date: string; amount: number
@@ -20,6 +21,22 @@ export interface BankTx {
 export interface BankConnection {
   status: 'none' | 'pending' | 'active' | 'expired' | 'error' | 'disconnected'
   valid_until: string | null; last_synced_at: string | null; last_error: string | null
+}
+
+interface MatchRow { booking_date: string; amount: number; counterparty: string | null; counterparty_iban: string | null; account_uid: string }
+const norm = (s: string | null | undefined) => String(s || '').replace(/\s/g, '').toUpperCase()
+/** Zelfde regels als matchesAccount/manualBalance in netlify/functions/bank/bankCore.js. */
+function matchesAccount(t: MatchRow, a: BankAccount) {
+  if (a.iban && t.counterparty_iban && norm(a.iban) === norm(t.counterparty_iban)) return true
+  const m = String(a.match || '').trim().toLowerCase()
+  if (!m) return false
+  if (/^[a-z]{2}\d{2}[a-z0-9]{8,}$/.test(m.replace(/\s/g, ''))) return norm(m) === norm(t.counterparty_iban)
+  return String(t.counterparty || '').toLowerCase().includes(m)
+}
+function manualBalance(a: BankAccount, txs: MatchRow[]) {
+  let bal = Number(a.base_balance || 0)
+  for (const t of txs) if (a.base_date && t.booking_date > a.base_date && matchesAccount(t, a)) bal -= Number(t.amount)
+  return Math.round(bal * 100) / 100
 }
 
 // Zie src/utils/bankCallback.js (App.jsx bewaart de code bij terugkeer uit de bank)
@@ -55,6 +72,7 @@ const ruleKey = (s: string | null) => String(s || '').toLowerCase().replace(/[0-
 
 export function useBank(userId: string) {
   const refreshGeld = useGeldStore(s => s.refresh)
+  const setBankByExpense = useGeldStore(s => s.setBankByExpense)
   const [conn, setConn] = useState<BankConnection>({ status: 'none', valid_until: null, last_synced_at: null, last_error: null })
   const [accounts, setAccounts] = useState<BankAccount[]>([])
   const [inbox, setInbox] = useState<BankTx[]>([])
@@ -65,18 +83,38 @@ export function useBank(userId: string) {
   const [missing, setMissing] = useState(false) // migratie add_bank_sync.sql nog niet gedraaid
 
   const load = useCallback(async () => {
-    const [c, a, t, m] = await Promise.all([
+    const since = new Date(Date.now() - 400 * 86400000).toISOString().slice(0, 10)
+    const [c, a, t, m, linked] = await Promise.all([
       supabase.from('bank_connections').select('status, valid_until, last_synced_at, last_error').eq('user_id', userId).maybeSingle(),
       supabase.from('bank_accounts').select('*').eq('user_id', userId).order('kind').order('name'),
       supabase.from('bank_transactions').select('*').eq('user_id', userId).eq('status', 'new').order('booking_date', { ascending: false }).limit(200),
       supabase.from('bank_transactions').select('*').eq('user_id', userId).eq('status', 'matched').order('booking_date', { ascending: false }).limit(20),
+      // Banktransacties die aan een uitgave hangen → ING-gegevens in de transactierijen
+      supabase.from('bank_transactions').select('id, booking_date, amount, counterparty, counterparty_iban, description, expense_id, account_uid')
+        .eq('user_id', userId).not('expense_id', 'is', null).gte('booking_date', since).limit(2000),
     ])
     if (c.error && /bank_connections|does not exist|PGRST205/i.test(`${c.error.message} ${c.error.code}`)) { setMissing(true); setLoading(false); return null }
     const next = (c.data as BankConnection) || { status: 'none', valid_until: null, last_synced_at: null, last_error: null }
     setConn(next)
-    setAccounts((a.data as BankAccount[]) || [])
+    let accs = (a.data as BankAccount[]) || []
+    const manual = accs.filter(x => x.manual && x.base_date)
+    if (manual.length) {
+      const from = manual.map(x => x.base_date as string).sort()[0]
+      const real = new Set(accs.filter(x => !x.manual).map(x => x.uid))
+      const { data: txs } = await supabase.from('bank_transactions').select('booking_date, amount, counterparty, counterparty_iban, account_uid')
+        .eq('user_id', userId).gt('booking_date', from)
+      const own = ((txs || []) as MatchRow[]).filter(t => real.has(t.account_uid))
+      accs = accs.map(x => x.manual && x.base_date ? { ...x, balance: manualBalance(x, own) } : x)
+    }
+    setAccounts(accs)
     setInbox((t.data as BankTx[]) || [])
     setMatched((m.data as BankTx[]) || [])
+    const names = new Map(((a.data as BankAccount[]) || []).map(x => [x.uid, x.name]))
+    const byExp: Record<string, BankDetail[]> = {}
+    for (const r of (linked.data || []) as (BankDetail & { expense_id: string; account_uid: string })[]) {
+      (byExp[r.expense_id] ||= []).push({ ...r, amount: Number(r.amount), account_name: names.get(r.account_uid) || null })
+    }
+    setBankByExpense(byExp)
     setLoading(false)
     return next
   }, [userId])
@@ -146,6 +184,40 @@ export function useBank(userId: string) {
     const { error: e } = await supabase.from('bank_transactions').update({ status: 'new', expense_id: null }).eq('id', tx.id)
     if (e) throw new Error(e.message)
   })
+  /**
+   * Spaarrekening die de bank niet deelt: startsaldo + overboekingen die op de betaalrekening te zien zijn.
+   * `match` = IBAN of (deel van de) naam van de tegenpartij. Opnieuw opslaan = saldo corrigeren (nieuwe startdatum).
+   */
+  const saveManualSavings = (input: { uid?: string; name: string; balance: number; match: string; goal?: number | null }) => run(async () => {
+    const today = new Date().toLocaleDateString('en-CA')
+    const row = { name: input.name.trim() || 'Spaarrekening', kind: 'spaar', manual: true, base_balance: input.balance, base_date: today,
+      balance: input.balance, balance_at: new Date().toISOString(), match: input.match.trim() || null, goal: input.goal || null,
+      iban: /^[A-Z]{2}\d{2}[A-Z0-9]{8,}$/i.test(input.match.replace(/\s/g, '')) ? input.match.replace(/\s/g, '').toUpperCase() : null,
+      updated_at: new Date().toISOString() }
+    const res = input.uid
+      ? await supabase.from('bank_accounts').update(row).eq('uid', input.uid)
+      : await supabase.from('bank_accounts').insert({ ...row, uid: `manual-${crypto.randomUUID()}`, user_id: userId })
+    if (res.error) throw new Error(/manual|base_|match|goal/.test(res.error.message) ? 'Draai eerst de migratie add_bank_manual_savings.sql in Supabase.' : res.error.message)
+  })
+  const removeManualSavings = (acc: BankAccount) => run(async () => {
+    if (!acc.manual) return
+    const { error: e } = await supabase.from('bank_accounts').delete().eq('uid', acc.uid)
+    if (e) throw new Error(e.message)
+  })
+  /** Tegenpartijen van overboekingen die op een spaarrekening lijken (voor "herkennen aan"). */
+  const savingsCandidates = async (): Promise<string[]> => {
+    const { data } = await supabase.from('bank_transactions').select('counterparty, counterparty_iban')
+      .eq('user_id', userId).order('booking_date', { ascending: false }).limit(1000)
+    const seen = new Map<string, number>()
+    for (const r of (data || []) as { counterparty: string | null; counterparty_iban: string | null }[]) {
+      const label = r.counterparty_iban || r.counterparty
+      if (!label) continue
+      const hint = /spaar|saving|rente|deposito|oranje/i.test(r.counterparty || '')
+      seen.set(label, (seen.get(label) || 0) + (hint ? 100 : 1))
+    }
+    return [...seen.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([k]) => k)
+  }
+
   const setKind = (acc: BankAccount, kind: 'betaal' | 'spaar') => run(async () => {
     await supabase.from('bank_accounts').update({ kind }).eq('uid', acc.uid)
   })
@@ -160,6 +232,7 @@ export function useBank(userId: string) {
     loading, busy, error, missing, conn, accounts: visible, inbox, matched, savingsTotal, checkingBalance, daysLeft,
     connected: conn.status === 'active' || conn.status === 'expired' || conn.status === 'error',
     connect, refresh, disconnect, add, ignore, ignoreBefore, unmatch, setKind,
+    saveManualSavings, removeManualSavings, savingsCandidates,
   }
 }
 export type BankState = ReturnType<typeof useBank>

@@ -1,11 +1,53 @@
-import { Landmark, RefreshCw, Inbox, AlertTriangle, PiggyBank, Wallet } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Landmark, RefreshCw, Inbox, AlertTriangle, PiggyBank, Wallet, Plus, Pencil } from 'lucide-react'
 import { GlassCard } from './ui/Glass'
-import { fmt } from '../lib/format'
-import type { BankState } from '../hooks/useBank'
+import { fmt, parseAmount } from '../lib/format'
+import type { BankAccount, BankState } from '../hooks/useBank'
+
+// Spaarrekening die ING niet deelt: naam, huidig saldo en waaraan overboekingen te herkennen zijn
+function ManualSavingsForm({ bank, acc, onDone }: { bank: BankState; acc?: BankAccount; onDone: () => void }) {
+  const [name, setName] = useState(acc?.name || '')
+  const [balance, setBalance] = useState(acc?.balance != null ? String(acc.balance).replace('.', ',') : '')
+  const [match, setMatch] = useState(acc?.match || acc?.iban || '')
+  const [goal, setGoal] = useState(acc?.goal ? String(acc.goal).replace('.', ',') : '')
+  const [cands, setCands] = useState<string[]>([])
+  useEffect(() => { bank.savingsCandidates().then(setCands) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const ok = name.trim() && balance.trim()
+  const input = { width: '100%', boxSizing: 'border-box' as const, fontSize: 13, padding: '7px 10px' }
+  return (
+    <div className="mt-3 rounded-xl p-3 flex flex-col gap-2" style={{ background: 'var(--c-surface-2)', border: '1px solid var(--c-border)' }}>
+      <p className="m-0 text-[12px] font-semibold text-white/80">{acc ? 'Spaarrekening aanpassen' : 'Spaarrekening toevoegen'}</p>
+      <input className="glass-input" style={input} placeholder="Naam (bv. Oranje Spaarrekening)" value={name} onChange={e => setName(e.target.value)} />
+      <input className="glass-input" style={input} inputMode="decimal" placeholder="Huidig saldo (zie de ING-app)" value={balance} onChange={e => setBalance(e.target.value)} />
+      <input className="glass-input" style={input} inputMode="decimal" placeholder="Doel (optioneel)" value={goal} onChange={e => setGoal(e.target.value)} />
+      <input className="glass-input" style={input} placeholder="Herkennen aan: IBAN of naam bij overboekingen" value={match} onChange={e => setMatch(e.target.value)} />
+      {cands.length > 0 && (
+        <div className="flex gap-1 flex-wrap">
+          {cands.map(c => (
+            <button key={c} type="button" onClick={() => setMatch(c)} className="text-[11px] rounded-full px-2 py-0.5"
+              style={{ cursor: 'pointer', border: `1px solid ${match === c ? 'var(--accent-border)' : 'var(--c-border)'}`, background: match === c ? 'var(--accent-soft)' : 'transparent', color: match === c ? 'var(--accent)' : 'var(--c-text-3)' }}>
+              {c}
+            </button>
+          ))}
+        </div>
+      )}
+      <p className="m-0 text-[11px] text-white/40">Hypex telt overboekingen van/naar deze rekening op je betaalrekening erbij of eraf. Rente of stortingen van buitenaf zie je niet; pas dan het saldo hier aan.</p>
+      <div className="flex gap-2">
+        {acc && <button type="button" className="btn-ghost" style={{ padding: '6px 10px', fontSize: 12 }}
+          onClick={async () => { if (window.confirm(`"${acc.name}" verwijderen?`)) { await bank.removeManualSavings(acc); onDone() } }}>Verwijderen</button>}
+        <span className="flex-1" />
+        <button type="button" className="btn-ghost" style={{ padding: '6px 10px', fontSize: 12 }} onClick={onDone}>Annuleren</button>
+        <button type="button" className="btn-primary" style={{ padding: '6px 12px', fontSize: 12 }} disabled={!ok || bank.busy}
+          onClick={async () => { await bank.saveManualSavings({ uid: acc?.uid, name, balance: parseAmount(balance), match, goal: goal.trim() ? parseAmount(goal) : null }); onDone() }}>Opslaan</button>
+      </div>
+    </div>
+  )
+}
 
 // Kaart "Rekeningen" op Geld → Home: saldo's van ING (betaal + spaar), status van de koppeling,
 // en de knop naar de inbox met nieuwe banktransacties.
 export function BankCard({ bank, onOpenInbox }: { bank: BankState; onOpenInbox: () => void }) {
+  const [editing, setEditing] = useState<BankAccount | 'new' | null>(null)
   if (bank.missing || bank.loading) return null
   const synced = bank.conn.last_synced_at
     ? new Date(bank.conn.last_synced_at).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
@@ -60,13 +102,35 @@ export function BankCard({ bank, onOpenInbox }: { bank: BankState; onOpenInbox: 
             {a.kind === 'spaar' ? <PiggyBank size={14} className="text-white/40 shrink-0" /> : <Wallet size={14} className="text-white/40 shrink-0" />}
             <div className="flex-1 min-w-0">
               <p className="m-0 text-[13px] text-white/85 truncate">{a.name || (a.kind === 'spaar' ? 'Spaarrekening' : 'Betaalrekening')}</p>
-              {a.iban && <p className="m-0 text-[10px] text-white/35 tnum">{a.iban.replace(/(.{4})/g, '$1 ').trim()}</p>}
+              {a.manual && a.goal
+                ? <div className="mt-1 flex items-center gap-2">
+                    <span className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: 'var(--c-surface-3)' }}>
+                      <span className="block h-full rounded-full" style={{ width: `${Math.min(100, Math.max(0, (Number(a.balance || 0) / Number(a.goal)) * 100))}%`, background: Number(a.balance || 0) >= Number(a.goal) ? 'var(--c-success)' : 'var(--accent)' }} />
+                    </span>
+                    <span className="text-[10px] text-white/40 tnum shrink-0">doel {fmt(Number(a.goal))}</span>
+                  </div>
+                : a.manual
+                ? <p className="m-0 text-[10px] text-white/35">zelf bijgehouden{a.match ? ' · via overboekingen' : ' · nog niet gekoppeld aan overboekingen'}</p>
+                : a.iban && <p className="m-0 text-[10px] text-white/35 tnum">{a.iban.replace(/(.{4})/g, '$1 ').trim()}</p>}
             </div>
             <span className="text-[14px] font-semibold tnum" style={{ color: Number(a.balance) < 0 ? 'var(--c-danger)' : 'var(--c-text)' }}>
-              {a.balance == null ? '—' : fmt(Number(a.balance))}
+              {a.balance == null ? '—' : `${a.manual ? '≈ ' : ''}${fmt(Number(a.balance))}`}
             </span>
+            {a.manual && (
+              <button type="button" onClick={() => setEditing(a)} aria-label={`${a.name} aanpassen`} title="Saldo of naam aanpassen"
+                className="text-white/35 hover:text-white/70" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}>
+                <Pencil size={12} />
+              </button>
+            )}
           </div>
         ))}
+        {!editing && (
+          <button type="button" onClick={() => setEditing('new')} className="self-start mt-1 inline-flex items-center gap-1 text-[12px] text-white/45 hover:text-white/75"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+            <Plus size={12} /> Spaarrekening toevoegen
+          </button>
+        )}
+        {editing && <ManualSavingsForm bank={bank} acc={editing === 'new' ? undefined : editing} onDone={() => setEditing(null)} />}
         {bank.accounts.some(a => a.kind === 'spaar') && (
           <div className="flex items-center justify-between pt-2 mt-1 text-[12px]" style={{ borderTop: '1px solid var(--c-border)' }}>
             <span className="text-white/50">Totaal gespaard</span>

@@ -1,4 +1,6 @@
-import { Pencil, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { Pencil, Trash2, Landmark } from 'lucide-react'
+import { useGeldStore } from '../store/geldStore'
 import type { CategoryConfig, Expense } from '../types'
 import { findCategory, findIncomeCategory } from '../lib/categories'
 import { fmt, fmtDay } from '../lib/format'
@@ -9,19 +11,28 @@ export function TransactionRow({ exp, allCategories, onEdit, onDelete }: {
   onEdit?: (exp: Expense) => void
   onDelete: (id: string) => void
 }) {
+  const bankTxs = useGeldStore(s => s.bankByExpense[exp.id])
+  const [open, setOpen] = useState(false)
   const isInc = !!exp.is_income
   const cat = isInc ? findIncomeCategory(exp.category) : findCategory(allCategories, exp.category)
   const color = isInc ? '#34D399' : ((cat as CategoryConfig).color || '#94A3B8')
 
   return (
-    <div className={`flex items-center gap-3 px-3.5 py-2.5 rounded-2xl border backdrop-blur-lg ${
+    <div className={`rounded-2xl border backdrop-blur-lg ${
       isInc ? 'bg-emerald-400/[0.06] border-emerald-400/15' : 'bg-white/[0.04] border-white/[0.07]'
     }`}>
+    <div className="flex items-center gap-3 px-3.5 py-2.5">
       <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0"
         style={{ background: `color-mix(in srgb, ${color} 8%, transparent)` }}>{cat.emoji}</div>
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0" onClick={bankTxs?.length ? () => setOpen(o => !o) : undefined}
+        style={bankTxs?.length ? { cursor: 'pointer' } : undefined}>
         <p className="text-[13px] font-semibold text-white/85 m-0 truncate">{exp.description || cat.label}</p>
-        <p className="text-[11px] text-white/30 m-0">{fmtDay(exp.date)}{isInc ? ' · inkomsten' : ''}</p>
+        <p className="text-[11px] text-white/30 m-0 flex items-center gap-1">
+          {fmtDay(exp.date)}{isInc ? ' · inkomsten' : ''}
+          {bankTxs?.length ? <span className="inline-flex items-center gap-0.5" style={{ color: '#FF6200' }} title="Van ING — tik voor details">
+            · <Landmark size={10} /> {bankTxs.length > 1 ? `${bankTxs.length} betalingen` : 'ING'}
+          </span> : null}
+        </p>
       </div>
       <div className="flex flex-col items-end gap-0.5 shrink-0">
         <span className="text-[15px] font-bold tabular-nums" style={{ color }}>{isInc ? '+' : ''}{fmt(exp.amount)}</span>
@@ -39,6 +50,24 @@ export function TransactionRow({ exp, allCategories, onEdit, onDelete }: {
       <button onClick={() => onDelete(exp.id)} className="bg-transparent border-none cursor-pointer text-red-400/40 p-1">
         <Trash2 size={12} />
       </button>
+    </div>
+    {/* ING-gegevens zoals op je afschrift */}
+    {open && bankTxs?.length ? (
+      <div className="px-3.5 pb-2.5 flex flex-col gap-1.5">
+        {bankTxs.map(t => (
+          <div key={t.id} className="rounded-xl px-3 py-2 text-[11px]" style={{ background: 'var(--c-surface-2)', border: '1px solid var(--c-border)' }}>
+            <div className="flex items-baseline gap-2">
+              <span className="font-semibold text-white/85 flex-1 min-w-0 truncate">{t.counterparty || 'Onbekend'}</span>
+              <span className="tabular-nums font-semibold" style={{ color: t.amount > 0 ? '#34D399' : 'var(--c-text)' }}>{t.amount > 0 ? '+' : '−'}{fmt(Math.abs(t.amount))}</span>
+            </div>
+            {t.description && <p className="m-0 mt-0.5 text-white/55 break-words">{t.description}</p>}
+            <p className="m-0 mt-0.5 text-white/35 tabular-nums">
+              Boekdatum {fmtDay(t.booking_date)}{t.counterparty_iban ? ` · ${t.counterparty_iban.replace(/(.{4})/g, '$1 ').trim()}` : ''}{t.account_name ? ` · ${t.account_name}` : ''}
+            </p>
+          </div>
+        ))}
+      </div>
+    ) : null}
     </div>
   )
 }

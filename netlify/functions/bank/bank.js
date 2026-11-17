@@ -12,7 +12,7 @@
 
 const crypto = require('crypto')
 const { createClient } = require('@supabase/supabase-js')
-const { suggest } = require('./bankCore')
+const { suggest, manualBalance } = require('./bankCore')
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 const API = 'https://api.enablebanking.com'
@@ -117,9 +117,11 @@ async function syncConnection(conn) {
     return { expired: true }
   }
   try {
-    const { data: accounts } = await supabase.from('bank_accounts').select('*').eq('connection_id', conn.id)
+    const { data: allAccounts } = await supabase.from('bank_accounts').select('*').eq('user_id', uid)
+    const accounts = (allAccounts || []).filter(a => a.connection_id === conn.id && !a.manual)
     const { data: cfg } = await supabase.from('budget_config').select('bank_rules').eq('user_id', uid).maybeSingle()
-    const ctx = { ownAccounts: (accounts || []).map(a => ({ iban: a.iban, kind: a.kind })), rules: cfg?.bank_rules || {} }
+    // Eigen rekeningen (ook zelf toegevoegde spaarrekeningen) → overboekingen herkennen
+    const ctx = { ownAccounts: (allAccounts || []).map(a => ({ iban: a.iban, kind: a.kind, match: a.match })), rules: cfg?.bank_rules || {} }
     const since = conn.last_synced_at ? new Date(new Date(conn.last_synced_at).getTime() - 14 * DAY) : new Date(Date.now() - 90 * DAY)
     let added = 0
 
@@ -160,12 +162,27 @@ async function syncConnection(conn) {
         await matchExisting(uid, (inserted || []).filter(r => r.status === 'new' && r.suggested_kind === 'uitgave'))
       }
     }
+    await updateManualSavings(uid, allAccounts || [])
     await supabase.from('bank_connections').update({ status: 'active', last_synced_at: new Date().toISOString(), last_error: null, updated_at: new Date().toISOString() }).eq('id', conn.id)
     return { added }
   } catch (e) {
     const expired = e.status === 401 || e.status === 403 || /expired|EXPIRED_SESSION|not authorized/i.test(e.message)
     await supabase.from('bank_connections').update({ status: expired ? 'expired' : conn.status, last_error: e.message.slice(0, 500), updated_at: new Date().toISOString() }).eq('id', conn.id)
     throw e
+  }
+}
+
+// Zelf toegevoegde spaarrekeningen: saldo = startsaldo + overboekingen die op de betaalrekening te zien zijn
+async function updateManualSavings(uid, accounts) {
+  const manual = accounts.filter(a => a.manual && a.base_date)
+  if (!manual.length) return
+  const from = manual.map(a => a.base_date).sort()[0]
+  const real = new Set(accounts.filter(a => !a.manual).map(a => a.uid))
+  const { data: txs } = await supabase.from('bank_transactions').select('booking_date, amount, counterparty, counterparty_iban, account_uid')
+    .eq('user_id', uid).gt('booking_date', from)
+  const own = (txs || []).filter(t => real.has(t.account_uid))
+  for (const a of manual) {
+    await supabase.from('bank_accounts').update({ balance: manualBalance(a, own), balance_at: new Date().toISOString() }).eq('uid', a.uid)
   }
 }
 
@@ -194,7 +211,7 @@ async function matchExisting(uid, txs) {
 // ── acties ──────────────────────────────────────────────────────────────────
 async function status(uid) {
   const conn = await getConnection(uid)
-  const { data: accounts } = await supabase.from('bank_accounts').select('uid,name,iban,kind,balance,currency,balance_at,hidden').eq('user_id', uid).order('kind')
+  const { data: accounts } = await supabase.from('bank_accounts').select('*').eq('user_id', uid).order('kind')
   const { count } = await supabase.from('bank_transactions').select('id', { count: 'exact', head: true }).eq('user_id', uid).eq('status', 'new')
   return {
     connected: !!conn?.session_id && conn.status !== 'disconnected', status: conn?.status || 'none', aspsp: conn?.aspsp || ASPSP,

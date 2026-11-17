@@ -8,7 +8,7 @@
 // carryover-reset per september 2026 en maand-aanpassingen.
 
 const { createClient } = require('@supabase/supabase-js')
-const { processTransaction } = require('../bank/bankCore')
+const { processTransaction, normalizeCounterparty } = require('../bank/bankCore')
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 const TOKEN = process.env.GELD_MCP_TOKEN
@@ -65,11 +65,15 @@ const slim = (e) => ({ id: e.id, date: e.date, amount: Number(e.amount), categor
 async function bankBalances(uid) {
   const [conn, accs, inbox] = await Promise.all([
     supabase.from('bank_connections').select('status, valid_until, last_synced_at, last_error').eq('user_id', uid).maybeSingle(),
-    supabase.from('bank_accounts').select('uid, name, iban, kind, balance, currency, balance_at, hidden').eq('user_id', uid),
+    supabase.from('bank_accounts').select('*').eq('user_id', uid),
     supabase.from('bank_transactions').select('id', { count: 'exact', head: true }).eq('user_id', uid).eq('status', 'new'),
   ])
   if (conn.error && /bank_connections|does not exist/i.test(conn.error.message)) return { connected: false, note: 'Bankkoppeling nog niet ingesteld (migratie add_bank_sync.sql)' }
-  const accounts = (accs.data || []).filter(a => !a.hidden).map(a => ({ name: a.name, iban: a.iban, kind: a.kind, balance: a.balance == null ? null : Number(a.balance), as_of: a.balance_at }))
+  const accounts = (accs.data || []).filter(a => !a.hidden).map(a => ({
+    name: a.name, iban: a.iban, kind: a.kind, balance: a.balance == null ? null : Number(a.balance), as_of: a.balance_at,
+    ...(a.manual ? { source: 'zelf bijgehouden (startsaldo + overboekingen op de betaalrekening; rente niet meegeteld)', recognised_by: a.match || null } : { source: 'bank' }),
+    ...(a.goal ? { goal: Number(a.goal), goal_progress_pct: Math.round((Number(a.balance || 0) / Number(a.goal)) * 100), to_goal: r2(Math.max(0, Number(a.goal) - Number(a.balance || 0))) } : {}),
+  }))
   return {
     connected: !!conn.data && conn.data.status !== 'disconnected', status: conn.data?.status || 'none',
     consent_valid_until: conn.data?.valid_until || null, last_synced_at: conn.data?.last_synced_at || null,
@@ -192,9 +196,12 @@ const TOOLS = [
     inputSchema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] }, annotations: { destructiveHint: true } },
   { name: 'get_bank_balances', description: 'Actuele saldo\'s van de gekoppelde bankrekeningen (ING, alleen-lezen): betaal- en spaarrekeningen, totaal spaargeld, wanneer bijgewerkt, hoe lang de toestemming nog geldt en hoeveel banktransacties nog in de inbox staan.',
     inputSchema: { type: 'object', properties: {} }, annotations: { readOnlyHint: true } },
-  { name: 'list_bank_transactions', description: 'Transacties zoals ze van de bank binnenkwamen. status: new = nog te verwerken (inbox), added = als uitgave/inkomen toegevoegd, ignored, matched = stond er al. amount: + bij, − af. Met voorgestelde soort/categorie.',
+  { name: 'list_bank_transactions', description: 'Transacties zoals ze op het ING-afschrift staan (tegenpartij, omschrijving, boekdatum, IBAN). status: new = nog te verwerken (inbox), added = als uitgave/inkomen toegevoegd, ignored, matched = stond er al. amount: + bij, − af. Gebruik search om bv. alle uitgaven bij de PLUS te vinden, en group_by=counterparty voor totalen per winkel.',
     inputSchema: { type: 'object', properties: {
-      status: { type: 'string', enum: ['new', 'added', 'ignored', 'matched', 'alle'], description: 'Standaard new' },
+      status: { type: 'string', enum: ['new', 'added', 'ignored', 'matched', 'alle'], description: 'Standaard new; met search of group_by standaard alle' },
+      search: { type: 'string', description: 'Zoek in tegenpartij en omschrijving, bv. "plus", "albert heijn", "thuisbezorgd"' },
+      direction: { type: 'string', enum: ['af', 'bij', 'alle'], description: 'af = uitgaven, bij = ontvangsten (standaard alle)' },
+      group_by: { type: 'string', enum: ['counterparty'], description: 'Totalen per tegenpartij (winkel) i.p.v. losse transacties' },
       from: { type: 'string', description: 'Vanaf YYYY-MM-DD' }, to: { type: 'string', description: 'T/m YYYY-MM-DD' },
       limit: { type: 'number', description: 'Max. aantal (standaard 50, max 300)' } } }, annotations: { readOnlyHint: true } },
   { name: 'process_bank_transaction', description: 'Een banktransactie uit de inbox verwerken: add = toevoegen als uitgave/inkomen/spaaractie (met optioneel een andere soort of categorie; een afwijkende categorie wordt onthouden voor die tegenpartij), ignore = negeren. Vraag eerst bevestiging.',
@@ -284,15 +291,42 @@ async function callTool(name, args = {}) {
   }
   if (name === 'get_bank_balances') return bankBalances(uid)
   if (name === 'list_bank_transactions') {
-    const status = args.status || 'new'
-    let q = supabase.from('bank_transactions').select('id, booking_date, amount, counterparty, description, status, suggested_kind, suggested_category, expense_id, account_uid').eq('user_id', uid)
+    const status = args.status || (args.search || args.group_by ? 'alle' : 'new')
+    let q = supabase.from('bank_transactions').select('id, booking_date, amount, counterparty, counterparty_iban, description, status, suggested_kind, suggested_category, expense_id, account_uid').eq('user_id', uid)
     if (status !== 'alle') q = q.eq('status', status)
+    if (args.search) {
+      const term = String(args.search).replace(/[%_,()]/g, ' ').trim()
+      if (term) q = q.or(`counterparty.ilike.%${term}%,description.ilike.%${term}%`)
+    }
+    if (args.direction === 'af') q = q.lt('amount', 0)
+    if (args.direction === 'bij') q = q.gt('amount', 0)
     if (args.from) { if (!isDate(args.from)) throw new Error('from moet YYYY-MM-DD zijn'); q = q.gte('booking_date', args.from) }
     if (args.to) { if (!isDate(args.to)) throw new Error('to moet YYYY-MM-DD zijn'); q = q.lte('booking_date', args.to) }
+    if (args.group_by === 'counterparty') {
+      const { data, error } = await q.order('booking_date', { ascending: false }).limit(5000)
+      if (error) throw new Error(error.message)
+      const groups = new Map()
+      for (const t of data || []) {
+        // Interne overboekingen (bv. naar spaarrekeningen) niet als winkel meetellen
+        if (t.suggested_kind === 'intern') continue
+        const key = normalizeCounterparty(t.counterparty) || '(onbekend)'
+        const g = groups.get(key) || { counterparty: t.counterparty || '(onbekend)', count: 0, total_out: 0, total_in: 0, first: t.booking_date, last: t.booking_date }
+        g.count++
+        if (Number(t.amount) < 0) g.total_out += -Number(t.amount); else g.total_in += Number(t.amount)
+        if (t.booking_date < g.first) g.first = t.booking_date
+        if (t.booking_date > g.last) g.last = t.booking_date
+        groups.set(key, g)
+      }
+      const list = [...groups.values()].map(g => ({ ...g, total_out: r2(g.total_out), total_in: r2(g.total_in) }))
+        .sort((a, b) => b.total_out - a.total_out || b.total_in - a.total_in)
+        .slice(0, Math.min(100, Math.max(1, Number(args.limit) || 30)))
+      return { groups: list, note: 'Totalen per tegenpartij over de gekozen periode (alle statussen tenzij anders gekozen).' }
+    }
     const limit = Math.min(300, Math.max(1, Number(args.limit) || 50))
     const { data, error } = await q.order('booking_date', { ascending: false }).limit(limit)
     if (error) throw new Error(error.message)
-    return { count: (data || []).length, items: (data || []).map(t => ({ ...t, amount: Number(t.amount) })) }
+    const list = (data || []).map(t => ({ ...t, amount: Number(t.amount) }))
+    return { count: list.length, total_out: r2(list.filter(t => t.amount < 0).reduce((n, t) => n - t.amount, 0)), total_in: r2(list.filter(t => t.amount > 0).reduce((n, t) => n + t.amount, 0)), items: list }
   }
   if (name === 'process_bank_transaction') {
     if (!args.id || !args.action) throw new Error('id en action zijn verplicht')
@@ -340,7 +374,8 @@ async function callTool(name, args = {}) {
 // ── JSON-RPC / MCP ──────────────────────────────────────────────────────────
 const INSTRUCTIONS = 'Geld-app van Fachri (Hypex Dash). Bedragen in euro. Gebruik get_overview voor de stand van een maand, ' +
   'list_expenses om transacties te vinden (ids nodig voor wijzigen/verwijderen) en get_budget_config voor categorieën en instellingen. ' +
-  'Bankkoppeling (ING, alleen-lezen): get_bank_balances voor saldo\'s en spaargeld, list_bank_transactions voor de inbox, process_bank_transaction om die te verwerken. ' +
+  'Bankkoppeling (ING, alleen-lezen): get_bank_balances voor saldo\'s, spaarrekeningen en spaardoelen (spaarrekeningen worden door ING niet gedeeld en zijn zelf bijgehouden), ' +
+  'list_bank_transactions voor de afschriften (zoeken op winkel met search, totalen per winkel met group_by=counterparty) en de inbox, process_bank_transaction om de inbox te verwerken. ' +
   'Vraag bevestiging voordat je transacties verwijdert, budgetten wijzigt of banktransacties verwerkt.'
 
 async function handleMessage(msg) {
@@ -356,7 +391,7 @@ async function handleMessage(msg) {
       return ok({
         protocolVersion: PROTOCOL_VERSIONS.includes(asked) ? asked : PROTOCOL_VERSIONS[0],
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: 'hypex-geld', version: '1.1.0' },
+        serverInfo: { name: 'hypex-geld', version: '1.2.0' },
         instructions: INSTRUCTIONS,
       })
     }

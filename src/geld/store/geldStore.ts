@@ -18,9 +18,18 @@ interface GeldStore {
   searchQuery: string
   setSearchQuery: (q: string) => void
 
+  // Banktransacties (ING) per uitgave-id, gevuld door useBank — TransactionRow toont daarmee de bankgegevens
+  bankByExpense: Record<string, BankDetail[]>
+  setBankByExpense: (m: Record<string, BankDetail[]>) => void
+
   // Wordt opgehoogd na elke mutatie zodat alle data-hooks refetchen
   refreshKey: number
   refresh: () => void
+}
+
+export interface BankDetail {
+  id: string; booking_date: string; amount: number; counterparty: string | null
+  counterparty_iban: string | null; description: string | null; account_name?: string | null
 }
 
 const now = new Date()
@@ -49,6 +58,9 @@ export const useGeldStore = create<GeldStore>((set) => ({
   setSearchOpen: (open) => set({ searchOpen: open, ...(open ? {} : { searchQuery: '' }) }),
   searchQuery: '',
   setSearchQuery: (q) => set({ searchQuery: q }),
+
+  bankByExpense: {},
+  setBankByExpense: (m) => set({ bankByExpense: m }),
 
   refreshKey: 0,
   refresh: () => set((s) => ({ refreshKey: s.refreshKey + 1 })),

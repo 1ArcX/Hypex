@@ -23,7 +23,7 @@ function normalizeCounterparty(s) {
  * → { kind, category, autoIgnore }
  */
 function suggest(tx, ctx) {
-  const own = (ctx.ownAccounts || []).find(a => a.iban && tx.counterparty_iban && a.iban.replace(/\s/g, '') === tx.counterparty_iban.replace(/\s/g, ''))
+  const own = (ctx.ownAccounts || []).find(a => matchesAccount(tx, a))
   // Bewegingen op een spaarrekening zelf: de tegenhanger staat al op de betaalrekening
   if (tx.account_kind === 'spaar') return { kind: 'intern', category: null, autoIgnore: true }
   if (own) {
@@ -39,6 +39,26 @@ function suggest(tx, ctx) {
   if (learned) return { kind: 'uitgave', category: learned }
   const hit = KEYWORDS.find(([, re]) => re.test(text))
   return { kind: 'uitgave', category: hit ? hit[0] : 'overig' }
+}
+
+/** Hoort een transactie bij (overboeking van/naar) deze eigen rekening? Op IBAN, of op (deel van de) naam (`match`). */
+function matchesAccount(tx, acc) {
+  const norm = (s) => String(s || '').replace(/\s/g, '').toUpperCase()
+  if (acc.iban && tx.counterparty_iban && norm(acc.iban) === norm(tx.counterparty_iban)) return true
+  const m = String(acc.match || '').trim().toLowerCase()
+  if (!m) return false
+  if (/^[a-z]{2}\d{2}[a-z0-9]{8,}$/.test(m.replace(/\s/g, ''))) return norm(m) === norm(tx.counterparty_iban)
+  return String(tx.counterparty || '').toLowerCase().includes(m)
+}
+
+/** Saldo van een zelf toegevoegde spaarrekening: startsaldo + overboekingen vanaf de betaalrekening na de startdatum. */
+function manualBalance(acc, txs) {
+  let bal = Number(acc.base_balance || 0)
+  for (const t of txs) {
+    if (!acc.base_date || t.booking_date <= acc.base_date) continue
+    if (matchesAccount(t, acc)) bal -= Number(t.amount) // −50 van de betaalrekening = +50 op de spaarrekening
+  }
+  return Math.round(bal * 100) / 100
 }
 
 /** Banktransactie → rij voor `expenses`. */
@@ -84,4 +104,4 @@ async function processTransaction(db, userId, id, { action, category, kind } = {
   return { id, status: 'added', expense_id: exp.id, kind: useKind, category: useCat }
 }
 
-module.exports = { suggest, toExpense, processTransaction, normalizeCounterparty }
+module.exports = { suggest, toExpense, processTransaction, normalizeCounterparty, matchesAccount, manualBalance }
