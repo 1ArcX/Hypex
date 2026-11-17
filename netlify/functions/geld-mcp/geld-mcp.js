@@ -113,12 +113,12 @@ async function overview(uid, month) {
     && (!vac || !cfg.vacation_start || e.date >= cfg.vacation_start) && (vac || !isHistVac(e, vh)))
   const totalSpent = sum(budgetExp)
 
-  // Carryover: overschrijding van vorige maanden gespreid terugbetalen (t/m augustus 2026 telt niet mee)
+  // Carryover: overschrijding van vorige maanden gespreid terugbetalen (t/m oktober 2026 telt niet mee)
   let carryover = 0
   if (!vac) {
     for (let i = 1; i <= recovery; i++) {
       const d = new Date(selY, selM - i, 1), pY = d.getFullYear(), pM = d.getMonth()
-      if (pY < 2026 || (pY === 2026 && pM <= 7)) continue
+      if (pY < 2026 || (pY === 2026 && pM <= 9)) continue
       const pSpent = sum(all.filter(e => inMonth(e, pY, pM) && !e.is_savings_withdrawal && !e.is_income && !e.paid_from_savings
         && !e.is_savings_contribution && !e.is_loan_repayment && e.category !== FIXED_CAT && (!e.is_planned || e.amount > 0) && !isHistVac(e, vh)))
       const thr = Math.max(0, baseMonthly + ((cfg.month_adjustments || {})[monthKey(pY, pM)] || 0) - vaste)

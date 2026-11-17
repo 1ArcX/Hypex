@@ -6,6 +6,14 @@
 
 export const RELEASES = [
   {
+    id: 37,
+    date: '2026-11-17',
+    title: 'Geld: overschrijdingen spreiden vanaf november',
+    items: [
+      { area: 'geld', text: "Te veel uitgegeven vóór november wordt niet meer van je budget afgetrokken; vanaf november wordt een overschrijding weer over de maanden erna gespreid." },
+    ],
+  },
+  {
     id: 36,
     date: '2026-11-17',
     title: 'Bank: echte betaaldatum (ook voor je vakantie)',

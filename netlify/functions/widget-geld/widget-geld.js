@@ -107,7 +107,7 @@ exports.handler = async (event) => {
     for (let i = 1; i <= recoveryMonths; i++) {
       const ppY = (selM - i) < 0 ? selY - 1 : selY
       const ppM = ((selM - i) % 12 + 12) % 12
-      if (ppY === 2026 && ppM <= 2) continue
+      if (ppY < 2026 || (ppY === 2026 && ppM <= 9)) continue // zelfde reset als de app: t/m oktober 2026 telt niet mee
       let pSpent = 0
       if (i === 1) pSpent = prevSpent
       else if (ppY === selY) {
