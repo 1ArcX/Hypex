@@ -1,4 +1,6 @@
-// MCP-server voor de Geld-app: Claude (claude.ai → Instellingen → Connectors → eigen connector) kan je
+// MCP-server "Hypex" (was: Geld-app): Geld-tools hieronder + planner-tools (agenda, werkuren, taken, notities) uit
+// ./planner.js. Bereikbaar via /mcp/hypex/<sleutel> en (oud) /mcp/geld/<sleutel>.
+// Geld-app: Claude (claude.ai → Instellingen → Connectors → eigen connector) kan je
 // uitgaven en budget bekijken en aanpassen. Stateless "Streamable HTTP": elke POST is één JSON-RPC-bericht
 // (of een batch) en krijgt direct een JSON-antwoord terug; geen SSE nodig.
 //
@@ -9,6 +11,7 @@
 
 const { createClient } = require('@supabase/supabase-js')
 const { processTransaction, normalizeCounterparty } = require('../bank/bankCore')
+const planner = require('./planner') // agenda, werkuren, taken, notities (Hypex-connector)
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 const TOKEN = process.env.GELD_MCP_TOKEN
@@ -236,6 +239,7 @@ function cleanExpense(args, cfg, partial) {
 
 async function callTool(name, args = {}) {
   const uid = await userId()
+  if (planner.NAMES.has(name)) return planner.callTool(supabase, uid, name, args)
   if (name === 'get_overview') return overview(uid, args.month)
   if (name === 'get_budget_config') {
     const cfg = await getConfig(uid)
@@ -372,11 +376,15 @@ async function callTool(name, args = {}) {
 }
 
 // ── JSON-RPC / MCP ──────────────────────────────────────────────────────────
-const INSTRUCTIONS = 'Geld-app van Fachri (Hypex Dash). Bedragen in euro. Gebruik get_overview voor de stand van een maand, ' +
+const GELD_INSTRUCTIONS = 'Geld-app van Fachri (Hypex Dash). Bedragen in euro. Gebruik get_overview voor de stand van een maand, ' +
   'list_expenses om transacties te vinden (ids nodig voor wijzigen/verwijderen) en get_budget_config voor categorieën en instellingen. ' +
   'Bankkoppeling (ING, alleen-lezen): get_bank_balances voor saldo\'s, spaarrekeningen en spaardoelen (spaarrekeningen worden door ING niet gedeeld en zijn zelf bijgehouden), ' +
   'list_bank_transactions voor de afschriften (zoeken op winkel met search, totalen per winkel met group_by=counterparty) en de inbox, process_bank_transaction om de inbox te verwerken. ' +
   'Vraag bevestiging voordat je transacties verwijdert, budgetten wijzigt of banktransacties verwerkt.'
+const INSTRUCTIONS = `${planner.INSTRUCTIONS}
+
+${GELD_INSTRUCTIONS}`
+const ALL_TOOLS = [...planner.TOOLS, ...TOOLS]
 
 async function handleMessage(msg) {
   const { id, method, params } = msg || {}
@@ -391,15 +399,15 @@ async function handleMessage(msg) {
       return ok({
         protocolVersion: PROTOCOL_VERSIONS.includes(asked) ? asked : PROTOCOL_VERSIONS[0],
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: 'hypex-geld', version: '1.2.0' },
+        serverInfo: { name: 'hypex', version: '2.0.0' },
         instructions: INSTRUCTIONS,
       })
     }
     if (method === 'ping') return ok({})
-    if (method === 'tools/list') return ok({ tools: TOOLS })
+    if (method === 'tools/list') return ok({ tools: ALL_TOOLS })
     if (method === 'tools/call') {
       const name = params?.name
-      if (!TOOLS.some(t => t.name === name)) return fail(-32602, `Onbekende tool: ${name}`)
+      if (!ALL_TOOLS.some(t => t.name === name)) return fail(-32602, `Onbekende tool: ${name}`)
       try {
         const result = await callTool(name, params?.arguments || {})
         return ok({ content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result })
@@ -443,4 +451,4 @@ exports.handler = async (event) => {
 }
 
 // Voor tests
-exports._internal = { overview, callTool, handleMessage, TOOLS }
+exports._internal = { overview, callTool, handleMessage, TOOLS: ALL_TOOLS }

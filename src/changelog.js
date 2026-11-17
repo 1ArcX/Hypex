@@ -6,6 +6,16 @@
 
 export const RELEASES = [
   {
+    id: 40,
+    date: '2026-11-17',
+    title: 'Claude kent nu je hele planning',
+    items: [
+      { area: 'app', text: "De Claude-connector heet nu Hypex: naast je geld kan Claude je agenda (ook MijnX en WDK, met jouw aanpassingen), je werkuren, taken, afgeronde taken en notities zien." },
+      { area: 'agenda', text: "Claude kan vrije momenten zoeken en (na jouw akkoord) taken en agenda-items inplannen, verplaatsen, afvinken of feed-items aanpassen. Wijzigingen verschijnen vanzelf in de app." },
+      { area: 'notities', text: "Claude kan notities lezen, maken en aanvullen, bijvoorbeeld iets op je boodschappenlijst zetten." },
+    ],
+  },
+  {
     id: 39,
     date: '2026-11-17',
     title: 'Reserveringen tellen mee in je budget',

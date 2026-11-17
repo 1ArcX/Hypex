@@ -33,7 +33,14 @@
   status = 200
   force = false
 
-# MCP-server voor de Geld-app (Claude-connector): /mcp/geld/<GELD_MCP_TOKEN>
+# Hypex-connector voor Claude (agenda, werkuren, taken, notities + geld): /mcp/hypex/<GELD_MCP_TOKEN>
+[[redirects]]
+  from = "/mcp/hypex/*"
+  to = "/.netlify/functions/geld-mcp/:splat"
+  status = 200
+  force = true
+
+# Zelfde server, oude URL (bestaande connector blijft werken): /mcp/geld/<GELD_MCP_TOKEN>
 [[redirects]]
   from = "/mcp/geld/*"
   to = "/.netlify/functions/geld-mcp/:splat"
