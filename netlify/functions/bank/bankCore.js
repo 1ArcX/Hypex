@@ -27,6 +27,17 @@ function isRepayment(tx) {
   return /^(hr|mw|dhr|mevr|mr|mrs)\.?\s|^([a-z]\.){1,4}\s?[a-z]/i.test((tx.counterparty || '').trim()) && Math.abs(tx.amount) < 250
 }
 
+/**
+ * Geldautomaat: ING geeft bij opnames/stortingen ("GELDMAAT …", "STORTING ING Geldmaat …") geen tegenpartij.
+ * → "Geldautomaat (opname)" / "Geldautomaat (storting)", anders null.
+ */
+function atmCounterparty(tx) {
+  if (tx.counterparty) return null
+  const d = String(tx.description || '')
+  if (!/geldmaat|geldautomaat|\bchipknip\b/i.test(d)) return null
+  return /storting/i.test(d) || Number(tx.amount) > 0 ? 'Geldautomaat (storting)' : 'Geldautomaat (opname)'
+}
+
 /** "ALBERT HEIJN 1234 ARNHEM NLD" → "albert heijn arnhem": sleutel voor geleerde regels. */
 function normalizeCounterparty(s) {
   return String(s || '').toLowerCase().replace(/[0-9]+/g, ' ').replace(/[^a-zà-ÿ&.\- ]/g, ' ')
@@ -111,31 +122,79 @@ function toExpense(tx, kind, category, userId) {
 /**
  * Transactie verwerken. action 'add' → uitgave aanmaken (+ categorie onthouden als die afwijkt van het voorstel),
  * 'ignore' → negeren. `db` = Supabase-client (service key of ingelogde gebruiker).
+ * Al toegevoegd (status added) + 'add' = opnieuw verwerken: de gekoppelde uitgave wordt omgezet naar de nieuwe
+ * soort/categorie (datum en "van spaargeld" blijven). Al toegevoegd + 'ignore' = gekoppelde uitgave weg, negeren.
  */
 async function processTransaction(db, userId, id, { action, category, kind } = {}) {
   const { data: tx, error } = await db.from('bank_transactions').select('*').eq('id', id).eq('user_id', userId).maybeSingle()
   if (error) throw new Error(error.message)
   if (!tx) throw new Error('Banktransactie niet gevonden')
-  if (tx.status === 'added' && action === 'add') throw new Error('Deze transactie is al toegevoegd')
   if (action === 'ignore') {
-    const { error: e } = await db.from('bank_transactions').update({ status: 'ignored' }).eq('id', id)
+    let removed = null
+    // Door de bank aangemaakte uitgave (added/reservering) opruimen; bij matched hoort de uitgave bij je eigen invoer en blijft hij
+    if (tx.expense_id && (tx.status === 'added' || tx.status === 'pending')) {
+      const { data: gone, error: ed } = await db.from('expenses').delete().eq('id', tx.expense_id).eq('user_id', userId).select('id').maybeSingle()
+      if (ed) throw new Error(ed.message)
+      removed = gone?.id || null
+    }
+    const { error: e } = await db.from('bank_transactions').update({ status: 'ignored', expense_id: null }).eq('id', id)
     if (e) throw new Error(e.message)
-    return { id, status: 'ignored' }
+    return { id, status: 'ignored', previous_status: tx.status, ...(removed ? { deleted_expense_id: removed } : {}) }
   }
   if (action !== 'add') throw new Error('action moet add of ignore zijn')
   const useKind = kind || tx.suggested_kind || (tx.amount > 0 ? 'inkomen' : 'uitgave')
   const useCat = category || tx.suggested_category || 'overig'
+  if (useKind === 'intern') throw new Error('Interne overboeking: gebruik ignore, of geef een kind mee')
+
+  // Opnieuw verwerken: bestaande gekoppelde uitgave omzetten (alle soort-vlaggen expliciet, zodat er geen oude blijft hangen)
+  if (tx.status === 'added' && tx.expense_id) {
+    const { data: cur } = await db.from('expenses').select('*').eq('id', tx.expense_id).eq('user_id', userId).maybeSingle()
+    if (cur) {
+      const fresh = toExpense(tx, useKind, useCat, userId)
+      const patch = { amount: fresh.amount, category: fresh.category, description: fresh.description,
+        is_income: !!fresh.is_income, is_savings_withdrawal: !!fresh.is_savings_withdrawal,
+        is_savings_contribution: !!fresh.is_savings_contribution, is_loan_repayment: false,
+        ...(fresh.savings_type ? { savings_type: fresh.savings_type } : {}) }
+      // Inkomen/spaaracties zijn nooit "van spaargeld betaald"
+      if (useKind !== 'uitgave' && useKind !== 'terugbetaling') patch.paid_from_savings = false
+      const { data: upd, error: eu } = await db.from('expenses').update(patch).eq('id', cur.id).eq('user_id', userId).select().single()
+      if (eu) throw new Error(eu.message)
+      await learnRule(db, userId, tx, category, useKind)
+      const view = (e) => ({ amount: Number(e.amount), category: e.category, is_income: !!e.is_income, description: e.description })
+      return { id, status: 'added', reprocessed: true, expense_id: cur.id, kind: useKind, category: upd.category, before: view(cur), after: view(upd) }
+    }
+  }
   const { data: exp, error: e1 } = await db.from('expenses').insert(toExpense(tx, useKind, useCat, userId)).select().single()
   if (e1) throw new Error(e1.message)
   const { error: e2 } = await db.from('bank_transactions').update({ status: 'added', expense_id: exp.id }).eq('id', id)
   if (e2) throw new Error(e2.message)
+  await learnRule(db, userId, tx, category, useKind)
+  return { id, status: 'added', expense_id: exp.id, kind: useKind, category: useCat, previous_status: tx.status }
+}
+
+async function learnRule(db, userId, tx, category, useKind) {
   // Andere categorie gekozen dan voorgesteld → onthouden voor deze tegenpartij
   const key = normalizeCounterparty(tx.counterparty)
   if (key && category && category !== tx.suggested_category && (useKind === 'uitgave' || useKind === 'inkomen')) {
     const { data: cfg } = await db.from('budget_config').select('bank_rules').eq('user_id', userId).maybeSingle()
     if (cfg) await db.from('budget_config').update({ bank_rules: { ...(cfg.bank_rules || {}), [key]: category } }).eq('user_id', userId)
   }
-  return { id, status: 'added', expense_id: exp.id, kind: useKind, category: useCat }
 }
 
-module.exports = { paidDate, suggest, toExpense, processTransaction, normalizeCounterparty, matchesAccount, manualBalance, isSavingsTransfer, isRepayment }
+/**
+ * Uitgave wordt verwijderd → gekoppelde banktransacties bijwerken, zodat ze niet "added" blijven zonder uitgave:
+ * added/reservering → ignored (een volgende sync voegt ze niet opnieuw toe), matched → new (weer in de inbox,
+ * want je eigen invoer bestaat niet meer). Aanroepen vóór het verwijderen (de FK zet expense_id anders op null).
+ */
+async function unlinkExpense(db, userId, expenseId) {
+  const { data: txs } = await db.from('bank_transactions').select('id, status').eq('user_id', userId).eq('expense_id', expenseId)
+  const out = []
+  for (const t of txs || []) {
+    const status = t.status === 'matched' ? 'new' : 'ignored'
+    await db.from('bank_transactions').update({ status, expense_id: null }).eq('id', t.id)
+    out.push({ id: t.id, from: t.status, to: status })
+  }
+  return out
+}
+
+module.exports = { paidDate, suggest, toExpense, processTransaction, unlinkExpense, atmCounterparty, normalizeCounterparty, matchesAccount, manualBalance, isSavingsTransfer, isRepayment }

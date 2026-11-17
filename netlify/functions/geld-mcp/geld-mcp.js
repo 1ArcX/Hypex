@@ -10,7 +10,7 @@
 // carryover-reset per september 2026 en maand-aanpassingen.
 
 const { createClient } = require('@supabase/supabase-js')
-const { processTransaction, normalizeCounterparty } = require('../bank/bankCore')
+const { processTransaction, unlinkExpense, atmCounterparty, normalizeCounterparty } = require('../bank/bankCore')
 const planner = require('./planner') // agenda, werkuren, taken, notities (Hypex-connector)
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
@@ -27,6 +27,7 @@ const CATEGORIES = [
 const INCOME_CATEGORIES = ['salaris', 'bijbaan', 'freelance', 'zakgeld', 'overig']
 const DEFAULT_CAT_BUDGETS = { eten: 120, boodschappen: 80, transport: 40, kleding: 50, abonnementen: 30, sport: 20, overig: 60 }
 const FIXED_CAT = 'abonnementen'
+const CAT_COLORS = ['#F97316', '#EF4444', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#FACC15', '#06B6D4', '#84CC16', '#94A3B8', '#FB923C', '#A3E635']
 const EXPENSE_FIELDS = ['amount', 'category', 'description', 'date', 'is_income', 'is_planned', 'paid_from_savings',
   'is_savings_withdrawal', 'is_savings_contribution', 'is_loan_repayment', 'savings_type', 'repaid']
 
@@ -60,9 +61,43 @@ async function getConfig(uid) {
   const { data } = await supabase.from('budget_config').select('*').eq('user_id', uid).maybeSingle()
   return data || {}
 }
-const allCategories = (cfg) => [...CATEGORIES, ...((cfg.custom_categories || []).map(c => ({ id: c.id, label: c.label })))]
-const slim = (e) => ({ id: e.id, date: e.date, amount: Number(e.amount), category: e.category, description: e.description || '', type: kindOf(e),
-  ...(e.savings_type ? { savings_type: e.savings_type } : {}), ...(e.repaid ? { repaid: true } : {}) })
+const allCategories = (cfg) => [...CATEGORIES, ...((cfg.custom_categories || []).map(c => ({ id: c.id, label: c.label, custom: true })))]
+/**
+ * Transactie voor de output. paid_from_savings staat er altijd (dat bepaalt of een uitgave tegen je budget telt).
+ * savings_type alleen bij een spaaropname: de kolom heeft standaard 'saved', ook bij gewone uitgaven, maar betekent
+ * alleen iets voor opnames ("Echt gespaard" vs. lening van jezelf). vacation = valt in een eerdere vakantie (telt niet mee).
+ */
+const slim = (e, vh) => ({ id: e.id, date: e.date, amount: Number(e.amount), category: e.category, description: e.description || '', type: kindOf(e),
+  paid_from_savings: !!e.paid_from_savings,
+  ...(e.is_savings_withdrawal ? { savings_type: e.savings_type === 'loan' ? 'loan' : 'saved' } : {}),
+  ...(e.is_savings_withdrawal && e.savings_type === 'loan' ? { repaid: !!e.repaid } : {}),
+  ...(vh && !e.is_income && isHistVac(e, vh) ? { vacation: true } : {}) })
+
+/** "33,85" / "€ 1.234,50" / 33.85 → 33.85 (zonder teken), of null als het geen bedrag is. */
+function parseAmount(v) {
+  if (v === undefined || v === null || v === '') return null
+  if (typeof v === 'number') return isFinite(v) ? Math.abs(r2(v)) : null
+  let s = String(v).replace(/[€\s+]/g, '').replace(/^-/, '')
+  if (!/^\d{1,3}(\.\d{3})*(,\d{1,2})?$|^\d+([.,]\d{1,2})?$/.test(s)) return null
+  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.')
+  else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '')
+  return Math.abs(r2(Number(s)))
+}
+/** Filter op bedrag (zonder teken: 33,85 vindt zowel −33,85 als +33,85). amount = exact, of min_amount/max_amount. */
+function amountFilter(q, args) {
+  const exact = parseAmount(args.amount)
+  const lo = parseAmount(args.min_amount), hi = parseAmount(args.max_amount)
+  if (args.amount !== undefined && exact === null) throw new Error('amount moet een bedrag zijn, bv. 33.85 of "33,85"')
+  if (exact !== null) return q.or(`amount.eq.${exact},amount.eq.${-exact}`)
+  if (lo === null && hi === null) return q
+  const a = lo ?? 0, b = hi ?? 1e9
+  return q.or(`and(amount.gte.${a},amount.lte.${b}),and(amount.lte.${-a},amount.gte.${-b})`)
+}
+const amountProps = {
+  amount: { type: ['number', 'string'], description: 'Exact bedrag zonder teken, bv. 33.85 of "33,85" (vindt af én bij)' },
+  min_amount: { type: 'number', description: 'Minimaal bedrag (zonder teken)' },
+  max_amount: { type: 'number', description: 'Maximaal bedrag (zonder teken)' },
+}
 
 // ── bank (ING via Enable Banking, zie netlify/functions/bank) ────────────────
 async function bankBalances(uid) {
@@ -137,8 +172,13 @@ async function overview(uid, month) {
   const perCategory = cats.map(c => {
     const spent = sum(reg.filter(e => e.category === c.id && !e.paid_from_savings && (!e.is_planned || e.amount > 0)))
     const budget = c.id === FIXED_CAT ? (catBudgets[c.id] || 0) : Math.round((catBudgets[c.id] || 0) * scale)
-    return { id: c.id, label: c.label, budget, spent: r2(spent), remaining: r2(budget - spent) }
+    const vacSpent = vac ? 0 : sum(reg.filter(e => e.category === c.id && !e.paid_from_savings && (!e.is_planned || e.amount > 0) && isHistVac(e, vh)))
+    return { id: c.id, label: c.label, budget, spent: r2(spent), remaining: r2(budget - spent), ...(vacSpent ? { of_which_vacation: r2(vacSpent) } : {}) }
   }).filter(c => c.budget || c.spent)
+
+  // Wat valt buiten het budget door een eerdere vakantie (vacation_history)? Zelfde regel als de app.
+  const vacItems = vac ? [] : reg.filter(e => !e.paid_from_savings && e.category !== FIXED_CAT && (!e.is_planned || e.amount > 0) && isHistVac(e, vh))
+  const vacPeriods = vh.filter(v => v.start <= monthEnd(selY, selM) && (v.end || v.start) >= monthStart(selY, selM))
 
   const isCurrent = monthKey(selY, selM) === t.slice(0, 7)
   const dayOfMonth = isCurrent ? Number(t.slice(8, 10)) : null
@@ -150,9 +190,14 @@ async function overview(uid, month) {
     carryover_deduction: r2(carryover), spendable_budget: r2(adjustedBase),
     spent_against_budget: r2(totalSpent), remaining: r2(remaining),
     ...(isCurrent ? { days_left: daysLeft, per_day_left: r2(remaining > 0 ? remaining / daysLeft : 0) } : {}),
+    ...(vacItems.length ? { vacation_excluded: {
+      total: r2(sum(vacItems)), count: vacItems.length,
+      periods: vacPeriods.map(v => ({ start: v.start, end: v.end || v.start, ...(v.budget ? { budget: v.budget } : {}) })),
+      note: 'Uitgaven in een eerdere vakantie tellen niet tegen het maandbudget (zoals in de app: Uitgaven → Vakantie). Ze staan wel in per_category (of_which_vacation).',
+    } } : {}),
     spent_from_savings: r2(sum(reg.filter(e => e.paid_from_savings))),
     fixed_costs_spent: r2(sum(reg.filter(e => e.category === FIXED_CAT && !e.paid_from_savings))),
-    planned_open: exp.filter(e => e.is_planned).map(slim),
+    planned_open: exp.filter(e => e.is_planned).map(e => slim(e, vh)),
     income: r2(sum(exp.filter(e => e.is_income))),
     savings_contributions: r2(sum(exp.filter(e => e.is_savings_contribution))),
     savings_withdrawals: r2(sum(exp.filter(e => e.is_savings_withdrawal))),
@@ -161,23 +206,23 @@ async function overview(uid, month) {
     per_category: perCategory,
     count: exp.length,
     ...(isCurrent ? { bank: await bankBalances(uid).catch(() => null) } : {}),
-    note: 'Vaste lasten (abonnementen) tellen niet mee in het vrije budget. remaining = spendable_budget − spent_against_budget.',
+    note: 'Vaste lasten (abonnementen), uitgaven van spaargeld (paid_from_savings) en uitgaven tijdens een eerdere vakantie tellen niet mee in het vrije budget. remaining = spendable_budget − spent_against_budget.',
   }
 }
 
 // ── tools ───────────────────────────────────────────────────────────────────
 const expenseProps = {
-  amount: { type: 'number', description: 'Bedrag in euro, positief' },
+  amount: { type: 'number', description: 'Bedrag in euro. Positief; alleen bij een gewone uitgave mag het negatief zijn (terugbetaling/Tikkie: verlaagt die categorie)' },
   category: { type: 'string', description: 'Categorie-id (zie get_budget_config; inkomen: salaris/bijbaan/freelance/zakgeld/overig)' },
   description: { type: 'string', description: 'Omschrijving' },
   date: { type: 'string', description: 'Datum YYYY-MM-DD' },
   is_income: { type: 'boolean', description: 'Inkomen in plaats van uitgave' },
   is_planned: { type: 'boolean', description: 'Geplande (nog niet betaalde) uitgave' },
-  paid_from_savings: { type: 'boolean', description: 'Betaald van spaargeld (telt niet tegen het budget)' },
+  paid_from_savings: { type: 'boolean', description: 'Uitgave betaald van spaargeld: telt niet tegen het budget (spent_from_savings). Dit is het veld dat telt, niet savings_type' },
   is_savings_withdrawal: { type: 'boolean', description: 'Opname van spaarrekening' },
   is_savings_contribution: { type: 'boolean', description: 'Storting naar spaarrekening' },
   is_loan_repayment: { type: 'boolean', description: 'Aflossing van geleend spaargeld' },
-  savings_type: { type: 'string', enum: ['saved', 'loan'], description: 'Bij een spaaropname: echt gespaard of geleend' },
+  savings_type: { type: 'string', enum: ['saved', 'loan'], description: 'Alleen bij een spaaropname (is_savings_withdrawal): saved = "Echt gespaard", loan = lening van jezelf. Zegt niets over gewone uitgaven' },
   repaid: { type: 'boolean', description: 'Lening terugbetaald' },
 }
 const TOOLS = [
@@ -186,28 +231,30 @@ const TOOLS = [
   { name: 'list_expenses', description: 'Transacties (uitgaven, inkomen, spaaracties) opzoeken, nieuwste eerst.',
     inputSchema: { type: 'object', properties: {
       from: { type: 'string', description: 'Vanaf YYYY-MM-DD' }, to: { type: 'string', description: 'T/m YYYY-MM-DD' },
-      category: { type: 'string' }, search: { type: 'string', description: 'Zoek in omschrijving' },
+      category: { type: 'string' }, search: { type: 'string', description: 'Zoek in omschrijving (een bedrag zoals "33,85" zoekt op bedrag)' },
+      ...amountProps,
       type: { type: 'string', enum: ['alle', 'uitgave', 'inkomen', 'sparen', 'gepland'], description: 'Standaard alle' },
       limit: { type: 'number', description: 'Max. aantal (standaard 100, max 500)' } } }, annotations: { readOnlyHint: true } },
-  { name: 'get_budget_config', description: 'Instellingen: maandbudget, budget per categorie, categorieën (ook eigen), spaardoel, min. saldo, terugbetaalmaanden, vakantiemodus, vaste inkomsten en maand-aanpassingen.',
+  { name: 'get_budget_config', description: 'Instellingen: maandbudget, budget per categorie, categorieën (ook eigen), spaardoel, min. saldo, terugbetaalmaanden, vakantiemodus + eerdere vakanties, vaste inkomsten en maand-aanpassingen.',
     inputSchema: { type: 'object', properties: {} }, annotations: { readOnlyHint: true } },
   { name: 'add_expense', description: 'Nieuwe transactie toevoegen (standaard een gewone uitgave van vandaag).',
     inputSchema: { type: 'object', properties: expenseProps, required: ['amount', 'category'] } },
-  { name: 'update_expense', description: 'Een bestaande transactie aanpassen (alleen de meegegeven velden).',
+  { name: 'update_expense', description: 'Een bestaande transactie aanpassen. Alleen de meegegeven velden veranderen; de rest blijft zoals het was (de output toont before/after). Inkomen omzetten naar een terugbetaling: is_income=false + negatief amount + de categorie waarvoor je voorschoot.',
     inputSchema: { type: 'object', properties: { id: { type: 'string' }, ...expenseProps }, required: ['id'] } },
-  { name: 'delete_expense', description: 'Een transactie definitief verwijderen. Vraag de gebruiker eerst om bevestiging.',
+  { name: 'delete_expense', description: 'Een transactie definitief verwijderen. Kwam hij van de bank, dan wordt die banktransactie op ignored gezet (komt niet terug bij een sync); was hij aan een banktransactie gekoppeld (matched), dan gaat die terug naar de inbox. Vraag de gebruiker eerst om bevestiging.',
     inputSchema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] }, annotations: { destructiveHint: true } },
   { name: 'get_bank_balances', description: 'Actuele saldo\'s van de gekoppelde bankrekeningen (ING, alleen-lezen): betaal- en spaarrekeningen, totaal spaargeld, wanneer bijgewerkt, hoe lang de toestemming nog geldt en hoeveel banktransacties nog in de inbox staan.',
     inputSchema: { type: 'object', properties: {} }, annotations: { readOnlyHint: true } },
   { name: 'list_bank_transactions', description: 'Transacties zoals ze op het ING-afschrift staan (tegenpartij, omschrijving, boekdatum, IBAN). status: new = nog te verwerken (inbox), added = als uitgave/inkomen toegevoegd, ignored, matched = stond er al. amount: + bij, − af. Gebruik search om bv. alle uitgaven bij de PLUS te vinden, en group_by=counterparty voor totalen per winkel.',
     inputSchema: { type: 'object', properties: {
-      status: { type: 'string', enum: ['new', 'added', 'ignored', 'matched', 'alle'], description: 'Standaard new; met search of group_by standaard alle' },
-      search: { type: 'string', description: 'Zoek in tegenpartij en omschrijving, bv. "plus", "albert heijn", "thuisbezorgd"' },
+      status: { type: 'string', enum: ['new', 'added', 'ignored', 'matched', 'pending', 'alle'], description: 'Standaard new; met search, bedrag of group_by standaard alle. pending = reservering (nog niet geboekt)' },
+      search: { type: 'string', description: 'Zoek in tegenpartij en omschrijving, bv. "plus", "albert heijn", "thuisbezorgd", "geldautomaat". Een bedrag ("33,85") zoekt op bedrag' },
+      ...amountProps,
       direction: { type: 'string', enum: ['af', 'bij', 'alle'], description: 'af = uitgaven, bij = ontvangsten (standaard alle)' },
       group_by: { type: 'string', enum: ['counterparty'], description: 'Totalen per tegenpartij (winkel) i.p.v. losse transacties' },
       from: { type: 'string', description: 'Vanaf YYYY-MM-DD' }, to: { type: 'string', description: 'T/m YYYY-MM-DD' },
       limit: { type: 'number', description: 'Max. aantal (standaard 50, max 300)' } } }, annotations: { readOnlyHint: true } },
-  { name: 'process_bank_transaction', description: 'Een banktransactie uit de inbox verwerken: add = toevoegen als uitgave/inkomen/spaaractie (met optioneel een andere soort of categorie; een afwijkende categorie wordt onthouden voor die tegenpartij), ignore = negeren. Vraag eerst bevestiging.',
+  { name: 'process_bank_transaction', description: 'Een banktransactie verwerken of opnieuw verwerken. add = toevoegen als uitgave/inkomen/spaaractie (optioneel andere soort of categorie; een afwijkende categorie wordt onthouden voor die tegenpartij). Op een al toegevoegde transactie (status added) zet add de gekoppelde uitgave om, bv. inkomen → terugbetaling (output: before/after). ignore = negeren; bij status added wordt de gekoppelde uitgave dan verwijderd. Werkt ook voor ignored en matched. Vraag eerst bevestiging.',
     inputSchema: { type: 'object', properties: {
       id: { type: 'string' }, action: { type: 'string', enum: ['add', 'ignore'] },
       kind: { type: 'string', enum: ['uitgave', 'inkomen', 'terugbetaling', 'spaarstorting', 'spaaropname'], description: 'terugbetaling = Tikkie/terugbetaling van iemand: negatieve uitgave in de categorie waarvoor je voorschoot' },
@@ -218,23 +265,126 @@ const TOOLS = [
       recovery_months: { type: 'number', description: 'Over hoeveel maanden een overschrijding wordt terugbetaald (1–12)' },
       category_budgets: { type: 'object', additionalProperties: { type: 'number' }, description: '{ categorie-id: bedrag }' },
       month_adjustments: { type: 'object', additionalProperties: { type: 'number' }, description: '{ "YYYY-MM": extra bedrag (+/−) }' },
+      recurring_income: { type: 'array', description: 'Vaste inkomsten toevoegen/wijzigen/verwijderen (samengevoegd op id; zonder id = nieuw). Bestaande ids: zie get_budget_config.',
+        items: { type: 'object', properties: {
+          id: { type: 'string', description: 'Id van een bestaande bron (weglaten = nieuwe bron)' },
+          name: { type: 'string' }, amount: { type: 'number', description: 'Bedrag per keer' },
+          type: { type: 'string', enum: ['monthly', 'interval'], description: 'monthly = elke maand op day; interval = elke interval_days dagen vanaf ref_date' },
+          day: { type: 'number', description: 'Dag van de maand (1–31) bij monthly' },
+          interval_days: { type: 'number' }, ref_date: { type: 'string', description: 'Laatste betaaldatum YYYY-MM-DD bij interval' },
+          emoji: { type: 'string' }, category: { type: 'string', description: 'Inkomenscategorie (standaard salaris)' },
+          remove: { type: 'boolean', description: 'true = deze bron verwijderen' } } } },
     } } },
+  { name: 'manage_category', description: 'Eigen uitgavencategorie toevoegen, hernoemen (ook emoji/kleur) of verwijderen. De vaste categorieën (eten, boodschappen, transport, kleding, abonnementen, sport, overig) kunnen niet hernoemd of verwijderd worden. Bij verwijderen gaan de uitgaven in die categorie naar overig. Vraag eerst bevestiging.',
+    inputSchema: { type: 'object', properties: {
+      action: { type: 'string', enum: ['add', 'rename', 'delete'] },
+      id: { type: 'string', description: 'Categorie-id (bij rename/delete)' },
+      label: { type: 'string', description: 'Naam (bij add/rename)' },
+      emoji: { type: 'string' }, color: { type: 'string', description: 'Hex-kleur, bv. #10B981' },
+      budget: { type: 'number', description: 'Maandbudget voor deze categorie (bij add, optioneel)' } }, required: ['action'] } },
+  { name: 'update_savings_account', description: 'Een spaarrekening/spaarpotje (zie get_bank_balances) hernoemen of het spaardoel aanpassen. Bij een zelf bijgehouden spaarrekening kan ook het saldo opnieuw worden gezet (startsaldo per vandaag). Zoek op huidige naam of IBAN. Vraag eerst bevestiging.',
+    inputSchema: { type: 'object', properties: {
+      account: { type: 'string', description: 'Huidige naam (of deel ervan) of IBAN' },
+      name: { type: 'string', description: 'Nieuwe naam' },
+      goal: { type: ['number', 'null'], description: 'Spaardoel in euro (null = geen doel)' },
+      balance: { type: 'number', description: 'Alleen zelf bijgehouden spaarrekeningen: saldo per vandaag' } }, required: ['account'] } },
 ]
 
-function cleanExpense(args, cfg, partial) {
+/** Eindtoestand controleren: een negatief bedrag mag alleen bij een gewone uitgave (terugbetaling), maar één soort tegelijk. */
+function checkExpense(row) {
+  const kinds = ['is_income', 'is_savings_withdrawal', 'is_savings_contribution', 'is_loan_repayment'].filter(k => row[k])
+  if (kinds.length > 1) throw new Error(`Een transactie kan maar één soort zijn (nu: ${kinds.join(', ')})`)
+  if (Number(row.amount) < 0 && (kinds.length || row.is_planned)) throw new Error('Een negatief bedrag (terugbetaling) kan alleen bij een gewone uitgave: zet is_income/spaarvlaggen op false')
+  if (row.paid_from_savings && kinds.length) throw new Error('paid_from_savings kan alleen bij een uitgave')
+}
+
+function cleanExpense(args, cfg, partial, base) {
   const out = {}
   for (const k of EXPENSE_FIELDS) if (args[k] !== undefined) out[k] = args[k]
   if (!partial && out.date === undefined) out.date = todayTZ()
-  if (out.amount !== undefined && (typeof out.amount !== 'number' || !isFinite(out.amount) || out.amount < 0)) throw new Error('amount moet een positief getal zijn')
+  if (out.amount !== undefined && (typeof out.amount !== 'number' || !isFinite(out.amount) || out.amount === 0)) throw new Error('amount moet een getal zijn (niet 0)')
   if (out.amount !== undefined) out.amount = r2(out.amount)
   if (out.date !== undefined && !isDate(out.date)) throw new Error('date moet YYYY-MM-DD zijn')
   if (out.category !== undefined) {
-    const ok = out.is_income || args.is_income ? INCOME_CATEGORIES.includes(out.category) || allCategories(cfg).some(c => c.id === out.category)
+    const income = out.is_income ?? base?.is_income
+    const ok = income ? INCOME_CATEGORIES.includes(out.category) || allCategories(cfg).some(c => c.id === out.category)
       : allCategories(cfg).some(c => c.id === out.category)
     if (!ok) throw new Error(`Onbekende categorie "${out.category}". Gebruik get_budget_config voor de lijst.`)
   }
   if (out.description !== undefined) out.description = String(out.description).slice(0, 300)
   return out
+}
+
+async function saveConfig(uid, cfg, patch) {
+  patch.updated_at = new Date().toISOString()
+  const res = cfg.user_id
+    ? await supabase.from('budget_config').update(patch).eq('user_id', uid)
+    : await supabase.from('budget_config').insert({ user_id: uid, ...patch })
+  if (res.error) throw new Error(res.error.message)
+}
+
+async function manageCategory(uid, args) {
+  const cfg = await getConfig(uid)
+  const custom = [...(cfg.custom_categories || [])]
+  const builtIn = (id) => CATEGORIES.some(c => c.id === id)
+  const color = (c) => { if (c === undefined) return undefined; if (!/^#[0-9a-f]{6}$/i.test(c)) throw new Error('color moet een hex-kleur zijn, bv. #10B981'); return c }
+  const label = (l) => { const s = String(l || '').trim().slice(0, 40); if (!s) throw new Error('label ontbreekt'); return s }
+  if (args.action === 'add') {
+    const name = label(args.label)
+    if (allCategories(cfg).some(c => c.label.toLowerCase() === name.toLowerCase())) throw new Error(`Categorie "${name}" bestaat al`)
+    const cat = { id: `cat_${Date.now()}`, label: name, emoji: args.emoji || '🏷️', color: color(args.color) || CAT_COLORS[custom.length % CAT_COLORS.length] }
+    if (args.budget !== undefined && (typeof args.budget !== 'number' || args.budget < 0)) throw new Error('budget moet een positief getal zijn')
+    await saveConfig(uid, cfg, { custom_categories: [...custom, cat], category_budgets: { ...(cfg.category_budgets || DEFAULT_CAT_BUDGETS), [cat.id]: r2(args.budget || 0) } })
+    return { added: cat, budget: r2(args.budget || 0) }
+  }
+  if (!args.id) throw new Error('id ontbreekt (zie get_budget_config → categories)')
+  if (builtIn(args.id)) throw new Error(`"${args.id}" is een vaste categorie en kan niet hernoemd of verwijderd worden; maak eventueel een eigen categorie`)
+  const at = custom.findIndex(c => c.id === args.id)
+  if (at < 0) throw new Error(`Categorie "${args.id}" niet gevonden`)
+  if (args.action === 'rename') {
+    const before = custom[at]
+    const next = { ...before, ...(args.label !== undefined ? { label: label(args.label) } : {}), ...(args.emoji ? { emoji: args.emoji } : {}), ...(args.color !== undefined ? { color: color(args.color) } : {}) }
+    custom[at] = next
+    await saveConfig(uid, cfg, { custom_categories: custom })
+    return { renamed: { before, after: next } }
+  }
+  if (args.action === 'delete') {
+    const { data: moved, error } = await supabase.from('expenses').update({ category: 'overig' }).eq('user_id', uid).eq('category', args.id).eq('is_income', false).select('id')
+    if (error) throw new Error(error.message)
+    const budgets = { ...(cfg.category_budgets || DEFAULT_CAT_BUDGETS) }; delete budgets[args.id]
+    await saveConfig(uid, cfg, { custom_categories: custom.filter(c => c.id !== args.id), category_budgets: budgets })
+    return { deleted: custom[at], expenses_moved_to_overig: (moved || []).length }
+  }
+  throw new Error('action moet add, rename of delete zijn')
+}
+
+async function updateSavingsAccount(uid, args) {
+  const { data: accs, error } = await supabase.from('bank_accounts').select('*').eq('user_id', uid)
+  if (error) throw new Error(/bank_accounts|does not exist/i.test(error.message) ? 'Bankkoppeling nog niet ingesteld' : error.message)
+  const term = String(args.account || '').trim().toLowerCase()
+  const norm = (s) => String(s || '').replace(/\s/g, '').toLowerCase()
+  const exact = (accs || []).filter(a => (a.name || '').toLowerCase() === term || (a.iban && norm(a.iban) === norm(term)))
+  const hits = exact.length ? exact : (accs || []).filter(a => (a.name || '').toLowerCase().includes(term))
+  if (!hits.length) throw new Error(`Geen rekening gevonden voor "${args.account}". Namen: ${(accs || []).map(a => a.name).filter(Boolean).join(', ')}`)
+  if (hits.length > 1) throw new Error(`Meerdere rekeningen passen bij "${args.account}": ${hits.map(a => a.name).join(', ')}`)
+  const acc = hits[0]
+  const patch = {}
+  if (args.name !== undefined) { const n = String(args.name).trim().slice(0, 60); if (!n) throw new Error('name is leeg'); patch.name = n }
+  if (args.goal !== undefined) {
+    if (args.goal !== null && (typeof args.goal !== 'number' || args.goal < 0)) throw new Error('goal moet een positief getal of null zijn')
+    patch.goal = args.goal ? r2(args.goal) : null
+  }
+  if (args.balance !== undefined) {
+    if (!acc.manual) throw new Error('Het saldo van een bankrekening komt van ING en kan niet worden aangepast')
+    if (typeof args.balance !== 'number') throw new Error('balance moet een getal zijn')
+    Object.assign(patch, { base_balance: r2(args.balance), base_date: todayTZ(), balance: r2(args.balance), balance_at: new Date().toISOString() })
+  }
+  if (!Object.keys(patch).length) throw new Error('Geen velden om aan te passen (name, goal of balance)')
+  patch.updated_at = new Date().toISOString()
+  const { error: ue } = await supabase.from('bank_accounts').update(patch).eq('uid', acc.uid).eq('user_id', uid)
+  if (ue) throw new Error(ue.message)
+  const view = (a) => ({ name: a.name, kind: a.kind, balance: a.balance == null ? null : Number(a.balance), goal: a.goal ? Number(a.goal) : null })
+  return { updated: { before: view(acc), after: view({ ...acc, ...patch }) }, ...(acc.manual ? {} : { note: 'Naam alleen in Hypex aangepast; bij ING blijft de naam hetzelfde.' }) }
 }
 
 async function callTool(name, args = {}) {
@@ -248,6 +398,7 @@ async function callTool(name, args = {}) {
       categories: allCategories(cfg), income_categories: INCOME_CATEGORIES, fixed_costs_category: FIXED_CAT,
       savings_goal: cfg.savings_goal || 0, min_balance: cfg.min_balance ?? 300, recovery_months: cfg.recovery_months || 3,
       vacation_mode: !!cfg.vacation_mode, vacation_budget: cfg.vacation_budget || 0, vacation_start: cfg.vacation_start || null, vacation_end: cfg.vacation_end || null,
+      vacation_history: (cfg.vacation_history || []).map(v => ({ start: v.start, end: v.end || v.start, ...(v.budget ? { budget: v.budget } : {}) })),
       recurring_income: cfg.recurring_income || [], month_adjustments: cfg.month_adjustments || {},
     }
   }
@@ -256,7 +407,9 @@ async function callTool(name, args = {}) {
     if (args.from) { if (!isDate(args.from)) throw new Error('from moet YYYY-MM-DD zijn'); q = q.gte('date', args.from) }
     if (args.to) { if (!isDate(args.to)) throw new Error('to moet YYYY-MM-DD zijn'); q = q.lte('date', args.to) }
     if (args.category) q = q.eq('category', args.category)
-    if (args.search) q = q.ilike('description', `%${String(args.search).replace(/[%_]/g, '')}%`)
+    const searchAmount = parseAmount(args.search)
+    if (args.search && searchAmount === null) q = q.ilike('description', `%${String(args.search).replace(/[%_]/g, '')}%`)
+    q = amountFilter(q, searchAmount !== null && args.amount === undefined ? { ...args, amount: searchAmount } : args)
     const type = args.type || 'alle'
     if (type === 'inkomen') q = q.eq('is_income', true)
     if (type === 'gepland') q = q.eq('is_planned', true)
@@ -267,11 +420,15 @@ async function callTool(name, args = {}) {
     if (type === 'uitgave') list = regular(list).filter(e => !e.is_planned)
     if (type === 'sparen') list = list.filter(e => e.is_savings_withdrawal || e.is_savings_contribution || e.is_loan_repayment || e.paid_from_savings)
     list = list.slice(0, limit)
-    return { count: list.length, total: r2(sum(list)), items: list.map(slim) }
+    const vh = (await getConfig(uid)).vacation_history || []
+    return { count: list.length, total: r2(sum(list)), items: list.map(e => slim(e, vh)) }
   }
   if (name === 'add_expense') {
     const cfg = await getConfig(uid)
     const row = { is_income: false, is_savings_withdrawal: false, ...cleanExpense(args, cfg, false), user_id: uid }
+    if (row.is_savings_withdrawal && !row.savings_type) row.savings_type = 'saved'
+    if (!row.is_savings_withdrawal) delete row.savings_type // kolom-standaard; betekent alleen iets bij opnames
+    checkExpense(row)
     const { data, error } = await supabase.from('expenses').insert(row).select().single()
     if (error) throw new Error(error.message)
     return { added: slim(data) }
@@ -279,26 +436,42 @@ async function callTool(name, args = {}) {
   if (name === 'update_expense') {
     if (!args.id) throw new Error('id ontbreekt')
     const cfg = await getConfig(uid)
-    const patch = cleanExpense(args, cfg, true)
+    const { data: cur, error: ce } = await supabase.from('expenses').select('*').eq('id', args.id).eq('user_id', uid).maybeSingle()
+    if (ce) throw new Error(ce.message)
+    if (!cur) throw new Error('Transactie niet gevonden')
+    // Alleen de meegegeven velden; niets anders wordt aangeraakt
+    const patch = cleanExpense(args, cfg, true, cur)
     if (!Object.keys(patch).length) throw new Error('Geen velden om aan te passen')
+    if (patch.is_savings_withdrawal === true && !cur.is_savings_withdrawal && !patch.savings_type) patch.savings_type = 'saved'
+    checkExpense({ ...cur, ...patch })
     const { data, error } = await supabase.from('expenses').update(patch).eq('id', args.id).eq('user_id', uid).select().maybeSingle()
     if (error) throw new Error(error.message)
     if (!data) throw new Error('Transactie niet gevonden')
-    return { updated: slim(data) }
+    const vh = cfg.vacation_history || []
+    const changed = Object.keys(patch).filter(k => String(cur[k] ?? null) !== String(data[k] ?? null))
+    return { updated: slim(data, vh), changed, before: slim(cur, vh) }
   }
   if (name === 'delete_expense') {
     if (!args.id) throw new Error('id ontbreekt')
+    const { data: cur } = await supabase.from('expenses').select('id').eq('id', args.id).eq('user_id', uid).maybeSingle()
+    if (!cur) throw new Error('Transactie niet gevonden')
+    const bank = await unlinkExpense(supabase, uid, args.id) // vóór het verwijderen (FK zet expense_id anders op null)
     const { data, error } = await supabase.from('expenses').delete().eq('id', args.id).eq('user_id', uid).select().maybeSingle()
     if (error) throw new Error(error.message)
     if (!data) throw new Error('Transactie niet gevonden')
-    return { deleted: slim(data) }
+    return { deleted: slim(data), ...(bank.length ? { bank_transactions: bank } : {}) }
   }
   if (name === 'get_bank_balances') return bankBalances(uid)
   if (name === 'list_bank_transactions') {
-    const status = args.status || (args.search || args.group_by ? 'alle' : 'new')
+    const searchAmount = parseAmount(args.search)
+    const byAmount = searchAmount !== null || args.amount !== undefined || args.min_amount !== undefined || args.max_amount !== undefined
+    const status = args.status || (args.search || args.group_by || byAmount ? 'alle' : 'new')
     let q = supabase.from('bank_transactions').select('id, booking_date, amount, counterparty, counterparty_iban, description, status, suggested_kind, suggested_category, expense_id, account_uid').eq('user_id', uid)
     if (status !== 'alle') q = q.eq('status', status)
-    if (args.search) {
+    q = amountFilter(q, searchAmount !== null && args.amount === undefined ? { ...args, amount: searchAmount } : args)
+    if (args.search && searchAmount === null && /geldautomaat|geldmaat|pinautomaat|\batm\b/i.test(args.search)) {
+      q = q.or('counterparty.ilike.%geldautomaat%,description.ilike.%geldmaat%')
+    } else if (args.search && searchAmount === null) {
       const term = String(args.search).replace(/[%_,()]/g, ' ').trim()
       if (term) q = q.or(`counterparty.ilike.%${term}%,description.ilike.%${term}%`)
     }
@@ -313,8 +486,9 @@ async function callTool(name, args = {}) {
       for (const t of data || []) {
         // Interne overboekingen (bv. naar spaarrekeningen) niet als winkel meetellen
         if (t.suggested_kind === 'intern') continue
-        const key = normalizeCounterparty(t.counterparty) || '(onbekend)'
-        const g = groups.get(key) || { counterparty: t.counterparty || '(onbekend)', count: 0, total_out: 0, total_in: 0, first: t.booking_date, last: t.booking_date }
+        const party = t.counterparty || atmCounterparty(t)
+        const key = normalizeCounterparty(party) || '(onbekend)'
+        const g = groups.get(key) || { counterparty: party || '(onbekend)', count: 0, total_out: 0, total_in: 0, first: t.booking_date, last: t.booking_date }
         g.count++
         if (Number(t.amount) < 0) g.total_out += -Number(t.amount); else g.total_in += Number(t.amount)
         if (t.booking_date < g.first) g.first = t.booking_date
@@ -329,7 +503,7 @@ async function callTool(name, args = {}) {
     const limit = Math.min(300, Math.max(1, Number(args.limit) || 50))
     const { data, error } = await q.order('booking_date', { ascending: false }).limit(limit)
     if (error) throw new Error(error.message)
-    const list = (data || []).map(t => ({ ...t, amount: Number(t.amount) }))
+    const list = (data || []).map(t => ({ ...t, amount: Number(t.amount), counterparty: t.counterparty || atmCounterparty(t) }))
     return { count: list.length, total_out: r2(list.filter(t => t.amount < 0).reduce((n, t) => n - t.amount, 0)), total_in: r2(list.filter(t => t.amount > 0).reduce((n, t) => n + t.amount, 0)), items: list }
   }
   if (name === 'process_bank_transaction') {
@@ -364,14 +538,38 @@ async function callTool(name, args = {}) {
       }
       patch.month_adjustments = next
     }
+    if (args.recurring_income !== undefined) {
+      if (!Array.isArray(args.recurring_income)) throw new Error('recurring_income moet een lijst zijn')
+      const next = [...(cfg.recurring_income || [])]
+      for (const [i, it] of args.recurring_income.entries()) {
+        const at = it.id ? next.findIndex(r => r.id === it.id) : -1
+        if (it.id && at < 0) throw new Error(`Vaste inkomstenbron "${it.id}" bestaat niet`)
+        if (it.remove) { if (at < 0) throw new Error('remove heeft een id nodig'); next.splice(at, 1); continue }
+        const src = { ...(at >= 0 ? next[at] : { id: `rec_${Date.now()}_${i}`, emoji: '💰', type: 'monthly' }) }
+        for (const k of ['name', 'amount', 'type', 'day', 'interval_days', 'ref_date', 'emoji', 'category']) if (it[k] !== undefined) src[k] = it[k]
+        if (!String(src.name || '').trim()) throw new Error('Vaste inkomsten: name ontbreekt')
+        src.name = String(src.name).trim().slice(0, 60)
+        if (typeof src.amount !== 'number' || !(src.amount > 0)) throw new Error(`Vaste inkomsten "${src.name}": amount moet positief zijn`)
+        src.amount = r2(src.amount)
+        if (src.type === 'monthly') {
+          if (!Number.isInteger(src.day) || src.day < 1 || src.day > 31) throw new Error(`Vaste inkomsten "${src.name}": day moet 1–31 zijn`)
+          delete src.interval_days; delete src.ref_date
+        } else if (src.type === 'interval') {
+          if (!Number.isInteger(src.interval_days) || src.interval_days < 1) throw new Error(`Vaste inkomsten "${src.name}": interval_days ontbreekt`)
+          if (!isDate(src.ref_date)) throw new Error(`Vaste inkomsten "${src.name}": ref_date moet YYYY-MM-DD zijn`)
+          delete src.day
+        } else throw new Error('type moet monthly of interval zijn')
+        if (src.category !== undefined && !INCOME_CATEGORIES.includes(src.category)) throw new Error(`Onbekende inkomenscategorie "${src.category}"`)
+        if (at >= 0) next[at] = src; else next.push(src)
+      }
+      patch.recurring_income = next
+    }
     if (!Object.keys(patch).length) throw new Error('Geen velden om aan te passen')
-    patch.updated_at = new Date().toISOString()
-    const res = cfg.user_id
-      ? await supabase.from('budget_config').update(patch).eq('user_id', uid)
-      : await supabase.from('budget_config').insert({ user_id: uid, ...patch })
-    if (res.error) throw new Error(res.error.message)
+    await saveConfig(uid, cfg, patch)
     return { updated: patch }
   }
+  if (name === 'manage_category') return manageCategory(uid, args)
+  if (name === 'update_savings_account') return updateSavingsAccount(uid, args)
   throw new Error(`Onbekende tool: ${name}`)
 }
 
@@ -380,6 +578,9 @@ const GELD_INSTRUCTIONS = 'Geld-app van Fachri (Hypex Dash). Bedragen in euro. G
   'list_expenses om transacties te vinden (ids nodig voor wijzigen/verwijderen) en get_budget_config voor categorieën en instellingen. ' +
   'Bankkoppeling (ING, alleen-lezen): get_bank_balances voor saldo\'s, spaarrekeningen en spaardoelen (spaarrekeningen worden door ING niet gedeeld en zijn zelf bijgehouden), ' +
   'list_bank_transactions voor de afschriften (zoeken op winkel met search, totalen per winkel met group_by=counterparty) en de inbox, process_bank_transaction om de inbox te verwerken. ' +
+  'paid_from_savings = uitgave van spaargeld (telt niet tegen het budget); savings_type geldt alleen voor spaaropnames. ' +
+  'Uitgaven tijdens een eerdere vakantie (vacation_history) tellen niet tegen het maandbudget; get_overview toont ze onder vacation_excluded. ' +
+  'Instellingen: update_budget_config (ook vaste inkomsten), manage_category (eigen categorieën), update_savings_account (spaarrekening hernoemen/doel). ' +
   'Vraag bevestiging voordat je transacties verwijdert, budgetten wijzigt of banktransacties verwerkt.'
 const INSTRUCTIONS = `${planner.INSTRUCTIONS}
 

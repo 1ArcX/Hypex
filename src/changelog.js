@@ -6,6 +6,16 @@
 
 export const RELEASES = [
   {
+    id: 41,
+    date: '2026-11-17',
+    title: 'Geld via Claude: meer kunnen en duidelijker',
+    items: [
+      { area: 'geld', text: "Verwijder je een uitgave die van ING kwam, dan wordt die banktransactie genegeerd en komt hij niet terug bij de volgende sync. Hoorde hij bij je eigen invoer, dan staat hij weer in de inbox." },
+      { area: 'geld', text: "Opnames en stortingen bij de geldautomaat heten nu 'Geldautomaat (opname)' of 'Geldautomaat (storting)' in plaats van een lege naam." },
+      { area: 'app', text: "Claude kan een al toegevoegde banktransactie opnieuw verwerken (bijv. inkomen → Tikkie-terugbetaling), zoeken op bedrag, vaste inkomsten en eigen categorieën beheren, spaarrekeningen hernoemen, en laat zien welke uitgaven van spaargeld of tijdens een vakantie waren." },
+    ],
+  },
+  {
     id: 40,
     date: '2026-11-17',
     title: 'Claude kent nu je hele planning',

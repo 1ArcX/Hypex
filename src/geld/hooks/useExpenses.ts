@@ -50,6 +50,12 @@ export function useExpenses(userId: string) {
   }, [refresh])
 
   const deleteExpense = useCallback(async (id: string) => {
+    // Gekoppelde ING-transacties niet "toegevoegd" laten staan: van de bank → negeren (komt niet terug bij een sync),
+    // gekoppeld aan je eigen invoer (matched) → weer in de inbox. Zelfde regel als de connector (bankCore.unlinkExpense).
+    const { data: linked } = await supabase.from('bank_transactions').select('id, status').eq('expense_id', id)
+    for (const t of (linked || []) as { id: string; status: string }[]) {
+      await supabase.from('bank_transactions').update({ status: t.status === 'matched' ? 'new' : 'ignored', expense_id: null }).eq('id', t.id)
+    }
     await supabase.from('expenses').delete().eq('id', id)
     refresh()
   }, [refresh])

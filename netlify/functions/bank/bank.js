@@ -12,7 +12,7 @@
 
 const crypto = require('crypto')
 const { createClient } = require('@supabase/supabase-js')
-const { suggest, manualBalance, toExpense, paidDate, normalizeCounterparty } = require('./bankCore')
+const { suggest, manualBalance, toExpense, paidDate, normalizeCounterparty, atmCounterparty } = require('./bankCore')
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 const API = 'https://api.enablebanking.com'
@@ -91,9 +91,10 @@ function mapTransaction(t) {
   const partyAcc = debit ? t.creditor_account : t.debtor_account
   const description = (Array.isArray(t.remittance_information) ? t.remittance_information.join(' ') : (t.remittance_information || '')).trim()
   const booking = t.booking_date || t.value_date || t.transaction_date
-  const counterparty = (party?.name || '').trim() || null
+  const rawParty = (party?.name || '').trim() || null
+  const counterparty = rawParty || atmCounterparty({ counterparty: null, description, amount })
   const ext = t.entry_reference || t.transaction_id
-    || crypto.createHash('sha1').update(`${booking}|${amount}|${counterparty}|${description}`).digest('hex')
+    || crypto.createHash('sha1').update(`${booking}|${amount}|${rawParty}|${description}`).digest('hex') // ruwe naam: ids blijven gelijk
   const paid = t.transaction_date && t.transaction_date !== booking ? t.transaction_date : null
   return { ext_id: String(ext), booking_date: booking, paid_date: paid, amount, counterparty, counterparty_iban: partyAcc?.iban || null, description: description || null, status: t.status }
 }
@@ -187,13 +188,14 @@ async function syncConnection(conn, { from } = {}) {
 
       // Reserveringen: nieuwe meteen als uitgave (telt mee in je budget, label "Reservering"); verdwenen
       // reserveringen worden hieronder aan de geboekte transactie gekoppeld of, als die er niet is, opgeruimd.
-      const { data: oldPending } = await supabase.from('bank_transactions').select('*').eq('account_uid', acc.uid).eq('status', 'pending')
+      // Ook genegeerde reserveringen (uitgave verwijderd) meenemen, anders zou de sync ze opnieuw toevoegen
+      const { data: oldPending } = await supabase.from('bank_transactions').select('*').eq('account_uid', acc.uid).like('ext_id', 'pending:%')
       const currentIds = new Set(pendingRows.map(r => r.ext_id))
       const vanished = (oldPending || []).filter(p => !currentIds.has(p.ext_id))
       const oldById = new Map((oldPending || []).map(p => [p.ext_id, p]))
       for (const r of [...new Map(pendingRows.map(r => [r.ext_id, r])).values()]) {
         const old = oldById.get(r.ext_id)
-        if (old?.expense_id) continue
+        if (old?.expense_id || old?.status === 'ignored') continue
         let expenseId = null
         if (r.suggested_kind === 'uitgave' && r.amount < 0) {
           const { data: exp, error: ee } = await supabase.from('expenses').insert(toExpense(r, 'uitgave', r.suggested_category, uid)).select('id').single()
@@ -206,6 +208,12 @@ async function syncConnection(conn, { from } = {}) {
           : await supabase.from('bank_transactions').insert({ ...r, expense_id: expenseId })
         if (pe) console.warn('[bank] reservering', pe.message)
       }
+
+      // Eerder opgeslagen geldautomaat-transacties zonder tegenpartij alsnog een naam geven
+      await supabase.from('bank_transactions').update({ counterparty: 'Geldautomaat (storting)' })
+        .eq('account_uid', acc.uid).is('counterparty', null).ilike('description', '%geldmaat%').gt('amount', 0)
+      await supabase.from('bank_transactions').update({ counterparty: 'Geldautomaat (opname)' })
+        .eq('account_uid', acc.uid).is('counterparty', null).ilike('description', '%geldmaat%').lt('amount', 0)
 
       let insertedBooked = []
       if (rows.length) {
