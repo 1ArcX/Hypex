@@ -18,6 +18,7 @@ import type { BankState, BankTx } from '../hooks/useBank'
 
 const KINDS = [
   { id: 'uitgave', label: 'Uitgave' }, { id: 'inkomen', label: 'Inkomen' },
+  { id: 'terugbetaling', label: 'Terugbetaling' },
   { id: 'spaarstorting', label: 'Naar spaar' }, { id: 'spaaropname', label: 'Van spaar' },
 ]
 const card = { background: 'var(--c-surface-2)', border: '1px solid var(--c-border)' }
@@ -39,6 +40,8 @@ export function BankInboxSheet({ bank, categories, onClose }: { bank: BankState;
   const [confirmOnly, setConfirmOnly] = useState(false)
   const [onlyMonth, setOnlyMonth] = useState(bank.bankMonths[0] || '')
   const [preview, setPreview] = useState<{ add: BankTx[]; del: Expense[] } | null>(null)
+  const [clean, setClean] = useState<Awaited<ReturnType<BankState['previewCleanup']>> | null>(null)
+  useEffect(() => { bank.previewCleanup().then(setClean) }, [bank.inbox.length, bank.matched.length]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!onlyMonth && bank.bankMonths[0]) setOnlyMonth(bank.bankMonths[0]) }, [bank.bankMonths.length]) // eslint-disable-line react-hooks/exhaustive-deps
   const pick = (tx: BankTx) => ({ kind: choice[tx.id]?.kind || tx.suggested_kind || (tx.amount > 0 ? 'inkomen' : 'uitgave'), category: choice[tx.id]?.category || tx.suggested_category || 'overig' })
   const set = (id: string, patch: { kind?: string; category?: string }) => setChoice(c => ({ ...c, [id]: { ...c[id], ...patch } }))
@@ -80,6 +83,22 @@ export function BankInboxSheet({ bank, categories, onClose }: { bank: BankState;
       {bank.error && <p className="m-0 mb-3 text-[12px]" style={{ color: 'var(--c-danger)' }}>{bank.error}</p>}
       {bank.inbox.length === 0 && bank.notOnStatement.length === 0 && (
         <p className="text-[13px] text-white/50 m-0 mb-4">Alles verwerkt. Nieuwe transacties verschijnen hier na het bijwerken.</p>
+      )}
+
+      {/* 0. Eerder verkeerd geïmporteerd: spaaroverboekingen als uitgave/inkomen, Tikkies als inkomen */}
+      {clean && (clean.savings.length > 0 || clean.repay.length > 0) && (
+        <div className="rounded-2xl p-3 mb-3" style={{ background: 'color-mix(in srgb, var(--accent) 8%, transparent)', border: '1px solid var(--accent-border)' }}>
+          <p className="m-0 text-[12px] font-semibold text-white/85 mb-1">Opschonen</p>
+          <ul className="m-0 mb-2 pl-4 text-[12px] text-white/70">
+            {clean.savingsExp.length > 0 && <li>{clean.savingsExp.length} overboekingen met je spaarrekeningen staan als uitgave/inkomen ({fmt(clean.savingsExp.reduce((n, e) => n + Math.abs(Number(e.amount)), 0))}) — die worden verwijderd, want het is alleen geld verschuiven.</li>}
+            {clean.savings.length - clean.savingsExp.length > 0 && <li>{clean.savings.length - clean.savingsExp.length} spaaroverboekingen in de inbox worden genegeerd.</li>}
+            {clean.repay.filter(r => r.expense).length > 0 && <li>{clean.repay.filter(r => r.expense).length} Tikkies/terugbetalingen staan als inkomen ({fmt(clean.repay.filter(r => r.expense).reduce((n, r) => n + Math.abs(Number(r.expense!.amount)), 0))}) — die verlagen voortaan de uitgave waarvoor je voorschoot.</li>}
+            {clean.repay.filter(r => !r.expense).length > 0 && <li>{clean.repay.filter(r => !r.expense).length} Tikkies in de inbox krijgen het voorstel "Terugbetaling".</li>}
+          </ul>
+          <button type="button" onClick={async () => { await bank.cleanup(); setClean(await bank.previewCleanup()) }} disabled={bank.busy} className="btn-primary w-full" style={{ padding: '7px 12px', fontSize: 12 }}>
+            {bank.busy ? 'Bezig…' : 'Rechtzetten'}
+          </button>
+        </div>
       )}
 
       {/* 1. Geschiedenis van de eerste koppeling */}
@@ -206,7 +225,7 @@ export function BankInboxSheet({ bank, categories, onClose }: { bank: BankState;
               {loose.filter(t => t.booking_date === day).map(tx => {
                 const p = pick(tx)
                 const cats = p.kind === 'inkomen' ? INCOME_CATEGORIES.map(c => ({ id: c.id, label: c.label, emoji: c.emoji })) : categories
-                const showCats = p.kind === 'uitgave' || p.kind === 'inkomen'
+                const showCats = p.kind === 'uitgave' || p.kind === 'inkomen' || p.kind === 'terugbetaling'
                 const near = entriesNear(ownFree, tx)
                 return (
                   <div key={tx.id} className="rounded-2xl p-3" style={card}>

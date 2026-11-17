@@ -152,8 +152,15 @@ async function syncConnection(conn, { from } = {}) {
             res = await eb(`/accounts/${acc.uid}/transactions`, { query: { date_from: isoDate(accFrom) } })
           } else throw e
         }
-        for (const t of res?.transactions || []) {
-          const m = mapTransaction(t)
+        const batch = (res?.transactions || []).map(mapTransaction)
+        // Terugbetaling (Tikkie): zelfde categorie als de grootste uitgave 0–3 dagen eerder die er groter dan is
+        ctx.repaymentCategory = (tx) => {
+          const day = Date.parse(tx.booking_date)
+          const cand = [...batch, ...rows].filter(o => o.amount < 0 && -o.amount > tx.amount && (day - Date.parse(o.booking_date)) / DAY >= 0 && (day - Date.parse(o.booking_date)) / DAY <= 3)
+            .sort((a, b) => a.amount - b.amount)[0]
+          return cand ? (cand.suggested_category || suggest({ ...cand, account_kind: acc.kind }, { ...ctx, repaymentCategory: null }).category) : null
+        }
+        for (const m of batch) {
           if (!m.booking_date || (m.status && m.status !== 'BOOK')) continue // alleen geboekte transacties (pending krijgen later een ander id)
           const s = suggest({ ...m, account_kind: acc.kind }, ctx)
           rows.push({

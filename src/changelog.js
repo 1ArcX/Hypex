@@ -6,6 +6,16 @@
 
 export const RELEASES = [
   {
+    id: 34,
+    date: '2026-11-17',
+    title: 'Bank: spaaroverboekingen en Tikkies goed geteld',
+    items: [
+      { area: 'geld', text: "Overboekingen met je Oranje spaarrekeningen tellen niet meer als uitgave of inkomen — het is alleen geld verschuiven. Daardoor waren je uitgaven (en inkomsten) veel te hoog." },
+      { area: 'geld', text: "Tikkies en terugbetalingen van vrienden worden een 'Terugbetaling': die verlaagt de uitgave waarvoor je voorschoot (zelfde categorie) in plaats van als inkomen te tellen." },
+      { area: 'geld', text: "Met 'Opschonen' in de bank-inbox zet je eerder verkeerd geïmporteerde regels in één keer recht." },
+    ],
+  },
+  {
     id: 33,
     date: '2026-11-17',
     title: 'Alleen ING vervangt nu echt alles',

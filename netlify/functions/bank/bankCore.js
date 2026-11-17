@@ -10,6 +10,23 @@ const KEYWORDS = [
   ['abonnementen', /spotify|netflix|disney|videoland|hbo|vodafone|\bkpn\b|odido|t-?mobile|ziggo|simyo|lebara|youfone|apple\.com|icloud|google ?(one|storage)|zorgverzeker|\bcz\b|\bvgz\b|zilveren kruis|menzis|\bduo\b|huur|vattenfall|eneco|essent|energie|verzekering/],
 ]
 
+/** Overboeking met een eigen ING-spaarrekening ("Oranje spaarrekening F12156498"): alleen geld verschuiven. */
+const SAVINGS_RE = /oranje\s*spaarrekening|spaarrekening\s+[a-z]\d{6,}|\bspaarrekening\b.*\b[a-z]\d{7,}\b/i
+const isSavingsTransfer = (tx) => SAVINGS_RE.test(`${tx.counterparty || ''} ${tx.description || ''}`)
+/**
+ * Terugbetaling van iemand anders (je schoot voor): Tikkie-ontvangst of een overboeking van een persoon.
+ * Bedrijven/instanties (DUO, Belastingdienst, salaris…) tellen niet.
+ */
+const COMPANY_RE = /\b(b\.?v\.?|n\.?v\.?|bv|duo|belastingdienst|gemeente|svb|uwv|adecco|connexxion|randstad|tempo-team|zorgverzeker|bank|stichting|vof|holding|salaris|loon)\b/i
+function isRepayment(tx) {
+  if (tx.amount <= 0) return false
+  const text = `${tx.counterparty || ''} ${tx.description || ''}`
+  if (COMPANY_RE.test(text) || isSavingsTransfer(tx)) return false
+  if (/tikkie/i.test(text)) return true
+  // Persoonsnaam: "Hr L Vonk", "Mw …", "B.A. de Lange", "Hr W J E van Hunen en/of …"
+  return /^(hr|mw|dhr|mevr|mr|mrs)\.?\s|^([a-z]\.){1,4}\s?[a-z]/i.test((tx.counterparty || '').trim()) && Math.abs(tx.amount) < 250
+}
+
 /** "ALBERT HEIJN 1234 ARNHEM NLD" → "albert heijn arnhem": sleutel voor geleerde regels. */
 function normalizeCounterparty(s) {
   return String(s || '').toLowerCase().replace(/[0-9]+/g, ' ').replace(/[^a-zà-ÿ&.\- ]/g, ' ')
@@ -26,10 +43,11 @@ function suggest(tx, ctx) {
   const own = (ctx.ownAccounts || []).find(a => matchesAccount(tx, a))
   // Bewegingen op een spaarrekening zelf: de tegenhanger staat al op de betaalrekening
   if (tx.account_kind === 'spaar') return { kind: 'intern', category: null, autoIgnore: true }
-  if (own) {
-    if (own.kind === 'spaar') return tx.amount < 0 ? { kind: 'spaarstorting', category: 'overig' } : { kind: 'spaaropname', category: 'overig' }
-    return { kind: 'intern', category: null, autoIgnore: true } // tussen eigen betaalrekeningen
-  }
+  // Geld verschuiven tussen eigen rekeningen (ook ING-spaarrekeningen die de bank niet deelt) telt nergens mee;
+  // spaarsaldo's volgen deze overboekingen via de zelf toegevoegde spaarrekeningen.
+  if (own || isSavingsTransfer(tx)) return { kind: 'intern', category: null, autoIgnore: true }
+  // Tikkie / terugbetaling van iemand: verlaagt de uitgave waarvoor je voorschoot (zelfde categorie)
+  if (isRepayment(tx)) return { kind: 'terugbetaling', category: ctx.repaymentCategory?.(tx) || 'eten' }
   const key = normalizeCounterparty(tx.counterparty)
   const text = `${tx.counterparty || ''} ${tx.description || ''}`.toLowerCase()
   const learned = key && ctx.rules ? ctx.rules[key] : null
@@ -71,6 +89,8 @@ function toExpense(tx, kind, category, userId) {
   if (kind === 'inkomen') return { ...base, is_income: true, category: category || 'overig', description: description || 'Inkomen' }
   if (kind === 'spaarstorting') return { ...base, is_savings_contribution: true, category: 'overig', description: '🏦 Spaarstorting' }
   if (kind === 'spaaropname') return { ...base, is_savings_withdrawal: true, savings_type: 'saved', category: 'overig', description: description || 'Spaaropname' }
+  // Terugbetaling: negatieve uitgave in de categorie waarvoor je voorschoot (verlaagt die uitgaven)
+  if (kind === 'terugbetaling') return { ...base, amount: -amount, category: category || 'overig', description: `↩ ${description || 'Terugbetaling'}`.slice(0, 120) }
   return { ...base, category: category || 'overig', description }
 }
 
@@ -104,4 +124,4 @@ async function processTransaction(db, userId, id, { action, category, kind } = {
   return { id, status: 'added', expense_id: exp.id, kind: useKind, category: useCat }
 }
 
-module.exports = { suggest, toExpense, processTransaction, normalizeCounterparty, matchesAccount, manualBalance }
+module.exports = { suggest, toExpense, processTransaction, normalizeCounterparty, matchesAccount, manualBalance, isSavingsTransfer, isRepayment }

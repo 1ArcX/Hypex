@@ -3,6 +3,7 @@ import { supabase } from '../../supabaseClient'
 import { useGeldStore, type BankDetail } from '../store/geldStore'
 import type { Expense } from '../types'
 import { suggestGroups, type GroupMatch } from '../lib/bankMatch'
+import { isSavingsTransfer, isRepayment } from '../lib/bankRules'
 
 // Bankkoppeling (ING via Enable Banking, alleen-lezen). Saldo's en de inbox komen rechtstreeks uit
 // Supabase; koppelen en synchroniseren gaan via de Netlify-functie `bank` (netlify/functions/bank/bank.js).
@@ -17,7 +18,7 @@ export interface BankTx {
   id: string; account_uid: string; booking_date: string; amount: number
   counterparty: string | null; description: string | null
   status: 'new' | 'added' | 'ignored' | 'matched'
-  suggested_kind: 'uitgave' | 'inkomen' | 'spaarstorting' | 'spaaropname' | 'intern' | null
+  suggested_kind: 'uitgave' | 'inkomen' | 'spaarstorting' | 'spaaropname' | 'terugbetaling' | 'intern' | null
   suggested_category: string | null; expense_id: string | null
 }
 export interface BankConnection {
@@ -71,6 +72,7 @@ function toExpense(tx: BankTx, kind: string, category: string, userId: string) {
   if (kind === 'inkomen') return { ...base, is_income: true, category: category || 'overig', description: description || 'Inkomen' }
   if (kind === 'spaarstorting') return { ...base, is_savings_contribution: true, category: 'overig', description: '🏦 Spaarstorting' }
   if (kind === 'spaaropname') return { ...base, is_savings_withdrawal: true, savings_type: 'saved', category: 'overig', description: description || 'Spaaropname' }
+  if (kind === 'terugbetaling') return { ...base, amount: -amount, category: category || 'overig', description: `↩ ${description || 'Terugbetaling'}`.slice(0, 120) }
   return { ...base, category: category || 'overig', description }
 }
 const ruleKey = (s: string | null) => String(s || '').toLowerCase().replace(/[0-9]+/g, ' ').replace(/[^a-zà-ÿ&.\- ]/g, ' ')
@@ -252,7 +254,8 @@ export function useBank(userId: string) {
     const checked = reviewedLocal()
     // Spaaracties (opname, storting, aflossing) blijven van jou: daar zit je leningadministratie in, die ING niet kent
     const isSavingsMove = (x: { suggested_kind?: string | null }) => x.suggested_kind === 'spaarstorting' || x.suggested_kind === 'spaaropname'
-    const add = ((txRes.data || []) as BankTx[]).filter(t => t.suggested_kind !== 'intern' && !isSavingsMove(t))
+    // Ook op naam controleren: oudere transacties kunnen nog een verouderd voorstel hebben
+    const add = ((txRes.data || []) as BankTx[]).filter(t => t.suggested_kind !== 'intern' && !isSavingsMove(t) && !isSavingsTransfer(t))
     const del = ((ownRes.data || []) as (Expense & { bank_checked?: boolean })[])
       .filter(e => !e.is_planned && !fromBank.has(e.id) && !e.bank_checked && !checked.has(e.id)
         && !e.is_savings_withdrawal && !e.is_savings_contribution && !e.is_loan_repayment)
@@ -267,6 +270,7 @@ export function useBank(userId: string) {
       const prev = t.expense_id ? own.get(t.expense_id) : undefined
       if (prev && !prev.is_income) await addTx(t, prev.category, t.amount > 0 ? 'inkomen' : 'uitgave', prev)
       else if (prev) await addTx(t, prev.category, 'inkomen', prev)
+      else if (isRepayment(t)) await addTx(t, t.suggested_kind === 'terugbetaling' ? t.suggested_category || undefined : repaymentCategory(t, del), 'terugbetaling')
       else await addTx(t)
     }
     if (del.length) {
@@ -275,6 +279,55 @@ export function useBank(userId: string) {
     }
     refreshGeld()
   })
+  // ── Opschonen: eerder verkeerd geïmporteerde spaaroverboekingen en Tikkies rechtzetten ──
+  /** Categorie voor een terugbetaling: die van de grootste eigen uitgave 0–3 dagen eerder die groter is. */
+  const repaymentCategory = (tx: { booking_date: string; amount: number }, exps: Expense[]) => {
+    const day = Date.parse(tx.booking_date)
+    const hit = exps.filter(e => !e.is_income && Number(e.amount) > tx.amount && (day - Date.parse(e.date)) / 86400000 >= 0 && (day - Date.parse(e.date)) / 86400000 <= 3)
+      .sort((a, b) => Number(b.amount) - Number(a.amount))[0]
+    return hit?.category || 'eten'
+  }
+  const previewCleanup = async () => {
+    const [txRes, expRes] = await Promise.all([
+      supabase.from('bank_transactions').select('*').eq('user_id', userId).in('status', ['new', 'added', 'ignored']).limit(5000),
+      supabase.from('expenses').select('*').eq('user_id', userId).gte('date', new Date(Date.now() - 800 * 86400000).toISOString().slice(0, 10)).limit(5000),
+    ])
+    const txs = (txRes.data || []) as BankTx[]
+    const exps = (expRes.data || []) as Expense[]
+    const byId = new Map(exps.map(e => [e.id, e]))
+    // 1) Spaaroverboekingen die als uitgave/inkomen zijn toegevoegd of nog in de inbox staan
+    const savings = txs.filter(t => isSavingsTransfer(t) && (t.status === 'new' || (t.status === 'added' && t.expense_id && byId.has(t.expense_id))))
+    // 2) Tikkies die als inkomen (categorie overig) zijn toegevoegd of nog in de inbox staan
+    const repay = txs.filter(t => isRepayment(t) && (
+      (t.status === 'new' && t.suggested_kind !== 'terugbetaling') ||
+      (t.status === 'added' && t.expense_id && byId.get(t.expense_id)?.is_income && byId.get(t.expense_id)?.category === 'overig')))
+      .map(t => ({ tx: t, expense: t.expense_id ? byId.get(t.expense_id) : undefined, category: repaymentCategory(t, exps) }))
+    const savingsExp = savings.filter(t => t.status === 'added').map(t => byId.get(t.expense_id!)!)
+    return { savings, savingsExp, repay }
+  }
+  const cleanup = () => run(async () => {
+    const { savings, savingsExp, repay } = await previewCleanup()
+    if (savingsExp.length) {
+      const { error: e } = await supabase.from('expenses').delete().in('id', savingsExp.map(x => x.id)).eq('user_id', userId)
+      if (e) throw new Error(e.message)
+    }
+    if (savings.length) {
+      const { error: e } = await supabase.from('bank_transactions').update({ status: 'ignored', suggested_kind: 'intern', suggested_category: null, expense_id: null }).in('id', savings.map(x => x.id))
+      if (e) throw new Error(e.message)
+    }
+    for (const r of repay) {
+      if (r.expense) {
+        const desc = r.expense.description || r.tx.counterparty || 'Terugbetaling'
+        const { error: e } = await supabase.from('expenses').update({ is_income: false, amount: -Math.abs(Number(r.expense.amount)), category: r.category, description: desc.startsWith('↩') ? desc : `↩ ${desc}` }).eq('id', r.expense.id)
+        if (e) throw new Error(e.message)
+        await supabase.from('bank_transactions').update({ suggested_kind: 'terugbetaling', suggested_category: r.category }).eq('id', r.tx.id)
+      } else {
+        await supabase.from('bank_transactions').update({ suggested_kind: 'terugbetaling', suggested_category: r.category }).eq('id', r.tx.id)
+      }
+    }
+    refreshGeld()
+  })
+
   /** Maanden waarvan de bank gegevens heeft (eerste boeking t/m nu), nieuwste eerst. */
   const bankMonths = (() => {
     if (!firstBankDate) return [] as string[]
@@ -339,7 +392,7 @@ export function useBank(userId: string) {
       .eq('user_id', userId).order('booking_date', { ascending: false }).limit(1000)
     const seen = new Map<string, number>()
     for (const r of (data || []) as { counterparty: string | null; counterparty_iban: string | null }[]) {
-      const label = r.counterparty_iban || r.counterparty
+      const label = /spaar/i.test(r.counterparty || '') ? r.counterparty : (r.counterparty_iban || r.counterparty)
       if (!label) continue
       const hint = /spaar|saving|rente|deposito|oranje/i.test(r.counterparty || '')
       seen.set(label, (seen.get(label) || 0) + (hint ? 100 : 1))
@@ -372,7 +425,7 @@ export function useBank(userId: string) {
     connect, refresh, disconnect, add, ignore, ignoreBefore, unmatch, setKind, fetchHistory, historyNote,
     saveManualSavings, removeManualSavings, savingsCandidates,
     ownOpen, groups, notOnStatement, linkTxs, replaceWithBank, markChecked, deleteOwn, onlyBank,
-    previewMonth, onlyBankMonth, bankMonths, firstBankDate,
+    previewMonth, onlyBankMonth, bankMonths, firstBankDate, previewCleanup, cleanup,
   }
 }
 export type BankState = ReturnType<typeof useBank>

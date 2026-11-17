@@ -207,7 +207,7 @@ const TOOLS = [
   { name: 'process_bank_transaction', description: 'Een banktransactie uit de inbox verwerken: add = toevoegen als uitgave/inkomen/spaaractie (met optioneel een andere soort of categorie; een afwijkende categorie wordt onthouden voor die tegenpartij), ignore = negeren. Vraag eerst bevestiging.',
     inputSchema: { type: 'object', properties: {
       id: { type: 'string' }, action: { type: 'string', enum: ['add', 'ignore'] },
-      kind: { type: 'string', enum: ['uitgave', 'inkomen', 'spaarstorting', 'spaaropname'] },
+      kind: { type: 'string', enum: ['uitgave', 'inkomen', 'terugbetaling', 'spaarstorting', 'spaaropname'], description: 'terugbetaling = Tikkie/terugbetaling van iemand: negatieve uitgave in de categorie waarvoor je voorschoot' },
       category: { type: 'string', description: 'Categorie-id (zie get_budget_config)' } }, required: ['id', 'action'] } },
   { name: 'update_budget_config', description: 'Budgetinstellingen aanpassen. category_budgets en month_adjustments worden samengevoegd met de bestaande waarden (zet een maand op 0 om de aanpassing te wissen).',
     inputSchema: { type: 'object', properties: {

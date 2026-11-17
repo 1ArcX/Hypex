@@ -19,7 +19,7 @@ export const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) -
 export function ownValue(e: Expense): number {
   const a = Math.abs(Number(e.amount))
   if (e.is_income || e.is_savings_withdrawal) return -a
-  return a // gewone uitgave, spaarstorting, aflossing
+  return Number(e.amount) // gewone uitgave, spaarstorting, aflossing (negatief = terugbetaling, dus instroom)
 }
 /** Uitstroom volgens de bank (bank: − = af). */
 export const txValue = (t: MatchTx) => -Number(t.amount)
