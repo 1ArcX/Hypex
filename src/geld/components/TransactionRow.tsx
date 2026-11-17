@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Pencil, Trash2, Landmark } from 'lucide-react'
 import { useGeldStore } from '../store/geldStore'
+import { setExpenseCategory } from '../lib/quickCategory'
+import { INCOME_CATEGORIES } from '../lib/categories'
 import type { CategoryConfig, Expense } from '../types'
 import { findCategory, findIncomeCategory } from '../lib/categories'
 import { fmt, fmtDay } from '../lib/format'
@@ -13,6 +15,15 @@ export function TransactionRow({ exp, allCategories, onEdit, onDelete }: {
 }) {
   const bankTxs = useGeldStore(s => s.bankByExpense[exp.id])
   const [open, setOpen] = useState(false)
+  const [catOpen, setCatOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const refresh = useGeldStore(s => s.refresh)
+  const pickCategory = async (id: string) => {
+    if (id === exp.category) { setCatOpen(false); return }
+    setSaving(true)
+    try { await setExpenseCategory(exp.id, id, bankTxs); refresh() } catch (e) { window.alert(`Categorie wijzigen lukte niet: ${e instanceof Error ? e.message : e}`) }
+    setSaving(false); setCatOpen(false)
+  }
   const isInc = !!exp.is_income
   const cat = isInc ? findIncomeCategory(exp.category) : findCategory(allCategories, exp.category)
   const color = isInc ? '#34D399' : ((cat as CategoryConfig).color || '#94A3B8')
@@ -22,8 +33,12 @@ export function TransactionRow({ exp, allCategories, onEdit, onDelete }: {
       isInc ? 'bg-emerald-400/[0.06] border-emerald-400/15' : 'bg-white/[0.04] border-white/[0.07]'
     }`}>
     <div className="flex items-center gap-3 px-3.5 py-2.5">
-      <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0"
-        style={{ background: `color-mix(in srgb, ${color} 8%, transparent)` }}>{cat.emoji}</div>
+      {/* Tik op het icoontje = categorie direct wijzigen */}
+      <button type="button" onClick={() => setCatOpen(o => !o)} aria-label={`Categorie wijzigen (nu: ${cat.label})`} title="Categorie wijzigen"
+        className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0"
+        style={{ background: `color-mix(in srgb, ${color} 8%, transparent)`, border: catOpen ? `1px solid color-mix(in srgb, ${color} 50%, transparent)` : '1px solid transparent', cursor: 'pointer', padding: 0, opacity: saving ? 0.5 : 1 }}>
+        {cat.emoji}
+      </button>
       <div className="flex-1 min-w-0" onClick={bankTxs?.length ? () => setOpen(o => !o) : undefined}
         style={bankTxs?.length ? { cursor: 'pointer' } : undefined}>
         <p className="text-[13px] font-semibold text-white/85 m-0 truncate">{exp.description || cat.label}</p>
@@ -51,6 +66,20 @@ export function TransactionRow({ exp, allCategories, onEdit, onDelete }: {
         <Trash2 size={12} />
       </button>
     </div>
+    {catOpen && (
+      <div className="px-3.5 pb-2.5 flex gap-1.5 flex-wrap">
+        {(isInc ? INCOME_CATEGORIES : allCategories).map(c => {
+          const active = c.id === exp.category
+          return (
+            <button key={c.id} type="button" disabled={saving} onClick={() => pickCategory(c.id)}
+              className="text-[11px] rounded-full px-2.5 py-1"
+              style={{ cursor: 'pointer', border: `1px solid ${active ? 'var(--accent-border)' : 'var(--c-border)'}`, background: active ? 'var(--accent-soft)' : 'var(--c-surface-2)', color: active ? 'var(--accent)' : 'var(--c-text-2)', fontWeight: active ? 700 : 500 }}>
+              {c.emoji} {c.label}
+            </button>
+          )
+        })}
+      </div>
+    )}
     {/* ING-gegevens zoals op je afschrift */}
     {open && bankTxs?.length ? (
       <div className="px-3.5 pb-2.5 flex flex-col gap-1.5">

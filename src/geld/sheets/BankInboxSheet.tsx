@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Check, X, Undo2, Link2, Landmark, AlertTriangle } from 'lucide-react'
 import { Sheet } from '../components/ui/Sheet'
 import { fmt, fmtDay } from '../lib/format'
@@ -37,12 +37,14 @@ function OwnLabel({ e, categories }: { e: Expense; categories: CategoryConfig[] 
 export function BankInboxSheet({ bank, categories, onClose }: { bank: BankState; categories: CategoryConfig[]; onClose: () => void }) {
   const [choice, setChoice] = useState<Record<string, { kind?: string; category?: string }>>({})
   const [confirmOnly, setConfirmOnly] = useState(false)
+  const [onlyMonth, setOnlyMonth] = useState(bank.bankMonths[0] || '')
+  const [preview, setPreview] = useState<{ add: BankTx[]; del: Expense[] } | null>(null)
+  useEffect(() => { if (!onlyMonth && bank.bankMonths[0]) setOnlyMonth(bank.bankMonths[0]) }, [bank.bankMonths.length]) // eslint-disable-line react-hooks/exhaustive-deps
   const pick = (tx: BankTx) => ({ kind: choice[tx.id]?.kind || tx.suggested_kind || (tx.amount > 0 ? 'inkomen' : 'uitgave'), category: choice[tx.id]?.category || tx.suggested_category || 'overig' })
   const set = (id: string, patch: { kind?: string; category?: string }) => setChoice(c => ({ ...c, [id]: { ...c[id], ...patch } }))
 
   const now = new Date()
   const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
-  const todayStr = now.toLocaleDateString('en-CA')
   const monthName = now.toLocaleDateString('nl-NL', { month: 'long' })
   const olderCount = bank.inbox.filter(t => t.booking_date < monthStart).length
 
@@ -53,9 +55,18 @@ export function BankInboxSheet({ bank, categories, onClose }: { bank: BankState;
   const ownFree = bank.ownOpen.filter(e => !groupedOwn.has(e.id))
   const days = [...new Set(loose.map(t => t.booking_date))].sort((a, b) => b.localeCompare(a))
 
-  // Alleen ING (deze maand)
-  const onlyDel = bank.ownOpen.filter(e => e.date >= monthStart && e.date <= todayStr)
-  const onlyAdd = bank.inbox.filter(t => t.booking_date >= monthStart && t.booking_date <= todayStr)
+  // Alleen ING voor de gekozen maand: voorbeeld ophalen zodra je de bevestiging opent of een andere maand kiest
+  useEffect(() => {
+    if (!confirmOnly || !onlyMonth) return
+    let cancelled = false
+    setPreview(null)
+    bank.previewMonth(onlyMonth).then(p => { if (!cancelled) setPreview(p) })
+    return () => { cancelled = true }
+  }, [confirmOnly, onlyMonth]) // eslint-disable-line react-hooks/exhaustive-deps
+  const onlyDel = preview?.del || []
+  const onlyAdd = preview?.add || []
+  const monthLabel = (ym: string) => new Date(`${ym}-01T12:00:00`).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
+  const partial = onlyMonth && bank.firstBankDate && bank.firstBankDate.slice(0, 7) === onlyMonth && bank.firstBankDate.slice(8) !== '01'
 
   const addAll = async () => {
     for (const tx of loose) {
@@ -84,22 +95,30 @@ export function BankInboxSheet({ bank, categories, onClose }: { bank: BankState;
       )}
 
       {/* 2. Alleen ING voor deze maand */}
-      {olderCount === 0 && onlyAdd.length > 0 && (
+      {bank.bankMonths.length > 0 && (
         <div className="rounded-2xl p-3 mb-3" style={card}>
           {!confirmOnly ? (
             <div className="flex items-center gap-2">
               <Landmark size={15} style={{ color: '#FF6200' }} className="shrink-0" />
-              <p className="m-0 text-[12px] text-white/70 flex-1">Liever alleen je ING-afschrift als bron voor {monthName}?</p>
+              <p className="m-0 text-[12px] text-white/70 flex-1">Een maand helemaal vervangen door je ING-afschrift?</p>
               <button type="button" className="btn-ghost" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => setConfirmOnly(true)}>Alleen ING</button>
             </div>
           ) : (
             <div className="flex flex-col gap-2">
-              <p className="m-0 text-[12px] font-semibold text-white/85 flex items-center gap-1.5"><AlertTriangle size={13} style={{ color: 'var(--c-warning)' }} /> Alleen ING voor {monthName}</p>
+              <div className="flex items-center gap-2">
+                <p className="m-0 text-[12px] font-semibold text-white/85 flex items-center gap-1.5 flex-1"><AlertTriangle size={13} style={{ color: 'var(--c-warning)' }} /> Alleen ING voor</p>
+                <select className="glass-input" value={onlyMonth} onChange={e => setOnlyMonth(e.target.value)} aria-label="Maand"
+                  style={{ width: 'auto', fontSize: 12, padding: '5px 8px', colorScheme: 'dark' }}>
+                  {bank.bankMonths.map(ym => <option key={ym} value={ym}>{monthLabel(ym)}</option>)}
+                </select>
+              </div>
+              {partial && <p className="m-0 text-[11px]" style={{ color: 'var(--c-warning)' }}>ING heeft voor deze maand pas gegevens vanaf {fmtDay(bank.firstBankDate!)}; eigen invoer daarvóór wordt ook vervangen.</p>}
+              {!preview ? <p className="m-0 text-[12px] text-white/50">Even kijken wat er verandert…</p> : <>
               <p className="m-0 text-[12px] text-white/65">
                 {onlyDel.length
                   ? <>Je <b>{onlyDel.length}</b> losse eigen {onlyDel.length === 1 ? 'invoer wordt' : 'invoeren worden'} verwijderd ({fmt(onlyDel.reduce((n, e) => n + Number(e.amount), 0))}) en </>
                   : 'Er wordt niets van je eigen invoer verwijderd; '}
-                de <b>{onlyAdd.length}</b> transacties van ING worden toegevoegd met hun voorgestelde categorie. Wat al gekoppeld is, geplande uitgaven en wat je als "klopt" markeerde blijven staan.
+                de <b>{onlyAdd.length}</b> transacties van ING worden toegevoegd met hun voorgestelde categorie (aanpassen kan daarna met één tik op het icoontje). Wat al gekoppeld is, geplande uitgaven en wat je als "klopt" markeerde blijven staan.
               </p>
               {onlyDel.length > 0 && (
                 <div className="max-h-32 overflow-y-auto rounded-lg p-2 text-[11px] text-white/55 flex flex-col gap-0.5" style={{ background: 'var(--c-surface-3)' }}>
@@ -110,9 +129,10 @@ export function BankInboxSheet({ bank, categories, onClose }: { bank: BankState;
               )}
               <div className="flex gap-2">
                 <button type="button" className="btn-ghost flex-1" style={{ padding: '7px 10px', fontSize: 12 }} onClick={() => setConfirmOnly(false)}>Annuleren</button>
-                <button type="button" className="btn-primary flex-1" style={{ padding: '7px 10px', fontSize: 12 }} disabled={bank.busy}
-                  onClick={async () => { await bank.onlyBank(monthStart, todayStr); setConfirmOnly(false) }}>Vervangen door ING</button>
+                <button type="button" className="btn-primary flex-1" style={{ padding: '7px 10px', fontSize: 12 }} disabled={bank.busy || !preview || (!onlyAdd.length && !onlyDel.length)}
+                  onClick={async () => { await bank.onlyBankMonth(onlyMonth); setConfirmOnly(false) }}>Vervangen door ING</button>
               </div>
+              </>}
             </div>
           )}
         </div>

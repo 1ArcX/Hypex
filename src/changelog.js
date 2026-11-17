@@ -6,6 +6,15 @@
 
 export const RELEASES = [
   {
+    id: 31,
+    date: '2026-11-17',
+    title: 'Geld: Alleen ING per maand en snel categorie kiezen',
+    items: [
+      { area: 'geld', text: "'Alleen ING' werkt nu voor elke maand waarvan ING gegevens heeft: kies de maand, bekijk wat er verandert en bevestig. Eerder genegeerde transacties gaan ook mee." },
+      { area: 'geld', text: "Tik in een transactie op het icoontje om meteen een andere categorie te kiezen. Bij uitgaven van de bank onthoudt Hypex die keuze voor die winkel." },
+    ],
+  },
+  {
     id: 30,
     date: '2026-11-17',
     title: 'Bank-inbox: slim vergelijken met je eigen invoer',

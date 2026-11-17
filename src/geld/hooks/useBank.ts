@@ -220,6 +220,47 @@ export function useBank(userId: string) {
    * Alleen ING voor een periode: je losse eigen invoer in [from, to] verwijderen en alle open banktransacties
    * in die periode toevoegen. (Gekoppelde invoer, geplande uitgaven en wat je als "klopt" markeerde blijven staan.)
    */
+  /** Wat "Alleen ING" voor maand `ym` (YYYY-MM) zou doen: welke eigen invoer weg, welke banktransacties erbij. */
+  const previewMonth = async (ym: string) => {
+    const [y, m] = ym.split('-').map(Number)
+    const from = `${ym}-01`, to = `${ym}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`
+    const [txRes, ownRes, linkRes] = await Promise.all([
+      // Ook eerder genegeerde transacties (bv. "alles vóór 1 nov negeren"); interne overboekingen niet
+      supabase.from('bank_transactions').select('*').eq('user_id', userId).in('status', ['new', 'ignored'])
+        .gte('booking_date', from).lte('booking_date', to).order('booking_date'),
+      supabase.from('expenses').select('*').eq('user_id', userId).gte('date', from).lte('date', to),
+      supabase.from('bank_transactions').select('expense_id').eq('user_id', userId).not('expense_id', 'is', null),
+    ])
+    const linked = new Set(((linkRes.data || []) as { expense_id: string }[]).map(x => x.expense_id))
+    const checked = reviewedLocal()
+    const add = ((txRes.data || []) as BankTx[]).filter(t => t.suggested_kind !== 'intern')
+    const del = ((ownRes.data || []) as (Expense & { bank_checked?: boolean })[])
+      .filter(e => !e.is_planned && !linked.has(e.id) && !e.bank_checked && !checked.has(e.id))
+    return { from, to, add, del }
+  }
+  const onlyBankMonth = (ym: string) => run(async () => {
+    const { add: txs, del } = await previewMonth(ym)
+    if (del.length) {
+      const { error: e } = await supabase.from('expenses').delete().in('id', del.map(x => x.id)).eq('user_id', userId)
+      if (e) throw new Error(e.message)
+    }
+    for (const t of txs) await addTx(t)
+    refreshGeld()
+  })
+  /** Maanden waarvan de bank gegevens heeft (eerste boeking t/m nu), nieuwste eerst. */
+  const bankMonths = (() => {
+    if (!firstBankDate) return [] as string[]
+    const out: string[] = []
+    const d = new Date(), first = firstBankDate.slice(0, 7)
+    for (let i = 0; i < 24; i++) {
+      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      out.push(ym)
+      if (ym <= first) break
+      d.setMonth(d.getMonth() - 1)
+    }
+    return out
+  })()
+
   const onlyBank = (from: string, to: string) => run(async () => {
     const del = ownOpen.filter(e => e.date >= from && e.date <= to)
     if (del.length) {
@@ -303,6 +344,7 @@ export function useBank(userId: string) {
     connect, refresh, disconnect, add, ignore, ignoreBefore, unmatch, setKind,
     saveManualSavings, removeManualSavings, savingsCandidates,
     ownOpen, groups, notOnStatement, linkTxs, replaceWithBank, markChecked, deleteOwn, onlyBank,
+    previewMonth, onlyBankMonth, bankMonths, firstBankDate,
   }
 }
 export type BankState = ReturnType<typeof useBank>
