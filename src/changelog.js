@@ -6,6 +6,14 @@
 
 export const RELEASES = [
   {
+    id: 38,
+    date: '2026-11-17',
+    title: 'Bank: reserveringen zien',
+    items: [
+      { area: 'geld', text: "Betalingen die bij ING nog in verwerking zijn (reserveringen) staan nu meteen in de bank-inbox, in een grijs lijstje. Ze tellen nog niet mee; zodra ING ze boekt komen ze als gewone transactie binnen." },
+    ],
+  },
+  {
     id: 37,
     date: '2026-11-17',
     title: 'Geld: overschrijdingen spreiden vanaf november',

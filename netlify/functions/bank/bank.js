@@ -142,6 +142,7 @@ async function syncConnection(conn, { from } = {}) {
 
       // Transacties (gepagineerd)
       const rows = []
+      const pendingRows = [] // reserveringen (nog niet geboekt): alleen ter info, worden elke sync vervangen
       let key = null, pages = 0, accFrom = since
       do {
         let res
@@ -162,7 +163,17 @@ async function syncConnection(conn, { from } = {}) {
           return cand ? (cand.suggested_category || suggest({ ...cand, account_kind: acc.kind }, { ...ctx, repaymentCategory: null }).category) : null
         }
         for (const m of batch) {
-          if (!m.booking_date || (m.status && m.status !== 'BOOK')) continue // alleen geboekte transacties (pending krijgen later een ander id)
+          if (m.status && m.status !== 'BOOK') {
+            // Reservering: krijgt bij het boeken een ander id, dus apart bewaren (status 'pending') en elke sync vervangen
+            const ps = suggest({ ...m, booking_date: m.booking_date || isoDate(new Date()), account_kind: acc.kind }, ctx)
+            if (ps.kind !== 'intern') pendingRows.push({
+              user_id: uid, account_uid: acc.uid, ext_id: `pending:${m.ext_id}`, booking_date: m.booking_date || isoDate(new Date()), amount: m.amount,
+              counterparty: m.counterparty, counterparty_iban: m.counterparty_iban, description: m.description,
+              suggested_kind: ps.kind, suggested_category: ps.category, status: 'pending',
+            })
+            continue
+          }
+          if (!m.booking_date) continue
           const s = suggest({ ...m, account_kind: acc.kind }, ctx)
           rows.push({
             user_id: uid, account_uid: acc.uid, ext_id: m.ext_id, booking_date: m.booking_date, amount: m.amount,
@@ -173,6 +184,14 @@ async function syncConnection(conn, { from } = {}) {
         }
         key = res?.continuation_key || null
       } while (key && ++pages < 40)
+
+      // Reserveringen verversen: oude weg, huidige erin (geboekte komen als normale transactie binnen)
+      await supabase.from('bank_transactions').delete().eq('account_uid', acc.uid).eq('status', 'pending')
+      if (pendingRows.length) {
+        const uniq = [...new Map(pendingRows.map(r => [r.ext_id, r])).values()]
+        const { error: pe } = await supabase.from('bank_transactions').insert(uniq)
+        if (pe) console.warn('[bank] reserveringen', pe.message)
+      }
 
       if (rows.length) {
         // Bestaande (zelfde rekening + ext_id) blijven zoals ze zijn

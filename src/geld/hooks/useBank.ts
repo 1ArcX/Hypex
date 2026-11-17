@@ -17,7 +17,7 @@ export interface BankAccount {
 export interface BankTx {
   id: string; account_uid: string; booking_date: string; amount: number
   counterparty: string | null; description: string | null; paid_date?: string | null
-  status: 'new' | 'added' | 'ignored' | 'matched'
+  status: 'new' | 'added' | 'ignored' | 'matched' | 'pending'
   suggested_kind: 'uitgave' | 'inkomen' | 'spaarstorting' | 'spaaropname' | 'terugbetaling' | 'intern' | null
   suggested_category: string | null; expense_id: string | null
 }
@@ -99,6 +99,7 @@ export function useBank(userId: string) {
   const [accounts, setAccounts] = useState<BankAccount[]>([])
   const [inbox, setInbox] = useState<BankTx[]>([])
   const [matched, setMatched] = useState<BankTx[]>([])
+  const [pending, setPending] = useState<BankTx[]>([]) // reserveringen (nog niet geboekt)
   // Slim vergelijken: eigen invoer (expenses) die nog aan geen banktransactie hangt
   const [ownOpen, setOwnOpen] = useState<Expense[]>([])
   const [firstBankDate, setFirstBankDate] = useState<string | null>(null)
@@ -111,7 +112,7 @@ export function useBank(userId: string) {
 
   const load = useCallback(async () => {
     const since = new Date(Date.now() - 400 * 86400000).toISOString().slice(0, 10)
-    const [c, a, t, m, linked] = await Promise.all([
+    const [c, a, t, m, linked, pend] = await Promise.all([
       supabase.from('bank_connections').select('status, valid_until, last_synced_at, last_error').eq('user_id', userId).maybeSingle(),
       supabase.from('bank_accounts').select('*').eq('user_id', userId).order('kind').order('name'),
       supabase.from('bank_transactions').select('*').eq('user_id', userId).eq('status', 'new').order('booking_date', { ascending: false }).limit(200),
@@ -119,6 +120,7 @@ export function useBank(userId: string) {
       // Banktransacties die aan een uitgave hangen → ING-gegevens in de transactierijen
       supabase.from('bank_transactions').select('id, booking_date, amount, counterparty, counterparty_iban, description, expense_id, account_uid')
         .eq('user_id', userId).not('expense_id', 'is', null).gte('booking_date', since).limit(2000),
+      supabase.from('bank_transactions').select('*').eq('user_id', userId).eq('status', 'pending').order('booking_date', { ascending: false }).limit(50),
     ])
     if (c.error && /bank_connections|does not exist|PGRST205/i.test(`${c.error.message} ${c.error.code}`)) { setMissing(true); setLoading(false); return null }
     const next = (c.data as BankConnection) || { status: 'none', valid_until: null, last_synced_at: null, last_error: null }
@@ -136,6 +138,7 @@ export function useBank(userId: string) {
     setAccounts(accs)
     setInbox((t.data as BankTx[]) || [])
     setMatched((m.data as BankTx[]) || [])
+    setPending((pend.data as BankTx[]) || [])
     const inboxRows = (t.data as BankTx[]) || []
     const monthStart = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01` })()
     const minInbox = inboxRows.map(x => x.booking_date).sort()[0]
@@ -465,7 +468,7 @@ export function useBank(userId: string) {
   const daysLeft = conn.valid_until ? Math.ceil((new Date(conn.valid_until).getTime() - Date.now()) / 86400000) : null
 
   return {
-    loading, busy, error, missing, conn, accounts: visible, inbox, matched, savingsTotal, checkingBalance, daysLeft,
+    loading, busy, error, missing, conn, accounts: visible, inbox, matched, pending, savingsTotal, checkingBalance, daysLeft,
     connected: conn.status === 'active' || conn.status === 'expired' || conn.status === 'error',
     connect, refresh, disconnect, add, ignore, ignoreBefore, unmatch, setKind, fetchHistory, historyNote,
     saveManualSavings, removeManualSavings, savingsCandidates,

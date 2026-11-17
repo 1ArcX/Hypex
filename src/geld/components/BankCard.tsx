@@ -174,12 +174,12 @@ export function BankCard({ bank, onOpenInbox }: { bank: BankState; onOpenInbox: 
         )}
       </div>
 
-      {(bank.inbox.length > 0 || bank.matched.length > 0 || bank.notOnStatement.length > 0) && (
+      {(bank.inbox.length > 0 || bank.matched.length > 0 || bank.notOnStatement.length > 0 || bank.pending.length > 0) && (
         <button type="button" onClick={onOpenInbox} className="w-full mt-3 flex items-center gap-2 rounded-xl px-3 py-2.5 text-left"
           style={{ background: bank.inbox.length ? 'var(--accent-soft)' : 'var(--c-surface-2)', border: `1px solid ${bank.inbox.length ? 'var(--accent-border)' : 'var(--c-border)'}`, cursor: 'pointer', color: 'var(--c-text)' }}>
           <Inbox size={15} style={{ color: bank.inbox.length ? 'var(--accent)' : 'var(--c-text-3)' }} />
           <span className="flex-1 text-[13px] font-semibold">
-            {bank.inbox.length ? `${bank.inbox.length} nieuwe ${bank.inbox.length === 1 ? 'transactie' : 'transacties'}` : bank.notOnStatement.length ? `${bank.notOnStatement.length} niet op je afschrift` : 'Banktransacties'}
+            {bank.inbox.length ? `${bank.inbox.length} nieuwe ${bank.inbox.length === 1 ? 'transactie' : 'transacties'}` : bank.notOnStatement.length ? `${bank.notOnStatement.length} niet op je afschrift` : bank.pending.length ? `${bank.pending.length} ${bank.pending.length === 1 ? 'reservering' : 'reserveringen'}` : 'Banktransacties'}
           </span>
           <span className="text-[12px] text-white/50">Bekijken</span>
         </button>

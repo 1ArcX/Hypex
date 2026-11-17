@@ -81,6 +81,23 @@ export function BankInboxSheet({ bank, categories, onClose }: { bank: BankState;
   return (
     <Sheet onClose={onClose} title={`Banktransacties${bank.inbox.length ? ` (${bank.inbox.length})` : ''}`}>
       {bank.error && <p className="m-0 mb-3 text-[12px]" style={{ color: 'var(--c-danger)' }}>{bank.error}</p>}
+      {/* Reserveringen: nog niet geboekt, tellen nog niet mee */}
+      {bank.pending.length > 0 && (
+        <div className="mb-4">
+          <p className={heading}>Reserveringen · nog in verwerking</p>
+          <div className="flex flex-col gap-1 rounded-2xl px-3 py-2" style={{ border: '1px dashed var(--c-border-strong)' }}>
+            {bank.pending.map(t => (
+              <div key={t.id} className="flex items-center gap-2 text-[12px] text-white/50">
+                <span className="w-14 shrink-0">{fmtDay(t.booking_date)}</span>
+                <span className="flex-1 min-w-0 truncate">{t.counterparty || t.description || 'Onbekend'}</span>
+                <span className="tnum shrink-0">{signed(t.amount)}</span>
+              </div>
+            ))}
+            <p className="m-0 mt-1 text-[11px] text-white/35">Tellen nog niet mee. Zodra ING ze boekt, komen ze hieronder als gewone transactie binnen.</p>
+          </div>
+        </div>
+      )}
+
       {bank.inbox.length === 0 && bank.notOnStatement.length === 0 && (
         <p className="text-[13px] text-white/50 m-0 mb-4">Alles verwerkt. Nieuwe transacties verschijnen hier na het bijwerken.</p>
       )}
