@@ -190,15 +190,20 @@ async function syncConnection(conn, { from } = {}) {
       const { data: oldPending } = await supabase.from('bank_transactions').select('*').eq('account_uid', acc.uid).eq('status', 'pending')
       const currentIds = new Set(pendingRows.map(r => r.ext_id))
       const vanished = (oldPending || []).filter(p => !currentIds.has(p.ext_id))
-      const known = new Set((oldPending || []).map(p => p.ext_id))
+      const oldById = new Map((oldPending || []).map(p => [p.ext_id, p]))
       for (const r of [...new Map(pendingRows.map(r => [r.ext_id, r])).values()]) {
-        if (known.has(r.ext_id)) continue
+        const old = oldById.get(r.ext_id)
+        if (old?.expense_id) continue
         let expenseId = null
         if (r.suggested_kind === 'uitgave' && r.amount < 0) {
-          const { data: exp } = await supabase.from('expenses').insert(toExpense(r, 'uitgave', r.suggested_category, uid)).select('id').single()
+          const { data: exp, error: ee } = await supabase.from('expenses').insert(toExpense(r, 'uitgave', r.suggested_category, uid)).select('id').single()
+          if (ee) console.warn('[bank] reservering uitgave', ee.message)
           expenseId = exp?.id || null
         }
-        const { error: pe } = await supabase.from('bank_transactions').insert({ ...r, expense_id: expenseId })
+        // Reserveringen van vóór deze versie staan er al zonder uitgave → alsnog koppelen
+        const { error: pe } = old
+          ? await supabase.from('bank_transactions').update({ expense_id: expenseId }).eq('id', old.id)
+          : await supabase.from('bank_transactions').insert({ ...r, expense_id: expenseId })
         if (pe) console.warn('[bank] reservering', pe.message)
       }
 
