@@ -6,6 +6,14 @@
 
 export const RELEASES = [
   {
+    id: 32,
+    date: '2026-11-17',
+    title: 'Bank: oudere maanden ophalen',
+    items: [
+      { area: 'geld', text: "Bij 'Alleen ING' in de bank-inbox kun je nu oudere maanden ophalen (tot 12 maanden terug). ING geeft dat meestal alleen vlak na opnieuw inloggen; lukt het niet, dan zie je een knop om opnieuw te koppelen." },
+    ],
+  },
+  {
     id: 31,
     date: '2026-11-17',
     title: 'Geld: Alleen ING per maand en snel categorie kiezen',

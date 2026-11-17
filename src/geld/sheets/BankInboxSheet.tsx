@@ -113,6 +113,14 @@ export function BankInboxSheet({ bank, categories, onClose }: { bank: BankState;
                 </select>
               </div>
               {partial && <p className="m-0 text-[11px]" style={{ color: 'var(--c-warning)' }}>ING heeft voor deze maand pas gegevens vanaf {fmtDay(bank.firstBankDate!)}; eigen invoer daarvóór wordt ook vervangen.</p>}
+              <div className="flex items-center gap-2">
+                <button type="button" className="btn-ghost" style={{ padding: '5px 10px', fontSize: 11 }} disabled={bank.busy}
+                  onClick={() => { const d = new Date(); d.setMonth(d.getMonth() - 12); d.setDate(1); bank.fetchHistory(d.toLocaleDateString('en-CA')) }}>
+                  Oudere maanden ophalen
+                </button>
+                {bank.historyNote && <span className="text-[11px] text-white/55 flex-1">{bank.historyNote}</span>}
+                {bank.historyNote?.startsWith('ING gaf') && <button type="button" className="btn-ghost" style={{ padding: '5px 10px', fontSize: 11 }} onClick={bank.connect}>Opnieuw koppelen</button>}
+              </div>
               {!preview ? <p className="m-0 text-[12px] text-white/50">Even kijken wat er verandert…</p> : <>
               <p className="m-0 text-[12px] text-white/65">
                 {onlyDel.length

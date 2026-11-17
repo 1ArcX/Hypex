@@ -109,7 +109,9 @@ const userError = (msg) => Object.assign(new Error(msg), { status: 400 })
 const getConnection = async (uid) => (await supabase.from('bank_connections').select('*').eq('user_id', uid).maybeSingle()).data
 
 // ── synchroniseren ──────────────────────────────────────────────────────────
-async function syncConnection(conn) {
+// Oudere geschiedenis (> 90 dagen) geven banken meestal alleen vlak na het inloggen bij de bank (PSD2/SCA).
+// Lukt het niet, dan valt de sync terug op 90 dagen en meldt `history_limited`.
+async function syncConnection(conn, { from } = {}) {
   const uid = conn.user_id
   if (!conn.session_id || conn.status === 'disconnected') return { skipped: 'geen koppeling' }
   if (conn.valid_until && new Date(conn.valid_until) < new Date()) {
@@ -122,8 +124,10 @@ async function syncConnection(conn) {
     const { data: cfg } = await supabase.from('budget_config').select('bank_rules').eq('user_id', uid).maybeSingle()
     // Eigen rekeningen (ook zelf toegevoegde spaarrekeningen) → overboekingen herkennen
     const ctx = { ownAccounts: (allAccounts || []).map(a => ({ iban: a.iban, kind: a.kind, match: a.match })), rules: cfg?.bank_rules || {} }
-    const since = conn.last_synced_at ? new Date(new Date(conn.last_synced_at).getTime() - 14 * DAY) : new Date(Date.now() - 90 * DAY)
-    let added = 0
+    const since = from ? new Date(`${from}T00:00:00`)
+      : conn.last_synced_at ? new Date(new Date(conn.last_synced_at).getTime() - 14 * DAY) : new Date(Date.now() - 365 * DAY)
+    const fallback = new Date(Date.now() - 89 * DAY)
+    let added = 0, historyLimited = false
 
     for (const acc of accounts || []) {
       // Saldo
@@ -137,9 +141,17 @@ async function syncConnection(conn) {
 
       // Transacties (gepagineerd)
       const rows = []
-      let key = null, pages = 0
+      let key = null, pages = 0, accFrom = since
       do {
-        const res = await eb(`/accounts/${acc.uid}/transactions`, { query: { date_from: isoDate(since), continuation_key: key } })
+        let res
+        try { res = await eb(`/accounts/${acc.uid}/transactions`, { query: { date_from: isoDate(accFrom), continuation_key: key } }) }
+        catch (e) {
+          // Bank weigert de oude periode → met 90 dagen opnieuw (alleen bij de eerste pagina)
+          if (!key && accFrom < fallback && e.status && e.status < 500 && e.status !== 401) {
+            historyLimited = true; accFrom = fallback
+            res = await eb(`/accounts/${acc.uid}/transactions`, { query: { date_from: isoDate(accFrom) } })
+          } else throw e
+        }
         for (const t of res?.transactions || []) {
           const m = mapTransaction(t)
           if (!m.booking_date || (m.status && m.status !== 'BOOK')) continue // alleen geboekte transacties (pending krijgen later een ander id)
@@ -151,7 +163,7 @@ async function syncConnection(conn) {
           })
         }
         key = res?.continuation_key || null
-      } while (key && ++pages < 20)
+      } while (key && ++pages < 40)
 
       if (rows.length) {
         // Bestaande (zelfde rekening + ext_id) blijven zoals ze zijn
@@ -164,7 +176,7 @@ async function syncConnection(conn) {
     }
     await updateManualSavings(uid, allAccounts || [])
     await supabase.from('bank_connections').update({ status: 'active', last_synced_at: new Date().toISOString(), last_error: null, updated_at: new Date().toISOString() }).eq('id', conn.id)
-    return { added }
+    return { added, history_limited: historyLimited }
   } catch (e) {
     const expired = e.status === 401 || e.status === 403 || /expired|EXPIRED_SESSION|not authorized/i.test(e.message)
     await supabase.from('bank_connections').update({ status: expired ? 'expired' : conn.status, last_error: e.message.slice(0, 500), updated_at: new Date().toISOString() }).eq('id', conn.id)
@@ -306,6 +318,15 @@ exports.handler = async (event) => {
     if (body.action === 'start') return json(200, await start(user.id))
     if (body.action === 'callback') return json(200, await callback(user.id, body))
     if (body.action === 'disconnect') return json(200, await disconnect(user.id))
+    if (body.action === 'history') {
+      // Oudere transacties ophalen vanaf `from` (YYYY-MM-DD, max. 2 jaar terug)
+      const conn = await getConnection(user.id)
+      if (!conn?.session_id) return json(400, { error: 'Nog geen bankkoppeling' })
+      const min = isoDate(new Date(Date.now() - 730 * DAY))
+      const from = /^\d{4}-\d{2}-\d{2}$/.test(body.from || '') && body.from >= min ? body.from : isoDate(new Date(Date.now() - 365 * DAY))
+      const r = await syncConnection(conn, { from })
+      return json(200, { ...(await status(user.id)), history: r })
+    }
     if (body.action === 'sync') {
       const conn = await getConnection(user.id)
       if (!conn?.session_id) return json(200, await status(user.id))

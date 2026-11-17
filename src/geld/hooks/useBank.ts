@@ -175,6 +175,16 @@ export function useBank(userId: string) {
     if (url) window.location.href = url
   })
   const refresh = () => run(() => callBank('sync', { force: true }))
+  /** Oudere transacties (tot 12 maanden) ophalen. Banken staan dat vaak alleen vlak na opnieuw inloggen toe. */
+  const [historyNote, setHistoryNote] = useState<string | null>(null)
+  const fetchHistory = (from: string) => run(async () => {
+    setHistoryNote(null)
+    const r = await callBank('history', { from })
+    const h = r?.history || {}
+    setHistoryNote(h.history_limited
+      ? 'ING gaf alleen de laatste 90 dagen. Koppel opnieuw (knop hieronder) en probeer het direct daarna nog eens.'
+      : `${h.added || 0} oudere transacties opgehaald.`)
+  })
   const disconnect = () => run(() => callBank('disconnect'))
 
   const addTx = async (tx: BankTx, category?: string, kind?: string) => {
@@ -341,7 +351,7 @@ export function useBank(userId: string) {
   return {
     loading, busy, error, missing, conn, accounts: visible, inbox, matched, savingsTotal, checkingBalance, daysLeft,
     connected: conn.status === 'active' || conn.status === 'expired' || conn.status === 'error',
-    connect, refresh, disconnect, add, ignore, ignoreBefore, unmatch, setKind,
+    connect, refresh, disconnect, add, ignore, ignoreBefore, unmatch, setKind, fetchHistory, historyNote,
     saveManualSavings, removeManualSavings, savingsCandidates,
     ownOpen, groups, notOnStatement, linkTxs, replaceWithBank, markChecked, deleteOwn, onlyBank,
     previewMonth, onlyBankMonth, bankMonths, firstBankDate,
