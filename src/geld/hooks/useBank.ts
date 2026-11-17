@@ -136,6 +136,12 @@ export function useBank(userId: string) {
     if (e) throw new Error(e.message)
   })
   /** "Al ingevoerd" klopt niet → terug naar de inbox. */
+  /** Alles in de inbox van vóór `date` (YYYY-MM-DD) negeren — bv. de geschiedenis van de eerste koppeling. */
+  const ignoreBefore = (date: string) => run(async () => {
+    const { error: e } = await supabase.from('bank_transactions').update({ status: 'ignored' })
+      .eq('user_id', userId).eq('status', 'new').lt('booking_date', date)
+    if (e) throw new Error(e.message)
+  })
   const unmatch = (tx: BankTx) => run(async () => {
     const { error: e } = await supabase.from('bank_transactions').update({ status: 'new', expense_id: null }).eq('id', tx.id)
     if (e) throw new Error(e.message)
@@ -153,7 +159,7 @@ export function useBank(userId: string) {
   return {
     loading, busy, error, missing, conn, accounts: visible, inbox, matched, savingsTotal, checkingBalance, daysLeft,
     connected: conn.status === 'active' || conn.status === 'expired' || conn.status === 'error',
-    connect, refresh, disconnect, add, ignore, unmatch, setKind,
+    connect, refresh, disconnect, add, ignore, ignoreBefore, unmatch, setKind,
   }
 }
 export type BankState = ReturnType<typeof useBank>

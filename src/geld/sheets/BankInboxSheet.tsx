@@ -20,6 +20,11 @@ export function BankInboxSheet({ bank, categories, onClose }: { bank: BankState;
   const pick = (tx: BankTx) => ({ kind: choice[tx.id]?.kind || tx.suggested_kind || (tx.amount > 0 ? 'inkomen' : 'uitgave'), category: choice[tx.id]?.category || tx.suggested_category || 'overig' })
   const set = (id: string, patch: { kind?: string; category?: string }) => setChoice(c => ({ ...c, [id]: { ...c[id], ...patch } }))
 
+  // Eerste koppeling haalt 90 dagen op; wat vóór deze maand valt staat meestal al in Geld
+  const now = new Date()
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  const olderCount = bank.inbox.filter(t => t.booking_date < monthStart).length
+
   const addAll = async () => {
     for (const tx of bank.inbox) {
       const p = pick(tx)
@@ -31,7 +36,17 @@ export function BankInboxSheet({ bank, categories, onClose }: { bank: BankState;
     <Sheet onClose={onClose} title={`Banktransacties${bank.inbox.length ? ` (${bank.inbox.length})` : ''}`}>
       {bank.inbox.length === 0 && <p className="text-[13px] text-white/50 m-0 mb-4">Alles verwerkt. Nieuwe transacties verschijnen hier na het bijwerken.</p>}
 
-      {bank.inbox.length > 1 && (
+      {olderCount > 0 && (
+        <div className="rounded-2xl p-3 mb-3" style={{ background: 'color-mix(in srgb, var(--c-warning) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--c-warning) 30%, transparent)' }}>
+          <p className="m-0 text-[12px] text-white/75 mb-2">
+            {olderCount} {olderCount === 1 ? 'transactie is' : 'transacties zijn'} van vóór deze maand. Die staan meestal al in Geld; negeer ze om dubbele uitgaven te voorkomen.
+          </p>
+          <button type="button" onClick={() => bank.ignoreBefore(monthStart)} disabled={bank.busy} className="btn-ghost w-full" style={{ padding: '7px 12px', fontSize: 12 }}>
+            Alles vóór 1 {now.toLocaleDateString('nl-NL', { month: 'long' })} negeren ({olderCount})
+          </button>
+        </div>
+      )}
+      {bank.inbox.length > 1 && olderCount === 0 && (
         <button type="button" onClick={addAll} disabled={bank.busy} className="btn-ghost w-full mb-3" style={{ padding: '8px 12px', fontSize: 12 }}>
           Alles met voorstel toevoegen
         </button>

@@ -6,6 +6,14 @@
 
 export const RELEASES = [
   {
+    id: 28,
+    date: '2026-11-17',
+    title: 'Bank-inbox: oude transacties in één keer negeren',
+    items: [
+      { area: 'geld', text: "Na het koppelen staan de transacties van de afgelopen 90 dagen in de inbox. Met één knop negeer je alles van vóór deze maand, zodat je alleen nieuwe transacties hoeft te verwerken." },
+    ],
+  },
+  {
     id: 27,
     date: '2026-11-17',
     title: 'Geld: ING automatisch gekoppeld',
