@@ -12,6 +12,7 @@
 const { createClient } = require('@supabase/supabase-js')
 const { processTransaction, unlinkExpense, atmCounterparty, normalizeCounterparty } = require('../bank/bankCore')
 const planner = require('./planner') // agenda, werkuren, taken, notities (Hypex-connector)
+const study = require('./study') // Focus (vakken, studiesessies) + Recap
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 const TOKEN = process.env.GELD_MCP_TOKEN
@@ -390,6 +391,7 @@ async function updateSavingsAccount(uid, args) {
 async function callTool(name, args = {}) {
   const uid = await userId()
   if (planner.NAMES.has(name)) return planner.callTool(supabase, uid, name, args)
+  if (study.NAMES.has(name)) return study.callTool(supabase, uid, name, args)
   if (name === 'get_overview') return overview(uid, args.month)
   if (name === 'get_budget_config') {
     const cfg = await getConfig(uid)
@@ -584,8 +586,10 @@ const GELD_INSTRUCTIONS = 'Geld-app van Fachri (Hypex Dash). Bedragen in euro. G
   'Vraag bevestiging voordat je transacties verwijdert, budgetten wijzigt of banktransacties verwerkt.'
 const INSTRUCTIONS = `${planner.INSTRUCTIONS}
 
+${study.INSTRUCTIONS}
+
 ${GELD_INSTRUCTIONS}`
-const ALL_TOOLS = [...planner.TOOLS, ...TOOLS]
+const ALL_TOOLS = [...planner.TOOLS, ...study.TOOLS, ...TOOLS]
 
 async function handleMessage(msg) {
   const { id, method, params } = msg || {}

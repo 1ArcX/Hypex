@@ -6,6 +6,15 @@
 
 export const RELEASES = [
   {
+    id: 42,
+    date: '2026-11-18',
+    title: 'Claude als studiecoach',
+    items: [
+      { area: 'focus', text: "Claude ziet je vakken, toetsdatums, onderwerpen, cijfers en studiesessies, en kan (na jouw akkoord) sessies loggen, vakken, toetsen en onderwerpen aanmaken en cijfers invullen." },
+      { area: 'recap', text: "Claude kan je dag- en weekrecap voorbereiden met wat je echt deed (taken, studietijd, agenda, werk, uitgaven) en hem na jouw akkoord opslaan, inclusief doelen voor morgen." },
+    ],
+  },
+  {
     id: 41,
     date: '2026-11-17',
     title: 'Geld via Claude: meer kunnen en duidelijker',
