@@ -2,7 +2,7 @@ export type RecapKind = 'day' | 'week'
 export type RecapTab = 'today' | 'week' | 'history'
 
 /** Doel voor de volgende dag/week, afgevinkt op die dag/week zelf */
-export interface Goal { text: string; done: boolean }
+export interface Goal { text: string; done: boolean; /** gekoppelde taak: doel vinkt vanzelf af als die taak klaar is */ task_id?: string | null }
 
 export interface Recap {
   id: string

@@ -43,7 +43,7 @@ export default function RecapPage({ userId, tasks, isAdmin }: { userId: string; 
         ) : tab === 'history' ? (
           <HistoryView />
         ) : (
-          <TodayView tasks={tasks} activity={activity} />
+          <TodayView tasks={tasks} activity={activity} userId={userId} isAdmin={isAdmin} />
         )}
       </div>
     </div>

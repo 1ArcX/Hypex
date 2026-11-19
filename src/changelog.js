@@ -6,6 +6,17 @@
 
 export const RELEASES = [
   {
+    id: 47,
+    date: '2026-11-19',
+    title: 'Recap laat je hele dag zien',
+    items: [
+      { area: 'recap', text: "Nieuw in je dagrecap: wat gepland stond tegenover wat je deed, met 'naar morgen' voor wat bleef liggen, je dag in uren (school, werk, persoonlijk, slaap apart, vrij), deadlines van de komende 3 dagen en een aftelling naar je volgende toets." },
+      { area: 'recap', text: "Doelen voor morgen kun je aan een taak koppelen: zodra die taak klaar is, vinkt het doel zichzelf af." },
+      { area: 'recap', text: "Studeren per vak in plaats van één totaal, en (bij Geld) vandaag uitgegeven tegenover je dagbudget, wat er deze week nog over is en je geen-uitgaven-dagen." },
+      { area: 'recap', text: "De weekrecap opent nu de huidige week en laat per dag je taken en focustijd zien, ook als je geen dagrecaps hebt ingevuld." },
+    ],
+  },
+  {
     id: 46,
     date: '2026-11-19',
     title: 'Claude plant slimmer',

@@ -48,6 +48,7 @@ export function GoalChecklist({ goals, onToggle }: { goals: Goal[]; onToggle?: (
           <button type="button" className={`rc-goal${g.done ? ' is-done' : ''}`} onClick={() => onToggle?.(i)} disabled={!onToggle} aria-pressed={g.done}>
             <span className="rc-check">{g.done && <Check size={12} strokeWidth={3} />}</span>
             <span className="rc-goal-text">{g.text}</span>
+            {g.task_id && <span className="rc-hint" title="Gekoppeld aan een taak: vinkt vanzelf af als die klaar is">taak</span>}
           </button>
         </li>
       ))}
@@ -61,16 +62,30 @@ export function GoalSummary({ goals }: { goals: Goal[] }) {
   return <span className="rc-chip" style={{ '--rc-c': done === total ? 'var(--c-success)' : 'var(--accent)' } as CSSProperties}>{done}/{total} gehaald</span>
 }
 
-/** Drie invulvelden voor doelen */
-export function GoalInputs({ goals, onChange, placeholder }: { goals: Goal[]; onChange: (g: Goal[]) => void; placeholder: string[] }) {
-  const list = [0, 1, 2].map(i => goals[i] || { text: '', done: false })
+/** Drie invulvelden voor doelen; met `tasks` kun je per doel een bestaande taak koppelen */
+export function GoalInputs({ goals, onChange, placeholder, tasks }: {
+  goals: Goal[]; onChange: (g: Goal[]) => void; placeholder: string[]; tasks?: { id: string; title: string }[]
+}) {
+  const list: Goal[] = [0, 1, 2].map(i => goals[i] || { text: '', done: false })
+  const set = (i: number, p: Partial<Goal>) => onChange(list.map((x, j) => (j === i ? { ...x, ...p } : x)))
   return (
     <div>
       {list.map((g, i) => (
         <div key={i} className="rc-goal-row">
           <span className="rc-goal-num">{i + 1}</span>
           <input className="glass-input rc-input" value={g.text} maxLength={140} placeholder={placeholder[i]}
-            onChange={e => onChange(list.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))} />
+            onChange={e => set(i, { text: e.target.value })} />
+          {tasks && tasks.length > 0 && (
+            <select className="glass-input rc-goal-task" value={g.task_id || ''} aria-label={`Taak koppelen aan doel ${i + 1}`}
+              title="Koppel een taak: het doel vinkt vanzelf af als die klaar is"
+              onChange={e => {
+                const t = tasks.find(x => x.id === e.target.value)
+                set(i, { task_id: t?.id || null, ...(t && !g.text.trim() ? { text: t.title.slice(0, 140) } : {}) })
+              }}>
+              <option value="">Taak…</option>
+              {tasks.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
+            </select>
+          )}
         </div>
       ))}
     </div>

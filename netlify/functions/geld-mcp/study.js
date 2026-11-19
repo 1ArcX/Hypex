@@ -131,6 +131,71 @@ async function loadRecaps(sb, uid, from, to, kind) {
   if (error) { if (missing(error)) throw new Error('Recap-tabel ontbreekt (migratie add_recap.sql)'); throw new Error(error.message) }
   return data || []
 }
+const SLEEP_RE = /(slapen|slaap|sleep|nachtrust)/i
+const WAKE_MIN = 16 * 60
+
+/**
+ * Extra voor de dagrecap (zelfde als Recap → Vandaag in de app, src/recap/hooks/useDayDetails.ts):
+ * gepland tegenover gedaan, de dag in uren per type, deadlines van de 3 dagen erna, eerstvolgende toets, geld.
+ */
+async function dayExtras(sb, uid, day) {
+  const types = await H.loadTypes(sb, uid)
+  const [tasksRes, agenda, logsRes, focus, exps] = await Promise.all([
+    sb.from('tasks').select('*').eq('user_id', uid).limit(5000),
+    H.loadAgenda(sb, uid, types, day, day).catch(() => []),
+    sb.from('task_completions').select('task_id, title, day, recurring, completed_at').eq('user_id', uid).eq('day', day),
+    loadFocus(sb, uid).catch(() => ({ courses: [], dates: [], topics: [], parts: [] })),
+    sb.from('expenses').select('date, amount, is_income, is_savings_contribution, is_savings_withdrawal, is_loan_repayment, is_planned, paid_from_savings')
+      .eq('user_id', uid).gte('date', day.slice(0, 8) + '01').lte('date', day),
+  ])
+  const tasks = tasksRes.data || [], logs = logsRes.data || []
+  const today = todayLocal()
+  const lo = +toUTC(day), hi = +toUTC(addDays(day, 1))
+  // Gepland maar blijven liggen: eenmalige taken van die dag (meerdaagse op hun laatste dag) + eigen items die voorbij zijn
+  const leftOpen = tasks.filter(t => !t.recurrence && !t.completed && t.date && H.taskOnDay(t, day) && H.taskLast(t) <= day)
+    .map(t => ({ id: t.id, title: t.title, ...(t.date < day ? { was_overdue: true } : {}) }))
+  const own = agenda.filter(x => x.kind === 'eigen' && !x.hidden && !x.all_day && +x.start >= lo && +x.start < hi)
+  const routines = tasks.filter(t => H.routineDueOn(t, day, today, logs))
+  // Uren per type (deel binnen de dag, overlap per type één keer; slaap apart en telt niet als bezig)
+  const byCat = new Map()
+  for (const x of agenda) {
+    if (x.hidden || x.all_day) continue
+    const s = Math.max(+x.start, lo), e = Math.min(+x.end, hi)
+    if (e <= s) continue
+    const cat = SLEEP_RE.test(x.title || '') ? 'slaap' : x.cat
+    byCat.set(cat, [...(byCat.get(cat) || []), [s, e]])
+  }
+  const merged = (list) => { let tot = 0, cur = null; for (const [s, e] of list.sort((a, b) => a[0] - b[0])) { if (cur && s <= cur[1]) cur[1] = Math.max(cur[1], e); else { if (cur) tot += cur[1] - cur[0]; cur = [s, e] } } return (cur ? tot + cur[1] - cur[0] : tot) / 60000 }
+  const hoursPerType = Object.fromEntries([...byCat.entries()].map(([c, l]) => [c === 'slaap' ? 'Slaap' : types.name(c), fmtHours(Math.round(merged(l)))]))
+  const busy = Math.round(merged([...byCat.entries()].filter(([c]) => c !== 'slaap').flatMap(([, l]) => l)))
+  // Deadlines in de 3 dagen na deze dag
+  const until = addDays(day, 3)
+  const courseName = (id) => { const c = focus.courses.find(x => x.id === id); return c ? (c.code || c.name) : null }
+  const deadlines = [
+    ...tasks.filter(t => !t.completed && t.due_date && t.due_date > day && t.due_date <= until).map(t => ({ title: t.title, date: t.due_date, kind: 'taak' })),
+    ...focus.dates.filter(d => d.date > day && d.date <= until).map(d => ({ title: d.title, date: d.date, kind: 'toets', course: courseName(d.course_id) })),
+  ].sort((a, b) => a.date.localeCompare(b.date))
+  const nextDate = focus.dates.filter(d => d.date >= day && focus.courses.some(c => c.id === d.course_id && c.status !== 'archived'))[0]
+  // Geld: uitgegeven die dag en geen-uitgaven-dagen deze maand (budget zelf: get_overview)
+  const spendRows = (exps.data || []).filter(e => !e.is_income && !e.is_savings_contribution && !e.is_savings_withdrawal && !e.is_loan_repayment && !e.is_planned && !e.paid_from_savings)
+  const spentOn = (d) => spendRows.filter(e => e.date === d).reduce((a, e) => a + Number(e.amount), 0)
+  let noSpend = 0
+  for (let d = day; d >= day.slice(0, 8) + '01'; d = addDays(d, -1)) if (spentOn(d) <= 0) noSpend++
+  return {
+    planned_vs_done: {
+      done: logs.slice().sort((a, b) => String(a.completed_at).localeCompare(String(b.completed_at))).map(c => ({ title: c.title, ...(c.recurring ? { routine: true } : {}), time: c.completed_at ? localHM(c.completed_at) : null })),
+      left_open: leftOpen,
+      own_events: own.map(x => ({ id: x.id, title: x.title, type: types.name(x.cat), start: localHM(x.start), end: localHM(x.end), ...(+x.end < Date.now() ? { past: true } : {}) })),
+      routines: { done: routines.filter(t => H.routineDoneOn(t, day, logs)).length, total: routines.length, missed: routines.filter(t => !H.routineDoneOn(t, day, logs)).map(t => t.title) },
+      tip: leftOpen.length ? 'Open taken doorschuiven: close_day met apply=true (na akkoord) of update_task.' : undefined,
+    },
+    hours_per_type: { ...hoursPerType, Vrij: fmtHours(Math.max(0, WAKE_MIN - busy)), note: 'Vrij = 16 wakkere uren min wat er met een tijd in de agenda stond (slaap telt niet mee)' },
+    deadlines_next_3_days: deadlines,
+    ...(nextDate ? { next_exam: { course: courseName(nextDate.course_id), title: nextDate.title, date: nextDate.date, in_days: daysBetween(day, nextDate.date) } } : {}),
+    money: { spent: Math.round(spentOn(day) * 100) / 100, no_spend_days_this_month: noSpend, note: 'Dag- en weekbudget: get_overview' },
+  }
+}
+
 /** Wat je op die dag(en) deed: taken, focus, agenda/werk, uitgaven (zoals useActivity in de app). */
 async function activity(sb, uid, from, to) {
   const [comps, sessions, focus, exps, types] = await Promise.all([
@@ -199,7 +264,7 @@ const TOOLS = [
   { name: 'delete_focus_item', description: 'Iets uit Focus verwijderen: een sessie, datum, onderwerp, cijferonderdeel of een heel vak (met al zijn datums/onderwerpen/cijfers; sessies blijven zonder vak). Vraag eerst bevestiging.',
     inputSchema: S({ type: str('session, date, topic, grade_part of course', { enum: ['session', 'date', 'topic', 'grade_part', 'course'] }), id: str('Id (bij course mag ook naam/code)') }, ['type', 'id']), annotations: DEL },
   // Recap
-  { name: 'get_recap', description: 'Dag- of weekrecap met alles wat je nodig hebt om er een te schrijven: de recap zelf (als die er is), de doelen die je jezelf voor deze dag/week had gegeven (+ afgevinkt), je bericht van gisteren/vorige week, en wat je echt deed: afgeronde taken en routines, studietijd per vak + sessies, agenda en werkuren, uitgaven. Week: ook scores per dag en gemiddelden.',
+  { name: 'get_recap', description: 'Dag- of weekrecap met alles wat je nodig hebt om er een te schrijven: de recap zelf (als die er is), de doelen die je jezelf voor deze dag/week had gegeven (+ afgevinkt), je bericht van gisteren/vorige week, en wat je echt deed: afgeronde taken en routines, studietijd per vak + sessies, agenda en werkuren, uitgaven. Dag: ook planned_vs_done (afgerond met tijd, blijven liggen, eigen agenda-items, routines), hours_per_type, deadlines_next_3_days, next_exam en money (uitgegeven, geen-uitgaven-dagen). Week: ook scores, taken en focus per dag en gemiddelden.',
     inputSchema: S({ kind: str('day (standaard) of week', { enum: ['day', 'week'] }), date: str('YYYY-MM-DD (standaard vandaag; bij week: een dag in die week)') }), annotations: RO },
   { name: 'list_recaps', description: 'Eerdere recaps (scores, teksten, doelen) met streak en gemiddelde scores. Handig voor patronen ("wanneer heb ik weinig energie?").',
     inputSchema: S({ from: str('YYYY-MM-DD'), to: str('YYYY-MM-DD (standaard vandaag)'), kind: str('day, week of alle', { enum: ['day', 'week', 'alle'] }) }, ['from']), annotations: RO },
@@ -207,7 +272,7 @@ const TOOLS = [
     inputSchema: S({ kind: str('day (standaard) of week', { enum: ['day', 'week'] }), date: str('YYYY-MM-DD (standaard vandaag; week: een dag in die week)'),
       energy: score('Energie'), focus: score('Focus'), mood: score('Stemming'),
       went_well: str('Wat ging goed / grootste winst'), improve: str('Wat kan beter / lessen'), highlight: str('Hoogtepunt / verder nog'), note_next: str('Bericht voor morgen / volgende week'),
-      goals: { type: 'array', items: { type: ['string', 'object'] }, description: 'Doelen voor de volgende dag/week: ["…", "…"] of [{ text, done }] (vervangt de lijst)' },
+      goals: { type: 'array', items: { type: ['string', 'object'] }, description: 'Doelen voor de volgende dag/week: ["…", "…"] of [{ text, done, task_id }] (vervangt de lijst). Met task_id (uit list_tasks) vinkt het doel vanzelf af als die taak klaar is.' },
       tick_goals: { type: 'array', items: { type: 'integer' }, description: 'Afvinken van de doelen die je jezelf VOOR deze dag/week gaf (indexen 0,1,2 uit get_recap → goals_for_this)' } }) },
 ]
 const NAMES = new Set(TOOLS.map(t => t.name))
@@ -399,14 +464,15 @@ async function callTool(sb, uid, name, args = {}) {
     const date = optDate(args.date, 'date') || today
     if (kind === 'day') {
       const prev = addDays(date, -1)
-      const [recs, act] = await Promise.all([loadRecaps(sb, uid, prev, date, 'day'), activity(sb, uid, date, date)])
+      const [recs, act, extra] = await Promise.all([loadRecaps(sb, uid, prev, date, 'day'), activity(sb, uid, date, date), dayExtras(sb, uid, date)])
       const mine = recs.find(r => r.day === date), y = recs.find(r => r.day === prev)
       const lastWeek = await loadRecaps(sb, uid, addDays(mondayOf(date), -7), addDays(mondayOf(date), -7), 'week')
       return {
         kind, date, weekday: WEEKDAYS[dow(date)], ...(dow(date) === 0 ? { tip: 'Zondag: ook een weekrecap invullen (kind=week).' } : {}),
         recap: slimRecap(mine) || null,
-        goals_for_this: (Array.isArray(y?.goals) ? y.goals : []).filter(g => String(g?.text || '').trim()).map((g, i) => ({ index: i, text: g.text, done: !!g.done })),
+        goals_for_this: (Array.isArray(y?.goals) ? y.goals : []).filter(g => String(g?.text || '').trim()).map((g, i) => ({ index: i, text: g.text, done: !!g.done, ...(g.task_id ? { task_id: g.task_id } : {}) })),
         message_from_yesterday: y?.note_next || null,
+        ...extra,
         week_goals: (Array.isArray(lastWeek[0]?.goals) ? lastWeek[0].goals : []).filter(g => String(g?.text || '').trim()),
         did: act,
       }
@@ -416,6 +482,10 @@ async function callTool(sb, uid, name, args = {}) {
     const [days, weeks, act, prevAct] = await Promise.all([
       loadRecaps(sb, uid, addDays(mon, -1), sun, 'day'), loadRecaps(sb, uid, prevMon, mon, 'week'),
       activity(sb, uid, mon, sun < today ? sun : today), activity(sb, uid, prevMon, addDays(mon, -1)),
+    ])
+    const [weekLogs, weekSessions] = await Promise.all([
+      sb.from('task_completions').select('day').eq('user_id', uid).gte('day', mon).lte('day', sun).limit(3000),
+      loadSessions(sb, uid, mon, sun),
     ])
     const inWeek = days.filter(r => r.day >= mon)
     const avg = (k) => { const xs = inWeek.map(r => r[k]).filter(x => x != null); return xs.length ? r1(xs.reduce((a, b) => a + b, 0) / xs.length) : null }
@@ -429,7 +499,9 @@ async function callTool(sb, uid, name, args = {}) {
       kind, week_of: mon, to: sun, recap: slimRecap(mine) || null,
       goals_for_this: (Array.isArray(last?.goals) ? last.goals : []).filter(g => String(g?.text || '').trim()).map((g, i) => ({ index: i, text: g.text, done: !!g.done })),
       message_from_last_week: last?.note_next || null,
-      days: dayList(mon, sun).map(d => { const r = inWeek.find(x => x.day === d); return { date: d, weekday: WEEKDAYS[dow(d)], score: dayScore(r), ...(r?.highlight ? { highlight: r.highlight } : {}), filled: !!r } }),
+      // Per dag ook zonder recap: taken gedaan (logboek) en focustijd
+      days: dayList(mon, sun).map(d => { const r = inWeek.find(x => x.day === d); return { date: d, weekday: WEEKDAYS[dow(d)], score: dayScore(r), ...(r?.highlight ? { highlight: r.highlight } : {}), filled: !!r,
+        ...(d <= today ? { tasks_done: (weekLogs.data || []).filter(c => c.day === d).length, focus_min: weekSessions.filter(x => x.day === d).reduce((a, x) => a + x.min, 0) } : {}) } }),
       averages: { energy: avg('energy'), focus: avg('focus'), mood: avg('mood'), recaps_filled: inWeek.length },
       daily_goals: { done: goalsDone, total: goalsTotal },
       did: { ...act, focus_sessions: undefined, agenda: undefined },
@@ -465,7 +537,7 @@ async function callTool(sb, uid, name, args = {}) {
     }
     if (args.goals !== undefined) {
       need(Array.isArray(args.goals), 'goals moet een lijst zijn')
-      row.goals = args.goals.map(g => (typeof g === 'string' ? { text: g, done: false } : { text: String(g?.text || ''), done: !!g?.done })).filter(g => g.text.trim()).slice(0, 10)
+      row.goals = args.goals.map(g => (typeof g === 'string' ? { text: g, done: false } : { text: String(g?.text || ''), done: !!g?.done, ...(g?.task_id ? { task_id: String(g.task_id) } : {}) })).filter(g => g.text.trim()).slice(0, 10)
     }
     let ticked = null
     if (args.tick_goals !== undefined) {

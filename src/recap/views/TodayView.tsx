@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CheckSquare, Flame, Repeat, Target, Timer, Wallet, PenLine, Sparkles } from 'lucide-react'
+import { useDayDetails } from '../hooks/useDayDetails'
+import { DeadlineList, HoursCard, MoneyCard, PlannedCard, StudyCard } from '../components/DayCards'
 import { Card, CardHeader, KpiTile, FilterTabs } from '../components/ui'
 import { routineStats } from '../../utils/recurrence'
 import { addDays, fmtDur, todayISO } from '../../focus/lib/format'
@@ -9,7 +11,7 @@ import type { Activity } from '../hooks/useActivity'
 import type { Goal, Recap, RecapInput } from '../types'
 import { GoalChecklist, GoalInputs, GoalSummary, NoteCard, RecapRead, ScoreChips, ScoreInput, TextField, cap, longDate } from '../components/parts'
 
-interface Task { id: string; recurrence?: string | null; completed?: boolean; last_completed_date?: string | null }
+interface Task { id: string; title?: string; date?: string | null; recurrence?: string | null; completed?: boolean; last_completed_date?: string | null }
 
 const blank = (day: string): RecapInput => ({
   kind: 'day', day, energy: null, focus: null, mood: null, went_well: '', improve: '', highlight: '', note_next: '', goals: [],
@@ -20,7 +22,7 @@ const toDraft = (r: Recap | undefined, day: string): RecapInput => (r
 
 const DAY_LABELS = { went_well: 'Wat ging goed', improve: 'Wat kan beter', highlight: 'Hoogtepunt / dankbaar voor', note_next: 'Bericht voor de volgende dag', goals: 'Doelen voor de volgende dag' }
 
-export default function TodayView({ tasks, activity }: { tasks: Task[]; activity: Activity }) {
+export default function TodayView({ tasks, activity, userId, isAdmin }: { tasks: Task[]; activity: Activity; userId: string; isAdmin: boolean }) {
   const byKey = useRecapStore(s => s.byKey)
   const recaps = useRecapStore(s => s.recaps)
   const save = useRecapStore(s => s.save)
@@ -39,9 +41,19 @@ export default function TodayView({ tasks, activity }: { tasks: Task[]; activity
 
   useEffect(() => { setDraft(toDraft(byKey[recapKey('day', target)], target)); setEditing(!byKey[recapKey('day', target)]) }, [target]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const details = useDayDetails(userId, target, tasks)
+
   // Doelen voor de gekozen dag staan op de recap van de dag ervoor
   const goalSource = byKey[recapKey('day', addDays(target, -1))]
-  const goalsToday = goalSource?.goals.filter(g => g.text.trim()) || []
+  // Gekoppelde taak klaar (op of na de doeldag, of de taak staat op afgerond) → doel telt als gehaald
+  const linkedDone = (g: Goal) => !!g.task_id && (activity.completions.some(c => c.task_id === g.task_id && c.day >= target)
+    || !!tasks.find(t => t.id === g.task_id && t.completed))
+  const goalsToday = (goalSource?.goals.filter(g => g.text.trim()) || []).map(g => (linkedDone(g) && !g.done ? { ...g, done: true } : g))
+  // ...en dat ook opslaan, zodat het in de geschiedenis en via Claude klopt
+  useEffect(() => {
+    if (!goalSource || !goalSource.goals.some(g => !g.done && linkedDone(g))) return
+    setGoals(goalSource, goalSource.goals.map(g => (!g.done && linkedDone(g) ? { ...g, done: true } : g)))
+  }, [goalSource, activity.completions, tasks]) // eslint-disable-line react-hooks/exhaustive-deps
   const toggleGoal = (idx: number) => {
     if (!goalSource) return
     const real = goalSource.goals.map((g, i) => ({ g, i })).filter(x => x.g.text.trim())[idx]
@@ -53,20 +65,22 @@ export default function TodayView({ tasks, activity }: { tasks: Task[]; activity
     // Zelfde regel als Dashboard en connector: afvinklogboek per dag (date schuift door na afvinken)
     return routineStats(tasks, target, activity.completions.filter(c => c.recurring), today)
   }, [tasks, target, today, activity.completions])
-  const doneTitles = activity.completions.filter(c => c.day === target && !c.recurring).map(c => c.title)
   const gp = goalProgress(goalsToday)
   const streak = recapStreak(byKey, today)
   const best = bestStreak(recaps)
 
   const onSave = async () => {
     setSaving(true)
-    const goals: Goal[] = draft.goals.filter(g => g.text.trim()).map(g => ({ text: g.text.trim(), done: g.done }))
+    const goals: Goal[] = draft.goals.filter(g => g.text.trim()).map(g => ({ text: g.text.trim(), done: g.done, ...(g.task_id ? { task_id: g.task_id } : {}) }))
     const row = await save({ ...draft, goals, went_well: draft.went_well?.trim() || null, improve: draft.improve?.trim() || null, highlight: draft.highlight?.trim() || null, note_next: draft.note_next?.trim() || null })
     setSaving(false)
     // Gisteren ingevuld → door naar vandaag
     if (row) { if (target !== today) setTarget(today); else setEditing(false) }
   }
   const patch = (p: Partial<RecapInput>) => setDraft(d => ({ ...d, ...p }))
+  // Open eenmalige taken om aan een doel te koppelen (eerst die met een datum)
+  const openTasks = tasks.filter(t => !t.recurrence && !t.completed && t.title)
+    .sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999')).slice(0, 60).map(t => ({ id: t.id, title: t.title! }))
   const isToday = target === today
 
   return (
@@ -99,15 +113,10 @@ export default function TodayView({ tasks, activity }: { tasks: Task[]; activity
           <KpiTile icon={Flame} value={streak} label="Recap-streak" sub={best > streak ? `dagen op rij een recap · record ${best}` : "dagen op rij een recap"} tone="danger" />
         </div>
 
-        {doneTitles.length > 0 && (
-          <Card>
-            <CardHeader icon={CheckSquare} title={isToday ? 'Vandaag afgerond' : 'Gisteren afgerond'} count={doneTitles.length} />
-            <ul className="rc-done-list">
-              {doneTitles.slice(0, 8).map((t, i) => <li key={i}>{t}</li>)}
-              {doneTitles.length > 8 && <li style={{ color: 'var(--c-text-3)' }}>en nog {doneTitles.length - 8}</li>}
-            </ul>
-          </Card>
-        )}
+        <PlannedCard details={details} day={target} done={activity.completions.filter(c => c.day === target)} />
+        <HoursCard details={details} />
+        <StudyCard details={details} />
+        {isAdmin && <MoneyCard userId={userId} day={target} />}
       </div>
 
       <div className="rc-col">
@@ -131,8 +140,13 @@ export default function TodayView({ tasks, activity }: { tasks: Task[]; activity
               <TextField label="Wat kan beter?" value={draft.improve || ''} onChange={v => patch({ improve: v })} placeholder="Wat doe je morgen anders?" />
               <TextField label="Hoogtepunt" hint="of waar je dankbaar voor bent" value={draft.highlight || ''} onChange={v => patch({ highlight: v })} />
               <div className="rc-field">
-                <span className="rc-label">Top 3 doelen voor {isToday ? 'morgen' : 'vandaag'}</span>
-                <GoalInputs goals={draft.goals} onChange={goals => patch({ goals })} placeholder={['Belangrijkste doel', 'Tweede doel', 'Derde doel']} />
+                <span className="rc-label">Deadlines komende 3 dagen</span>
+                <DeadlineList details={details} day={target} />
+              </div>
+              <div className="rc-field">
+                <span className="rc-label">Top 3 doelen voor {isToday ? 'morgen' : 'vandaag'} <span className="rc-hint">· koppel een taak, dan vinkt het doel vanzelf af</span></span>
+                <GoalInputs goals={draft.goals} onChange={goals => patch({ goals })} placeholder={['Belangrijkste doel', 'Tweede doel', 'Derde doel']}
+                  tasks={openTasks} />
               </div>
               <TextField label={`Bericht voor ${isToday ? 'morgen' : 'vandaag'}`} hint="motivatie voor jezelf, staat er bovenaan"
                 value={draft.note_next || ''} onChange={v => patch({ note_next: v })} placeholder="Bijv. Begin met het moeilijkste, je kunt dit!" />

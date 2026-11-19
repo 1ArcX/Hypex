@@ -960,4 +960,4 @@ async function callTool(sb, uid, name, args = {}) {
 
 module.exports = { TOOLS, NAMES, INSTRUCTIONS, callTool, _t: { toUTC, localStamp, sumHours, workShifts, loadAgenda, freeSlots, nextOcc, prevOcc },
   // gedeeld met study.js (Focus + Recap)
-  helpers: { TZ, WEEKDAYS, pad, parts, localDay, localHM, todayLocal, toUTC, addDays, dow, isoDow, daysBetween, dayList, mondayOf, isDate, isHM, hmToMin, fmtHours, hours, need, optDate, optHM, loadTypes, loadAgenda, workShifts, sumHours, slimEvent } }
+  helpers: { taskOnDay, taskLast, routineDueOn, routineDoneOn, TZ, WEEKDAYS, pad, parts, localDay, localHM, todayLocal, toUTC, addDays, dow, isoDow, daysBetween, dayList, mondayOf, isDate, isHM, hmToMin, fmtHours, hours, need, optDate, optHM, loadTypes, loadAgenda, workShifts, sumHours, slimEvent } }

@@ -24,10 +24,10 @@ const rangeLabel = (monday: string) => {
     : `${a.getDate()} ${MONTHS_SHORT[a.getMonth()]} – ${b.getDate()} ${MONTHS_SHORT[b.getMonth()]}`
 }
 
-/** Welke week openen: op zondag deze week; anders vorige week zolang die nog niet is ingevuld */
+/** Welke week openen: deze week; alleen op maandag nog de vorige week als die weekrecap nog open staat */
 export function defaultWeek(byKey: Record<string, Recap>, today = todayISO()) {
   const thisMonday = mondayOf(today)
-  if (isSunday(today)) return thisMonday
+  if (isSunday(today) || today !== thisMonday) return thisMonday
   const prev = addDays(thisMonday, -7)
   return byKey[recapKey('week', prev)] ? thisMonday : prev
 }
@@ -112,17 +112,22 @@ export default function WeekView({ activity }: { activity: Activity }) {
                 const r = byKey[recapKey('day', d)]
                 const s = dayScore(r)
                 const g = goalProgress(byKey[recapKey('day', addDays(d, -1))]?.goals)
+                const nTasks = activity.tasksByDay[d] || 0, fMins = activity.focusByDay[d] || 0
                 return (
-                  <div key={d} className="rc-wday" title={r ? `Score ${fmtScore(s)}` : 'Geen recap'}>
+                  <div key={d} className="rc-wday" title={`${r ? `Score ${fmtScore(s)}` : 'Geen recap'} · ${nTasks} taken · ${fmtDur(fMins)} focus`}>
                     <span>{DAYS_SHORT[parseDay(d).getDay()]}</span>
                     <b style={s != null ? { background: `color-mix(in srgb, var(--accent) ${Math.round(12 + (s - 1) * 14)}%, var(--c-surface-2))` } : d > today ? { opacity: 0.4 } : undefined}>
                       {s != null ? fmtScore(s) : '·'}
                     </b>
                     <span className="tnum">{g.total ? `${g.done}/${g.total}` : ' '}</span>
+                    {/* Ook zonder recap: wat je die dag deed */}
+                    <span className="tnum rc-wday-act">{d > today ? ' ' : `✓${nTasks}`}</span>
+                    <span className="tnum rc-wday-act">{d > today || !fMins ? ' ' : fmtDur(fMins)}</span>
                   </div>
                 )
               })}
             </div>
+            <p className="rc-sub" style={{ marginTop: 8 }}>Score uit je recap · doelen · ✓ taken gedaan · focustijd</p>
           </Card>
         </div>
 
