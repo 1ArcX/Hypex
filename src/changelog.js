@@ -6,6 +6,14 @@
 
 export const RELEASES = [
   {
+    id: 43,
+    date: '2026-11-19',
+    title: 'Taken via Claude krijgen de juiste lengte',
+    items: [
+      { area: 'agenda', text: "Een taak met een tijd die Claude inplant (bijv. 15 minuten) staat nu ook zo lang in de agenda, in plaats van standaard een uur." },
+    ],
+  },
+  {
     id: 42,
     date: '2026-11-18',
     title: 'Claude als studiecoach',

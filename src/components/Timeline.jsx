@@ -994,7 +994,7 @@ export default function Timeline({ userId, userEmail, tasks: tasksIn, subjects, 
                   const timeStr = task.start_time || task.time
                   const startMins = timeStrToMins(timeStr)
                   // Eindtijd vóór de begintijd = loopt door na middernacht: hier tot 24:00
-                  const endMins = task.end_time ? (crossesMidnight(timeStr.slice(0, 5), task.end_time.slice(0, 5)) ? 24 * 60 : timeStrToMins(task.end_time)) : Math.min(24 * 60, startMins + 60)
+                  const endMins = task.end_time ? (crossesMidnight(timeStr.slice(0, 5), task.end_time.slice(0, 5)) ? 24 * 60 : timeStrToMins(task.end_time)) : Math.min(24 * 60, startMins + (task.duration_minutes >= 5 ? task.duration_minutes : 60))
                   // Reistijd hoort bij het blok (zoals bij events)
                   const tb = Math.min(startMins, task.travel_before || 0), ta = Math.min(24 * 60 - endMins, task.travel_after || 0)
                   return { type: 'task', key: `task-${task.id}`, startMins: startMins - tb, endMins: endMins + ta, tb, ta, evStart: startMins, evEnd: endMins, data: task }

@@ -404,6 +404,16 @@ function taskFields(args, types, orig = null) {
   if (has('deadline')) f.due_date = optDate(args.deadline, 'deadline') || null
   if (has('description')) f.description = args.description ? String(args.description).slice(0, 2000) : null
   for (const k of ['travel_before', 'travel_after']) if (has(k)) { need(!args[k] || (args[k] > 0 && args[k] <= 600), `${k} moet 0–600 minuten zijn`); f[k] = args[k] ? Math.round(args[k]) : null }
+  // De agenda (Timeline) leest de eindtijd uit end_time (zonder end_time = 1 uur), net als ItemModal: dus end_time
+  // altijd meeschrijven bij een tijdslot. Verschuiven houdt de duur van het blok; alleen duration_minutes past het einde aan.
+  const start = f.start_time !== undefined ? f.start_time : (orig?.start_time || orig?.time || null)
+  if (start && !has('end_time') && (has('time') || has('duration_minutes'))) {
+    const os = orig && (orig.start_time || orig.time), oe = orig?.end_time
+    const span = os && oe ? ((hmToMin(oe.slice(0, 5)) - hmToMin(os.slice(0, 5)) + 1440) % 1440) || null : null
+    const dur = f.duration_minutes ?? span ?? orig?.duration_minutes ?? 30
+    f.end_time = minToHM(hmToMin(start.slice(0, 5)) + dur)
+    if (f.duration_minutes === undefined) f.duration_minutes = dur
+  }
   const rec = f.recurrence !== undefined ? f.recurrence : orig?.recurrence
   if (rec && (f.date || (!orig && !f.date))) f.date = snap(f.date || todayLocal(), rec, f.recurrence_days !== undefined ? f.recurrence_days : orig?.recurrence_days)
   return f
