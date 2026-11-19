@@ -6,6 +6,14 @@
 
 export const RELEASES = [
   {
+    id: 49,
+    date: '2026-11-20',
+    title: 'Reistijd per lesdag',
+    items: [
+      { area: 'agenda', text: "De standaard reistijd voor je rooster telt nu per lesdag: heen alleen vóór de eerste les en terug alleen na de laatste. Lessen met een pauze ertussen (zoals lunch) horen bij hetzelfde blok, tenzij er meer dan 2 uur tussen zit." },
+    ],
+  },
+  {
     id: 48,
     date: '2026-11-19',
     title: 'Recap kijkt naar de klok',

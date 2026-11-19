@@ -79,7 +79,37 @@ function travelRule(raw, conn) {
   if (!rules.length || raw.all_day) return null
   const text = `${raw.location || ''} ${raw.title || ''}`.toLowerCase()
   const hit = rules.find(r => r?.match && text.includes(String(r.match).toLowerCase()))
-  return hit ? { before: Number(hit.before) || 0, after: Number(hit.after) || 0 } : null
+  return hit ? { before: Number(hit.before) || 0, after: Number(hit.after) || 0, max_gap: hit.max_gap ?? 120 } : null
+}
+
+/**
+ * Lessen op dezelfde dag (zelfde feed) zijn één blok: reistijd heen alleen vóór de eerste les, terug alleen na de
+ * laatste. Een gat groter dan max_gap (standaard 120 min, per regel instelbaar) begint een nieuw blok.
+ * Zelfde logica als src/utils/externalEvents.js (applyTravelBlocks).
+ */
+function travelBlocks(items) {
+  const groups = new Map()
+  for (const x of items) {
+    if (!x._rule || x.all_day || x.hidden) continue
+    const k = `${x.connection_id}|${localDay(x.start)}`
+    groups.set(k, [...(groups.get(k) || []), x])
+  }
+  for (const list of groups.values()) {
+    list.sort((a, b) => a.start - b.start)
+    const blocks = []
+    for (const x of list) {
+      const cur = blocks[blocks.length - 1], gap = Number(x._rule.max_gap ?? 120)
+      if (cur && (+x.start - +cur.end) / 60000 <= gap) { cur.items.push(x); if (x.end > cur.end) cur.end = x.end }
+      else blocks.push({ items: [x], end: x.end })
+    }
+    for (const b of blocks) {
+      b.items.forEach((x, i) => {
+        if (i > 0 && x._ruleB) { x.travel_before = 0; delete x.travel_from_rule }
+        if (i < b.items.length - 1 && x._ruleA) x.travel_after = 0
+        if (b.items.length > 1) x.travel_block = { index: i + 1, of: b.items.length }
+      })
+    }
+  }
 }
 
 // ── slim standaardtype op basis van de titel (alleen als er geen type is meegegeven) ──
@@ -228,6 +258,8 @@ async function loadAgenda(sb, uid, types, from, to) {
       all_day: ov?.all_day ?? !!raw.all_day, location: raw.location || null, description: raw.description || null,
       travel_before: ov?.travel_before || rule?.before || 0, travel_after: ov?.travel_after || rule?.after || 0, note: ov?.note || null,
       ...(!ov?.travel_before && rule?.before ? { travel_from_rule: true } : {}),
+      // Voor blokken (travelBlocks): welke reistijd komt uit de regel (een eigen reistijd blijft altijd staan)
+      ...(rule ? { _rule: rule, _ruleB: !ov?.travel_before && !!rule.before, _ruleA: !ov?.travel_after && !!rule.after } : {}),
       hidden: !!ov?.hidden, edited: !!(ov && (ov.title || ov.start_time || ov.end_time || ov.all_day != null || ov.type_id || ov.note)),
       original: ov ? { title: raw.title, start: localStamp(s), end: localStamp(e) } : undefined, recurring: false,
     })
@@ -250,6 +282,7 @@ async function loadAgenda(sb, uid, types, from, to) {
     }
   }
   const lo = +toUTC(from), hi = +toUTC(addDays(to, 1))
+  travelBlocks(out)
   return out.filter(x => +x.end > lo && +x.start < hi).sort((a, b) => a.start - b.start)
 }
 
@@ -258,6 +291,7 @@ const slimEvent = (x, types) => ({
   start: localStamp(x.start), end: localStamp(x.end), all_day: x.all_day, ...(!x.all_day ? { duration_min: Math.round((x.end - x.start) / 60000) } : {}),
   ...(x.travel_before ? { travel_before_min: x.travel_before, leave_at: localHM(+x.start - x.travel_before * 60000), ...(x.travel_from_rule ? { travel_source: 'locatieregel' } : {}) } : {}),
   ...(x.travel_after ? { travel_after_min: x.travel_after } : {}),
+  ...(x.travel_block ? { travel_block: x.travel_block.index === 1 ? `eerste van ${x.travel_block.of} (reistijd heen)` : x.travel_block.index === x.travel_block.of ? `laatste van ${x.travel_block.of} (reistijd terug)` : `${x.travel_block.index} van ${x.travel_block.of}` } : {}),
   ...(x.location ? { location: x.location } : {}), ...(x.description ? { description: String(x.description).slice(0, 300) } : {}),
   ...(x.note ? { note: x.note } : {}), ...(x.hidden ? { hidden: true } : {}), ...(x.edited ? { edited: true, original: x.original } : {}),
   ...(x.recurring ? { recurring: x.raw.recurrence } : {}),
@@ -488,9 +522,11 @@ const TOOLS = [
   { name: 'close_day', description: 'Dag afsluiten: wat is gedaan (taken + routines met tijd), wat bleef liggen (eenmalige taken van die dag + te laat), welke routines niet zijn gedaan, en of de recap al is ingevuld. Met apply=true worden de blijven-liggen taken verplaatst naar move_to (standaard de dag erna); vraag daar eerst bevestiging voor en noem welke taken.',
     inputSchema: S({ date: str('YYYY-MM-DD (standaard vandaag)'), apply: bool('Open taken echt verplaatsen (anders alleen een voorstel)'), move_to: str('Naar welke dag (standaard de dag erna)'),
       task_ids: { type: 'array', items: { type: 'string' }, description: 'Alleen deze taken verplaatsen (standaard alle open taken van die dag)' } }) },
-  { name: 'set_feed_travel_rule', description: 'Standaard reistijd per locatie voor een geïmporteerde agenda (bv. MyX: "R29" = 15 min heen en terug). Geldt voor alle items van die feed waarvan de locatie (of titel) de tekst bevat, behalve items met een eigen reistijd. remove=true haalt de regel weg. Zonder argumenten: toon de regels. Vraag eerst bevestiging.',
+  { name: 'set_feed_travel_rule', description: 'Standaard reistijd per locatie voor een geïmporteerde agenda (bv. MyX: "R29" = 15 min heen en terug). Geldt voor de items van die feed waarvan de locatie (of titel) de tekst bevat, behalve items met een eigen reistijd. Lessen op dezelfde dag zijn één blok (gat ≤ max_gap, standaard 2 uur): reistijd heen alleen vóór de eerste les (leave_at), terug alleen na de laatste. remove=true haalt de regel weg. Zonder argumenten: toon de regels. Vraag eerst bevestiging.',
     inputSchema: S({ feed: str('Naam van de feed (bv. MijnX, HAN), zie list_agenda → source'), match: str('Tekst in de locatie, bv. "R29"'),
-      before: num('Reistijd heen (min)'), after: num('Reistijd terug (min, standaard gelijk aan heen)'), remove: bool('Regel verwijderen') }) },
+      before: num('Reistijd heen (min)'), after: num('Reistijd terug (min, standaard gelijk aan heen)'),
+      max_gap: num('Lessen op dezelfde dag met een gat tot zoveel minuten zijn één blok (standaard 120): reistijd heen alleen vóór de eerste, terug alleen na de laatste'),
+      remove: bool('Regel verwijderen') }) },
   { name: 'create_task', description: 'Nieuwe taak. Vraag eerst bevestiging (titel, dag, tijd/dagdeel). Geef een type mee (zie list_types, bv. Sport); zonder type kiest de server er een op basis van de titel (type_chosen_automatically). Geeft het volledige item terug.', inputSchema: S(taskProps, ['title']) },
   { name: 'update_task', description: 'Taak aanpassen of verplaatsen (alleen meegegeven velden; null wist een veld). Vraag eerst bevestiging.', inputSchema: S({ id: str('Taak-id'), ...taskProps }, ['id']) },
   { name: 'complete_task', description: 'Taak afvinken (herhalende taak schuift door naar de volgende keer, streak telt mee) of met undo=true weer open zetten. Vraag eerst bevestiging.',
@@ -839,11 +875,12 @@ async function callTool(sb, uid, name, args = {}) {
       need(Number(args.before) > 0 && Number(args.before) <= 600, 'before moet 1–600 minuten zijn')
       const after = args.after === undefined ? Number(args.before) : Number(args.after)
       need(after >= 0 && after <= 600, 'after moet 0–600 minuten zijn')
-      rules = [...rules, { match, before: Math.round(Number(args.before)), after: Math.round(after) }]
+      need(args.max_gap === undefined || (Number(args.max_gap) >= 0 && Number(args.max_gap) <= 600), 'max_gap moet 0–600 minuten zijn')
+      rules = [...rules, { match, before: Math.round(Number(args.before)), after: Math.round(after), ...(args.max_gap !== undefined ? { max_gap: Math.round(Number(args.max_gap)) } : {}) }]
     }
     const { error: ue } = await sb.from('calendar_connections').update({ travel_rules: rules }).eq('id', conn.id).eq('user_id', uid)
     if (ue) throw new Error(ue.message)
-    return { feed: conn.name, rules, note: 'Geldt meteen voor alle items met deze locatie; items met een eigen reistijd houden die.' }
+    return { feed: conn.name, rules, note: 'Geldt meteen. Lessen op dezelfde dag (gat ≤ max_gap, standaard 120 min) zijn één blok: reistijd heen vóór de eerste, terug na de laatste. Items met een eigen reistijd houden die.' }
   }
 
   if (name === 'create_task') {

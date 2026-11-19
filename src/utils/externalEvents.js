@@ -34,7 +34,38 @@ function localAllDay(ev) {
 
 function withTravelRule(ev) {
   const r = travelRuleFor(ev, ev.connection)
-  return r ? { ...ev, travel_before: r.before || null, travel_after: r.after || null, travel_from_rule: true } : ev
+  return r ? { ...ev, travel_before: r.before || null, travel_after: r.after || null, travel_from_rule: true, _rule: r } : ev
+}
+
+const localDayOf = (iso) => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+
+/**
+ * Lessen op dezelfde dag (zelfde feed) zijn één blok: reistijd heen alleen vóór de eerste les, terug alleen na de
+ * laatste; een gat groter dan max_gap (standaard 120 min) begint een nieuw blok. Een eigen reistijd blijft staan.
+ * Zelfde logica als de Claude-connector (planner.js travelBlocks).
+ */
+export function applyTravelBlocks(events) {
+  const groups = new Map()
+  for (const ev of events) {
+    if (!ev._rule || ev.all_day || ev.hidden) continue
+    const k = `${ev.connection_id}|${localDayOf(ev.start_time)}`
+    groups.set(k, [...(groups.get(k) || []), ev])
+  }
+  for (const list of groups.values()) {
+    list.sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
+    const blocks = []
+    for (const ev of list) {
+      const cur = blocks[blocks.length - 1], gap = Number(ev._rule.max_gap ?? 120)
+      const s = new Date(ev.start_time).getTime(), e = new Date(ev.end_time).getTime()
+      if (cur && (s - cur.end) / 60000 <= gap) { cur.items.push(ev); cur.end = Math.max(cur.end, e) }
+      else blocks.push({ items: [ev], end: e })
+    }
+    for (const b of blocks) b.items.forEach((ev, i) => {
+      if (i > 0 && !ev._override?.travel_before) ev.travel_before = null
+      if (i < b.items.length - 1 && !ev._override?.travel_after) ev.travel_after = null
+    })
+  }
+  return events
 }
 
 /** Standaard reistijd uit de regels van de feed (calendar_connections.travel_rules), op locatie of titel. */
@@ -43,7 +74,7 @@ export function travelRuleFor(ev, connection) {
   if (!rules.length || ev.all_day) return null
   const text = `${ev.location || ''} ${ev.title || ''}`.toLowerCase()
   const hit = rules.find(r => r?.match && text.includes(String(r.match).toLowerCase()))
-  return hit ? { before: Number(hit.before) || 0, after: Number(hit.after) || 0 } : null
+  return hit ? { before: Number(hit.before) || 0, after: Number(hit.after) || 0, max_gap: hit.max_gap ?? 120 } : null
 }
 
 /** Past een aanpassing toe; `_original` bewaart de waarden uit de feed. */
@@ -95,10 +126,10 @@ export async function loadExternalEvents({ since, until, limit } = {}) {
   if (events.error || !events.data) return null
   const ovMap = new Map(overrides.map(o => [overrideKey(o.connection_id, o.external_id), o]))
   const connMap = new Map(connections.map(c => [c.id, c]))
-  return events.data.map(ev => applyOverride(
+  return applyTravelBlocks(events.data.map(ev => applyOverride(
     { ...ev, id: `external:${ev.id}`, external: true, description: ev.description || '', connection: connMap.get(ev.connection_id) || null },
     ovMap.get(overrideKey(ev.connection_id, ev.external_id)),
-  ))
+  )))
 }
 
 const overrideRow = (userId, ev, patch) => ({
