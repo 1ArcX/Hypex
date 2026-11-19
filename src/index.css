@@ -1261,7 +1261,7 @@ body.is-col-resizing { cursor: col-resize; user-select: none; }
 
 /* ===== TAKEN (v2) ===== */
 .taken-head { flex-shrink: 0; width: 100%; max-width: 920px; margin: 0 auto; padding: 24px 28px 4px; box-sizing: border-box; }
-.taken-body { flex: 1; overflow-y: auto; }
+.taken-body { flex: 1; overflow-y: auto; container-type: size; }
 .taken-body > * { max-width: 920px; margin: 0 auto; padding: 14px 28px 100px; box-sizing: border-box; }
 .taken-body > .task-overview { max-width: 1200px; }
 .taken-body > .done-view { max-width: 1000px; }
@@ -1355,7 +1355,10 @@ body.is-col-resizing { cursor: col-resize; user-select: none; }
 .task-overview__routines button:hover { color: var(--c-text); text-decoration: underline; }
 @container (min-width: 820px) {
   .task-overview__grid { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 24px; }
-  .task-overview__left { position: sticky; top: 0; max-height: calc(100dvh - 190px); overflow-y: auto; }
+  /* Linkerkolom scrolt zelf; hoogte = zichtbare hoogte van .taken-body (cqh). De kaarten mogen niet krimpen:
+     door de glow hebben ze overflow: hidden, dan zou hun inhoud worden afgeknipt i.p.v. dat de kolom scrolt. */
+  .task-overview__left { position: sticky; top: 0; max-height: calc(100cqh - 24px); overflow-y: auto; overscroll-behavior: contain; }
+  .task-overview__left > * { flex-shrink: 0; }
 }
 @media (max-width: 767px) {
   .task-overview__today { padding: 14px 12px; }

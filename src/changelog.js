@@ -6,6 +6,14 @@
 
 export const RELEASES = [
   {
+    id: 50,
+    date: '2026-11-20',
+    title: 'Taken scrollt weer',
+    items: [
+      { area: 'taken', text: "In het Overzicht scrollt de linkerkolom (Vandaag en Nog in te plannen) weer zelf als hij niet op je scherm past, in plaats van dat de kaarten worden afgeknipt." },
+    ],
+  },
+  {
     id: 49,
     date: '2026-11-20',
     title: 'Reistijd per lesdag',
