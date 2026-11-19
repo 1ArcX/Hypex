@@ -101,7 +101,8 @@ export function TimerSheet({ engine, onClose, variant = 'sheet' }: { engine: Eng
         <div className="fx-field"><span>Vak</span>
           <div className="fx-chip-row">
             <button type="button" className={`fx-chip${!meta.courseId ? ' is-active' : ''}`} onClick={() => setMeta({ courseId: null, topicId: null })}>{NO_COURSE.name}</button>
-            {courses.map(c => (
+            {/* Gekozen vak vooraan, zodat het in de scrollende rij altijd in beeld is */}
+            {[...courses].sort((a, b) => Number(b.id === meta.courseId) - Number(a.id === meta.courseId)).map(c => (
               <button key={c.id} type="button" className={`fx-chip${meta.courseId === c.id ? ' is-tint' : ''}`}
                 style={meta.courseId === c.id ? { background: c.color } : undefined}
                 onClick={() => setMeta({ courseId: c.id, topicId: null })}>

@@ -122,7 +122,7 @@
 .fx-hero-right .fx-big { font-size: 28px; font-weight: 700; line-height: 1.15; }
 
 /* ── Pastel-tegels ───────────────────────────────────────────────────────── */
-.fx-tiles { display: flex; gap: 10px; overflow-x: auto; margin: 20px -20px 0; padding: 0 20px 4px; scrollbar-width: none; }
+.fx-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 20px 0 0; }
 .fx-tiles::-webkit-scrollbar { display: none; }
 .fx-tiles.is-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: visible; margin: 0; padding: 0; }
 .fx-tile {
@@ -269,7 +269,7 @@
 }
 
 /* ── Vakken: kaarten in Dash-stijl ────────────────────────────────────── */
-.fx-total { margin: 18px 0 16px; }
+.fx-total { margin: 16px 0 16px; }
 .fx-total-head { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; border: none; background: none; padding: 0; cursor: pointer; color: inherit; text-align: left; }
 .fx-total-head b { font-size: 26px; font-weight: 700; letter-spacing: -0.01em; }
 .fx-total-track { position: relative; height: 10px; border-radius: 5px; background: var(--fx-line); overflow: hidden; margin-top: 8px; }
@@ -290,8 +290,12 @@
   color: var(--course); background: color-mix(in srgb, var(--course) 14%, transparent); }
 .fx-ccard-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; color: var(--fx-text-2); }
 .fx-ccard-meta > span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
-.fx-ccard-meta .is-soon { color: var(--fx-orange); font-weight: 600; }
-.fx-ccard-meta .is-urgent { color: var(--fx-red); font-weight: 700; }
+.fx-ccard-next { width: 100%; min-width: 0; }
+.fx-ccard-meta svg { flex-shrink: 0; }
+.fx-ccard-next b { flex-shrink: 0; font-weight: 700; color: var(--fx-text); }
+.fx-ccard-next em { font-style: normal; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx-ccard-next.is-soon b { color: var(--fx-orange); }
+.fx-ccard-next.is-urgent b { color: var(--fx-red); }
 .fx-ccard-prog { display: flex; flex-direction: column; gap: 5px; }
 .fx-ccard-prog small { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--fx-text-3); }
 .fx-ccard-bar { height: 6px; border-radius: 3px; background: var(--fx-line); overflow: hidden; }

@@ -3,6 +3,7 @@ import { AlertTriangle, BookOpen, CalendarClock, ChevronRight, Clock, Plus } fro
 import { useFocusStore } from '../store/focusStore'
 import { addDays, dayOf, daysBetween, fmtDec, fmtDur, fmtHours, fmtShortDate, todayISO } from '../lib/format'
 import { STATUSES } from '../lib/meta'
+import { FilterTabs } from '../../recap/components/ui'
 import type { Course, CourseStatus } from '../types'
 
 const LS_FILTER = 'focus_course_filter'
@@ -80,16 +81,8 @@ export function CoursesView({ onOpenCourse, onNewCourse, onShowInsights }: {
 
   return (
     <div className="fx-page">
-      <div className="fx-chip-row" role="tablist" aria-label="Status">
-        {STATUSES.map(st => {
-          const n = courses.filter(c => c.status === st.id).length
-          return (
-            <button key={st.id} type="button" role="tab" aria-selected={filter === st.id} className={`fx-chip${filter === st.id ? ' is-active' : ''}`} onClick={() => setFilter(st.id)}>
-              {st.label} <span className="fx-count tnum">{n}</span>
-            </button>
-          )
-        })}
-      </div>
+      <FilterTabs variant="segmented" label="Status" value={filter} onChange={(v: CourseStatus) => setFilter(v)} style={{ alignSelf: 'flex-start', width: 'fit-content', maxWidth: '100%' }}
+        items={STATUSES.map(st => ({ value: st.id, label: st.label, count: courses.filter(c => c.status === st.id).length || undefined }))} />
 
       {rows.length > 0 && (
         <div className="fx-total">
@@ -137,7 +130,8 @@ function CourseCard({ row, active, onOpen }: { row: CourseRow; active: boolean; 
   const { course: c, next, weekMins, staleDays, topicDone, topicGoal, topicCount } = row
   const stale = active && (staleDays == null || staleDays > STALE_DAYS)
   const pct = topicGoal > 0 ? Math.round((topicDone / topicGoal) * 100) : null
-  const nextLabel = next ? (next.days === 0 ? `${next.title} vandaag` : next.days === 1 ? `${next.title} morgen` : `${next.title} over ${next.days} d`) : null
+  const when = next ? (next.days === 0 ? 'Vandaag' : next.days === 1 ? 'Morgen' : `Over ${next.days} d`) : null
+  const nextLabel = next ? `${next.title} ${when?.toLowerCase()}` : null
   return (
     <button type="button" className={`fx-ccard${stale ? ' is-stale' : ''}`} style={{ '--course': c.color } as CSSProperties} onClick={onOpen}
       aria-label={`${c.name}${nextLabel ? `, ${nextLabel}` : ''}, ${fmtDur(weekMins)} deze week`}>
@@ -147,8 +141,8 @@ function CourseCard({ row, active, onOpen }: { row: CourseRow; active: boolean; 
       </div>
       <div className="fx-ccard-meta">
         {next && (
-          <span className={next.days <= 3 ? 'is-urgent' : next.days <= 14 ? 'is-soon' : ''} title={fmtShortDate(next.date)}>
-            <CalendarClock size={13} /> {nextLabel}
+          <span className={`fx-ccard-next${next.days <= 3 ? ' is-urgent' : next.days <= 14 ? ' is-soon' : ''}`} title={`${next.title} · ${fmtShortDate(next.date)}`}>
+            <CalendarClock size={13} /> <b>{when}</b> <em>{next.title}</em>
           </span>
         )}
         <span><Clock size={13} /> {fmtDur(weekMins)} deze week</span>
