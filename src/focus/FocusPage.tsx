@@ -1,10 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { BookOpen, CalendarDays, Home, Sparkles, Timer, X } from 'lucide-react'
+import { Plus, Settings, Timer } from 'lucide-react'
 import './focus.css'
 import { useFocusStore } from './store/focusStore'
 import { usePomodoroEngine } from '../components/pomodoro/usePomodoroEngine'
 import { Sheet, useFxTheme, FxLayoutContext, FX_DESKTOP, FX_PANEL } from './components/ui'
-import { FocusSidebar } from './components/FocusSidebar'
+import { FilterTabs } from '../recap/components/ui'
 import { HomeView } from './views/HomeView'
 import { CoursesView } from './views/CoursesView'
 import { CourseDetail } from './views/CourseDetail'
@@ -20,11 +20,12 @@ import { FocusSettings } from './sheets/FocusSettings'
 import type { FocusTab } from './types'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-const TABS: { id: FocusTab; label: string; Icon: typeof Home }[] = [
-  { id: 'home', label: 'Home', Icon: Home },
-  { id: 'courses', label: 'Vakken', Icon: BookOpen },
-  { id: 'calendar', label: 'Kalender', Icon: CalendarDays },
-  { id: 'insights', label: 'Inzichten', Icon: Sparkles },
+// Zelfde pill-tabs als Taken/Recap (gedeelde FilterTabs)
+const TABS: { value: FocusTab; label: string }[] = [
+  { value: 'home', label: 'Overzicht' },
+  { value: 'courses', label: 'Vakken' },
+  { value: 'calendar', label: 'Kalender' },
+  { value: 'insights', label: 'Inzichten' },
 ]
 
 type SheetState =
@@ -34,9 +35,9 @@ type SheetState =
   | { kind: 'reminders'; id: string } | { kind: 'grades'; id: string }
   | null
 
-export default function FocusPage({ userId, onModeChange, onFocusModeChange, onPomodoroActive, seedTask, onSeedConsumed, onHome }: {
+export default function FocusPage({ userId, onModeChange, onFocusModeChange, onPomodoroActive, seedTask, onSeedConsumed }: {
   userId: string
-  onHome?: () => void
+  onHome?: () => void // niet meer nodig: Focus gebruikt nu de gewone Dash-navigatie
   onModeChange?: (isBreak: boolean) => void
   onFocusModeChange?: (on: boolean) => void
   onPomodoroActive?: (on: boolean) => void
@@ -52,7 +53,7 @@ export default function FocusPage({ userId, onModeChange, onFocusModeChange, onP
   const [openCourse, setOpenCourse] = useState<string | null>(null)
   const [sheet, setSheet] = useState<SheetState>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
-  // Breedte van het Focus-vlak → telefoonindeling, desktop (zijbalk + kolommen) of desktop + vast timerpaneel
+  // Breedte van het Focus-vlak → telefoonindeling, desktop (kolommen) of desktop + vast timerpaneel
   const rootRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(0)
   useLayoutEffect(() => {
@@ -92,6 +93,9 @@ export default function FocusPage({ userId, onModeChange, onFocusModeChange, onP
 
   const started = state.timerKind === 'stopwatch' ? state.seconds > 0 || state.running : state.running || state.seconds < state.workMins * 60 && state.mode === 'work'
 
+  const newCourse = () => setSheet({ kind: 'course', id: null })
+  const newSession = () => setSheet({ kind: 'session', id: null })
+
   let view
   if (openCourse) {
     view = <CourseDetail courseId={openCourse} onBack={() => setOpenCourse(null)}
@@ -100,25 +104,41 @@ export default function FocusPage({ userId, onModeChange, onFocusModeChange, onP
       onGrades={() => setSheet({ kind: 'grades', id: openCourse })}
       onStudy={() => studyCourse(openCourse)} onOpenSession={openSession} />
   } else if (tab === 'courses') {
-    view = <CoursesView onOpenCourse={setOpenCourse} onNewCourse={() => setSheet({ kind: 'course', id: null })}
-      onAddSession={() => setSheet({ kind: 'session', id: null })} onShowInsights={() => go('insights')} />
+    view = <CoursesView onOpenCourse={setOpenCourse} onNewCourse={newCourse} onShowInsights={() => go('insights')} />
   } else if (tab === 'calendar') {
     view = <CalendarView onOpenSession={openSession} />
   } else if (tab === 'insights') {
     view = <InsightsView />
   } else {
-    view = <HomeView userId={userId} onSettings={() => setSheet({ kind: 'settings' })} onAddSession={() => setSheet({ kind: 'session', id: null })}
-      onNewCourse={() => setSheet({ kind: 'course', id: null })} onOpenSession={openSession} />
+    view = <HomeView userId={userId} onAddSession={newSession} onStartTimer={openTimer} onOpenSession={openSession} />
   }
 
   return (
     <FxLayoutContext.Provider value={{ desktop, panel }}>
     <div ref={rootRef} className={`fx${desktop ? ' is-desktop' : ''}${panel ? ' has-panel' : ''}`} data-theme={theme}>
-      {desktop && (
-        <FocusSidebar tab={tab} inCourse={!!openCourse} onTab={go} engine={engine} started={started}
-          showTimerCard={!panel} onOpenTimer={openTimer} onSettings={() => setSheet({ kind: 'settings' })} onHome={onHome} />
-      )}
       <div className="fx-scroll" ref={scrollRef}>
+        {/* Kop zoals Taken/Statistieken: serif-titel, acties rechts, pill-tabs eronder */}
+        <header className="fx-head">
+          <div className="fx-head-row">
+            <h1 className="t-page hide-mobile">Focus</h1>
+            <div className="fx-head-actions">
+              {!panel && (
+                <button type="button" className={`fx-timerbtn${state.running ? ' is-running' : started ? ' is-paused' : ''}`} onClick={() => setSheet({ kind: 'timer' })}
+                  aria-label={started ? `Timer ${fmtClock(state.seconds)}, openen` : 'Timer openen'}>
+                  <Timer size={15} aria-hidden="true" />
+                  {started ? <span className="tnum">{fmtClock(state.seconds)}</span> : 'Timer'}
+                </button>
+              )}
+              <button type="button" className="fx-headicon" onClick={() => setSheet({ kind: 'settings' })} aria-label="Focus-instellingen" title="Instellingen">
+                <Settings size={16} />
+              </button>
+              {tab === 'courses' && !openCourse
+                ? <button type="button" className="btn-primary" onClick={newCourse}><Plus size={15} aria-hidden="true" /> Vak</button>
+                : <button type="button" className="btn-primary" onClick={newSession}><Plus size={15} aria-hidden="true" /> Sessie</button>}
+            </div>
+          </div>
+          <FilterTabs items={TABS} value={openCourse ? 'courses' : tab} onChange={(v: FocusTab) => go(v)} label="Focus-weergave" />
+        </header>
         {needsMigration && loaded && (
           <div className="fx-page" style={{ paddingBottom: 0 }}>
             <p className="fx-banner" style={{ marginBottom: 0 }}>
@@ -130,31 +150,6 @@ export default function FocusPage({ userId, onModeChange, onFocusModeChange, onP
       </div>
 
       {panel && <TimerSheet engine={engine} variant="panel" />}
-
-      {/* Telefoon / smal venster: zwevende onderbalk, rode ✕ en timerknop */}
-      {!desktop && <div className="fx-tabbar-wrap">
-        <nav className="fx-tabbar" aria-label="Focus">
-          {TABS.map(t => {
-            const active = tab === t.id && (!openCourse || t.id === 'courses')
-            return (
-              <button key={t.id} type="button" className={`fx-tab${active ? ' is-active' : ''}`} aria-current={active ? 'page' : undefined} onClick={() => go(t.id)}>
-                <t.Icon fill={active ? 'currentColor' : 'none'} strokeWidth={active ? 1.6 : 2} />
-                {t.label}
-              </button>
-            )
-          })}
-        </nav>
-        {onHome && (
-          <button type="button" className="fx-home" onClick={onHome} aria-label="Terug naar Home" title="Terug naar Home">
-            <X strokeWidth={2.6} />
-          </button>
-        )}
-        <button type="button" className={`fx-fab${state.running ? ' is-running' : started ? ' is-paused' : ''}`} onClick={() => setSheet({ kind: 'timer' })}
-          aria-label={started ? `Timer ${fmtClock(state.seconds)}, openen` : 'Timer starten'}>
-          <Timer strokeWidth={2.4} />
-          {started && <span className="tnum">{fmtClock(state.seconds)}</span>}
-        </button>
-      </div>}
 
       {sheet?.kind === 'timer' && !panel && <TimerSheet engine={engine} onClose={() => setSheet(null)} />}
       {sheet?.kind === 'settings' && <FocusSettings engine={engine} onClose={() => setSheet(null)} />}

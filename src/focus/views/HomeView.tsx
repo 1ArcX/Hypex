@@ -1,21 +1,20 @@
 import { useMemo, useState } from 'react'
-import { ChevronDown, ChevronUp, Flame, MoreHorizontal, Settings } from 'lucide-react'
+import { ChevronDown, ChevronUp, Flame, Timer } from 'lucide-react'
 import { useFocusStore } from '../store/focusStore'
 import { useFocusProgress } from '../../hooks/useFocusProgress'
 import { overview, volume, RANGE_LABELS, type Range } from '../lib/stats'
 import { fmtDec, fmtDur, fmtHours } from '../lib/format'
 import { VolumeArea } from '../charts/charts'
-import { ActionMenu, Delta, Dropdown } from '../components/ui'
+import { Delta, Dropdown } from '../components/ui'
 import { SessionList } from '../components/SessionList'
 
 type VolRange = Exclude<Range, 'all'>
 const VOL_OPTIONS: { id: VolRange; label: string }[] = (['7d', '30d', '90d', '1y'] as VolRange[]).map(id => ({ id, label: RANGE_LABELS[id] }))
 
-export function HomeView({ userId, onSettings, onAddSession, onNewCourse, onOpenSession }: {
+export function HomeView({ userId, onAddSession, onStartTimer, onOpenSession }: {
   userId: string
-  onSettings: () => void
   onAddSession: () => void
-  onNewCourse: () => void
+  onStartTimer: () => void
   onOpenSession: (id: string) => void
 }) {
   const sessions = useFocusStore(s => s.sessions)
@@ -33,17 +32,6 @@ export function HomeView({ userId, onSettings, onAddSession, onNewCourse, onOpen
 
   return (
     <div className="fx-page">
-      <div className="fx-top">
-        <div className="fx-pillbtns">
-          <button type="button" className="fx-iconbtn" onClick={onSettings} aria-label="Instellingen"><Settings size={22} strokeWidth={2.2} /></button>
-          <ActionMenu
-            trigger={<button type="button" className="fx-iconbtn" aria-label="Meer"><MoreHorizontal size={22} /></button>}
-            items={[{ label: 'Sessie toevoegen', onClick: onAddSession }, { label: 'Nieuw vak', onClick: onNewCourse }]} />
-        </div>
-      </div>
-
-      <h1 className="fx-h1">Overzicht</h1>
-
       <div className="fx-cols"><div className="fx-col">
 
       <div className="fx-hero">
@@ -81,7 +69,14 @@ export function HomeView({ userId, onSettings, onAddSession, onNewCourse, onOpen
           </div>
           <Dropdown value={range} options={VOL_OPTIONS} onChange={setRange} label="Periode studievolume" />
         </div>
-        <VolumeArea points={vol.points} />
+        {vol.total > 0 ? <VolumeArea points={vol.points} /> : (
+          // Geen lege grafiek met "0m": korte uitleg + actie
+          <div className="fx-card fx-empty-mini" style={{ marginTop: 10 }}>
+            <Timer size={22} color="var(--fx-orange)" style={{ flexShrink: 0 }} />
+            <div><b>Nog geen studietijd in deze periode</b>Start de timer of log een sessie die je al gedaan hebt.</div>
+            <button type="button" className="fx-btn is-primary" onClick={onStartTimer}>Start timer</button>
+          </div>
+        )}
       </div>
 
       </div><div className="fx-col">
@@ -93,7 +88,8 @@ export function HomeView({ userId, onSettings, onAddSession, onNewCourse, onOpen
         </button>
         {recentOpen && (
           sessions.length === 0
-            ? <div className="fx-card fx-empty"><h3>Nog geen sessies</h3>Start de timer rechtsonder of voeg een sessie toe via ⋯.</div>
+            ? <div className="fx-card fx-empty-mini"><div><b>Nog geen sessies</b>Start de timer of voeg een sessie toe met "+ Sessie".</div>
+                <button type="button" className="fx-btn" onClick={onAddSession}>+ Sessie</button></div>
             : <SessionList sessions={showAll ? sessions.slice(0, 50) : sessions.slice(0, 5)} onOpen={onOpenSession}
                 more={sessions.length > 5 ? { label: showAll ? 'Minder tonen' : `Toon meer (${Math.min(50, sessions.length) - 5})`, onClick: () => setShowAll(v => !v) } : undefined} />
         )}

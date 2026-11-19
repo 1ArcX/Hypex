@@ -56,7 +56,6 @@ export function CalendarView({ onOpenSession }: { onOpenSession: (id: string) =>
           )}
         </div>
       </div>
-      <h1 className="fx-h1">Kalender</h1>
       {fc && <div className="fx-muted" style={{ marginTop: -8, marginBottom: 10 }}>Gefilterd op <b style={{ color: fc.color }}>{fc.name}</b></div>}
 
       <div className="fx-cols"><div className="fx-col">

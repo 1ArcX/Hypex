@@ -6,6 +6,16 @@
 
 export const RELEASES = [
   {
+    id: 44,
+    date: '2026-11-19',
+    title: 'Focus past nu bij de rest van Hypex',
+    items: [
+      { area: 'focus', text: "Focus heeft nu dezelfde kop en tabs als Taken (Overzicht · Vakken · Kalender · Inzichten) met '+ Vak' / '+ Sessie' en een timerknop rechtsboven; de zwevende balk en het rode kruisje zijn weg, de gewone navigatie blijft zichtbaar." },
+      { area: 'focus', text: "Vakken zijn kaarten in plaats van een boekenplank: per vak de toets die eraan komt, je uren deze week en de voortgang van je onderwerpen. Gesorteerd op de eerstvolgende toets, en een waarschuwing als je een vak meer dan een week hebt laten liggen." },
+      { area: 'focus', text: "Bij een nieuwe sessie of de timer staat het vak van je geplande taak (of je laatst gebruikte vak) al klaar, en kun je meteen een onderwerp kiezen dat meetelt voor de doeluren." },
+    ],
+  },
+  {
     id: 43,
     date: '2026-11-19',
     title: 'Taken via Claude krijgen de juiste lengte',

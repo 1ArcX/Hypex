@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useFocusStore } from '../store/focusStore'
 import { loadFocusDays } from '../../hooks/useFocusProgress'
 import { dayOf, fmtTime, todayISO } from '../lib/format'
 import { KINDS } from '../lib/meta'
 import { RateInput, Sheet, SheetHead } from '../components/ui'
+import { useDefaultCourse } from '../lib/defaultCourse'
 import type { SessionKind } from '../types'
 
 /** Sessie handmatig toevoegen (sessionId leeg) of een bestaande bewerken/verwijderen */
@@ -12,7 +13,10 @@ export function SessionEditor({ sessionId, presetCourseId, onClose }: { sessionI
   const courses = useFocusStore(s => s.courses)
   const topics = useFocusStore(s => s.topics)
   const userId = useFocusStore(s => s.userId)
+  const sessions = useFocusStore(s => s.sessions)
   const { addSession, updateSession, deleteSession } = useFocusStore.getState()
+  // Nieuwe sessie: standaard het vak van de taak die nu gepland staat, anders het laatst gebruikte vak
+  const fallbackCourse = useDefaultCourse(userId, courses, sessions)
 
   const startTs = existing ? (existing.started_at || new Date(new Date(existing.completed_at).getTime() - existing.duration_minutes * 60000).toISOString()) : null
   const [courseId, setCourseId] = useState<string>(existing?.course_id || presetCourseId || '')
@@ -25,6 +29,8 @@ export function SessionEditor({ sessionId, presetCourseId, onClose }: { sessionI
   const [rating, setRating] = useState<number | null>(existing?.rating ?? null)
   const [note, setNote] = useState(existing?.note || '')
   const [busy, setBusy] = useState(false)
+  const touched = useRef(!!(existing || presetCourseId))
+  useEffect(() => { if (!touched.current && fallbackCourse) setCourseId(fallbackCourse) }, [fallbackCourse])
 
   const duration = hours * 60 + mins
   const courseTopics = topics.filter(t => t.course_id === courseId)
@@ -62,17 +68,20 @@ export function SessionEditor({ sessionId, presetCourseId, onClose }: { sessionI
         right={<button type="button" className="fx-pillbtn is-primary" onClick={save} disabled={!valid || busy}>Bewaar</button>} />
 
       <div className="fx-field"><span>Vak</span>
-        <select className="fx-select" value={courseId} onChange={e => { setCourseId(e.target.value); setTopicId('') }}>
+        <select className="fx-select" value={courseId} onChange={e => { touched.current = true; setCourseId(e.target.value); setTopicId('') }}>
           <option value="">Zonder vak</option>
-          {courses.map(c => <option key={c.id} value={c.id}>{c.name}{c.code ? ` (${c.code})` : ''}</option>)}
+          {courses.filter(c => c.status === 'active' || c.id === courseId).map(c => <option key={c.id} value={c.id}>{c.name}{c.code ? ` (${c.code})` : ''}</option>)}
         </select>
       </div>
-      {courseTopics.length > 0 && (
-        <div className="fx-field"><span>Onderwerp</span>
-          <select className="fx-select" value={topicId} onChange={e => setTopicId(e.target.value)}>
-            <option value="">Geen</option>
-            {courseTopics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
+      {courseId && (
+        <div className="fx-field"><span>Onderwerp <span className="fx-faint" style={{ fontWeight: 500 }}>(optioneel, telt mee voor de doeluren)</span></span>
+          {courseTopics.length > 0 ? (
+            <div className="fx-chips">
+              {courseTopics.map(t => (
+                <button key={t.id} type="button" className={`fx-chip${topicId === t.id ? ' is-active' : ''}`} onClick={() => setTopicId(topicId === t.id ? '' : t.id)}>{t.name}</button>
+              ))}
+            </div>
+          ) : <p className="fx-faint" style={{ margin: 0, fontSize: 13 }}>Dit vak heeft nog geen onderwerpen. Voeg ze toe bij het vak (Bewerken).</p>}
         </div>
       )}
       <div className="fx-field"><span>Soort</span>

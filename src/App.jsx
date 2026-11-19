@@ -1068,7 +1068,7 @@ export default function App() {
 
           {/* Mobile bottom nav — fixed, spacer holds its height in the flex column.
               Niet in Focus/Geld/Notities: die hebben hun eigen balk met een weg terug naar Home. */}
-          {!(activePage === 'focus' || activePage === 'notities' || (activePage === 'geld' && isAdmin)) && <div className="md:hidden" style={{ height: 'calc(72px + env(safe-area-inset-bottom))', flexShrink: 0 }}>
+          {!(activePage === 'notities' || (activePage === 'geld' && isAdmin)) && <div className="md:hidden" style={{ height: 'calc(72px + env(safe-area-inset-bottom))', flexShrink: 0 }}>
             <BottomNav
               activePage={activePage}
               setActivePage={handleSetActivePage}

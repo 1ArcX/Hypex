@@ -26,18 +26,13 @@ export function InsightsView() {
   if (sessions.length === 0) {
     return (
       <div className="fx-page">
-        <div className="fx-top" />
-        <h1 className="fx-h1">Inzichten</h1>
-        <div className="fx-card fx-empty"><h3>Nog niets te zien</h3>Rond een paar sessies af; dan zie je hier waar je tijd heen gaat en wanneer je het best studeert.</div>
+        <div className="fx-card fx-empty-mini"><div><b>Nog niets te zien</b>Rond een paar sessies af; dan zie je hier waar je tijd heen gaat en wanneer je het best studeert.</div></div>
       </div>
     )
   }
 
   return (
     <div className="fx-page">
-      <div className="fx-top" />
-      <h1 className="fx-h1">Inzichten</h1>
-
       {/* Waar je tijd heen ging */}
       <div className="fx-cols"><div className="fx-col">
       <section className="fx-section" style={{ marginTop: 8 }}>

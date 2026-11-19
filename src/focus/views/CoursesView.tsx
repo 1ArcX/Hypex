@@ -1,40 +1,85 @@
 import { useMemo, useState, type CSSProperties } from 'react'
-import { BookOpen, ChevronRight, MoreHorizontal, Plus } from 'lucide-react'
+import { AlertTriangle, BookOpen, CalendarClock, ChevronRight, Clock, Plus } from 'lucide-react'
 import { useFocusStore } from '../store/focusStore'
-import { courseTotals } from '../lib/stats'
-import { fmtHours } from '../lib/format'
+import { addDays, dayOf, daysBetween, fmtDec, fmtDur, fmtHours, fmtShortDate, todayISO } from '../lib/format'
 import { STATUSES } from '../lib/meta'
-import { ActionMenu, useFxLayout } from '../components/ui'
 import type { Course, CourseStatus } from '../types'
 
 const LS_FILTER = 'focus_course_filter'
+const STALE_DAYS = 7
 
-export function CoursesView({ onOpenCourse, onNewCourse, onAddSession, onShowInsights }: {
+interface CourseRow {
+  course: Course
+  totalMins: number
+  weekMins: number
+  lastDay: string | null
+  staleDays: number | null // dagen sinds laatst gestudeerd (null = nog nooit)
+  next: { title: string; date: string; days: number } | null
+  topicDone: number // minuten die meetellen voor de doeluren (per onderwerp afgetopt op het doel)
+  topicGoal: number // som van de doeluren in minuten
+  topicCount: number
+}
+
+/**
+ * Vakken als kaarten in Dash-stijl: kleurbalk, naam + kort label, dagen tot de eerstvolgende toets, uren deze week,
+ * voortgang van de onderwerpen (gestudeerd / doeluren). Gesorteerd op eerstvolgende toets; vakken die je langer dan
+ * een week niet hebt gestudeerd krijgen een markering.
+ */
+export function CoursesView({ onOpenCourse, onNewCourse, onShowInsights }: {
   onOpenCourse: (id: string) => void
   onNewCourse: () => void
-  onAddSession: () => void
   onShowInsights: () => void
 }) {
   const courses = useFocusStore(s => s.courses)
   const sessions = useFocusStore(s => s.sessions)
+  const dates = useFocusStore(s => s.dates)
+  const topics = useFocusStore(s => s.topics)
   const [filter, setFilterState] = useState<CourseStatus>(() => { try { return (localStorage.getItem(LS_FILTER) as CourseStatus) || 'active' } catch { return 'active' } })
-  const setFilter = (f: CourseStatus) => { setFilterState(f); try { localStorage.setItem(LS_FILTER, f) } catch { /* */ } }
-  const totals = useMemo(() => courseTotals(sessions), [sessions])
-  const shown = courses.filter(c => c.status === filter)
-  const total = shown.reduce((a, c) => a + (totals[c.id] || 0), 0)
+  const setFilter = (f: CourseStatus) => { setFilterState(f); try { localStorage.setItem(LS_FILTER, f) } catch { /* privé-venster */ } }
+
+  const today = todayISO()
+  const monday = addDays(today, -((new Date().getDay() + 6) % 7))
+
+  const rows = useMemo<CourseRow[]>(() => {
+    const byCourse = new Map<string, { total: number; week: number; last: string | null; perTopic: Record<string, number> }>()
+    for (const s of sessions) {
+      if (!s.course_id) continue
+      const day = dayOf(s.completed_at)
+      const r = byCourse.get(s.course_id) || { total: 0, week: 0, last: null, perTopic: {} }
+      r.total += s.duration_minutes || 0
+      if (day >= monday) r.week += s.duration_minutes || 0
+      if (!r.last || day > r.last) r.last = day
+      if (s.topic_id) r.perTopic[s.topic_id] = (r.perTopic[s.topic_id] || 0) + (s.duration_minutes || 0)
+      byCourse.set(s.course_id, r)
+    }
+    return courses.filter(c => c.status === filter).map(c => {
+      const r = byCourse.get(c.id) || { total: 0, week: 0, last: null, perTopic: {} }
+      const up = dates.filter(d => d.course_id === c.id && d.date >= today).sort((a, b) => a.date.localeCompare(b.date))[0]
+      const next = up ? { title: up.title, date: up.date, days: daysBetween(today, up.date) }
+        : c.final_date && c.final_date >= today ? { title: 'Eindtoets', date: c.final_date, days: daysBetween(today, c.final_date) } : null
+      const ts = topics.filter(t => t.course_id === c.id)
+      return {
+        course: c, totalMins: r.total, weekMins: r.week, lastDay: r.last,
+        staleDays: r.last ? daysBetween(r.last, today) : null,
+        next,
+        topicDone: ts.reduce((a, t) => a + Math.min(r.perTopic[t.id] || 0, t.target_minutes || 0), 0),
+        topicGoal: ts.reduce((a, t) => a + (t.target_minutes || 0), 0),
+        topicCount: ts.length,
+      }
+    }).sort((a, b) => {
+      // Eerstvolgende toets eerst; zonder toets daarna, op naam
+      if (a.next && b.next) return a.next.date.localeCompare(b.next.date) || a.course.name.localeCompare(b.course.name)
+      if (a.next || b.next) return a.next ? -1 : 1
+      return a.course.sort_order - b.course.sort_order || a.course.name.localeCompare(b.course.name)
+    })
+  }, [courses, sessions, dates, topics, filter, today, monday])
+
+  const total = rows.reduce((a, r) => a + r.totalMins, 0)
+  const goal = rows.reduce((a, r) => a + r.topicGoal, 0)
+  const done = rows.reduce((a, r) => a + r.topicDone, 0)
 
   return (
     <div className="fx-page">
-      <div className="fx-top">
-        <div className="fx-pillbtns">
-          <button type="button" className="fx-iconbtn" onClick={onNewCourse} aria-label="Nieuw vak"><Plus size={24} /></button>
-          <ActionMenu
-            trigger={<button type="button" className="fx-iconbtn" aria-label="Meer"><MoreHorizontal size={22} /></button>}
-            items={[{ label: 'Nieuw vak', onClick: onNewCourse }, { label: 'Sessie toevoegen', onClick: onAddSession }]} />
-        </div>
-      </div>
-      <h1 className="fx-h1">Vakken</h1>
-
       <div className="fx-chip-row" role="tablist" aria-label="Status">
         {STATUSES.map(st => {
           const n = courses.filter(c => c.status === st.id).length
@@ -46,76 +91,78 @@ export function CoursesView({ onOpenCourse, onNewCourse, onAddSession, onShowIns
         })}
       </div>
 
-      {shown.length > 0 && (
-        <>
-          <button type="button" onClick={onShowInsights} style={{ display: 'flex', alignItems: 'baseline', gap: 6, margin: '22px 0 10px', border: 'none', background: 'none', cursor: 'pointer', padding: 0 }}>
-            <span className="tnum" style={{ fontSize: 30, fontWeight: 800 }}>{fmtHours(total)}</span>
-            <span className="fx-label">totaal</span>
-            <ChevronRight size={20} color="var(--fx-text-3)" style={{ alignSelf: 'center' }} />
+      {rows.length > 0 && (
+        <div className="fx-total">
+          {/* Totaal met doel: de doeluren van alle onderwerpen (gestudeerd per onderwerp, afgetopt op het doel) */}
+          <button type="button" className="fx-total-head" onClick={onShowInsights} title="Naar Inzichten">
+            {goal > 0 ? <>
+              <b className="tnum">{fmtDec(done / 60)} van {fmtDec(goal / 60, 0)} u</b>
+              <span className="fx-label">doeluren onderwerpen · {fmtHours(total)} totaal gestudeerd</span>
+            </> : <>
+              <b className="tnum">{fmtHours(total)}</b>
+              <span className="fx-label">totaal · geef onderwerpen doeluren om een doel te zien</span>
+            </>}
+            <ChevronRight size={18} color="var(--fx-text-3)" style={{ alignSelf: 'center' }} />
           </button>
-          <div style={{ display: 'flex', gap: 3, height: 12, borderRadius: 6, overflow: 'hidden', background: 'var(--fx-line)' }} aria-hidden="true">
-            {shown.map(c => (totals[c.id] || 0) > 0 && <span key={c.id} style={{ flex: totals[c.id], background: c.color, borderRadius: 6 }} />)}
+          <div className="fx-total-track" aria-hidden="true">
+            <div className="fx-total-fill" style={{ width: goal > 0 ? `${Math.min(100, (done / goal) * 100)}%` : '100%' }}>
+              {rows.map(r => {
+                const v = goal > 0 ? r.topicDone : r.totalMins
+                return v > 0 ? <span key={r.course.id} style={{ flex: v, background: r.course.color }} /> : null
+              })}
+            </div>
           </div>
-        </>
+        </div>
       )}
 
-      {shown.length === 0 ? (
-        <div className="fx-empty">
-          <BookOpen size={44} color="var(--fx-orange)" />
-          <h3>{filter === 'active' ? 'Nog geen vakken' : `Geen ${STATUSES.find(s => s.id === filter)!.label.toLowerCase()} vakken`}</h3>
-          {filter === 'active' && <>
-            <p style={{ margin: '0 0 18px' }}>Maak een vak aan om je studietijd per vak, onderwerp en toets bij te houden.</p>
-            <button type="button" className="fx-btn is-primary" onClick={onNewCourse}><Plus size={20} /> Vak toevoegen</button>
-          </>}
+      {rows.length === 0 ? (
+        <div className="fx-card fx-empty-mini" style={{ marginTop: 16 }}>
+          <BookOpen size={22} color="var(--fx-orange)" style={{ flexShrink: 0 }} />
+          <div>
+            <b>{filter === 'active' ? 'Nog geen vakken' : `Geen ${STATUSES.find(s => s.id === filter)!.label.toLowerCase()} vakken`}</b>
+            {filter === 'active' && 'Maak een vak aan om je studietijd per vak, onderwerp en toets bij te houden.'}
+          </div>
+          {filter === 'active' && <button type="button" className="fx-btn is-primary" onClick={onNewCourse}><Plus size={16} /> Vak</button>}
         </div>
       ) : (
-        <Bookshelf courses={shown} totals={totals} onOpen={onOpenCourse} />
+        <div className="fx-cgrid">
+          {rows.map(r => <CourseCard key={r.course.id} row={r} active={filter === 'active'} onOpen={() => onOpenCourse(r.course.id)} />)}
+        </div>
       )}
     </div>
   )
 }
 
-/** Boekenplank: elk vak een boek in de vakkleur met de code op de rug en de uren onderaan */
-function Bookshelf({ courses, totals, onOpen }: { courses: Course[]; totals: Record<string, number>; onOpen: (id: string) => void }) {
-  const { desktop } = useFxLayout()
-  const PER_SHELF = desktop ? 9 : 5
-  const max = Math.max(...courses.map(c => totals[c.id] || 0), 1)
-  const shelves: Course[][] = []
-  for (let i = 0; i < courses.length; i += PER_SHELF) shelves.push(courses.slice(i, i + PER_SHELF))
+function CourseCard({ row, active, onOpen }: { row: CourseRow; active: boolean; onOpen: () => void }) {
+  const { course: c, next, weekMins, staleDays, topicDone, topicGoal, topicCount } = row
+  const stale = active && (staleDays == null || staleDays > STALE_DAYS)
+  const pct = topicGoal > 0 ? Math.round((topicDone / topicGoal) * 100) : null
+  const nextLabel = next ? (next.days === 0 ? `${next.title} vandaag` : next.days === 1 ? `${next.title} morgen` : `${next.title} over ${next.days} d`) : null
   return (
-    <div style={{ marginTop: 34 }}>
-      {shelves.map((row, si) => (
-        <div key={si} className="fx-shelf">
-          <div className="fx-shelf-books">
-            {row.map((c, i) => {
-              const mins = totals[c.id] || 0
-              const h = 250 + Math.round((mins / max) * 50)
-              const lean = i === row.length - 1 && row.length < PER_SHELF
-              const [a, b] = splitCode(c)
-              return (
-                <button key={c.id} type="button" className={`fx-book${lean ? ' is-lean' : ''}`} onClick={() => onOpen(c.id)}
-                  style={{ '--book': c.color, height: h } as CSSProperties} aria-label={`${c.name}, ${fmtHours(mins)}`}>
-                  <span className="fx-book-ribbon" aria-hidden="true" />
-                  <span className="fx-book-lines top" aria-hidden="true" />
-                  <span className="fx-book-title">{a}{b && <><br />{b}</>}</span>
-                  <span className="fx-book-lines bottom" aria-hidden="true" />
-                  <span className="fx-book-hours tnum">{fmtHours(mins)}</span>
-                </button>
-              )
-            })}
-          </div>
-          <div className="fx-shelf-board" aria-hidden="true" />
-        </div>
-      ))}
-    </div>
+    <button type="button" className={`fx-ccard${stale ? ' is-stale' : ''}`} style={{ '--course': c.color } as CSSProperties} onClick={onOpen}
+      aria-label={`${c.name}${nextLabel ? `, ${nextLabel}` : ''}, ${fmtDur(weekMins)} deze week`}>
+      <div className="fx-ccard-top">
+        <span className="fx-ccard-name">{c.name}</span>
+        {c.code && <span className="fx-ccard-code">{c.code}</span>}
+      </div>
+      <div className="fx-ccard-meta">
+        {next && (
+          <span className={next.days <= 3 ? 'is-urgent' : next.days <= 14 ? 'is-soon' : ''} title={fmtShortDate(next.date)}>
+            <CalendarClock size={13} /> {nextLabel}
+          </span>
+        )}
+        <span><Clock size={13} /> {fmtDur(weekMins)} deze week</span>
+      </div>
+      <div className="fx-ccard-prog">
+        <small>
+          <span>{topicCount ? `Onderwerpen · ${topicCount}` : 'Nog geen onderwerpen'}</span>
+          {pct != null && <span className="tnum">{fmtDec(topicDone / 60)} / {fmtDec(topicGoal / 60, 0)} u · {pct}%</span>}
+        </small>
+        <div className="fx-ccard-bar"><i style={{ width: `${pct ?? 0}%` }} /></div>
+      </div>
+      {stale && (
+        <span className="fx-stale"><AlertTriangle size={13} /> {staleDays == null ? 'Nog niet gestudeerd' : `${staleDays} dagen niet gestudeerd`}</span>
+      )}
+    </button>
   )
-}
-
-function splitCode(c: Course): [string, string] {
-  const src = (c.code || c.name).trim()
-  const m = src.match(/^([A-Za-z]+)\s*([\d\w-]+)$/)
-  if (c.code && m) return [m[1].toUpperCase(), m[2]]
-  const words = src.split(/\s+/)
-  if (words.length > 1) return [words[0], words.slice(1).join(' ')]
-  return [src, '']
 }

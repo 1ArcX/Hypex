@@ -3,6 +3,7 @@ import { ChevronDown, Pause, Play, RotateCcw, SkipForward, Square, Volume2, Volu
 import { useFocusStore } from '../store/focusStore'
 import { KINDS, NO_COURSE } from '../lib/meta'
 import { Sheet } from '../components/ui'
+import { useDefaultCourse } from '../lib/defaultCourse'
 import type { SessionKind } from '../types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -36,6 +37,18 @@ export function TimerSheet({ engine, onClose, variant = 'sheet' }: { engine: Eng
   const started = sw ? state.seconds > 0 || running : state.seconds < (state.mode === 'work' ? state.workMins : state.mode === 'break' ? state.breakMins : state.longBreakMins) * 60
   const courseTopics = topics.filter(t => t.course_id === meta.courseId)
   const [tooShort, setTooShort] = useState(false)
+
+  // Nog geen vak gekozen en de timer loopt niet: het vak van de taak die nu gepland staat, anders het laatst gebruikte
+  const userId = useFocusStore(s => s.userId)
+  const sessions = useFocusStore(s => s.sessions)
+  const allCourses = useFocusStore(s => s.courses)
+  const fallbackCourse = useDefaultCourse(userId, allCourses, sessions)
+  const prefilled = useRef(false)
+  useEffect(() => {
+    if (prefilled.current || !fallbackCourse) return
+    prefilled.current = true
+    if (!meta.courseId && !started) setMeta({ courseId: fallbackCourse, topicId: null })
+  }, [fallbackCourse]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Notitie lokaal typen, met vertraging synchroniseren
   const [note, setNote] = useState(meta.note || '')
@@ -98,13 +111,15 @@ export function TimerSheet({ engine, onClose, variant = 'sheet' }: { engine: Eng
             ))}
           </div>
         </div>
-        {courseTopics.length > 0 && (
-          <div className="fx-field"><span>Onderwerp</span>
-            <div className="fx-chip-row">
-              {courseTopics.map(t => (
-                <button key={t.id} type="button" className={`fx-chip${meta.topicId === t.id ? ' is-active' : ''}`} onClick={() => setMeta({ topicId: meta.topicId === t.id ? null : t.id })}>{t.name}</button>
-              ))}
-            </div>
+        {meta.courseId && (
+          <div className="fx-field"><span>Onderwerp <span className="fx-faint" style={{ fontWeight: 500 }}>(optioneel, telt mee voor de doeluren)</span></span>
+            {courseTopics.length > 0 ? (
+              <div className="fx-chip-row">
+                {courseTopics.map(t => (
+                  <button key={t.id} type="button" className={`fx-chip${meta.topicId === t.id ? ' is-active' : ''}`} onClick={() => setMeta({ topicId: meta.topicId === t.id ? null : t.id })}>{t.name}</button>
+                ))}
+              </div>
+            ) : <p className="fx-faint" style={{ margin: 0, fontSize: 13 }}>Dit vak heeft nog geen onderwerpen.</p>}
           </div>
         )}
         <div className="fx-field"><span>Soort</span>
