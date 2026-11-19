@@ -131,48 +131,24 @@ async function loadRecaps(sb, uid, from, to, kind) {
   if (error) { if (missing(error)) throw new Error('Recap-tabel ontbreekt (migratie add_recap.sql)'); throw new Error(error.message) }
   return data || []
 }
-const SLEEP_RE = /(slapen|slaap|sleep|nachtrust)/i
-const WAKE_MIN = 16 * 60
-
 /**
  * Extra voor de dagrecap (zelfde als Recap → Vandaag in de app, src/recap/hooks/useDayDetails.ts):
  * gepland tegenover gedaan, de dag in uren per type, deadlines van de 3 dagen erna, eerstvolgende toets, geld.
  */
 async function dayExtras(sb, uid, day) {
   const types = await H.loadTypes(sb, uid)
-  const [tasksRes, agenda, logsRes, focus, exps] = await Promise.all([
-    sb.from('tasks').select('*').eq('user_id', uid).limit(5000),
-    H.loadAgenda(sb, uid, types, day, day).catch(() => []),
-    sb.from('task_completions').select('task_id, title, day, recurring, completed_at').eq('user_id', uid).eq('day', day),
+  const [sum, focus, exps] = await Promise.all([
+    H.daySummary(sb, uid, types, day),
     loadFocus(sb, uid).catch(() => ({ courses: [], dates: [], topics: [], parts: [] })),
     sb.from('expenses').select('date, amount, is_income, is_savings_contribution, is_savings_withdrawal, is_loan_repayment, is_planned, paid_from_savings')
       .eq('user_id', uid).gte('date', day.slice(0, 8) + '01').lte('date', day),
   ])
-  const tasks = tasksRes.data || [], logs = logsRes.data || []
-  const today = todayLocal()
-  const lo = +toUTC(day), hi = +toUTC(addDays(day, 1))
-  // Gepland maar blijven liggen: eenmalige taken van die dag (meerdaagse op hun laatste dag) + eigen items die voorbij zijn
-  const leftOpen = tasks.filter(t => !t.recurrence && !t.completed && t.date && H.taskOnDay(t, day) && H.taskLast(t) <= day)
-    .map(t => ({ id: t.id, title: t.title, ...(t.date < day ? { was_overdue: true } : {}) }))
-  const own = agenda.filter(x => x.kind === 'eigen' && !x.hidden && !x.all_day && +x.start >= lo && +x.start < hi)
-  const routines = tasks.filter(t => H.routineDueOn(t, day, today, logs))
-  // Uren per type (deel binnen de dag, overlap per type één keer; slaap apart en telt niet als bezig)
-  const byCat = new Map()
-  for (const x of agenda) {
-    if (x.hidden || x.all_day) continue
-    const s = Math.max(+x.start, lo), e = Math.min(+x.end, hi)
-    if (e <= s) continue
-    const cat = SLEEP_RE.test(x.title || '') ? 'slaap' : x.cat
-    byCat.set(cat, [...(byCat.get(cat) || []), [s, e]])
-  }
-  const merged = (list) => { let tot = 0, cur = null; for (const [s, e] of list.sort((a, b) => a[0] - b[0])) { if (cur && s <= cur[1]) cur[1] = Math.max(cur[1], e); else { if (cur) tot += cur[1] - cur[0]; cur = [s, e] } } return (cur ? tot + cur[1] - cur[0] : tot) / 60000 }
-  const hoursPerType = Object.fromEntries([...byCat.entries()].map(([c, l]) => [c === 'slaap' ? 'Slaap' : types.name(c), fmtHours(Math.round(merged(l)))]))
-  const busy = Math.round(merged([...byCat.entries()].filter(([c]) => c !== 'slaap').flatMap(([, l]) => l)))
+  const isToday = day === sum.today
   // Deadlines in de 3 dagen na deze dag
   const until = addDays(day, 3)
   const courseName = (id) => { const c = focus.courses.find(x => x.id === id); return c ? (c.code || c.name) : null }
   const deadlines = [
-    ...tasks.filter(t => !t.completed && t.due_date && t.due_date > day && t.due_date <= until).map(t => ({ title: t.title, date: t.due_date, kind: 'taak' })),
+    ...sum.tasks.filter(t => !t.completed && t.due_date && t.due_date > day && t.due_date <= until).map(t => ({ title: t.title, date: t.due_date, kind: 'taak' })),
     ...focus.dates.filter(d => d.date > day && d.date <= until).map(d => ({ title: d.title, date: d.date, kind: 'toets', course: courseName(d.course_id) })),
   ].sort((a, b) => a.date.localeCompare(b.date))
   const nextDate = focus.dates.filter(d => d.date >= day && focus.courses.some(c => c.id === d.course_id && c.status !== 'archived'))[0]
@@ -182,14 +158,20 @@ async function dayExtras(sb, uid, day) {
   let noSpend = 0
   for (let d = day; d >= day.slice(0, 8) + '01'; d = addDays(d, -1)) if (spentOn(d) <= 0) noSpend++
   return {
+    // Zelfde lijsten als close_day (gedeelde daySummary in planner.js)
     planned_vs_done: {
-      done: logs.slice().sort((a, b) => String(a.completed_at).localeCompare(String(b.completed_at))).map(c => ({ title: c.title, ...(c.recurring ? { routine: true } : {}), time: c.completed_at ? localHM(c.completed_at) : null })),
-      left_open: leftOpen,
-      own_events: own.map(x => ({ id: x.id, title: x.title, type: types.name(x.cat), start: localHM(x.start), end: localHM(x.end), ...(+x.end < Date.now() ? { past: true } : {}) })),
-      routines: { done: routines.filter(t => H.routineDoneOn(t, day, logs)).length, total: routines.length, missed: routines.filter(t => !H.routineDoneOn(t, day, logs)).map(t => t.title) },
-      tip: leftOpen.length ? 'Open taken doorschuiven: close_day met apply=true (na akkoord) of update_task.' : undefined,
+      ...(isToday ? { now: localHM(Date.now()) } : {}),
+      done: sum.done,
+      left_open: sum.left_open,
+      still_to_come: sum.still_to_come,
+      own_events: [...sum.own_past.map(x => ({ ...x, past: true })), ...sum.own_upcoming],
+      own_past_unconfirmed: sum.own_past,
+      routines: sum.routines,
+      tip: [sum.left_open.length ? 'Open taken doorschuiven: close_day met apply=true (na akkoord).' : null,
+        sum.own_past.length ? 'own_past_unconfirmed: vraag of deze agenda-items gedaan of overgeslagen zijn.' : null].filter(Boolean).join(' ') || undefined,
     },
-    hours_per_type: { ...hoursPerType, Vrij: fmtHours(Math.max(0, WAKE_MIN - busy)), note: 'Vrij = 16 wakkere uren min wat er met een tijd in de agenda stond (slaap telt niet mee)' },
+    hours_per_type: { ...(isToday ? sum.hours_so_far : sum.hours_planned), note: isToday ? 'Tot nu; hours_planned = de hele dag zoals gepland. Vrij = wakkere uren (vanaf 08:00) min wat er met een tijd stond, slaap apart.' : 'Vrij = 16 wakkere uren min wat er met een tijd in de agenda stond (slaap apart)' },
+    ...(isToday ? { hours_planned: sum.hours_planned } : {}),
     deadlines_next_3_days: deadlines,
     ...(nextDate ? { next_exam: { course: courseName(nextDate.course_id), title: nextDate.title, date: nextDate.date, in_days: daysBetween(day, nextDate.date) } } : {}),
     money: { spent: Math.round(spentOn(day) * 100) / 100, no_spend_days_this_month: noSpend, note: 'Dag- en weekbudget: get_overview' },

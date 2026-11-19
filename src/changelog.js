@@ -6,6 +6,15 @@
 
 export const RELEASES = [
   {
+    id: 48,
+    date: '2026-11-19',
+    title: 'Recap kijkt naar de klok',
+    items: [
+      { area: 'recap', text: "Wat later vandaag nog gepland staat telt niet meer als 'blijven liggen' maar staat onder 'Nog te gaan vandaag', en de dag in uren telt tot nu (met apart wat nog gepland staat)." },
+      { area: 'recap', text: "Agenda-items die voorbij zijn, ook vaste blokken zoals sport, staan onder 'gedaan of overgeslagen?'. Taken die al te laat waren tellen mee bij 'blijven liggen'; Claude ziet precies dezelfde lijst bij de recap en bij dag afsluiten." },
+    ],
+  },
+  {
     id: 47,
     date: '2026-11-19',
     title: 'Recap laat je hele dag zien',

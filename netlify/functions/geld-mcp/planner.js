@@ -336,6 +336,70 @@ function slimTask(t, types, today, ctx = {}) {
   }
 }
 
+// ── dagsamenvatting: één regel voor close_day, get_recap (study.js) en Recap in de app (useDayDetails) ──
+const SLEEP_RE = /(slapen|slaap|sleep|nachtrust)/i
+const WAKE_MIN = 16 * 60
+/**
+ * Wat stond er op `day`, wat is gedaan, wat bleef liggen en wat moet nog komen.
+ * - blijven liggen = eenmalige taken van die dag (meerdaagse op hun laatste dag) waarvan het moment voorbij is
+ *   (tijd vóór nu, dagdeel afgelopen, of zonder tijd) + taken die al te laat waren (was_overdue);
+ * - nog te gaan = vandaag, met een tijd of dagdeel dat nog moet komen;
+ * - eigen agenda-items (ook herhalende): voorbij = "gedaan of overgeslagen?", of nog te gaan;
+ * - uren per type: tot nu (vandaag) en de hele dag zoals gepland; slaap apart.
+ */
+async function daySummary(sb, uid, types, day) {
+  const today = todayLocal(), now = Date.now(), nowHM = localHM(now)
+  const [tasks, comps, agenda] = await Promise.all([
+    loadTasks(sb, uid),
+    sb.from('task_completions').select('title, day, recurring, task_id, completed_at').eq('user_id', uid).eq('day', day),
+    loadAgenda(sb, uid, types, day, day),
+  ])
+  const logs = comps.data || []
+  const open = tasks.filter(t => !t.completed && !t.recurrence && t.date)
+  const momentPassed = (t) => {
+    if (day < today) return true
+    if (day > today) return false
+    const st = taskStart(t)
+    if (st) return st.slice(0, 5) <= nowHM
+    if (t.daypart && DAYPARTS[t.daypart]) return DAYPARTS[t.daypart][1] <= nowHM
+    return true // zonder tijd: telt als open voor vandaag
+  }
+  const onDay = open.filter(t => taskOnDay(t, day) && taskLast(t) <= day)
+  const overdue = open.filter(t => taskLast(t) < day)
+  const leftOpen = [...onDay.filter(momentPassed), ...overdue]
+  const upcoming = onDay.filter(t => !momentPassed(t))
+  const lo = +toUTC(day), hi = +toUTC(addDays(day, 1))
+  const own = agenda.filter(x => x.kind === 'eigen' && !x.hidden && !x.all_day && +x.start >= lo && +x.start < hi)
+  const routines = tasks.filter(t => routineDueOn(t, day, today, logs))
+  // Uren per type
+  const cut = day === today ? Math.min(hi, now) : hi
+  const byCat = new Map(), byCatAll = new Map()
+  for (const x of agenda) {
+    if (x.hidden || x.all_day) continue
+    const s = Math.max(+x.start, lo), e = Math.min(+x.end, hi)
+    if (e <= s) continue
+    const cat = SLEEP_RE.test(x.title || '') ? 'slaap' : x.cat
+    byCatAll.set(cat, [...(byCatAll.get(cat) || []), [s, e]])
+    if (Math.min(e, cut) > s) byCat.set(cat, [...(byCat.get(cat) || []), [s, Math.min(e, cut)]])
+  }
+  const merged = (list) => { let tot = 0, cur = null; for (const [s, e] of [...list].sort((a, b) => a[0] - b[0])) { if (cur && s <= cur[1]) cur[1] = Math.max(cur[1], e); else { if (cur) tot += cur[1] - cur[0]; cur = [s, e] } } return Math.round((cur ? tot + cur[1] - cur[0] : tot) / 60000) }
+  const perType = (m) => Object.fromEntries([...m.entries()].map(([c, l]) => [c === 'slaap' ? 'Slaap' : types.name(c), fmtHours(merged(l))]))
+  const busyAll = merged([...byCatAll.entries()].filter(([c]) => c !== 'slaap').flatMap(([, l]) => l))
+  const busyNow = merged([...byCat.entries()].filter(([c]) => c !== 'slaap').flatMap(([, l]) => l))
+  const ownView = (x) => ({ id: x.id, title: x.title, type: types.name(x.cat), start: localHM(x.start), end: localHM(x.end), ...(x.recurring ? { recurring: true } : {}) })
+  return {
+    tasks, logs, today,
+    done: [...logs].sort((a, b) => String(a.completed_at).localeCompare(String(b.completed_at))).map(c => ({ title: c.title, ...(c.recurring ? { routine: true } : {}), time: c.completed_at ? localHM(c.completed_at) : null })),
+    left_open: leftOpen.map(t => ({ ...slimTask(t, types, today), ...(taskLast(t) < day ? { was_overdue: true } : {}) })),
+    still_to_come: upcoming.map(t => slimTask(t, types, today)),
+    own_past: own.filter(x => +x.end <= now).map(ownView),
+    own_upcoming: own.filter(x => +x.end > now).map(ownView),
+    routines: { done: routines.filter(t => routineDoneOn(t, day, logs)).length, total: routines.length, missed: routines.filter(t => !routineDoneOn(t, day, logs)).map(t => t.title) },
+    hours_so_far: { ...perType(byCat), Vrij: fmtHours(Math.max(0, (day === today ? Math.min(WAKE_MIN, Math.max(0, (now - lo) / 60000 - 8 * 60)) : WAKE_MIN) - busyNow)) },
+    hours_planned: { ...perType(byCatAll), Vrij: fmtHours(Math.max(0, WAKE_MIN - busyAll)) },
+  }
+}
+
 // ── vrije tijd ───────────────────────────────────────────────────────────────
 function busyOnDay(day, agenda, tasks, includeTasks) {
   const lo = +toUTC(day), hi = +toUTC(addDays(day, 1)), dayMin = (hi - lo) / 60000
@@ -728,21 +792,16 @@ async function callTool(sb, uid, name, args = {}) {
   if (name === 'close_day') {
     const day = optDate(args.date, 'date') || today
     const moveTo = optDate(args.move_to, 'move_to') || addDays(day, 1)
-    const [tasks, comps, agenda, recap] = await Promise.all([
-      loadTasks(sb, uid),
-      sb.from('task_completions').select('title, day, recurring, task_id, completed_at').eq('user_id', uid).eq('day', day),
-      loadAgenda(sb, uid, types, day, day),
+    const [sum, recap] = await Promise.all([
+      daySummary(sb, uid, types, day),
       sb.from('recaps').select('id').eq('user_id', uid).eq('kind', 'day').eq('day', day).maybeSingle(),
     ])
-    const logs = comps.data || []
-    const routines = tasks.filter(t => routineDueOn(t, day, today, logs))
-    // Blijven liggen: eenmalige taken die die dag gepland stonden (meerdaagse alleen op hun laatste dag) + te laat
-    const open = tasks.filter(t => !t.completed && !t.recurrence && t.date && t.date <= day && taskLast(t) <= day)
-    const lo = +toUTC(day), hi = +toUTC(addDays(day, 1))
-    const ownEvents = agenda.filter(x => x.kind === 'eigen' && !x.hidden && +x.start >= lo && +x.start < hi)
+    const leftIds = new Set(sum.left_open.map(t => t.id))
+    const open = sum.tasks.filter(t => leftIds.has(t.id))
     let moved = []
     if (args.apply) {
-      const pick = Array.isArray(args.task_ids) && args.task_ids.length ? open.filter(t => args.task_ids.includes(t.id)) : open
+      // Standaard alleen wat bleef liggen; met task_ids ook iets dat nog moet komen
+      const pick = Array.isArray(args.task_ids) && args.task_ids.length ? sum.tasks.filter(t => args.task_ids.includes(t.id) && !t.completed && !t.recurrence) : open
       need(pick.length, 'Geen open taken om te verplaatsen')
       for (const t of pick) {
         const patch = { date: moveTo, updated_at: new Date().toISOString(), ...(t.end_date ? { end_date: null } : {}) }
@@ -752,13 +811,13 @@ async function callTool(sb, uid, name, args = {}) {
       }
     }
     return {
-      date: day, weekday: WEEKDAYS[dow(day)],
-      done: logs.sort((a, b) => String(a.completed_at).localeCompare(String(b.completed_at))).map(c => ({ title: c.title, ...(c.recurring ? { routine: true } : {}), time: c.completed_at ? localHM(c.completed_at) : null })),
-      routines: { done: routines.filter(t => routineDoneOn(t, day, logs)).length, total: routines.length, missed: routines.filter(t => !routineDoneOn(t, day, logs)).map(t => t.title) },
-      left_open: open.map(t => ({ ...slimTask(t, types, today), ...(t.date < day ? { was_overdue: true } : {}) })),
-      own_events: ownEvents.map(x => ({ title: x.title, type: types.name(x.cat), start: localHM(x.start), end: localHM(x.end) })),
+      date: day, weekday: WEEKDAYS[dow(day)], ...(day === today ? { now: localHM(Date.now()) } : {}),
+      done: sum.done, routines: sum.routines,
+      left_open: sum.left_open, still_to_come: sum.still_to_come,
+      own_events: [...sum.own_past.map(x => ({ ...x, past: true })), ...sum.own_upcoming],
+      own_past_unconfirmed: sum.own_past.length ? { items: sum.own_past, note: 'Voorbij: gedaan of overgeslagen? Vraag het de gebruiker; overgeslagen = verplaatsen (update_event) of laten staan.' } : undefined,
       recap_filled: !!recap.data, ...(recap.error ? { recap_note: 'Recap-tabel niet gevonden' } : {}),
-      ...(args.apply ? { moved } : { suggestion: open.length ? `Verplaats ${open.length} open ${open.length === 1 ? 'taak' : 'taken'} naar ${moveTo} met apply=true (na akkoord).` : 'Niets blijven liggen.' }),
+      ...(args.apply ? { moved } : { suggestion: open.length ? `Verplaats ${open.length} open ${open.length === 1 ? 'taak' : 'taken'} naar ${moveTo} met apply=true (na akkoord).${sum.still_to_come.length ? ` ${sum.still_to_come.length} ${sum.still_to_come.length === 1 ? 'taak moet' : 'taken moeten'} vandaag nog komen en blijven staan.` : ''}` : sum.still_to_come.length ? `Niets blijven liggen; ${sum.still_to_come.length} nog te gaan vandaag.` : 'Niets blijven liggen.' }),
       next_step: recap.data ? null : 'Recap invullen: get_recap + save_recap',
     }
   }
@@ -960,4 +1019,4 @@ async function callTool(sb, uid, name, args = {}) {
 
 module.exports = { TOOLS, NAMES, INSTRUCTIONS, callTool, _t: { toUTC, localStamp, sumHours, workShifts, loadAgenda, freeSlots, nextOcc, prevOcc },
   // gedeeld met study.js (Focus + Recap)
-  helpers: { taskOnDay, taskLast, routineDueOn, routineDoneOn, TZ, WEEKDAYS, pad, parts, localDay, localHM, todayLocal, toUTC, addDays, dow, isoDow, daysBetween, dayList, mondayOf, isDate, isHM, hmToMin, fmtHours, hours, need, optDate, optHM, loadTypes, loadAgenda, workShifts, sumHours, slimEvent } }
+  helpers: { daySummary, taskOnDay, taskLast, routineDueOn, routineDoneOn, TZ, WEEKDAYS, pad, parts, localDay, localHM, todayLocal, toUTC, addDays, dow, isoDow, daysBetween, dayList, mondayOf, isDate, isHM, hmToMin, fmtHours, hours, need, optDate, optHM, loadTypes, loadAgenda, workShifts, sumHours, slimEvent } }

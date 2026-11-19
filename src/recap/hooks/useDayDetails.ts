@@ -3,7 +3,9 @@ import { supabase } from '../../supabaseClient'
 import { loadExternalEvents } from '../../utils/externalEvents'
 import { eventCategory, categoryLabel, categoryColor } from '../../utils/category'
 import { taskOnDay } from '../../utils/taskStatus'
-import { addDays, parseDay } from '../../focus/lib/format'
+import { addDays, parseDay, todayISO } from '../../focus/lib/format'
+
+const DAYPART_END: Record<string, string> = { ochtend: '12:00', middag: '17:00', avond: '22:00' }
 
 // Alles wat Recap per dag nodig heeft naast de recap zelf: agenda van die dag (eigen + feeds), uren per type,
 // gepland-maar-blijven-liggen, deadlines van de komende 3 dagen, studietijd per vak en de eerstvolgende toets.
@@ -17,7 +19,10 @@ export interface DayDetails {
   events: DayEvent[]
   hours: TypeHours[]
   freeMins: number
+  /** vandaag: minuten die nog gepland staan (na nu), niet in `hours` */
+  laterMins: number
   leftOpen: any[]
+  stillToCome: any[]
   deadlines: { title: string; date: string; kind: 'taak' | 'toets'; course?: string }[]
   focusByCourse: { name: string; color: string; mins: number }[]
   nextExam: { course: string; title: string; date: string; days: number } | null
@@ -50,8 +55,8 @@ function ownOccursOn(ev: any, day: string) {
 }
 
 export function useDayDetails(userId: string, day: string, tasks: any[]): DayDetails {
-  const [state, setState] = useState<Omit<DayDetails, 'leftOpen' | 'deadlines' | 'reload'> & { taskDeadlinesRaw?: never; examDates: any[] }>({
-    loading: true, events: [], hours: [], freeMins: WAKE_MINS, focusByCourse: [], nextExam: null, examDates: [],
+  const [state, setState] = useState<Omit<DayDetails, 'leftOpen' | 'stillToCome' | 'deadlines' | 'reload'> & { examDates: any[] }>({
+    loading: true, events: [], hours: [], freeMins: WAKE_MINS, laterMins: 0, focusByCourse: [], nextExam: null, examDates: [],
   })
   const [tick, setTick] = useState(0)
   const reload = useCallback(() => setTick(t => t + 1), [])
@@ -84,11 +89,15 @@ export function useDayDetails(userId: string, day: string, tasks: any[]): DayDet
       }
       events.sort((a, b) => a.start.getTime() - b.start.getTime())
 
-      // Uren per type (alleen met tijd; per item het deel binnen deze dag; overlap telt per type één keer)
-      const byCat = new Map<string, [number, number][]>()
+      // Uren per type (alleen met tijd; per item het deel binnen deze dag; overlap telt per type één keer).
+      // Vandaag alleen tot nu: wat nog moet komen telt apart (laterMins).
+      const cut = Math.min(hi.getTime(), Date.now())
+      const byCat = new Map<string, [number, number][]>(), allBusy: [number, number][] = []
       for (const e of events) {
         if (e.raw.all_day) continue
-        const s = Math.max(e.start.getTime(), lo.getTime()), en = Math.min(e.end.getTime(), hi.getTime())
+        const s0 = Math.max(e.start.getTime(), lo.getTime()), e0 = Math.min(e.end.getTime(), hi.getTime())
+        if (e0 > s0 && !SLEEP_RE.test(e.title || '')) allBusy.push([s0, e0])
+        const s = s0, en = Math.min(e0, cut)
         if (en <= s) continue
         // Slaap apart (telt niet als bezig en niet als Persoonlijk)
         const cat = SLEEP_RE.test(e.title || '') ? 'slaap' : e.cat
@@ -104,7 +113,8 @@ export function useDayDetails(userId: string, day: string, tasks: any[]): DayDet
       }
       const hours = [...byCat.entries()].map(([cat, list]) => ({ cat, label: cat === 'slaap' ? 'Slaap' : categoryLabel(cat), color: cat === 'slaap' ? '#64748B' : categoryColor(cat), mins: Math.round(merge(list)) }))
         .sort((a, b) => (a.cat === 'slaap' ? 1 : 0) - (b.cat === 'slaap' ? 1 : 0) || b.mins - a.mins)
-      const busy = Math.round(merge([...byCat.entries()].filter(([c]) => c !== 'slaap').flatMap(([, l]) => l)))
+      const busyNow = Math.round(merge([...byCat.entries()].filter(([c]) => c !== 'slaap').flatMap(([, l]) => l)))
+      const busy = Math.round(merge(allBusy))
 
       const courseList = (courses.data || []) as any[]
       const perCourse = new Map<string, number>()
@@ -120,7 +130,7 @@ export function useDayDetails(userId: string, day: string, tasks: any[]): DayDet
       const nextExam = first ? { course: first.course.code || first.course.name, title: first.title, date: first.date,
         days: Math.round((parseDay(first.date).getTime() - parseDay(day).getTime()) / 86400000) } : null
 
-      setState({ loading: false, events, hours, freeMins: Math.max(0, WAKE_MINS - busy), focusByCourse, nextExam, examDates })
+      setState({ loading: false, events, hours, freeMins: Math.max(0, WAKE_MINS - busy), laterMins: Math.max(0, busy - busyNow), focusByCourse, nextExam, examDates })
     })()
     return () => { off = true }
   }, [userId, day, tick])
@@ -132,8 +142,23 @@ export function useDayDetails(userId: string, day: string, tasks: any[]): DayDet
     return () => { window.removeEventListener('refreshCalendarEvents', on); window.removeEventListener('refreshExternalCalendarEvents', on) }
   }, [reload])
 
-  // Blijven liggen: eenmalige taken die die dag gepland stonden (meerdaagse pas op hun laatste dag) en nog open zijn
-  const leftOpen = tasks.filter(t => !t.recurrence && !t.completed && t.date && taskOnDay(t, day) && (!t.end_date || t.end_date <= day))
+  // Zelfde regel als de connector (planner.daySummary): blijven liggen = taken van die dag waarvan het moment voorbij is
+  // (tijd vóór nu, dagdeel afgelopen, of zonder tijd) + taken die al te laat waren; nog te gaan = later vandaag.
+  const today = todayISO()
+  const nowHM = `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`
+  const passed = (t: any) => {
+    if (day < today) return true
+    if (day > today) return false
+    const st = (t.start_time || t.time || '').slice(0, 5)
+    if (st) return st <= nowHM
+    if (t.daypart && DAYPART_END[t.daypart]) return DAYPART_END[t.daypart] <= nowHM
+    return true
+  }
+  const lastOf = (t: any) => (t.end_date && t.end_date > t.date ? t.end_date : t.date)
+  const open = tasks.filter(t => !t.recurrence && !t.completed && t.date)
+  const onDay = open.filter(t => taskOnDay(t, day) && lastOf(t) <= day)
+  const leftOpen = [...onDay.filter(passed), ...open.filter(t => lastOf(t) < day)]
+  const stillToCome = onDay.filter(t => !passed(t))
   // Deadlines in de 3 dagen na deze dag: taken (deadline of datum met een deadline) + toetsen uit Focus
   const until = addDays(day, 3)
   const deadlines = [
@@ -141,5 +166,5 @@ export function useDayDetails(userId: string, day: string, tasks: any[]): DayDet
     ...state.examDates.filter(d => d.date > day && d.date <= until).map(d => ({ title: d.title, date: d.date, kind: 'toets' as const, course: d.course.code || d.course.name })),
   ].sort((a, b) => a.date.localeCompare(b.date))
 
-  return { ...state, leftOpen, deadlines, reload }
+  return { ...state, leftOpen, stillToCome, deadlines, reload }
 }

@@ -11,6 +11,7 @@ import { fmt } from '../../geld/lib/format'
 import type { DayDetails } from '../hooks/useDayDetails'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+const SLEEP = /(slapen|slaap|sleep|nachtrust)/i
 const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 const relDay = (date: string, from: string) => {
   const n = Math.round((parseDay(date).getTime() - parseDay(from).getTime()) / 86400000)
@@ -40,9 +41,9 @@ export function PlannedCard({ details, done, day }: { details: DayDetails; done:
   const next = addDays(day, 1) < todayISO() ? 'vandaag' : 'morgen'
   const isToday = day === todayISO()
   // Eigen, niet-herhalende items die voorbij zijn: misschien niet gedaan (bv. sport) → ook door te schuiven
-  // (alleen items die op deze dag beginnen: "Slapen" van gisteravond hoort bij gisteren)
+  // (alleen items die op deze dag beginnen: "Slapen" van gisteravond hoort bij gisteren; ook herhalende, zoals een vast sportblok)
   const dayStart = parseDay(day).toDateString()
-  const pastOwn = details.events.filter(e => e.own && !e.recurring && !e.raw.all_day && e.start.toDateString() === dayStart && e.end.getTime() < Date.now())
+  const pastOwn = details.events.filter(e => e.own && !e.raw.all_day && !SLEEP.test(e.title || '') && e.start.toDateString() === dayStart && e.end.getTime() < Date.now())
   const move = async (kind: 'task' | 'event', item: any, key: string) => {
     const to = await moveToNextDay(kind, item, day)
     setMoved(m => ({ ...m, [key]: to }))
@@ -52,7 +53,7 @@ export function PlannedCard({ details, done, day }: { details: DayDetails; done:
   return (
     <Card>
       <CardHeader icon={CheckSquare} title="Gepland tegenover gedaan" />
-      <p className="rc-sub" style={{ margin: '-6px 0 10px' }}>{done.length} afgerond · {details.leftOpen.length} blijven liggen</p>
+      <p className="rc-sub" style={{ margin: '-6px 0 10px' }}>{done.length} afgerond · {details.leftOpen.length} blijven liggen{details.stillToCome.length ? ` · ${details.stillToCome.length} nog te gaan` : ''}</p>
       {sorted.length > 0 && (
         <ul className="rc-done-list" style={{ marginTop: 0 }}>
           {sorted.slice(0, 10).map((c, i) => (
@@ -64,28 +65,47 @@ export function PlannedCard({ details, done, day }: { details: DayDetails; done:
           {sorted.length > 10 && <li style={{ color: 'var(--c-text-3)' }}>en nog {sorted.length - 10}</li>}
         </ul>
       )}
-      {(details.leftOpen.length > 0 || pastOwn.length > 0) && (
+      {details.leftOpen.length > 0 && (
         <>
           <span className="rc-label" style={{ marginTop: 12 }}>Blijven liggen</span>
           <ul className="rc-open-list">
             {details.leftOpen.map(t => (
               <li key={`t-${t.id}`}>
-                <span className="rc-open-title">{t.title}{t.date < day && <span className="rc-hint"> · te laat</span>}</span>
+                <span className="rc-open-title">{t.title}{(t.end_date && t.end_date > t.date ? t.end_date : t.date) < day && <span className="rc-hint"> · te laat</span>}</span>
                 {moved[`t-${t.id}`] ? <span className="rc-hint">→ {relDay(moved[`t-${t.id}`], todayISO())}</span>
                   : <button type="button" className="rc-movebtn" onClick={() => move('task', t, `t-${t.id}`)}>Naar {next} <ArrowRight size={12} /></button>}
               </li>
             ))}
+          </ul>
+        </>
+      )}
+      {pastOwn.length > 0 && (
+        <>
+          <span className="rc-label" style={{ marginTop: 12 }}>Agenda · gedaan of overgeslagen?</span>
+          <ul className="rc-open-list">
             {pastOwn.map(e => (
-              <li key={`e-${e.id}`}>
-                <span className="rc-open-title">{e.title} <span className="rc-hint tnum">· {hhmm(e.start)} · niet gedaan?</span></span>
-                {moved[`e-${e.id}`] ? <span className="rc-hint">→ {relDay(moved[`e-${e.id}`], todayISO())}</span>
+              <li key={`e-${e.id}-${e.start.getTime()}`}>
+                <span className="rc-open-title">{e.title} <span className="rc-hint tnum">· {hhmm(e.start)}{e.recurring ? ' · vast blok' : ''}</span></span>
+                {e.recurring ? <span className="rc-hint">herhaalt</span>
+                  : moved[`e-${e.id}`] ? <span className="rc-hint">→ {relDay(moved[`e-${e.id}`], todayISO())}</span>
                   : <button type="button" className="rc-movebtn" onClick={() => move('event', e.raw, `e-${e.id}`)}>Naar {next} <ArrowRight size={12} /></button>}
               </li>
             ))}
           </ul>
         </>
       )}
-      {!sorted.length && !details.leftOpen.length && !pastOwn.length && (
+      {details.stillToCome.length > 0 && (
+        <>
+          <span className="rc-label" style={{ marginTop: 12 }}>Nog te gaan vandaag</span>
+          <ul className="rc-open-list">
+            {details.stillToCome.map(t => (
+              <li key={`u-${t.id}`}><span className="rc-open-title">{t.title}</span>
+                <span className="rc-hint tnum">{(t.start_time || t.time || '').slice(0, 5) || t.daypart}</span></li>
+            ))}
+          </ul>
+        </>
+      )}
+      {!sorted.length && !details.leftOpen.length && !pastOwn.length && !details.stillToCome.length && (
         <p className="t-meta" style={{ margin: 0 }}>{isToday ? 'Nog niets afgerond en niets gepland vandaag.' : 'Niets afgerond en niets blijven liggen.'}</p>
       )}
     </Card>
@@ -97,7 +117,7 @@ export function HoursCard({ details }: { details: DayDetails }) {
   const total = details.hours.reduce((a, h) => a + h.mins, 0) + details.freeMins
   return (
     <Card>
-      <CardHeader icon={Clock} title="De dag in uren" />
+      <CardHeader icon={Clock} title="De dag in uren" action={details.laterMins > 0 ? <span className="rc-hint">tot nu</span> : undefined} />
       {details.loading ? <p className="t-meta" style={{ margin: 0 }}>Laden…</p> : (
         <>
           <div className="rc-hourbar" aria-hidden="true">
@@ -106,7 +126,8 @@ export function HoursCard({ details }: { details: DayDetails }) {
           </div>
           <ul className="rc-hourlist">
             {details.hours.map(h => <li key={h.cat}><i style={{ background: h.color }} />{h.label}<b className="tnum">{fmtDur(h.mins)}</b></li>)}
-            <li><i style={{ background: 'var(--c-surface-3)' }} />Vrij <span className="rc-hint">(van 16 wakkere uren)</span><b className="tnum">{fmtDur(details.freeMins)}</b></li>
+            {details.laterMins > 0 && <li><i style={{ background: 'transparent', border: '1px dashed var(--c-border-strong)' }} />Nog gepland vandaag<b className="tnum">{fmtDur(details.laterMins)}</b></li>}
+            <li><i style={{ background: 'var(--c-surface-3)' }} />Vrij <span className="rc-hint">(van 16 wakkere uren, na alles wat gepland staat)</span><b className="tnum">{fmtDur(details.freeMins)}</b></li>
           </ul>
           {!details.hours.length && <p className="rc-sub">Niets met een tijd in de agenda.</p>}
           {total === 0 && null}
