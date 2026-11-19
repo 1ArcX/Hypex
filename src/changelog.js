@@ -6,6 +6,26 @@
 
 export const RELEASES = [
   {
+    id: 46,
+    date: '2026-11-19',
+    title: 'Claude plant slimmer',
+    items: [
+      { area: 'app', text: "Claude ziet nu na het aanmaken het hele item (type, duur, reistijd, vertrektijd), kiest zelf een passend type zoals Sport als je er geen noemt, weet wat je vandaag al hebt afgerond en kan je dag afsluiten (open taken naar morgen, na jouw akkoord)." },
+      { area: 'agenda', text: "Standaard reistijd per locatie voor je rooster (bijv. R29 = 15 minuten): stel het in via Claude, dan krijgen alle lessen op die locatie automatisch een vertrektijd. Een eigen reistijd op een les gaat altijd voor." },
+    ],
+  },
+  {
+    id: 45,
+    date: '2026-11-19',
+    title: 'Routines en streaks kloppen weer',
+    items: [
+      { area: 'recap', text: "Routines tellen in Recap goed mee: afgevinkte routines vallen niet meer weg (geen 0/4 meer) en ook gisteren laat zien wat je hebt gedaan in plaats van '–'." },
+      { area: 'app', text: "Streaks hebben nu een naam: Recap-streak (dagen op rij een recap), Studie-streak (dagen op rij gestudeerd). De badges op Statistieken heten 'Gewoontes 7d' enz.: behaalde badges, geen lopende streak." },
+      { area: 'geld', text: "Negatieve bedragen staan er netjes als −€41 in plaats van €-41." },
+      { area: 'dashboard', text: "Het weer staat standaard op Arnhem. Een andere plaats kies je door op het weer te tikken." },
+    ],
+  },
+  {
     id: 44,
     date: '2026-11-19',
     title: 'Focus past nu bij de rest van Hypex',

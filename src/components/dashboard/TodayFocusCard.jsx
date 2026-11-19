@@ -5,7 +5,7 @@ import {
 import { Card, CardHeader, CardLink, CheckButton, Pill, IconButton, FilterTabs, EmptyState, ProgressBar } from '../ui'
 import { taskCategory, categoryColor } from '../../utils/category'
 import { daysLate, taskOnDay } from '../../utils/taskStatus'
-import { isDueToday, isDoneToday } from '../../utils/recurrence'
+import { isDoneToday, routineDueOn } from '../../utils/recurrence'
 import { DAYPARTS } from '../../utils/daypart'
 import { countdownLabel } from '../../utils/upcoming'
 import { NoteProgress } from '../../utils/linkedNotes'
@@ -31,7 +31,7 @@ function TodayPanel({ tasks, subjects, today, todayItems, attention, overdueIds,
 
   // Voortgang: zoals Taken → Vandaag (routines van vandaag + eenmalige taken op vandaag)
   const isDone = t => t.recurrence ? isDoneToday(t, today) : t.completed
-  const todays = tasks.filter(t => t.recurrence ? (isDueToday(t, today) || isDoneToday(t, today)) : taskOnDay(t, today))
+  const todays = tasks.filter(t => t.recurrence ? routineDueOn(t, today, today) : taskOnDay(t, today))
   const done = todays.filter(isDone).length
   const total = todays.length
 
@@ -40,7 +40,8 @@ function TodayPanel({ tasks, subjects, today, todayItems, attention, overdueIds,
   const untimed = tasks.filter(t => !t.recurrence && !t.completed && taskOnDay(t, today) && !(t.start_time || t.time) && !attIds.has(t.id))
   const groups = [...DAYPARTS.map(dp => ({ id: dp.id, label: `${dp.emoji} ${dp.label}`, items: untimed.filter(t => t.daypart === dp.id) })),
     { id: 'none', label: 'Vandaag', items: untimed.filter(t => !t.daypart) }].filter(g => g.items.length)
-  const routines = tasks.filter(t => t.recurrence && (isDueToday(t, today) || isDoneToday(t, today)))
+  // Zelfde regel als Recap en de connector (utils/recurrence routineDueOn)
+  const routines = tasks.filter(t => t.recurrence && routineDueOn(t, today, today))
 
   // Schema: tot `lim.schedule` items, met de eerstvolgende in beeld (afgelopen items vallen eerst weg)
   const schedule = todayItems.filter(i => !(i.type === 'task' && attIds.has(i.raw?.id)))

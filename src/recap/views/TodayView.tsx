@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CheckSquare, Flame, Repeat, Target, Timer, Wallet, PenLine, Sparkles } from 'lucide-react'
 import { Card, CardHeader, KpiTile, FilterTabs } from '../components/ui'
-import { appliesOn, isDoneToday } from '../../utils/recurrence'
+import { routineStats } from '../../utils/recurrence'
 import { addDays, fmtDur, todayISO } from '../../focus/lib/format'
 import { recapKey, useRecapStore } from '../store/recapStore'
 import { SCORES, goalProgress, recapStreak, bestStreak } from '../lib/recapStats'
@@ -50,9 +50,9 @@ export default function TodayView({ tasks, activity }: { tasks: Task[]; activity
   }
 
   const routines = useMemo(() => {
-    const due = tasks.filter(t => t.recurrence && appliesOn(t, target))
-    return { due: due.length, done: due.filter(t => (target === today ? isDoneToday(t, today) : t.last_completed_date && t.last_completed_date >= target)).length }
-  }, [tasks, target, today])
+    // Zelfde regel als Dashboard en connector: afvinklogboek per dag (date schuift door na afvinken)
+    return routineStats(tasks, target, activity.completions.filter(c => c.recurring), today)
+  }, [tasks, target, today, activity.completions])
   const doneTitles = activity.completions.filter(c => c.day === target && !c.recurring).map(c => c.title)
   const gp = goalProgress(goalsToday)
   const streak = recapStreak(byKey, today)
@@ -96,7 +96,7 @@ export default function TodayView({ tasks, activity }: { tasks: Task[]; activity
           {activity.spendByDay && (
             <KpiTile icon={Wallet} value={`€${Math.round(activity.spendByDay[target] || 0)}`} label="Uitgegeven" tone="warning" dimWhenZero={!activity.spendByDay[target]} />
           )}
-          <KpiTile icon={Flame} value={streak} label="Dagen op rij" sub={best > streak ? `Record ${best}` : undefined} tone="danger" />
+          <KpiTile icon={Flame} value={streak} label="Recap-streak" sub={best > streak ? `dagen op rij een recap · record ${best}` : "dagen op rij een recap"} tone="danger" />
         </div>
 
         {doneTitles.length > 0 && (

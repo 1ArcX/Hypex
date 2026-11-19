@@ -89,7 +89,8 @@ function XPCard({ userId, rank }) {
   const level = getLevel(xp)
   const xpIn = xp % LEVEL_XP
   const levelName = getLevelName(xp)
-  const labelMap = { streak_7:'🔥 7d', streak_14:'🔥 14d', streak_30:'🔥 30d', perfect_3:'💎 3d', perfect_7:'💎 7d', level_5:'⭐ Lvl5', level_10:'🌟 Lvl10' }
+  // Behaalde badges (oude Gewoontes-pagina), geen lopende streak
+  const labelMap = { streak_7:'🏅 Gewoontes 7d', streak_14:'🏅 Gewoontes 14d', streak_30:'🏅 Gewoontes 30d', perfect_3:'💎 Perfect 3d', perfect_7:'💎 Perfect 7d', level_5:'⭐ Lvl5', level_10:'🌟 Lvl10' }
 
   return (
     <div className="card card-tone glow-card" style={{ '--tone': '#FACC15', '--glow': '#FACC15', padding: '18px 20px' }}>

@@ -173,7 +173,7 @@ export default function WeatherWidget({ stacked = false, compact = false, userId
   const [rain, setRain]             = useState(null)
   const [coords, setCoords]         = useState(null)
   const [city, setCity]             = useState(() => {
-    try { const s = JSON.parse(localStorage.getItem('weather_coords')); return s?.city || 'Dronten' } catch { return 'Dronten' }
+    try { const s = JSON.parse(localStorage.getItem('weather_coords')); return s?.city || 'Arnhem' } catch { return 'Arnhem' }
   })
   const [loading, setLoading]       = useState(false)
   const [rainLoading, setRainLoading] = useState(false)

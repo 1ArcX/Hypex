@@ -36,7 +36,7 @@ export function HomeView({ userId, onAddSession, onStartTimer, onOpenSession }: 
 
       <div className="fx-hero">
         <div>
-          <div className="fx-label">Huidige streak</div>
+          <div className="fx-label" title="Dagen op rij dat je minstens één studiesessie hebt gedaan">Studie-streak</div>
           <div className="fx-streak tnum">
             {progress.streak}
             <Flame color="var(--fx-orange)" fill={progress.streak > 0 ? 'var(--fx-orange)' : 'none'} strokeWidth={1.8} style={{ opacity: progress.streak > 0 ? 1 : 0.5 }} />

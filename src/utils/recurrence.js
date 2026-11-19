@@ -145,6 +145,37 @@ export function isDoneToday(task, today = todayISO()) {
   return task.last_completed_date === today
 }
 
+// ── Routinestatus per datum (één regel voor Dashboard, Recap en de Claude-connector) ──
+// Let op: `date` van een routine schuift bij afvinken door naar de volgende keer, dus die zegt niets over
+// eerdere dagen. Daarom: toekomst = volgens `date`, vandaag = gepland of vandaag afgevinkt, verleden = het
+// ritme (vanaf de dag dat de routine bestond). "Gedaan" komt uit het afvinklogboek (task_completions).
+const dayOfTs = (ts) => (ts ? toISO(new Date(ts)) : null)
+
+/** Gedaan op `day`? logs = rijen uit task_completions ({ task_id, day }). */
+export function routineDoneOn(task, day, logs = []) {
+  return task.last_completed_date === day || logs.some(l => l.task_id === task.id && l.day === day)
+}
+
+/** Stond deze routine op `day` op de planning? */
+export function routineDueOn(task, day, today = todayISO(), logs = []) {
+  if (!task.recurrence) return false
+  if (day > today) return appliesOn(task, day)
+  if (day === today) return isDueToday(task, today) || task.last_completed_date === today
+  if (routineDoneOn(task, day, logs)) return true
+  const since = dayOfTs(task.created_at)
+  if (since && day < since) return false
+  if (task.recurrence === RECURRENCE.MONTHLY) {
+    return !!task.date && parseISO(day).getDate() === parseISO(snapToPattern(task.date, task.recurrence, task.recurrence_days)).getDate()
+  }
+  return matchesPattern(day, task.recurrence, task.recurrence_days)
+}
+
+/** Routines op een dag: { due, done } */
+export function routineStats(tasks, day, logs = [], today = todayISO()) {
+  const due = tasks.filter(t => routineDueOn(t, day, today, logs))
+  return { due: due.length, done: due.filter(t => routineDoneOn(t, day, logs)).length }
+}
+
 // Is de streak nog "levend" (gisteren/vorige keer ook gedaan, of vandaag)?
 export function isStreakActive(task, today = todayISO()) {
   if (!task.last_completed_date) return false

@@ -52,7 +52,7 @@ export default function HistoryView() {
   return (
     <div className="rc-col">
       <div className="rc-tiles">
-        <KpiTile icon={Flame} value={recapStreak(byKey, today)} label="Dagen op rij" tone="danger" />
+        <KpiTile icon={Flame} value={recapStreak(byKey, today)} label="Recap-streak (dagen op rij)" tone="danger" />
         <KpiTile icon={Trophy} value={bestStreak(recaps)} label="Langste reeks" tone="warning" />
         <KpiTile icon={NotebookPen} value={days.length} label="Dagrecaps" tone="accent" />
         <KpiTile icon={Sparkles} value={avg30.length ? fmtScore(avg30.reduce((a, b) => a + b, 0) / avg30.length) : '–'} label="Gem. score (30d)" tone="persoonlijk" dimWhenZero={!avg30.length} />

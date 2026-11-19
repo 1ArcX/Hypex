@@ -6,7 +6,7 @@ import { addDays, dayOf, todayISO } from '../../focus/lib/format'
 // Wat je per dag gedaan hebt, voor de automatische samenvatting in Recap:
 // afgeronde taken (task_completions), focusminuten (pomodoro_sessions) en uitgaven (expenses, alleen admin).
 
-export interface CompletionRow { id: string; day: string; title: string; recurring: boolean }
+export interface CompletionRow { id: string; day: string; title: string; recurring: boolean; task_id?: string | null; completed_at?: string }
 
 export interface Activity {
   completions: CompletionRow[]

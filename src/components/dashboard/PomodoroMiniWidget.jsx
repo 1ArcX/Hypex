@@ -40,7 +40,7 @@ export default function PomodoroMiniWidget({ onOpen, st: given, userId }) {
           </span>
           <span className="t-meta tnum" style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <span className={`focus-streak${fp.streak === 0 ? ' is-off' : fp.atRisk ? ' is-risk' : ''}`} style={{ fontSize: 11, padding: '1px 7px' }}
-              title={fp.atRisk ? 'Focus vandaag om je streak te houden' : `${fp.streak} dagen op rij`}>🔥 {fp.streak}</span>
+              title={fp.atRisk ? 'Studeer vandaag om je studie-streak te houden' : `Studie-streak: ${fp.streak} dagen op rij`}>🔥 {fp.streak}</span>
             <span style={{ color: fp.todayMins >= fp.goal ? 'var(--c-success)' : undefined }}>
               {fmtFocus(fp.todayMins)} / {fmtFocus(fp.goal)}{fp.todayMins >= fp.goal ? ' ✓' : ''}
             </span>

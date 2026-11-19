@@ -7,6 +7,9 @@ import { supabase } from '../supabaseClient'
 const overrideKey = (connectionId, externalId) => `${connectionId}|${externalId}`
 
 async function loadConnections() {
+  const withTravel = await supabase.from('calendar_connections').select('id,provider,name,default_type_id,type_rules,travel_rules')
+  if (!withTravel.error) return withTravel.data || []
+  // add_feed_travel_rules.sql nog niet gedraaid: zonder reistijdregels
   const full = await supabase.from('calendar_connections').select('id,provider,name,default_type_id,type_rules')
   if (!full.error) return full.data || []
   // Migratie nog niet gedraaid: zonder type-kolommen
@@ -29,9 +32,23 @@ function localAllDay(ev) {
   return { ...ev, start_time: start.toISOString(), end_time: end.toISOString() }
 }
 
+function withTravelRule(ev) {
+  const r = travelRuleFor(ev, ev.connection)
+  return r ? { ...ev, travel_before: r.before || null, travel_after: r.after || null, travel_from_rule: true } : ev
+}
+
+/** Standaard reistijd uit de regels van de feed (calendar_connections.travel_rules), op locatie of titel. */
+export function travelRuleFor(ev, connection) {
+  const rules = Array.isArray(connection?.travel_rules) ? connection.travel_rules : []
+  if (!rules.length || ev.all_day) return null
+  const text = `${ev.location || ''} ${ev.title || ''}`.toLowerCase()
+  const hit = rules.find(r => r?.match && text.includes(String(r.match).toLowerCase()))
+  return hit ? { before: Number(hit.before) || 0, after: Number(hit.after) || 0 } : null
+}
+
 /** Past een aanpassing toe; `_original` bewaart de waarden uit de feed. */
 export function applyOverride(rawEv, ov) {
-  const ev = localAllDay(rawEv)
+  const ev = withTravelRule(localAllDay(rawEv))
   const original = { title: ev.title, start_time: ev.start_time, end_time: ev.end_time, all_day: ev.all_day }
   if (!ov) return { ...ev, _original: original }
   return {
@@ -45,8 +62,9 @@ export function applyOverride(rawEv, ov) {
     type_id: ov.type_id || null,
     note: ov.note || '',
     hidden: !!ov.hidden,
-    travel_before: ov.travel_before || null,
-    travel_after: ov.travel_after || null,
+    // Eigen reistijd gaat voor; anders de standaard uit de feedregels
+    travel_before: ov.travel_before || ev.travel_before || null,
+    travel_after: ov.travel_after || ev.travel_after || null,
     edited: !!(ov.title || ov.start_time || ov.end_time || ov.all_day != null || ov.type_id || ov.note),
   }
 }

@@ -1,9 +1,12 @@
+// Negatief = "−€41,00" (echt minteken vóór het euroteken), niet "€-41,00"
 export function fmt(n: number): string {
-  return `€${Number(n).toFixed(2).replace('.', ',')}`
+  const v = Number(n)
+  return `${v < 0 && Math.abs(v) >= 0.005 ? '−' : ''}€${Math.abs(v).toFixed(2).replace('.', ',')}`
 }
 
 export function fmtShort(n: number): string {
-  return `€${Math.round(n)}`
+  const v = Math.round(Number(n))
+  return `${v < 0 ? '−' : ''}€${Math.abs(v)}`
 }
 
 export function pad2(n: number): string {

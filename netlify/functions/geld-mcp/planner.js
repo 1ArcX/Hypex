@@ -73,6 +73,37 @@ async function loadTypes(sb, uid) {
   return { list, name, catOfId, resolve }
 }
 
+// ── standaard reistijd per locatie (calendar_connections.travel_rules, zelfde als src/utils/externalEvents.js) ──
+function travelRule(raw, conn) {
+  const rules = Array.isArray(conn?.travel_rules) ? conn.travel_rules : []
+  if (!rules.length || raw.all_day) return null
+  const text = `${raw.location || ''} ${raw.title || ''}`.toLowerCase()
+  const hit = rules.find(r => r?.match && text.includes(String(r.match).toLowerCase()))
+  return hit ? { before: Number(hit.before) || 0, after: Number(hit.after) || 0 } : null
+}
+
+// ── slim standaardtype op basis van de titel (alleen als er geen type is meegegeven) ──
+const TYPE_HINTS = [
+  [/sport|gym|fitness|basic.?fit|hardlop|rennen|zwemm|voetbal|tennis|padel|training|workout|krachttraining|wandel/, ['sport']],
+  [/tentamen|toets|college|\bles\b|studeren|\bleren\b|huiswerk|opdracht|inleveren|project|\bhan\b|leerblok|oefenen|samenvat/, ['school']],
+  [/dienst|\bwerk\b|\bwdk\b|jumbo|\bpmt\b/, ['werk']],
+  [/creatine|tanden|medicijn|vitamine|ochtendroutine|avondroutine/, ['routine']],
+]
+function smartType(title, types) {
+  const t = String(title || '').toLowerCase()
+  // 1. een eigen type waarvan de naam in de titel staat ("Sport", "Gym"…)
+  const named = types.list.filter(x => x.name && x.name.length >= 3).sort((a, b) => b.name.length - a.name.length)
+    .find(x => t.includes(x.name.toLowerCase()))
+  if (named) return named
+  // 2. trefwoorden → een type met die naam of key
+  for (const [re, keys] of TYPE_HINTS) {
+    if (!re.test(t)) continue
+    const hit = types.list.find(x => keys.includes((x.key || '').toLowerCase()) || keys.some(k => (x.name || '').toLowerCase().includes(k)))
+    if (hit) return hit
+  }
+  return null
+}
+
 // ── herhaling van taken (src/utils/recurrence.js; recurrence_days = ISO 1=ma … 7=zo) ──
 function patternMatch(date, rec, days) {
   const d = isoDow(date)
@@ -109,6 +140,26 @@ function appliesOn(t, day) {
 const taskLast = (t) => (t.end_date && t.date && t.end_date > t.date ? t.end_date : t.date)
 const taskOnDay = (t, day) => t.recurrence ? appliesOn(t, day) : !!t.date && t.date <= day && taskLast(t) >= day
 const isDoneToday = (t, today) => t.last_completed_date === today
+// Routinestatus per datum (zelfde regel als src/utils/recurrence.js routineDueOn/routineDoneOn): `date` schuift
+// bij afvinken door, dus verleden = het ritme vanaf created_at, gedaan = afvinklogboek (task_completions).
+const routineDoneOn = (t, day, logs = []) => t.last_completed_date === day || logs.some(l => l.task_id === t.id && l.day === day)
+function routineDueOn(t, day, today, logs = []) {
+  if (!t.recurrence) return false
+  if (day > today) return appliesOn(t, day)
+  if (day === today) return (!!t.date && snap(t.date, t.recurrence, t.recurrence_days) <= today) || t.last_completed_date === today
+  if (routineDoneOn(t, day, logs)) return true
+  const since = t.created_at ? localDay(t.created_at) : null
+  if (since && day < since) return false
+  if (t.recurrence === 'monthly') return !!t.date && day.slice(8) === snap(t.date, t.recurrence, t.recurrence_days).slice(8)
+  return patternMatch(day, t.recurrence, t.recurrence_days)
+}
+/** Eerstvolgende keer dat de routine op de planning staat (vandaag als hij vandaag nog open is). */
+function routineNextDue(t, today) {
+  if (!t.recurrence) return null
+  if (t.last_completed_date === today) return nextOcc(today, t.recurrence, t.recurrence_days)
+  const due = t.date ? snap(t.date, t.recurrence, t.recurrence_days) : today
+  return due <= today ? (patternMatch(today, t.recurrence, t.recurrence_days) ? today : nextOcc(today, t.recurrence, t.recurrence_days)) : due
+}
 
 // ── agenda ───────────────────────────────────────────────────────────────────
 function ruleCat(title, rules, types) {
@@ -170,11 +221,13 @@ async function loadAgenda(sb, uid, types, from, to) {
     const title = ov?.title || raw.title
     const cat = types.catOfId(ov?.type_id) || ruleCat(raw.title, conn?.type_rules, types) || types.catOfId(conn?.default_type_id)
       || (conn?.provider === 'google' ? 'overig' : 'school')
+    const rule = travelRule(raw, conn)
     out.push({
       id: `feed:${raw.id}`, kind: 'feed', source: conn?.name || 'Feed', connection_id: raw.connection_id, raw,
       title, cat, start: ov?.start_time ? new Date(ov.start_time) : s, end: ov?.end_time ? new Date(ov.end_time) : e,
       all_day: ov?.all_day ?? !!raw.all_day, location: raw.location || null, description: raw.description || null,
-      travel_before: ov?.travel_before || 0, travel_after: ov?.travel_after || 0, note: ov?.note || null,
+      travel_before: ov?.travel_before || rule?.before || 0, travel_after: ov?.travel_after || rule?.after || 0, note: ov?.note || null,
+      ...(!ov?.travel_before && rule?.before ? { travel_from_rule: true } : {}),
       hidden: !!ov?.hidden, edited: !!(ov && (ov.title || ov.start_time || ov.end_time || ov.all_day != null || ov.type_id || ov.note)),
       original: ov ? { title: raw.title, start: localStamp(s), end: localStamp(e) } : undefined, recurring: false,
     })
@@ -202,8 +255,8 @@ async function loadAgenda(sb, uid, types, from, to) {
 
 const slimEvent = (x, types) => ({
   id: x.id, ...(x.occurrence ? { occurrence: x.occurrence } : {}), kind: x.kind, source: x.source, title: x.title, type: types.name(x.cat),
-  start: localStamp(x.start), end: localStamp(x.end), all_day: x.all_day,
-  ...(x.travel_before ? { travel_before_min: x.travel_before, leave_at: localHM(+x.start - x.travel_before * 60000) } : {}),
+  start: localStamp(x.start), end: localStamp(x.end), all_day: x.all_day, ...(!x.all_day ? { duration_min: Math.round((x.end - x.start) / 60000) } : {}),
+  ...(x.travel_before ? { travel_before_min: x.travel_before, leave_at: localHM(+x.start - x.travel_before * 60000), ...(x.travel_from_rule ? { travel_source: 'locatieregel' } : {}) } : {}),
   ...(x.travel_after ? { travel_after_min: x.travel_after } : {}),
   ...(x.location ? { location: x.location } : {}), ...(x.description ? { description: String(x.description).slice(0, 300) } : {}),
   ...(x.note ? { note: x.note } : {}), ...(x.hidden ? { hidden: true } : {}), ...(x.edited ? { edited: true, original: x.original } : {}),
@@ -256,7 +309,10 @@ async function loadTasks(sb, uid) {
 }
 const taskCat = (t, types) => types.catOfId(t.type_id) || (t.recurrence ? 'routine' : t.subject_id ? 'school' : 'persoonlijk')
 const taskStart = (t) => t.start_time || t.time || null
-function slimTask(t, types, today) {
+/** ctx.day = de opgevraagde dag (standaard vandaag), ctx.logs = afvinklogboek, voor de routinestatus op die dag. */
+function slimTask(t, types, today, ctx = {}) {
+  const day = ctx.day || today
+  const done = t.recurrence ? routineDoneOn(t, day, ctx.logs || []) : !!t.completed
   const start = taskStart(t)
   const overdue = !t.completed && !t.recurrence && !!t.date && taskLast(t) < today
   return {
@@ -266,10 +322,16 @@ function slimTask(t, types, today) {
     ...(t.daypart ? { daypart: t.daypart } : {}),
     priority: t.priority === 1 ? 'urgent' : t.priority === 3 ? 'later' : 'normaal',
     completed: !!t.completed, ...(overdue ? { overdue_days: daysBetween(taskLast(t), today) } : {}),
-    ...(t.recurrence ? { recurrence: t.recurrence, ...(t.recurrence_days?.length ? { recurrence_days: t.recurrence_days } : {}), streak: t.streak || 0, done_today: isDoneToday(t, today) } : {}),
+    // Routines: done/done_today gelden voor de opgevraagde dag; date = intern ankerpunt (schuift door bij afvinken),
+    // next_due = de eerstvolgende keer dat hij op de planning staat.
+    ...(t.recurrence ? { recurrence: t.recurrence, ...(t.recurrence_days?.length ? { recurrence_days: t.recurrence_days } : {}), streak: t.streak || 0,
+      done, done_today: done, ...(day !== today ? { done_for_date: day } : {}), next_due: routineNextDue(t, today),
+      ...(t.last_completed_date ? { last_done: t.last_completed_date } : {}) } : {}),
     ...(t.due_date ? { deadline: t.due_date } : {}), ...(t.description ? { description: String(t.description).slice(0, 300) } : {}),
-    ...(t.duration_minutes && !start ? { duration_min: t.duration_minutes } : {}),
-    ...(t.travel_before ? { travel_before_min: t.travel_before } : {}), ...(t.travel_after ? { travel_after_min: t.travel_after } : {}),
+    ...(start && t.end_time ? { duration_min: ((hmToMin(t.end_time.slice(0, 5)) - hmToMin(start.slice(0, 5)) + 1440) % 1440) || t.duration_minutes || null }
+      : t.duration_minutes ? { duration_min: t.duration_minutes } : {}),
+    ...(t.travel_before ? { travel_before_min: t.travel_before, ...(start ? { leave_at: minToHM((hmToMin(start.slice(0, 5)) - t.travel_before + 1440) % 1440) } : {}) } : {}),
+    ...(t.travel_after ? { travel_after_min: t.travel_after } : {}),
     ...(t.note_id ? { note_id: t.note_id } : {}), ...(t.group_name ? { group: t.group_name } : {}),
   }
 }
@@ -338,7 +400,8 @@ const TOOLS = [
   { name: 'get_today', description: 'Dagoverzicht zoals het dashboard: agenda (eigen items, feeds, werkdiensten, met reistijd/vertrektijd), taken van die dag (urgent, te laat, per dagdeel, routines, nog in te plannen), het eerstvolgende item, werkuren deze week en wat al is afgerond. Zonder date = vandaag.',
     inputSchema: S({ date: str('YYYY-MM-DD') }), annotations: RO },
   { name: 'list_agenda', description: 'Agenda-items in een periode: eigen items (kind eigen; herhalende items per keer met occurrence) en geïmporteerde feeds zoals MijnX/WDK (kind feed, id "feed:…") met jouw aanpassingen toegepast. Tijden lokaal (Europe/Amsterdam).',
-    inputSchema: S({ from: str('YYYY-MM-DD'), to: str('YYYY-MM-DD (max. 120 dagen na from)'), type: str('Alleen dit type'), include_hidden: bool('Ook verborgen feed-items') }, ['from', 'to']), annotations: RO },
+    inputSchema: S({ from: str('YYYY-MM-DD'), to: str('YYYY-MM-DD (max. 120 dagen na from)'), type: str('Alleen dit type (naam of key, zie list_types)'), include_hidden: bool('Ook verborgen feed-items'),
+      compact: bool('Alleen titel, type, bron, tijden, locatie en vertrektijd (geen beschrijvingen)') }, ['from', 'to']), annotations: RO },
   { name: 'get_work_hours', description: 'Werkuren (diensten uit de WDK-feed, anders alles van het type Werk; telt vanaf 12 okt 2026, pauze doorbetaald): totaal, al gewerkt en nog gepland, per dag met de diensten, en het verschil met de vorige week/maand.',
     inputSchema: S({ period: str('week (ma–zo) of month (kalendermaand)', { enum: ['week', 'month'] }), date: str('Een dag in de gewenste week/maand, YYYY-MM-DD (standaard vandaag)') }), annotations: RO },
   { name: 'get_time_overview', description: 'Waar gaat de tijd heen in een periode: agenda-uren per type en per weekdag, werkuren, afgeronde taken per type, drukste dagen.',
@@ -358,12 +421,18 @@ const TOOLS = [
     inputSchema: S({ id: str('Notitie-id') }, ['id']), annotations: RO },
   { name: 'list_note_folders', description: 'Notitiemappen (naam, aantal notities, afvinkbaar).', inputSchema: S({}), annotations: RO },
 
-  { name: 'create_task', description: 'Nieuwe taak. Vraag eerst bevestiging (titel, dag, tijd/dagdeel).', inputSchema: S(taskProps, ['title']) },
+  { name: 'close_day', description: 'Dag afsluiten: wat is gedaan (taken + routines met tijd), wat bleef liggen (eenmalige taken van die dag + te laat), welke routines niet zijn gedaan, en of de recap al is ingevuld. Met apply=true worden de blijven-liggen taken verplaatst naar move_to (standaard de dag erna); vraag daar eerst bevestiging voor en noem welke taken.',
+    inputSchema: S({ date: str('YYYY-MM-DD (standaard vandaag)'), apply: bool('Open taken echt verplaatsen (anders alleen een voorstel)'), move_to: str('Naar welke dag (standaard de dag erna)'),
+      task_ids: { type: 'array', items: { type: 'string' }, description: 'Alleen deze taken verplaatsen (standaard alle open taken van die dag)' } }) },
+  { name: 'set_feed_travel_rule', description: 'Standaard reistijd per locatie voor een geïmporteerde agenda (bv. MyX: "R29" = 15 min heen en terug). Geldt voor alle items van die feed waarvan de locatie (of titel) de tekst bevat, behalve items met een eigen reistijd. remove=true haalt de regel weg. Zonder argumenten: toon de regels. Vraag eerst bevestiging.',
+    inputSchema: S({ feed: str('Naam van de feed (bv. MijnX, HAN), zie list_agenda → source'), match: str('Tekst in de locatie, bv. "R29"'),
+      before: num('Reistijd heen (min)'), after: num('Reistijd terug (min, standaard gelijk aan heen)'), remove: bool('Regel verwijderen') }) },
+  { name: 'create_task', description: 'Nieuwe taak. Vraag eerst bevestiging (titel, dag, tijd/dagdeel). Geef een type mee (zie list_types, bv. Sport); zonder type kiest de server er een op basis van de titel (type_chosen_automatically). Geeft het volledige item terug.', inputSchema: S(taskProps, ['title']) },
   { name: 'update_task', description: 'Taak aanpassen of verplaatsen (alleen meegegeven velden; null wist een veld). Vraag eerst bevestiging.', inputSchema: S({ id: str('Taak-id'), ...taskProps }, ['id']) },
   { name: 'complete_task', description: 'Taak afvinken (herhalende taak schuift door naar de volgende keer, streak telt mee) of met undo=true weer open zetten. Vraag eerst bevestiging.',
     inputSchema: S({ id: str('Taak-id'), undo: bool('Afvinken ongedaan maken') }, ['id']) },
   { name: 'delete_task', description: 'Taak definitief verwijderen. Vraag eerst bevestiging.', inputSchema: S({ id: str('Taak-id') }, ['id']), annotations: DEL },
-  { name: 'create_event', description: 'Nieuw eigen agenda-item. Vraag eerst bevestiging.', inputSchema: S(eventProps, ['title', 'date']) },
+  { name: 'create_event', description: 'Nieuw eigen agenda-item. Vraag eerst bevestiging. Geef een type mee (zie list_types, bv. Sport); zonder type kiest de server er een op basis van de titel. Geeft het volledige item terug (type, duur, reistijd, vertrektijd).', inputSchema: S(eventProps, ['title', 'date']) },
   { name: 'update_event', description: 'Eigen agenda-item aanpassen (alleen meegegeven velden). Werkt niet op feed-items (gebruik update_feed_event). Bij een herhalend item verandert de hele reeks. Vraag eerst bevestiging.',
     inputSchema: S({ id: str('Id van het eigen item'), ...eventProps }, ['id']) },
   { name: 'delete_event', description: 'Eigen agenda-item verwijderen (bij herhaling: de hele reeks). Vraag eerst bevestiging.', inputSchema: S({ id: str('Id van het eigen item') }, ['id']), annotations: DEL },
@@ -383,6 +452,8 @@ const INSTRUCTIONS = 'Planner (Hypex Dash): agenda, werkuren, taken en notities.
   'Begin met get_today voor de dag of list_agenda + list_tasks voor een periode; get_work_hours voor werkuren, get_time_overview voor waar de tijd heen gaat. ' +
   'Gebruik find_free_time voordat je iets inplant, en houd rekening met reistijd, werkdiensten en school. ' +
   'Feed-items (MijnX/WDK, id "feed:…") pas je alleen aan met update_feed_event; eigen items met update_event. ' +
+  'Routines: done/done_today gelden voor de gevraagde dag, next_due = eerstvolgende keer; get_today.completed_today = wat al gedaan is (vraag dat niet opnieuw). ' +
+  'Geef bij nieuwe items een type mee (list_types). list_agenda met compact=true voor een kort overzicht. close_day om de dag af te sluiten (open taken naar morgen). ' +
   'Vraag altijd eerst bevestiging voordat je iets aanmaakt, wijzigt, afvinkt of verwijdert, en noem daarbij precies wat er verandert.'
 
 // ── handlers ─────────────────────────────────────────────────────────────────
@@ -473,7 +544,19 @@ async function callTool(sb, uid, name, args = {}) {
     let list = await loadAgenda(sb, uid, types, from, to)
     if (!args.include_hidden) list = list.filter(x => !x.hidden)
     if (args.type) { const t = types.resolve(args.type); list = list.filter(x => x.cat === t.cat) }
-    return { from, to, count: list.length, items: list.map(x => slimEvent(x, types)) }
+    if (args.compact) {
+      return { from, to, count: list.length, compact: true, items: list.map(x => ({ id: x.id, title: x.title, type: types.name(x.cat), source: x.source,
+        start: localStamp(x.start), end: localStamp(x.end), ...(x.all_day ? { all_day: true } : {}), ...(x.location ? { location: x.location } : {}),
+        ...(x.travel_before ? { leave_at: localHM(+x.start - x.travel_before * 60000) } : {}) })) }
+    }
+    // Dezelfde lange beschrijving (bv. bij elke WDK-dienst) maar één keer meesturen
+    const seen = new Set()
+    const items = list.map(x => {
+      const e = slimEvent(x, types)
+      if (e.description) { const k = `${x.source}|${e.description}`; if (seen.has(k)) { delete e.description; e.description_repeated = true } else seen.add(k) }
+      return e
+    })
+    return { from, to, count: list.length, items }
   }
 
   if (name === 'get_work_hours') {
@@ -578,8 +661,9 @@ async function callTool(sb, uid, name, args = {}) {
     const [agenda, tasks, comps] = await Promise.all([
       loadAgenda(sb, uid, types, week.from < day ? week.from : day, week.to > addDays(day, 1) ? week.to : addDays(day, 1)),
       loadTasks(sb, uid),
-      sb.from('task_completions').select('title, day, recurring').eq('user_id', uid).eq('day', day),
+      sb.from('task_completions').select('title, day, recurring, task_id, completed_at').eq('user_id', uid).eq('day', day),
     ])
+    const logs = comps.data || []
     const lo = +toUTC(day), hi = +toUTC(addDays(day, 1)), now = Date.now()
     const items = agenda.filter(x => !x.hidden && +x.end > lo && +x.start < hi)
     const next = agenda.filter(x => !x.hidden && !x.all_day && +x.start - (x.travel_before || 0) * 60000 > now)[0]
@@ -602,10 +686,14 @@ async function callTool(sb, uid, name, args = {}) {
         urgent: onDay.filter(t => t.priority === 1).map(t => slimTask(t, types, today)),
         overdue: overdue.map(t => slimTask(t, types, today)),
         by_daypart: byPart,
-        routines: onDay.filter(t => t.recurrence).map(t => slimTask(t, types, today)),
+        // Alle routines van die dag, ook de afgevinkte (done: true), zodat "3/4" klopt
+        routines: tasks.filter(t => routineDueOn(t, day, today, logs)).map(t => slimTask(t, types, today, { day, logs })),
         unplanned_count: open.filter(t => !t.date).length,
       },
-      completed: (comps.data || []).map(c => c.title),
+      completed: logs.map(c => c.title),
+      // Vandaag (of op de gevraagde dag) afgerond, met tijdstip: taken én routines
+      completed_today: logs.slice().sort((a, b) => String(a.completed_at).localeCompare(String(b.completed_at)))
+        .map(c => ({ title: c.title, ...(c.recurring ? { routine: true } : {}), time: c.completed_at ? localHM(c.completed_at) : null })),
       work_hours_this_week: { from: week.from, to: week.to, total_hours: hours(work.total_min), worked_hours: hours(work.worked_min), shifts: work.count },
     }
   }
@@ -637,12 +725,76 @@ async function callTool(sb, uid, name, args = {}) {
   }
 
   // ── bewerken ──
+  if (name === 'close_day') {
+    const day = optDate(args.date, 'date') || today
+    const moveTo = optDate(args.move_to, 'move_to') || addDays(day, 1)
+    const [tasks, comps, agenda, recap] = await Promise.all([
+      loadTasks(sb, uid),
+      sb.from('task_completions').select('title, day, recurring, task_id, completed_at').eq('user_id', uid).eq('day', day),
+      loadAgenda(sb, uid, types, day, day),
+      sb.from('recaps').select('id').eq('user_id', uid).eq('kind', 'day').eq('day', day).maybeSingle(),
+    ])
+    const logs = comps.data || []
+    const routines = tasks.filter(t => routineDueOn(t, day, today, logs))
+    // Blijven liggen: eenmalige taken die die dag gepland stonden (meerdaagse alleen op hun laatste dag) + te laat
+    const open = tasks.filter(t => !t.completed && !t.recurrence && t.date && t.date <= day && taskLast(t) <= day)
+    const lo = +toUTC(day), hi = +toUTC(addDays(day, 1))
+    const ownEvents = agenda.filter(x => x.kind === 'eigen' && !x.hidden && +x.start >= lo && +x.start < hi)
+    let moved = []
+    if (args.apply) {
+      const pick = Array.isArray(args.task_ids) && args.task_ids.length ? open.filter(t => args.task_ids.includes(t.id)) : open
+      need(pick.length, 'Geen open taken om te verplaatsen')
+      for (const t of pick) {
+        const patch = { date: moveTo, updated_at: new Date().toISOString(), ...(t.end_date ? { end_date: null } : {}) }
+        const { error } = await sb.from('tasks').update(patch).eq('id', t.id).eq('user_id', uid)
+        if (error) throw new Error(error.message)
+        moved.push({ id: t.id, title: t.title, from: t.date, to: moveTo })
+      }
+    }
+    return {
+      date: day, weekday: WEEKDAYS[dow(day)],
+      done: logs.sort((a, b) => String(a.completed_at).localeCompare(String(b.completed_at))).map(c => ({ title: c.title, ...(c.recurring ? { routine: true } : {}), time: c.completed_at ? localHM(c.completed_at) : null })),
+      routines: { done: routines.filter(t => routineDoneOn(t, day, logs)).length, total: routines.length, missed: routines.filter(t => !routineDoneOn(t, day, logs)).map(t => t.title) },
+      left_open: open.map(t => ({ ...slimTask(t, types, today), ...(t.date < day ? { was_overdue: true } : {}) })),
+      own_events: ownEvents.map(x => ({ title: x.title, type: types.name(x.cat), start: localHM(x.start), end: localHM(x.end) })),
+      recap_filled: !!recap.data, ...(recap.error ? { recap_note: 'Recap-tabel niet gevonden' } : {}),
+      ...(args.apply ? { moved } : { suggestion: open.length ? `Verplaats ${open.length} open ${open.length === 1 ? 'taak' : 'taken'} naar ${moveTo} met apply=true (na akkoord).` : 'Niets blijven liggen.' }),
+      next_step: recap.data ? null : 'Recap invullen: get_recap + save_recap',
+    }
+  }
+
+  if (name === 'set_feed_travel_rule') {
+    const { data: conns, error } = await sb.from('calendar_connections').select('*').eq('user_id', uid)
+    if (error) throw new Error(error.message)
+    const list = conns || []
+    if (!args.feed && !args.match) return { feeds: list.map(c => ({ feed: c.name, rules: Array.isArray(c.travel_rules) ? c.travel_rules : (c.travel_rules === undefined ? 'migratie add_feed_travel_rules.sql nog niet gedraaid' : []) })) }
+    need(args.feed, 'feed ontbreekt')
+    const f = String(args.feed).toLowerCase()
+    const conn = list.find(c => (c.name || '').toLowerCase() === f) || list.find(c => (c.name || '').toLowerCase().includes(f))
+    need(conn, `Feed "${args.feed}" niet gevonden. Feeds: ${list.map(c => c.name).join(', ')}`)
+    need(conn.travel_rules !== undefined, 'Draai eerst supabase/migrations/add_feed_travel_rules.sql in Supabase')
+    need(args.match && String(args.match).trim(), 'match ontbreekt (tekst in de locatie, bv. "R29")')
+    const match = String(args.match).trim()
+    let rules = (Array.isArray(conn.travel_rules) ? conn.travel_rules : []).filter(r => String(r.match).toLowerCase() !== match.toLowerCase())
+    if (!args.remove) {
+      need(Number(args.before) > 0 && Number(args.before) <= 600, 'before moet 1–600 minuten zijn')
+      const after = args.after === undefined ? Number(args.before) : Number(args.after)
+      need(after >= 0 && after <= 600, 'after moet 0–600 minuten zijn')
+      rules = [...rules, { match, before: Math.round(Number(args.before)), after: Math.round(after) }]
+    }
+    const { error: ue } = await sb.from('calendar_connections').update({ travel_rules: rules }).eq('id', conn.id).eq('user_id', uid)
+    if (ue) throw new Error(ue.message)
+    return { feed: conn.name, rules, note: 'Geldt meteen voor alle items met deze locatie; items met een eigen reistijd houden die.' }
+  }
+
   if (name === 'create_task') {
     const f = taskFields(args, types)
+    let auto = null
+    if (args.type === undefined) { auto = smartType(args.title, types); if (auto) f.type_id = auto.id }
     const row = { duration_minutes: 30, priority: 2, ...f, completed: false, user_id: uid }
     const { data, error } = await sb.from('tasks').insert(row).select().single()
     if (error) throw new Error(error.message)
-    return { created: slimTask(data, types, today) }
+    return { created: slimTask(data, types, today), ...(auto ? { type_chosen_automatically: auto.name } : {}) }
   }
   if (name === 'update_task') {
     const { data: orig } = await sb.from('tasks').select('*').eq('id', args.id).eq('user_id', uid).maybeSingle()
@@ -678,7 +830,9 @@ async function callTool(sb, uid, name, args = {}) {
       const { data, error } = await sb.from('tasks').update({ ...upd, updated_at: stamp }).eq('id', t.id).select().single()
       if (error) throw new Error(error.message)
       if (args.undo) await removeLog(); else await log(null)
-      return { [args.undo ? 'reopened' : 'completed']: slimTask(data, types, today), ...(args.undo ? {} : { next: upd.date, streak: upd.streak }) }
+      // Routine: blijft "open" (completed: false) omdat hij doorschuift naar next; done_for zegt voor welke dag hij is afgevinkt
+      return { [args.undo ? 'reopened' : 'completed']: slimTask(data, types, today), routine: true,
+        status: args.undo ? 'reopened' : 'done', ...(args.undo ? { undone_for: today } : { done_for: today }), next: args.undo ? today : upd.date, streak: upd.streak }
     }
     const completing = !args.undo
     need(completing !== !!t.completed, completing ? 'Taak is al afgerond' : 'Taak staat al open')
@@ -692,7 +846,7 @@ async function callTool(sb, uid, name, args = {}) {
     const { data, error } = await sb.from('tasks').update(patch).eq('id', t.id).select().single()
     if (error) throw new Error(error.message)
     if (completing) await log(t.date || null); else await removeLog()
-    return { [completing ? 'completed' : 'reopened']: slimTask(data, types, today) }
+    return { [completing ? 'completed' : 'reopened']: slimTask(data, types, today), status: completing ? 'done' : 'reopened', ...(completing ? { done_for: today } : {}) }
   }
   if (name === 'delete_task') {
     const { data, error } = await sb.from('tasks').delete().eq('id', args.id).eq('user_id', uid).select().maybeSingle()
@@ -712,17 +866,25 @@ async function callTool(sb, uid, name, args = {}) {
     if (args.recurrence !== undefined) { need(!args.recurrence || ['daily', 'weekdays', 'weekly', 'biweekly'].includes(args.recurrence), 'recurrence ongeldig'); p.recurrence = args.recurrence || null }
     if (args.recurrence_days !== undefined) { need(!args.recurrence_days || args.recurrence_days.every(d => d >= 1 && d <= 7), 'recurrence_days: 1=ma … 7=zo'); p.recurrence_days = args.recurrence_days?.length ? args.recurrence_days.map(d => d % 7) : null }
     for (const k of ['travel_before', 'travel_after']) if (args[k] !== undefined) { need(!args[k] || (args[k] > 0 && args[k] <= 600), `${k} moet 0–600 minuten zijn`); p[k] = args[k] ? Math.round(args[k]) : null }
-    let res
+    let res, autoName = null
     if (orig) {
       need(Object.keys(p).length, 'Geen velden om aan te passen')
       res = await sb.from('calendar_events').update(p).eq('id', orig.id).eq('user_id', uid).select().single()
     } else {
+      if (args.type === undefined) { const a = smartType(p.title, types); if (a) { p.type_id = a.id; p.color = a.color || BUILTIN_COLOR[a.key] || p.color; p._auto = a.name } }
       if (!p.color) { const t = types.resolve('persoonlijk'); p.color = t?.color || '#A78BFA'; if (!p.type_id && t) p.type_id = t.id }
+      autoName = p._auto || null; delete p._auto
       res = await sb.from('calendar_events').insert({ description: '', ...p, user_id: uid }).select().single()
     }
     if (res.error) throw new Error(res.error.message)
     const ev = res.data
-    return { [orig ? 'updated' : 'created']: { id: ev.id, title: ev.title, start: localStamp(ev.start_time), end: localStamp(ev.end_time), ...(ev.recurrence ? { recurrence: ev.recurrence } : {}) } }
+    // Volledig item terug (type, duur, reistijd, vertrektijd, beschrijving), zodat je kunt zien wat er is opgeslagen
+    const s0 = new Date(ev.start_time), e0 = new Date(ev.end_time)
+    const cat = types.catOfId(ev.type_id) || EVENT_COLOR_CATEGORY[(ev.color || '').toLowerCase()] || 'persoonlijk'
+    const full = slimEvent({ id: ev.id, kind: 'eigen', source: 'Eigen agenda', title: ev.title, cat, start: s0, end: e0, all_day: !!ev.all_day,
+      travel_before: ev.travel_before || 0, travel_after: ev.travel_after || 0, description: ev.description && !ev.description.startsWith('pmt:') ? ev.description : null,
+      location: ev.location || null, recurring: !!ev.recurrence, raw: ev }, types)
+    return { [orig ? 'updated' : 'created']: full, ...(autoName ? { type_chosen_automatically: autoName } : {}) }
   }
   if (name === 'delete_event') {
     need(!String(args.id || '').startsWith('feed:'), 'Feed-items kun je niet verwijderen; verberg ze met update_feed_event (hidden: true)')
