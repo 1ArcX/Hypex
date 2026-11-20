@@ -1,4 +1,4 @@
-import type { BudgetConfig, RecurringSource } from '../types'
+import type { BudgetConfig, Expense, FillMark, RecurringSource } from '../types'
 import { todayStr, monthStart, monthEnd } from './format'
 import { toISODate } from './format'
 
@@ -73,4 +73,58 @@ export function markFilledInToday(id: string): void {
     Object.keys(data).forEach(d => { if (d < today) delete data[d] })
     localStorage.setItem('income_filled_in', JSON.stringify(data))
   } catch {}
+}
+
+// ── Ingevuld per periode ────────────────────────────────────────────────────
+// Zelfde regels als de Claude-connector (netlify/functions/geld-mcp/recurring.js): maandelijks = kalendermaand,
+// interval = rond de dichtstbijzijnde betaaldag. "Ingevuld" = markering op de bron (recurring_income[].filled[periode])
+// of een inkomensregel met de naam van de bron in die periode (zo werd het altijd al herkend).
+
+export interface IncomePeriod { key: string; from: string; to: string; expected: string }
+
+const isoAdd = (iso: string, days: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10)
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+export function periodOf(src: RecurringSource, ref: string): IncomePeriod {
+  if (src.type === 'interval' && src.ref_date) {
+    const n = src.interval_days || 28
+    const k = Math.round((Date.parse(`${ref}T00:00:00Z`) - Date.parse(`${src.ref_date}T00:00:00Z`)) / DAY_MS / n)
+    const expected = isoAdd(src.ref_date, k * n)
+    return { key: expected, from: isoAdd(expected, -Math.floor(n / 2)), to: isoAdd(expected, Math.ceil(n / 2) - 1), expected }
+  }
+  const [y, m] = ref.split('-').map(Number)
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate()
+  const ym = `${y}-${pad2(m)}`
+  return { key: ym, from: `${ym}-01`, to: `${ym}-${pad2(last)}`, expected: `${ym}-${pad2(Math.min(src.day || 1, last))}` }
+}
+
+export function fillMark(src: RecurringSource, key: string): FillMark | null {
+  const v = src.filled?.[key]
+  return typeof v === 'string' ? { expense_id: v } : v || null
+}
+
+/** Inkomensregel waarmee de bron deze periode is ingevuld. `incomes` = inkomsten van de geladen maand. */
+export function fillFor(src: RecurringSource, period: IncomePeriod, incomes: Expense[]): Expense | FillMark | null {
+  const mark = fillMark(src, period.key)
+  if (mark?.expense_id) {
+    const hit = incomes.find(e => e.id === mark.expense_id)
+    if (hit) return hit
+    // Interval-periode over de maandgrens: de boeking staat dan in een maand die niet geladen is
+    if (mark.date && mark.date.slice(0, 7) !== todayStr().slice(0, 7)) return mark
+  }
+  return incomes.find(e => e.is_income && e.description === src.name && e.date >= period.from && e.date <= period.to) || null
+}
+
+/** Is de bron voor de lopende periode al ingevuld? */
+export function filledThisPeriod(src: RecurringSource, incomes: Expense[]): boolean {
+  return !!fillFor(src, periodOf(src, todayStr()), incomes)
+}
+
+/** Volgende betaaldag: deze periode als die nog moet komen en niet is ingevuld, anders de volgende. Kort NL-label. */
+export function nextPayLabel(src: RecurringSource, filled: boolean): string | null {
+  if (src.type !== 'monthly' && !(src.type === 'interval' && src.ref_date)) return null
+  const today = todayStr()
+  let p = periodOf(src, today)
+  if (p.expected <= today || filled) p = periodOf(src, isoAdd(p.to, 1))
+  return new Date(`${p.expected}T12:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
 }

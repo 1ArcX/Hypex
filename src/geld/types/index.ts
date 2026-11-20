@@ -49,6 +49,17 @@ export interface RecurringSource {
   interval_days?: number // type 'interval': elke N dagen
   ref_date?: string // type 'interval': laatste betaaldatum
   category?: string // inkomenscategorie, default 'salaris'
+  // per periode ("2026-11", of bij interval de betaaldag) de inkomensregel waarmee de bron is ingevuld
+  filled?: Record<string, FillMark | string>
+  // onthouden bij invullen via een banktransactie (Claude-connector): om volgende ontvangsten te herkennen
+  bank_match?: { iban?: string; counterparty?: string }
+}
+
+export interface FillMark {
+  expense_id: string
+  date?: string
+  amount?: number
+  before?: { amount: number; category: string; description: string; date: string }
 }
 
 export interface VacationEntry {

@@ -8,6 +8,7 @@ import type { RecurringSource } from '../types'
 import { INCOME_CATEGORIES } from '../lib/categories'
 import { fmt, todayStr, parseAmount } from '../lib/format'
 import { calcSavingsAdvice } from '../lib/savings'
+import { markRecurringFilled } from '../hooks/useRecurringIncome'
 
 // Betaaldag-modal (en handmatige eenmalige inkomsten via source=null):
 // inkomen loggen + adviesverdeling naar spaarrekening en leningaflossing.
@@ -47,9 +48,10 @@ export function IncomeDayModal({ source, defaultDate, adjustedBase, savingsGoal,
     try {
       const incomeDesc = isManual ? desc.trim() : source!.name
       const incomeCat = isManual ? catId : (source!.category || 'salaris')
-      const inserts = [
-        supabase.from('expenses').insert({ user_id: userId, amount: rec, category: incomeCat, description: incomeDesc, date, is_income: true, is_savings_withdrawal: false }),
-      ]
+      // Inkomensregel apart (id nodig om een terugkerende bron als ingevuld te markeren)
+      const { data: incomeRow } = await supabase.from('expenses').insert({ user_id: userId, amount: rec, category: incomeCat, description: incomeDesc, date, is_income: true, is_savings_withdrawal: false }).select('id').single()
+      if (!isManual && incomeRow?.id) await markRecurringFilled(userId, source!.id, { id: incomeRow.id, date, amount: rec })
+      const inserts: PromiseLike<unknown>[] = []
       if (toSavings > 0) inserts.push(supabase.from('expenses').insert({ user_id: userId, amount: toSavings, category: 'overig', description: '🏦 Spaarstorting', date, is_savings_contribution: true, is_income: false, is_savings_withdrawal: false }))
       if (toLoan > 0) inserts.push(supabase.from('expenses').insert({ user_id: userId, amount: toLoan, category: 'overig', description: '↩ Gedeeltelijke terugbetaling lening', date, is_loan_repayment: true, is_income: false, is_savings_withdrawal: false }))
       await Promise.all(inserts)

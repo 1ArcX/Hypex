@@ -9,7 +9,7 @@ import { useGeldStore } from '../store/geldStore'
 import type { BudgetStats } from '../hooks/useBudgetStats'
 import type { Expense, RecurringSource } from '../types'
 import { fmt, todayStr, parseAmount } from '../lib/format'
-import { getNextPayDate, calcRecurringThisMonth, isPayDayToday } from '../lib/recurring'
+import { calcRecurringThisMonth, isPayDayToday, fillFor, periodOf, nextPayLabel } from '../lib/recurring'
 
 // Inkomsten & sparen: terugkerende bronnen, openstaande lening,
 // spaaroverboekingen, opnames en eenmalige inkomsten
@@ -85,7 +85,8 @@ export function InkomstenSheet({ stats, savings, userId, isCurrentMonth, onClose
           </p>
           <div className="flex flex-col gap-2">
             {recurringIncome.map(src => {
-              const next = getNextPayDate(src)
+              const fill = isCurrentMonth ? fillFor(src, periodOf(src, todayStr()), manualIncome) : null
+              const next = nextPayLabel(src, !!fill)
               const thisMonth = calcRecurringThisMonth([src])
               const isToday = isPayDayToday(src)
               return (
@@ -101,7 +102,13 @@ export function InkomstenSheet({ stats, savings, userId, isCurrentMonth, onClose
                   <span className={`text-[14px] font-bold tabular-nums ${thisMonth > 0 ? 'text-emerald-400' : 'text-white/30'}`}>
                     {thisMonth > 0 ? fmt(thisMonth) : '–'}
                   </span>
-                  {isCurrentMonth && (
+                  {isCurrentMonth && fill && (
+                    <span title={`Ingevuld op ${fill.date ?? ''}`}
+                      className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap border border-emerald-400/25 text-emerald-400/80 bg-transparent">
+                      ✓ Ingevuld{fill.amount != null && Number(fill.amount) !== src.amount ? ` · ${fmt(Number(fill.amount))}` : ''}
+                    </span>
+                  )}
+                  {isCurrentMonth && !fill && (
                     <button onClick={() => onEarlyIncome(src)}
                       className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer whitespace-nowrap border ${
                         isToday ? 'bg-emerald-400 border-transparent text-black' : 'bg-emerald-400/10 border-emerald-400/35 text-emerald-400'

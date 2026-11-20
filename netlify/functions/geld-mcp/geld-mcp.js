@@ -13,6 +13,7 @@ const { createClient } = require('@supabase/supabase-js')
 const { processTransaction, unlinkExpense, atmCounterparty, normalizeCounterparty } = require('../bank/bankCore')
 const planner = require('./planner') // agenda, werkuren, taken, notities (Hypex-connector)
 const study = require('./study') // Focus (vakken, studiesessies) + Recap
+const recurring = require('./recurring') // terugkerend inkomen invullen (knop "Invullen" in Inkomsten & sparen)
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 const TOKEN = process.env.GELD_MCP_TOKEN
@@ -207,6 +208,7 @@ async function overview(uid, month) {
     per_category: perCategory,
     count: exp.length,
     ...(isCurrent ? { bank: await bankBalances(uid).catch(() => null) } : {}),
+    ...((cfg.recurring_income || []).length ? { recurring_income: await recurring.sourcesStatus(supabase, uid, cfg, t, { from: monthStart(selY, selM), to: monthEnd(selY, selM) }).catch(() => []) } : {}),
     note: 'Vaste lasten (abonnementen), uitgaven van spaargeld (paid_from_savings) en uitgaven tijdens een eerdere vakantie tellen niet mee in het vrije budget. remaining = spendable_budget − spent_against_budget.',
   }
 }
@@ -227,7 +229,7 @@ const expenseProps = {
   repaid: { type: 'boolean', description: 'Lening terugbetaald' },
 }
 const TOOLS = [
-  { name: 'get_overview', description: 'Budgetoverzicht van een maand: vrij budget, uitgegeven, nog te besteden (incl. aftrek van eerdere overschrijdingen), per categorie, inkomen, sparen, geplande uitgaven. Zonder month = huidige maand.',
+  { name: 'get_overview', description: 'Budgetoverzicht van een maand: vrij budget, uitgegeven, nog te besteden (incl. aftrek van eerdere overschrijdingen), per categorie, inkomen, sparen, geplande uitgaven, en per vaste inkomstenbron of hij die maand is ingevuld (recurring_income). Zonder month = huidige maand.',
     inputSchema: { type: 'object', properties: { month: { type: 'string', description: 'YYYY-MM' } } }, annotations: { readOnlyHint: true } },
   { name: 'list_expenses', description: 'Transacties (uitgaven, inkomen, spaaracties) opzoeken, nieuwste eerst.',
     inputSchema: { type: 'object', properties: {
@@ -236,7 +238,7 @@ const TOOLS = [
       ...amountProps,
       type: { type: 'string', enum: ['alle', 'uitgave', 'inkomen', 'sparen', 'gepland'], description: 'Standaard alle' },
       limit: { type: 'number', description: 'Max. aantal (standaard 100, max 500)' } } }, annotations: { readOnlyHint: true } },
-  { name: 'get_budget_config', description: 'Instellingen: maandbudget, budget per categorie, categorieën (ook eigen), spaardoel, min. saldo, terugbetaalmaanden, vakantiemodus + eerdere vakanties, vaste inkomsten en maand-aanpassingen.',
+  { name: 'get_budget_config', description: 'Instellingen: maandbudget, budget per categorie, categorieën (ook eigen), spaardoel, min. saldo, terugbetaalmaanden, vakantiemodus + eerdere vakanties, vaste inkomsten en maand-aanpassingen. recurring_income_status: per vaste inkomstenbron de lopende periode, verwachte datum, ingevuld ja/nee (met de boeking en banktransactie), volgende betaaldatum en possible_match (losse boeking die er waarschijnlijk bij hoort).',
     inputSchema: { type: 'object', properties: {} }, annotations: { readOnlyHint: true } },
   { name: 'add_expense', description: 'Nieuwe transactie toevoegen (standaard een gewone uitgave van vandaag).',
     inputSchema: { type: 'object', properties: expenseProps, required: ['amount', 'category'] } },
@@ -260,7 +262,7 @@ const TOOLS = [
       id: { type: 'string' }, action: { type: 'string', enum: ['add', 'ignore'] },
       kind: { type: 'string', enum: ['uitgave', 'inkomen', 'terugbetaling', 'spaarstorting', 'spaaropname'], description: 'terugbetaling = Tikkie/terugbetaling van iemand: negatieve uitgave in de categorie waarvoor je voorschoot' },
       category: { type: 'string', description: 'Categorie-id (zie get_budget_config)' } }, required: ['id', 'action'] } },
-  { name: 'update_budget_config', description: 'Budgetinstellingen aanpassen. category_budgets en month_adjustments worden samengevoegd met de bestaande waarden (zet een maand op 0 om de aanpassing te wissen).',
+  { name: 'update_budget_config', description: 'Budgetinstellingen aanpassen. category_budgets en month_adjustments worden samengevoegd met de bestaande waarden (zet een maand op 0 om de aanpassing te wissen). recurring_income wijzigt de bronnen zelf (naam, bedrag, dag); een betaling invullen doe je met fill_recurring_income.',
     inputSchema: { type: 'object', properties: {
       monthly_budget: { type: 'number' }, savings_goal: { type: 'number' }, min_balance: { type: 'number' },
       recovery_months: { type: 'number', description: 'Over hoeveel maanden een overschrijding wordt terugbetaald (1–12)' },
@@ -276,6 +278,15 @@ const TOOLS = [
           emoji: { type: 'string' }, category: { type: 'string', description: 'Inkomenscategorie (standaard salaris)' },
           remove: { type: 'boolean', description: 'true = deze bron verwijderen' } } } },
     } } },
+  { name: 'fill_recurring_income', description: 'Terugkerend inkomen invullen, precies zoals de knop "Invullen" / "Nu invullen" in Geld → Inkomsten & sparen → Terugkerend: maakt een inkomen met de naam en categorie van de bron en markeert de bron voor die periode als ingevuld (de app toont dan "Ingevuld" en schuift "volgende" door). Periode: maandelijks = kalendermaand van date, interval = rond de betaaldag. Met bank_transaction_id wordt de banktransactie gekoppeld: was die al als inkomen toegevoegd, dan wordt díe boeking de invulling (geen tweede inkomen); anders komt hij op matched. Met expense_id neem je een bestaande losse inkomensboeking over. Staat er in de periode al een losse boeking die erop lijkt, dan weigert de tool en noemt die boeking (geef dan expense_id/bank_transaction_id mee, of force). Weigert als de bron voor die periode al is ingevuld. undo: true draait de invulling terug (een overgenomen boeking krijgt zijn oude naam/bedrag terug, een nieuwe wordt verwijderd). Kijk eerst bij get_budget_config → recurring_income_status (possible_match) en vraag ALTIJD bevestiging (bron, bedrag, datum, welke boeking) voordat je invult of terugdraait.',
+    inputSchema: { type: 'object', properties: {
+      id: { type: 'string', description: 'Id van de bron, bv. rec_1776029038292 (zie get_budget_config)' },
+      amount: { type: ['number', 'string'], description: 'Ontvangen bedrag als dat afwijkt (standaard het bedrag van de banktransactie, anders dat van de bron)' },
+      date: { type: 'string', description: 'YYYY-MM-DD; bepaalt ook de periode. Standaard: datum van de banktransactie, anders de verwachte betaaldag (of vandaag als die nog moet komen)' },
+      bank_transaction_id: { type: 'string', description: 'Banktransactie (ontvangst) die bij deze betaling hoort' },
+      expense_id: { type: 'string', description: 'Bestaande inkomensboeking die de invulling wordt (wordt hernoemd naar de bron)' },
+      force: { type: 'boolean', description: 'Toch een aparte boeking maken als er al een gelijkende losse boeking staat' },
+      undo: { type: 'boolean', description: 'Invulling voor die periode terugdraaien' } }, required: ['id'] } },
   { name: 'manage_category', description: 'Eigen uitgavencategorie toevoegen, hernoemen (ook emoji/kleur) of verwijderen. De vaste categorieën (eten, boodschappen, transport, kleding, abonnementen, sport, overig) kunnen niet hernoemd of verwijderd worden. Bij verwijderen gaan de uitgaven in die categorie naar overig. Vraag eerst bevestiging.',
     inputSchema: { type: 'object', properties: {
       action: { type: 'string', enum: ['add', 'rename', 'delete'] },
@@ -401,8 +412,14 @@ async function callTool(name, args = {}) {
       savings_goal: cfg.savings_goal || 0, min_balance: cfg.min_balance ?? 300, recovery_months: cfg.recovery_months || 3,
       vacation_mode: !!cfg.vacation_mode, vacation_budget: cfg.vacation_budget || 0, vacation_start: cfg.vacation_start || null, vacation_end: cfg.vacation_end || null,
       vacation_history: (cfg.vacation_history || []).map(v => ({ start: v.start, end: v.end || v.start, ...(v.budget ? { budget: v.budget } : {}) })),
-      recurring_income: cfg.recurring_income || [], month_adjustments: cfg.month_adjustments || {},
+      recurring_income: (cfg.recurring_income || []).map(({ filled, bank_match, ...s }) => s), month_adjustments: cfg.month_adjustments || {},
+      recurring_income_status: await recurring.sourcesStatus(supabase, uid, cfg, todayTZ()).catch(() => []),
     }
+  }
+  if (name === 'fill_recurring_income') {
+    if (!args.id) throw new Error('id ontbreekt (zie get_budget_config → recurring_income)')
+    if (args.amount !== undefined) { const a = parseAmount(args.amount); if (a === null) throw new Error('amount is geen bedrag'); args.amount = a }
+    return recurring.fillRecurring(supabase, uid, args, { getConfig, saveConfig, today: todayTZ })
   }
   if (name === 'list_expenses') {
     let q = supabase.from('expenses').select('*').eq('user_id', uid)
@@ -515,7 +532,12 @@ async function callTool(name, args = {}) {
       const ok = INCOME_CATEGORIES.includes(args.category) || allCategories(cfg).some(c => c.id === args.category)
       if (!ok) throw new Error(`Onbekende categorie "${args.category}"`)
     }
-    return processTransaction(supabase, uid, args.id, { action: args.action, category: args.category, kind: args.kind })
+    const res = await processTransaction(supabase, uid, args.id, { action: args.action, category: args.category, kind: args.kind })
+    if (args.action === 'add' && (res.kind === 'inkomen' || !res.kind)) {
+      const sug = await recurring.suggestForTransaction(supabase, uid, await getConfig(uid), args.id).catch(() => null)
+      if (sug) res.recurring_income_suggestion = sug
+    }
+    return res
   }
   if (name === 'update_budget_config') {
     const cfg = await getConfig(uid)
@@ -580,10 +602,11 @@ const GELD_INSTRUCTIONS = 'Geld-app van Fachri (Hypex Dash). Bedragen in euro. G
   'list_expenses om transacties te vinden (ids nodig voor wijzigen/verwijderen) en get_budget_config voor categorieën en instellingen. ' +
   'Bankkoppeling (ING, alleen-lezen): get_bank_balances voor saldo\'s, spaarrekeningen en spaardoelen (spaarrekeningen worden door ING niet gedeeld en zijn zelf bijgehouden), ' +
   'list_bank_transactions voor de afschriften (zoeken op winkel met search, totalen per winkel met group_by=counterparty) en de inbox, process_bank_transaction om de inbox te verwerken. ' +
+  'Vaste inkomsten (zorgtoeslag, studiefinanciering, salaris): get_budget_config → recurring_income_status laat per bron zien of de lopende periode is ingevuld. Vul een betaling in met fill_recurring_income (niet met add_expense of process_bank_transaction, anders blijft "Invullen" in de app open en ontstaat er snel een dubbele boeking); hoort er een banktransactie of losse boeking bij, geef die mee (bank_transaction_id / expense_id). Geeft process_bank_transaction een recurring_income_suggestion, stel dan voor om die bron zo in te vullen. ' +
   'paid_from_savings = uitgave van spaargeld (telt niet tegen het budget); savings_type geldt alleen voor spaaropnames. ' +
   'Uitgaven tijdens een eerdere vakantie (vacation_history) tellen niet tegen het maandbudget; get_overview toont ze onder vacation_excluded. ' +
   'Instellingen: update_budget_config (ook vaste inkomsten), manage_category (eigen categorieën), update_savings_account (spaarrekening hernoemen/doel). ' +
-  'Vraag bevestiging voordat je transacties verwijdert, budgetten wijzigt of banktransacties verwerkt.'
+  'Vraag bevestiging voordat je transacties verwijdert, budgetten wijzigt, banktransacties verwerkt of vaste inkomsten invult/terugdraait.'
 const INSTRUCTIONS = `${planner.INSTRUCTIONS}
 
 ${study.INSTRUCTIONS}

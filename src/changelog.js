@@ -6,6 +6,15 @@
 
 export const RELEASES = [
   {
+    id: 51,
+    date: '2026-11-20',
+    title: 'Vaste inkomsten: ingevuld per maand',
+    items: [
+      { area: 'geld', text: "Bij Inkomsten & sparen → Terugkerend zie je nu per bron of hij deze maand al is ingevuld (✓ Ingevuld), en 'volgende' schuift dan door naar de volgende betaaldag. De betaaldag-popup komt niet meer voor een bron die al is ingevuld." },
+      { area: 'geld', text: "Claude kan een vaste inkomstenbron (zoals zorgtoeslag of studiefinanciering) invullen zoals de knop Invullen, en koppelt dan de banktransactie of de boeking die er al stond, zodat er geen dubbel inkomen ontstaat." },
+    ],
+  },
+  {
     id: 50,
     date: '2026-11-20',
     title: 'Taken scrollt weer',
