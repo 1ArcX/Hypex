@@ -65,6 +65,7 @@ function matchesSource(src, { amount, date, iban, counterparty }) {
   return null
 }
 
+const bankMatch = (tx) => ({ ...(tx.counterparty_iban ? { iban: tx.counterparty_iban.replace(/\s/g, '') } : {}), ...(tx.counterparty ? { counterparty: normalizeCounterparty(tx.counterparty) } : {}) })
 const view = (e) => ({ id: e.id, date: e.date, amount: Number(e.amount), category: e.category, description: e.description || '' })
 
 async function loadIncomes(db, uid, from, to) {
@@ -171,14 +172,21 @@ async function fillRecurring(db, uid, args, ctx) {
       action = { deleted_expense: view(existing), ...(unlinked.length ? { bank_transactions: unlinked } : {}) }
     }
     const filled = { ...(src.filled || {}) }; delete filled[period.key]
-    const patch = { recurring_income: sources.map(s => (s.id === src.id ? { ...s, filled } : s)) }
-    const conf = { ...(cfg.income_confirmed_dates || {}) }
-    if (conf[t]?.includes(src.id)) { conf[t] = conf[t].filter(x => x !== src.id); patch.income_confirmed_dates = conf }
-    await ctx.saveConfig(uid, cfg, patch)
+    await ctx.saveConfig(uid, cfg, { recurring_income: sources.map(s => (s.id === src.id ? { ...s, filled } : s)) })
     return { undone: true, source: sourceView, period: periodView, ...action, next_pay_date: nextPayDate(src, t, false) }
   }
 
   // ── invullen ──
+  // Al ingevuld met precies deze boeking maar zonder markering (bv. een eerdere poging die halverwege stopte): markering herstellen
+  const target = args.expense_id || tx?.expense_id
+  if (existing && !markOf(src, period.key) && target && existing.id === target) {
+    const filled = { ...(src.filled || {}), [period.key]: { expense_id: existing.id, date: existing.date, amount: Number(existing.amount) } }
+    const nextSrc = { ...src, filled, ...(tx ? { bank_match: bankMatch(tx) } : {}) }
+    await ctx.saveConfig(uid, cfg, { recurring_income: sources.map(s => (s.id === src.id ? nextSrc : s)) })
+    return { filled: true, repaired_mark: true, source: sourceView, period: periodView, expense: view(existing),
+      ...(tx ? { bank_transaction: { id: tx.id, status: tx.status } } : {}), next_pay_date: nextPayDate(nextSrc, t, period.key === periodOf(src, t).key),
+      note: 'Was al ingevuld met deze boeking; alleen de markering is nu opgeslagen.' }
+  }
   if (existing) {
     throw new Error(`${src.name} is voor ${periodLabel(src, period)} al ingevuld op ${existing.date} (€ ${Number(existing.amount).toFixed(2)}, expense ${existing.id}). Gebruik undo: true om dat eerst terug te draaien.`)
   }
@@ -226,16 +234,9 @@ async function fillRecurring(db, uid, args, ctx) {
 
   const filled = { ...(src.filled || {}), [period.key]: { expense_id: expense.id, date, amount, ...(before ? { before } : {}) } }
   for (const k of Object.keys(filled).sort().slice(0, -24)) delete filled[k] // laatste 24 periodes bewaren
-  const nextSrc = { ...src, filled, ...(tx ? { bank_match: { ...(tx.counterparty_iban ? { iban: tx.counterparty_iban.replace(/\s/g, '') } : {}), ...(tx.counterparty ? { counterparty: normalizeCounterparty(tx.counterparty) } : {}) } } : {}) }
-  const patch = { recurring_income: sources.map(s => (s.id === src.id ? nextSrc : s)) }
-  if (date === t) {
-    // Betaaldag-popup van vandaag niet meer tonen (zoals confirmIncomeToday in de app)
-    const conf = { ...(cfg.income_confirmed_dates || {}) }
-    conf[t] = [...new Set([...(conf[t] || []), src.id])]
-    for (const d of Object.keys(conf)) if (d < t) delete conf[d]
-    patch.income_confirmed_dates = conf
-  }
-  await ctx.saveConfig(uid, cfg, patch)
+  const nextSrc = { ...src, filled, ...(tx ? { bank_match: bankMatch(tx) } : {}) }
+  // (De betaaldag-popup kijkt zelf of de bron deze periode is ingevuld; income_confirmed_dates bestaat niet overal als kolom.)
+  await ctx.saveConfig(uid, cfg, { recurring_income: sources.map(s => (s.id === src.id ? nextSrc : s)) })
   return {
     filled: true, source: sourceView, period: periodView, expense: view(expense),
     ...(before ? { used_existing_expense: { id: expense.id, before } } : {}),
