@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "remote-fullscreen",
+  "description": "De live site mag het hoofdvenster volledig scherm maken (F11).",
+  "windows": ["main"],
+  "remote": { "urls": ["https://hypexdash.netlify.app/*"] },
+  "permissions": ["core:window:allow-set-fullscreen", "core:window:allow-is-fullscreen"]
+}

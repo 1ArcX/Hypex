@@ -6,6 +6,14 @@
 
 export const RELEASES = [
   {
+    id: 52,
+    date: '2026-11-24',
+    title: 'Desktop-app: volledig scherm',
+    items: [
+      { area: 'app', text: "In de Windows-app zet F11 het venster op volledig scherm (en weer terug). De app onthoudt de stand bij de volgende start. Installeer de nieuwe versie via Instellingen in de browser." },
+    ],
+  },
+  {
     id: 51,
     date: '2026-11-20',
     title: 'Vaste inkomsten: ingevuld per maand',

@@ -14,6 +14,20 @@ use tauri_plugin_opener::OpenerExt;
 const SITE_URL: &str = "https://hypexdash.netlify.app";
 const BG: tauri::window::Color = tauri::window::Color(0x0b, 0x0b, 0x0f, 0xff);
 
+const INIT_SCRIPT: &str = r#"
+window.__HYPEX_DESKTOP__ = true;
+window.__hypexToggleFullscreen = async function () {
+  var t = window.__TAURI_INTERNALS__;
+  if (!t) return null;
+  var fs = await t.invoke('plugin:window|is_fullscreen', { label: 'main' });
+  await t.invoke('plugin:window|set_fullscreen', { label: 'main', value: !fs });
+  return !fs;
+};
+window.addEventListener('keydown', function (e) {
+  if (e.key === 'F11') { e.preventDefault(); window.__hypexToggleFullscreen(); }
+}, true);
+"#;
+
 static POPUP_ID: AtomicUsize = AtomicUsize::new(0);
 
 /// Popups that must stay inside the app because the site talks to them via
@@ -44,7 +58,8 @@ fn build_main(app: &tauri::AppHandle) -> tauri::Result<()> {
         .theme(Some(tauri::Theme::Dark))
         .background_color(BG)
         // Lets the site know it runs inside the app (hides the download button).
-        .initialization_script("window.__HYPEX_DESKTOP__ = true;")
+        // F11 = volledig scherm aan/uit (de stand wordt door window-state onthouden).
+        .initialization_script(INIT_SCRIPT)
         .on_new_window(move |url, features| {
             if !open_in_app(&url) {
                 let _ = handle.opener().open_url(url.as_str(), None::<&str>);
