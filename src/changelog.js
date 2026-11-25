@@ -6,6 +6,14 @@
 
 export const RELEASES = [
   {
+    id: 53,
+    date: '2026-11-25',
+    title: 'Te laat afvinken: taak blijft op zijn dag',
+    items: [
+      { area: 'taken', text: "Vink je een taak een dag later af, dan blijft hij doorgestreept op de dag waarop hij gepland stond. Hij schuift niet meer door naar vandaag. Bij Gedaan en in Afgerond vandaag zie je hem nog wel op de dag van afvinken." },
+    ],
+  },
+  {
     id: 52,
     date: '2026-11-24',
     title: 'Desktop-app: volledig scherm',

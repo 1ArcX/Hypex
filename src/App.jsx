@@ -705,9 +705,9 @@ export default function App() {
     const today = todayISO()
     const patch = { completed: completing, updated_at: new Date().toISOString() }
     if (completing) {
-      // Afgerond = bewaard bij de dag waarop je hem deed (te laat, vooruit gewerkt of zonder datum → vandaag);
-      // de geplande datum staat in het logboek, zodat terugzetten hem daar weer neerzet.
-      if (!isMultiDay(task) && task.date !== today) patch.date = today
+      // Te laat afgevinkt: blijft op de geplande dag staan (doorgestreept). Zonder datum of vooruit
+      // gewerkt → vandaag; de geplande datum staat in het logboek, zodat terugzetten hem daar weer neerzet.
+      if (!isMultiDay(task) && (!task.date || task.date > today)) patch.date = today
     } else if (!isMultiDay(task)) {
       const planned = await lastPlannedDate(task.id)
       if (planned !== undefined) patch.date = planned

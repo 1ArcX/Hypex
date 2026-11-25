@@ -934,7 +934,7 @@ async function callTool(sb, uid, name, args = {}) {
     need(completing !== !!t.completed, completing ? 'Taak is al afgerond' : 'Taak staat al open')
     const multi = !!t.end_date && !!t.date && t.end_date > t.date
     const patch = { completed: completing, updated_at: stamp }
-    if (completing && !multi && t.date !== today) patch.date = today
+    if (completing && !multi && (!t.date || t.date > today)) patch.date = today // te laat = blijft op de geplande dag
     if (!completing && !multi) {
       const { data: last } = await sb.from('task_completions').select('planned_date').eq('user_id', uid).eq('task_id', t.id).order('completed_at', { ascending: false }).limit(1)
       if (last?.[0]) patch.date = last[0].planned_date || null

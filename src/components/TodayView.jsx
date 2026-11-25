@@ -96,7 +96,9 @@ export default function TodayView({ tasks, subjects = [], dateOffset = 0, onTogg
   const total = routines.length + dayTasks.length + doneOneoff
   const done = routinesDone + doneOneoff
   const pct = total > 0 ? Math.round((done / total) * 100) : 0
-  const doneTasks = isToday ? tasks.filter(t => !t.recurrence && t.completed && taskOnDay(t, today)).sort(taskTimeSort) : []
+  // Afgerond vandaag: ook te late taken die vandaag zijn afgevinkt (die blijven op hun geplande dag staan)
+  const doneLateToday = t => t.date && taskLastDate(t) < today && t.updated_at && toISO(new Date(t.updated_at)) === today
+  const doneTasks = isToday ? tasks.filter(t => !t.recurrence && t.completed && (taskOnDay(t, today) || doneLateToday(t))).sort(taskTimeSort) : []
   const isEmpty = routines.length === 0 && dayTasks.length === 0 && overdueTasks.length === 0 && !(showDone && doneTasks.length)
 
   const section = (id, props, rows) => (
