@@ -47,6 +47,8 @@ export function handleAuthCallback() {
   if (callbackDone) return callbackDone
   const code = new URLSearchParams(window.location.search).get('code')
   const verifier = localStorage.getItem('spotify_verifier')
+  // Bij een TV-pairing-callback hoort de ?code= bij de projector, niet bij Dash's eigen sessie
+  if (sessionStorage.getItem('tv_pair_code')) return (callbackDone = Promise.resolve(false))
   if (!code || !verifier) return (callbackDone = Promise.resolve(false))
   window.history.replaceState({}, '', window.location.pathname)
   callbackDone = fetch('https://accounts.spotify.com/api/token', {
@@ -129,6 +131,60 @@ export async function sp(path, { method = 'GET', query, body } = {}) {
     return { ok: true, status: res.status, data }
   } catch {
     return { ok: false, status: 0, data: null, reason: 'NETWORK' }
+  }
+}
+
+// ── TV-pairing: aparte PKCE-flow voor de projector (via sessionStorage, raakt localStorage niet aan) ──
+
+/** Start een Spotify PKCE login specifiek voor TV-koppeling. Slaat verifier + code op in sessionStorage. */
+export async function tvPairLogin(pairCode) {
+  const verifier = codeVerifier()
+  sessionStorage.setItem('tv_spotify_verifier', verifier)
+  sessionStorage.setItem('tv_pair_code', pairCode)
+  const params = new URLSearchParams({
+    client_id: CLIENT_ID, response_type: 'code', redirect_uri: REDIRECT_URI, scope: SCOPES,
+    code_challenge_method: 'S256', code_challenge: await codeChallenge(verifier),
+  })
+  window.location.href = `https://accounts.spotify.com/authorize?${params}`
+}
+
+/** Na de OAuth callback: als tv_pair_code in sessionStorage staat, wissel de code in en stuur tokens naar het tv-pair endpoint. */
+export async function handleTvPairCallback() {
+  const pairCode = sessionStorage.getItem('tv_pair_code')
+  const verifier = sessionStorage.getItem('tv_spotify_verifier')
+  const code = new URLSearchParams(window.location.search).get('code')
+  if (!pairCode || !verifier || !code) return null
+
+  window.history.replaceState({}, '', window.location.pathname)
+
+  try {
+    const r = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ client_id: CLIENT_ID, grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI, code_verifier: verifier }),
+    })
+    const data = await r.json()
+    if (!data.access_token) return { ok: false, error: 'Spotify gaf geen token terug' }
+
+    // Stuur tokens naar het tv-pair endpoint (complete mag zonder WIDGET_TOKEN; de paircode is het geheim)
+    const pairResp = await fetch('/api/tv-pair', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'complete', code: pairCode,
+        tokens: { access_token: data.access_token, refresh_token: data.refresh_token, expires_in: data.expires_in || 3600 },
+      }),
+    })
+    const pairData = await pairResp.json()
+
+    // Ruim sessionStorage op
+    sessionStorage.removeItem('tv_spotify_verifier')
+    sessionStorage.removeItem('tv_pair_code')
+
+    return pairData.ok ? { ok: true } : { ok: false, error: pairData.error || 'Koppeling mislukt' }
+  } catch (e) {
+    sessionStorage.removeItem('tv_spotify_verifier')
+    sessionStorage.removeItem('tv_pair_code')
+    return { ok: false, error: 'Netwerkfout bij het koppelen' }
   }
 }
 

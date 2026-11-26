@@ -24,6 +24,9 @@ import { loadItemTypes, useItemTypes } from './hooks/useItemTypes'
 import { loadExternalEvents, loadUnseenChanges, markChangesSeen } from './utils/externalEvents'
 import { applyTheme, DEFAULT_THEME } from './utils/themeStyles'
 import { captureBankCallback } from './utils/bankCallback'
+import { captureTvPairCode, getTvPairCode, clearTvPair } from './utils/tvPairCallback'
+import { handleTvPairCallback } from './components/spotify/spotifyApi'
+import TvPairModal from './components/TvPairModal'
 import { FeedChangesToast, FeedChangesSheet } from './components/FeedChanges'
 import { VAPID_PUBLIC, urlBase64ToUint8Array } from './utils/push'
 import XPToast from './components/XPToast'
@@ -112,6 +115,8 @@ export default function App() {
   const [updateAvailable, setUpdateAvailable] = useState(false)
   const [xpToast, setXpToast] = useState(null) // { xp, icon }
   const [hasLevelUp, setHasLevelUp] = useState(() => !!localStorage.getItem('levelup_pending'))
+  const [tvPair, setTvPair] = useState(() => captureTvPairCode()) // ?tv_pair=CODE uit de URL
+  const [tvPairResult, setTvPairResult] = useState(null) // { ok, error? } na de Spotify-callback
   const [hasActiveGymWorkout, setHasActiveGymWorkout] = useState(() => !!localStorage.getItem('gym_active_workout'))
   const [hasActivePomo, setHasActivePomo] = useState(false)
   const pomo = usePomodoroState() // timer-balk bovenaan elke tab (behalve Focus zelf)
@@ -129,6 +134,18 @@ export default function App() {
     const handler = (e) => setHasActiveGymWorkout(e.detail.active)
     window.addEventListener('gymWorkoutChange', handler)
     return () => window.removeEventListener('gymWorkoutChange', handler)
+  }, [])
+
+  // TV-pairing: na de Spotify OAuth callback, als tv_pair_code in sessionStorage staat,
+  // wissel de code in en stuur tokens naar het tv-pair endpoint
+  useEffect(() => {
+    const pairCode = getTvPairCode()
+    const urlCode = new URLSearchParams(window.location.search).get('code')
+    if (!pairCode || !urlCode) return
+    // Er is een tv_pair_code EN een ?code= → dit is de Spotify callback voor TV-pairing
+    handleTvPairCallback().then(result => {
+      if (result) { setTvPair(pairCode); setTvPairResult(result) }
+    })
   }, [])
 
   // Track keyboard height via visualViewport → CSS variable --keyboard-height
@@ -1208,6 +1225,9 @@ export default function App() {
           icon={xpToast.icon}
           onDone={() => setXpToast(null)}
         />
+      )}
+      {tvPair && (
+        <TvPairModal code={tvPair} callbackResult={tvPairResult} onClose={() => { clearTvPair(); setTvPair(null); setTvPairResult(null) }} />
       )}
     </div>
   )

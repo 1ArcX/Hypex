@@ -33,6 +33,19 @@
   status = 200
   force = false
 
+# Android TV / projector: data-endpoint en Spotify-pairing
+[[redirects]]
+  from = "/api/tv"
+  to = "/.netlify/functions/tv"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/tv-pair"
+  to = "/.netlify/functions/tv-pair"
+  status = 200
+  force = true
+
 # Hypex-connector voor Claude (agenda, werkuren, taken, notities + geld): /mcp/hypex/<GELD_MCP_TOKEN>
 [[redirects]]
   from = "/mcp/hypex/*"
