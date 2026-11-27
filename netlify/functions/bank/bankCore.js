@@ -91,6 +91,66 @@ function manualBalance(acc, txs) {
 }
 
 /**
+ * Saldo zelf invullen (nieuw potje of corrigeren). booking_date heeft geen tijd, dus "alles na vandaag" zou overboekingen
+ * van vandaag die later binnenkomen missen, en "alles vanaf vandaag" telt de overboekingen die al in het ingevulde saldo
+ * zitten dubbel. Daarom: startdatum = gisteren, en de overboekingen van vandaag die we nu al kennen (`txs`, van de
+ * betaalrekening) worden in het startsaldo verrekend. Alles wat hierna binnenkomt telt mee, Van én Naar.
+ */
+function rebaseManual(acc, balance, txs, today) {
+  const d = new Date(`${today}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - 1)
+  const base_date = d.toISOString().slice(0, 10)
+  let base = Number(balance)
+  for (const t of txs || []) if (t.booking_date > base_date && matchesAccount(t, acc)) base += Number(t.amount)
+  return { base_date, base_balance: Math.round(base * 100) / 100 }
+}
+
+/**
+ * Geboekte tegenhanger van een reservering kiezen uit `cands` (geboekte transacties van dezelfde rekening die nog
+ * aan geen uitgave hangen). Zelfde teken; zelfde winkel of zelfde bedrag; geboekt 1 dag vóór t/m 7 dagen na de
+ * reservering. `strict` (reservering staat nog bij de bank): zelfde bedrag én winkel en betaaldag ±1 dag.
+ */
+function pendingCounterpart(p, cands, { strict = false, claimed = new Set() } = {}) {
+  const DAYMS = 86400000
+  const pDay = Date.parse(p.booking_date)
+  const same = (b) => normalizeCounterparty(b.counterparty) === normalizeCounterparty(p.counterparty)
+  const eq = (b) => Math.abs(Number(b.amount) - Number(p.amount)) < 0.005
+  const hits = (cands || []).filter(b => {
+    if (claimed.has(b.id) || Math.sign(Number(b.amount)) !== Math.sign(Number(p.amount))) return false
+    if (strict) {
+      // Zelfde aankoop, niet een tweede aankoop van hetzelfde bedrag: zelfde betaaldag, en zelfde tijd als beide die noemen
+      if (!eq(b) || !same(b) || paidDate(b) !== paidDate(p)) return false
+      const tb = timeOf(b), tp = timeOf(p)
+      return !tb || !tp || tb === tp
+    }
+    const diff = (Date.parse(b.booking_date) - pDay) / DAYMS
+    return diff >= -1 && diff <= 7 && (same(b) || eq(b))
+  })
+  const score = (b) => (eq(b) ? 0 : 2) + (same(b) ? 0 : 1) + Math.abs(Number(b.amount) - Number(p.amount)) / 1000
+  return hits.sort((a, b) => score(a) - score(b))[0] || null
+}
+
+const timeOf = (tx) => (String(tx.description || '').match(/Tijd:\s*(\d{1,2}:\d{2})/i) || [])[1] || null
+
+/** Soort van een bestaande uitgave terugrekenen (voor toExpense). */
+function expenseKind(e) {
+  if (e.is_income) return 'inkomen'
+  if (e.is_savings_contribution) return 'spaarstorting'
+  if (e.is_savings_withdrawal) return 'spaaropname'
+  return Number(e.amount) < 0 ? 'terugbetaling' : 'uitgave'
+}
+
+/**
+ * Reservering is geboekt: de uitgave van de reservering hoort voortaan bij de geboekte transactie (zelfde id).
+ * Bedrag en datum komen van de boeking; categorie, soort, "van spaargeld" en een zelf aangepaste omschrijving blijven.
+ */
+function carryOverPatch(exp, p, booked) {
+  const kind = expenseKind(exp)
+  const fresh = toExpense(booked, kind, exp.category, exp.user_id)
+  const auto = toExpense(p, kind, exp.category, exp.user_id).description
+  return { amount: fresh.amount, date: fresh.date, ...(exp.description === auto && fresh.description ? { description: fresh.description } : {}) }
+}
+
+/**
  * Echte betaaldatum: ING boekt pinbetalingen vaak 1–3 dagen later (buitenland, weekend). Gebruik de
  * transactiedatum van de bank, of de datum in de omschrijving ("Datum: 02-10-2026", "02-10-2026 15:56"),
  * mits die 0–10 dagen vóór de boekdatum ligt.
@@ -197,4 +257,4 @@ async function unlinkExpense(db, userId, expenseId) {
   return out
 }
 
-module.exports = { paidDate, suggest, toExpense, processTransaction, unlinkExpense, atmCounterparty, normalizeCounterparty, matchesAccount, manualBalance, isSavingsTransfer, isRepayment }
+module.exports = { paidDate, suggest, toExpense, processTransaction, unlinkExpense, atmCounterparty, normalizeCounterparty, matchesAccount, manualBalance, rebaseManual, pendingCounterpart, carryOverPatch, expenseKind, isSavingsTransfer, isRepayment }

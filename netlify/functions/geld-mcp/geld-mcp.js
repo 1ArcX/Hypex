@@ -10,7 +10,7 @@
 // carryover-reset per september 2026 en maand-aanpassingen.
 
 const { createClient } = require('@supabase/supabase-js')
-const { processTransaction, unlinkExpense, atmCounterparty, normalizeCounterparty } = require('../bank/bankCore')
+const { processTransaction, unlinkExpense, atmCounterparty, normalizeCounterparty, rebaseManual } = require('../bank/bankCore')
 const planner = require('./planner') // agenda, werkuren, taken, notities (Hypex-connector)
 const study = require('./study') // Focus (vakken, studiesessies) + Recap
 const recurring = require('./recurring') // terugkerend inkomen invullen (knop "Invullen" in Inkomsten & sparen)
@@ -389,7 +389,14 @@ async function updateSavingsAccount(uid, args) {
   if (args.balance !== undefined) {
     if (!acc.manual) throw new Error('Het saldo van een bankrekening komt van ING en kan niet worden aangepast')
     if (typeof args.balance !== 'number') throw new Error('balance moet een getal zijn')
-    Object.assign(patch, { base_balance: r2(args.balance), base_date: todayTZ(), balance: r2(args.balance), balance_at: new Date().toISOString() })
+    // Startdatum = gisteren + de overboekingen van vandaag die al binnen zijn (die zitten in het opgegeven saldo)
+    const today = todayTZ()
+    const real = (accs || []).filter(a => !a.manual).map(a => a.uid)
+    const { data: todays } = real.length
+      ? await supabase.from('bank_transactions').select('booking_date, amount, counterparty, counterparty_iban, account_uid')
+        .eq('user_id', uid).in('account_uid', real).gte('booking_date', today).not('ext_id', 'like', 'pending:%')
+      : { data: [] }
+    Object.assign(patch, { ...rebaseManual(acc, r2(args.balance), todays || [], today), balance: r2(args.balance), balance_at: new Date().toISOString() })
   }
   if (!Object.keys(patch).length) throw new Error('Geen velden om aan te passen (name, goal of balance)')
   patch.updated_at = new Date().toISOString()

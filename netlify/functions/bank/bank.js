@@ -12,7 +12,7 @@
 
 const crypto = require('crypto')
 const { createClient } = require('@supabase/supabase-js')
-const { suggest, manualBalance, toExpense, paidDate, normalizeCounterparty, atmCounterparty } = require('./bankCore')
+const { suggest, manualBalance, toExpense, paidDate, normalizeCounterparty, atmCounterparty, pendingCounterpart, carryOverPatch } = require('./bankCore')
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 const API = 'https://api.enablebanking.com'
@@ -186,29 +186,6 @@ async function syncConnection(conn, { from } = {}) {
         key = res?.continuation_key || null
       } while (key && ++pages < 40)
 
-      // Reserveringen: nieuwe meteen als uitgave (telt mee in je budget, label "Reservering"); verdwenen
-      // reserveringen worden hieronder aan de geboekte transactie gekoppeld of, als die er niet is, opgeruimd.
-      // Ook genegeerde reserveringen (uitgave verwijderd) meenemen, anders zou de sync ze opnieuw toevoegen
-      const { data: oldPending } = await supabase.from('bank_transactions').select('*').eq('account_uid', acc.uid).like('ext_id', 'pending:%')
-      const currentIds = new Set(pendingRows.map(r => r.ext_id))
-      const vanished = (oldPending || []).filter(p => !currentIds.has(p.ext_id))
-      const oldById = new Map((oldPending || []).map(p => [p.ext_id, p]))
-      for (const r of [...new Map(pendingRows.map(r => [r.ext_id, r])).values()]) {
-        const old = oldById.get(r.ext_id)
-        if (old?.expense_id || old?.status === 'ignored') continue
-        let expenseId = null
-        if (r.suggested_kind === 'uitgave' && r.amount < 0) {
-          const { data: exp, error: ee } = await supabase.from('expenses').insert(toExpense(r, 'uitgave', r.suggested_category, uid)).select('id').single()
-          if (ee) console.warn('[bank] reservering uitgave', ee.message)
-          expenseId = exp?.id || null
-        }
-        // Reserveringen van vóór deze versie staan er al zonder uitgave → alsnog koppelen
-        const { error: pe } = old
-          ? await supabase.from('bank_transactions').update({ expense_id: expenseId }).eq('id', old.id)
-          : await supabase.from('bank_transactions').insert({ ...r, expense_id: expenseId })
-        if (pe) console.warn('[bank] reservering', pe.message)
-      }
-
       // Eerder opgeslagen geldautomaat-transacties zonder tegenpartij alsnog een naam geven
       await supabase.from('bank_transactions').update({ counterparty: 'Geldautomaat (storting)' })
         .eq('account_uid', acc.uid).is('counterparty', null).ilike('description', '%geldmaat%').gt('amount', 0)
@@ -238,31 +215,9 @@ async function syncConnection(conn, { from } = {}) {
         insertedBooked = inserted || []
       }
 
-      // Verdwenen reserveringen: geboekte tegenhanger zoeken (zelfde winkel of bedrag, 0–7 dagen later) en die aan
-      // dezelfde uitgave koppelen (bedrag/datum/omschrijving bijwerken). Niets gevonden = vervallen → uitgave weg.
-      const claimed = new Set()
-      for (const p of vanished) {
-        if (p.expense_id) {
-          const pDay = Date.parse(p.booking_date)
-          const cands = insertedBooked.filter(b => !claimed.has(b.id) && b.amount < 0 && b.status === 'new'
-            && (Date.parse(b.booking_date) - pDay) / DAY >= -1 && (Date.parse(b.booking_date) - pDay) / DAY <= 7
-            && (normalizeCounterparty(b.counterparty) === normalizeCounterparty(p.counterparty) || Math.abs(b.amount - p.amount) < 0.005))
-            .sort((a, b) => Math.abs(a.amount - p.amount) - Math.abs(b.amount - p.amount))
-          const hit = cands[0]
-          if (hit) {
-            claimed.add(hit.id)
-            const fresh = toExpense(hit, 'uitgave', p.suggested_category, uid)
-            await supabase.from('expenses').update({ amount: fresh.amount, date: paidDate(hit), ...(fresh.description ? { description: fresh.description } : {}) }).eq('id', p.expense_id)
-            await supabase.from('bank_transactions').update({ status: 'added', expense_id: p.expense_id }).eq('id', hit.id)
-            hit.status = 'added'
-          } else {
-            await supabase.from('expenses').delete().eq('id', p.expense_id).eq('user_id', uid)
-          }
-        }
-        await supabase.from('bank_transactions').delete().eq('id', p.id)
-      }
-
-      await matchExisting(uid, insertedBooked.filter(r => r.status === 'new' && r.suggested_kind === 'uitgave'))
+      // Eerst reserveringen omhangen naar hun geboekte versie; wat daar niet bij hoorde mag daarna "Al ingevoerd" worden
+      const carried = await resolvePending(uid, acc, pendingRows)
+      await matchExisting(uid, insertedBooked.filter(r => r.status === 'new' && r.suggested_kind === 'uitgave' && !carried.has(r.id)))
     }
     await updateManualSavings(uid, allAccounts || [])
     await supabase.from('bank_connections').update({ status: 'active', last_synced_at: new Date().toISOString(), last_error: null, updated_at: new Date().toISOString() }).eq('id', conn.id)
@@ -273,6 +228,103 @@ async function syncConnection(conn, { from } = {}) {
     throw e
   }
 }
+
+const PENDING_KEEP_DAYS = 10 // zo lang wachten we op de geboekte versie van een verdwenen reservering
+
+/**
+ * Reserveringen (ext_id 'pending:…') bijwerken, ná het opslaan van de geboekte transacties van deze sync.
+ * - Nieuwe reservering → meteen een uitgave (telt mee in je budget, label "Reservering").
+ * - Geboekte versie gevonden → de uitgave van de reservering hangt voortaan aan de geboekte transactie (zelfde
+ *   expense-id; categorie, soort en een zelf aangepaste omschrijving blijven, bedrag/datum komen van de boeking).
+ *   Genegeerde reservering → geboekte versie ook genegeerd. Zo komt er niets terug in de inbox.
+ *   Staat de reservering dan nog bij de bank (ING toont soms beide even), dan krijgt hij status 'booked' en wordt
+ *   hij niet opnieuw toegevoegd.
+ * - Verdwenen zonder geboekte versie → PENDING_KEEP_DAYS wachten; pas daarna vervallen en gaat de uitgave weg.
+ * - Zelfde reservering met een nieuw bank-id (zelfde winkel/bedrag) neemt de oude rij met uitgave over.
+ */
+async function resolvePending(uid, acc, pendingRows) {
+  const { data: oldRows } = await supabase.from('bank_transactions').select('*').eq('account_uid', acc.uid).like('ext_id', 'pending:%')
+  const old = oldRows || []
+  const current = new Map(pendingRows.map(r => [r.ext_id, r]))
+  const known = new Set(old.map(o => o.ext_id))
+  const today = isoDate(new Date())
+  const days = (a, b) => (Date.parse(a) - Date.parse(b)) / DAY
+  // Geboekte transacties die nog nergens aan hangen (ook "added zonder uitgave": kapot, wordt zo gerepareerd)
+  const minDay = [...old.map(p => p.booking_date), ...pendingRows.map(r => r.booking_date), today].sort()[0]
+  const { data: freeRows } = await supabase.from('bank_transactions').select('*').eq('account_uid', acc.uid)
+    .not('ext_id', 'like', 'pending:%').gte('booking_date', isoDate(new Date(Date.parse(minDay) - 2 * DAY)))
+    .is('expense_id', null).in('status', ['new', 'added'])
+  const free = (freeRows || []).filter(b => b.suggested_kind !== 'intern')
+  const claimed = new Set()
+  const linked = (p) => !!p.expense_id || p.status === 'ignored'
+
+  const carry = async (p, hit) => {
+    claimed.add(hit.id)
+    const { data: exp } = p.expense_id
+      ? await supabase.from('expenses').select('*').eq('id', p.expense_id).eq('user_id', uid).maybeSingle()
+      : { data: null }
+    if (exp) {
+      await supabase.from('expenses').update(carryOverPatch(exp, p, hit)).eq('id', exp.id).eq('user_id', uid)
+      await supabase.from('bank_transactions').update({ status: 'added', expense_id: exp.id }).eq('id', hit.id)
+    } else {
+      await supabase.from('bank_transactions').update({ status: 'ignored', expense_id: null }).eq('id', hit.id)
+    }
+  }
+
+  // Eerst de verdwenen reserveringen (die zijn het meest waarschijnlijk geboekt), dan de nog zichtbare
+  for (const p of [...old].sort((a, b) => Number(current.has(a.ext_id)) - Number(current.has(b.ext_id)))) {
+    const still = current.has(p.ext_id)
+    if (p.status === 'booked') { if (!still) await supabase.from('bank_transactions').delete().eq('id', p.id); continue }
+    if (still) {
+      // Al geboekt terwijl de reservering nog zichtbaar is → nu omhangen (streng: zelfde winkel, bedrag en dag)
+      if (!linked(p)) continue
+      const hit = pendingCounterpart(p, free, { strict: true, claimed })
+      if (!hit) continue
+      await carry(p, hit)
+      await supabase.from('bank_transactions').update({ status: 'booked', expense_id: null }).eq('id', p.id)
+      continue
+    }
+    // Verdwenen bij de bank
+    if (!linked(p)) { await supabase.from('bank_transactions').delete().eq('id', p.id); continue }
+    const hit = pendingCounterpart(p, free, { claimed })
+    if (hit) { await carry(p, hit); await supabase.from('bank_transactions').delete().eq('id', p.id); continue }
+    // Zelfde reservering met een nieuw bank-id → die neemt deze rij (met uitgave) over
+    const reId = [...current.values()].find(r => !known.has(r.ext_id) && !r._taken
+      && Math.abs(Number(r.amount) - Number(p.amount)) < 0.005 && normalizeCounterparty(r.counterparty) === normalizeCounterparty(p.counterparty)
+      && Math.abs(days(r.booking_date, p.booking_date)) <= 2)
+    if (reId) {
+      reId._taken = true
+      await supabase.from('bank_transactions').update({ ext_id: reId.ext_id, booking_date: reId.booking_date, description: reId.description }).eq('id', p.id)
+      continue
+    }
+    if (days(today, p.booking_date) <= PENDING_KEEP_DAYS) continue // nog even wachten op de boeking
+    // Vervallen: uitgave weg, tenzij er toch al een geboekte transactie aan hangt
+    if (p.expense_id) {
+      const { data: users } = await supabase.from('bank_transactions').select('id').eq('expense_id', p.expense_id).not('ext_id', 'like', 'pending:%')
+      if (!(users || []).length) await supabase.from('expenses').delete().eq('id', p.expense_id).eq('user_id', uid)
+    }
+    await supabase.from('bank_transactions').delete().eq('id', p.id)
+  }
+
+  // Nieuwe reserveringen (en oude rijen van vóór de uitgave-per-reservering)
+  for (const r of current.values()) {
+    if (r._taken) continue
+    const prev = old.find(o => o.ext_id === r.ext_id)
+    if (prev && (linked(prev) || prev.status === 'booked')) continue
+    let expenseId = null
+    if (r.suggested_kind === 'uitgave' && r.amount < 0) {
+      const { data: exp, error: ee } = await supabase.from('expenses').insert(toExpense(r, 'uitgave', r.suggested_category, uid)).select('id').single()
+      if (ee) console.warn('[bank] reservering uitgave', ee.message)
+      expenseId = exp?.id || null
+    }
+    const { error: pe } = prev
+      ? await supabase.from('bank_transactions').update({ expense_id: expenseId }).eq('id', prev.id)
+      : await supabase.from('bank_transactions').insert({ ...r, expense_id: expenseId })
+    if (pe) console.warn('[bank] reservering', pe.message)
+  }
+  return claimed
+}
+
 
 // Zelf toegevoegde spaarrekeningen: saldo = startsaldo + overboekingen die op de betaalrekening te zien zijn
 async function updateManualSavings(uid, accounts) {
@@ -431,4 +483,4 @@ exports.handler = async (event) => {
   }
 }
 
-exports._internal = { jwt, mapTransaction, pickBalance, accountKind }
+exports._internal = { jwt, mapTransaction, pickBalance, accountKind, resolvePending, updateManualSavings, matchExisting }

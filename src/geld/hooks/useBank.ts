@@ -41,6 +41,14 @@ function manualBalance(a: BankAccount, txs: MatchRow[]) {
   for (const t of txs) if (a.base_date && t.booking_date > a.base_date && matchesAccount(t, a)) bal -= Number(t.amount)
   return Math.round(bal * 100) / 100
 }
+/** Zelfde als rebaseManual in bankCore.js: startdatum = gisteren, overboekingen van vandaag die we al kennen zitten in het saldo. */
+function rebaseManual(a: BankAccount, balance: number, txs: MatchRow[], today: string) {
+  const d = new Date(`${today}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - 1)
+  const base_date = d.toISOString().slice(0, 10)
+  let base = Number(balance)
+  for (const t of txs) if (t.booking_date > base_date && matchesAccount(t, a)) base += Number(t.amount)
+  return { base_date, base_balance: Math.round(base * 100) / 100 }
+}
 
 const REVIEW_KEY = 'bank_reviewed_expenses'
 const reviewedLocal = (): Set<string> => { try { return new Set(JSON.parse(localStorage.getItem(REVIEW_KEY) || '[]')) } catch { return new Set() } }
@@ -399,9 +407,17 @@ export function useBank(userId: string) {
    */
   const saveManualSavings = (input: { uid?: string; name: string; balance: number; match: string; goal?: number | null }) => run(async () => {
     const today = new Date().toLocaleDateString('en-CA')
-    const row = { name: input.name.trim() || 'Spaarrekening', kind: 'spaar', manual: true, base_balance: input.balance, base_date: today,
-      balance: input.balance, balance_at: new Date().toISOString(), match: input.match.trim() || null, goal: input.goal || null,
-      iban: /^[A-Z]{2}\d{2}[A-Z0-9]{8,}$/i.test(input.match.replace(/\s/g, '')) ? input.match.replace(/\s/g, '').toUpperCase() : null,
+    const match = input.match.trim() || null
+    const iban = /^[A-Z]{2}\d{2}[A-Z0-9]{8,}$/i.test(input.match.replace(/\s/g, '')) ? input.match.replace(/\s/g, '').toUpperCase() : null
+    // Overboekingen van vandaag die al binnen zijn, zitten in het ingevulde saldo; alles wat later komt telt mee
+    const real = accounts.filter(a => !a.manual).map(a => a.uid)
+    const { data: todays } = real.length
+      ? await supabase.from('bank_transactions').select('booking_date, amount, counterparty, counterparty_iban, account_uid')
+        .eq('user_id', userId).in('account_uid', real).gte('booking_date', today).not('ext_id', 'like', 'pending:%')
+      : { data: [] }
+    const base = rebaseManual({ match, iban } as BankAccount, input.balance, (todays || []) as MatchRow[], today)
+    const row = { name: input.name.trim() || 'Spaarrekening', kind: 'spaar', manual: true, ...base,
+      balance: input.balance, balance_at: new Date().toISOString(), match, goal: input.goal || null, iban,
       updated_at: new Date().toISOString() }
     const res = input.uid
       ? await supabase.from('bank_accounts').update(row).eq('uid', input.uid)

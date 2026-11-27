@@ -6,6 +6,15 @@
 
 export const RELEASES = [
   {
+    id: 54,
+    date: '2026-11-27',
+    title: 'ING: spaarpotjes en reserveringen kloppen',
+    items: [
+      { area: 'geld', text: "Spaarpotjes tellen nu ook de overboekingen mee van de dag waarop je het saldo invulde of aanpaste. Van de spaarrekening trekt af, naar de spaarrekening telt op. Overboekingen die er bij het invullen al waren, worden niet dubbel geteld." },
+      { area: 'geld', text: "Wordt een reservering definitief geboekt, dan blijft je uitgave gewoon staan, met dezelfde categorie en je eigen omschrijving. Er komt geen tweede uitgave bij en de boeking komt niet terug in de inbox, ook niet bij terugbetalingen of genegeerde reserveringen. Een reservering die verdwijnt wordt pas na 10 dagen zonder boeking opgeruimd." },
+    ],
+  },
+  {
     id: 53,
     date: '2026-11-25',
     title: 'Te laat afvinken: taak blijft op zijn dag',
